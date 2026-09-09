@@ -98,6 +98,105 @@ function Stat({
   );
 }
 
+/**
+ * The screen once a pick is in.
+ *
+ * It replaces the board rather than sitting above it, because the decision is
+ * made and a list of alternatives is now noise. The one way back is the button.
+ * What it must show is what Jack asked for: the game he is actually in, the
+ * plan built on having spent this team, and a way to change his mind. The
+ * public-picks box stays where it is, outside this component, because that is
+ * filled in after the week and has nothing to do with the pick.
+ */
+function TakenPick({
+  taken,
+  report,
+  working,
+  onChange,
+}: {
+  taken: Candidate;
+  report: SurvivorReport;
+  working: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-b from-emerald-50/70 to-white p-5 dark:border-emerald-600/70 dark:from-emerald-950/25 dark:to-zinc-900 lg:p-6">
+      <div className="flex items-center gap-2">
+        <Check size={14} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+          Your pick, week {report.week}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4">
+        <Logo abbr={taken.team} size={48} />
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            {taken.team} <span className="text-zinc-400 dark:text-zinc-500">over</span>{" "}
+            {taken.opponent}
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {taken.home ? "Home" : "Away"} &middot; {kickoffLabel(taken.kickoff)}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={working}
+          onClick={onChange}
+          className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600"
+        >
+          <RotateCcw size={15} aria-hidden />
+          Change pick
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 border-t border-emerald-200/70 pt-4 sm:grid-cols-4 dark:border-emerald-900/50">
+        <Stat label="Win" value={pct(taken.winProb)} tone="good" />
+        <Stat
+          label="Field on it"
+          value={pct(taken.ownership)}
+          hint="Share of the field on this team, so the share that survives with you."
+        />
+        <Stat
+          label="Equity"
+          value={`${taken.equityMultiplier.toFixed(2)}x`}
+          tone={taken.equityMultiplier >= 1 ? "good" : "bad"}
+          hint="Above 1.00 gains ground on the field, below loses it."
+        />
+        <Stat
+          label="Future cost"
+          value={taken.futureCost.toFixed(3)}
+          tone={taken.futureCost > 0.05 ? "bad" : "default"}
+          hint="Discounted log-survival given up by burning this team now."
+        />
+      </div>
+
+      {report.myPickNote && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+          {report.myPickNote}
+        </p>
+      )}
+
+      {taken.flags.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {taken.flags.map((f, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span
+                className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${FLAG_TINT[f.severity]}`}
+              >
+                {FLAG_LABEL[f.kind]}
+              </span>
+              <span className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+                {f.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function SurvivorTool({ report }: { report: SurvivorReport }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -110,6 +209,9 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
 
   const { pool } = report;
   const usedSet = useMemo(() => new Set(pool.usedTeams), [pool.usedTeams]);
+  const taken = report.myPick
+    ? (report.candidates.find((c) => c.team === report.myPick) ?? null)
+    : null;
 
   async function patch(body: Record<string, unknown>) {
     setBusy(true);
@@ -128,7 +230,24 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
 
   const working = busy || pending;
 
-  function togglePick(team: string) {
+  /**
+   * Take a team for THIS week.
+   *
+   * Writes myPicks, not usedTeams. Writing usedTeams was the bug: it means
+   * burned, so the engine dropped the team from the board and the pick
+   * disappeared instead of becoming the answer. A pick burns itself once the
+   * week has passed, derived in the engine.
+   */
+  function takePick(team: string) {
+    void patch({ myPicks: { ...report.pool.myPicks, [String(report.week)]: team } });
+  }
+
+  function clearPick() {
+    void patch({ myPicks: { ...report.pool.myPicks, [String(report.week)]: "" } });
+  }
+
+  /** Burn or un-burn a team by hand, for weeks the tool did not see. */
+  function toggleBurned(team: string) {
     const next = new Set(usedSet);
     if (next.has(team)) next.delete(team);
     else next.add(team);
@@ -242,8 +361,13 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
         />
       )}
 
+      {/* Once a pick is in, it replaces the board. One way back, the button. */}
+      {taken && (
+        <TakenPick taken={taken} report={report} working={working} onChange={clearPick} />
+      )}
+
       {/* The pick */}
-      {best ? (
+      {taken ? null : best ? (
         <section className="grid gap-4 lg:grid-cols-3">
           <article className="flex flex-col gap-5 rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50/70 to-white p-5 dark:border-amber-600/70 dark:from-amber-950/25 dark:to-zinc-900 lg:col-span-2 lg:p-6">
             <div className="flex items-center gap-2">
@@ -323,7 +447,7 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
             <button
               type="button"
               disabled={working}
-              onClick={() => togglePick(best.team)}
+              onClick={() => takePick(best.team)}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"
             >
               <Check size={16} aria-hidden />
@@ -362,7 +486,7 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
                 <button
                   type="button"
                   disabled={working}
-                  onClick={() => togglePick(safest.team)}
+                  onClick={() => takePick(safest.team)}
                   className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-700"
                 >
                   I took {safest.team} instead
@@ -582,8 +706,8 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
         </div>
       </section>
 
-      {/* The board */}
-      {rest.length > 0 && (
+      {/* The board, hidden once the decision is made. */}
+      {!taken && rest.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -605,7 +729,7 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
                 rank={i + 2}
                 candidate={c}
                 disabled={working}
-                onTake={() => togglePick(c.team)}
+                onTake={() => takePick(c.team)}
               />
             ))}
           </ul>
@@ -684,7 +808,7 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
                 <button
                   type="button"
                   disabled={working}
-                  onClick={() => togglePick(t.abbr)}
+                  onClick={() => toggleBurned(t.abbr)}
                   aria-pressed={isUsed}
                   className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 ${
                     isUsed

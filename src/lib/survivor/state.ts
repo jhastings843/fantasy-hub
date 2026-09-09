@@ -36,6 +36,13 @@ export async function savePool(
   const next: PoolConfig = { ...current, ...patch };
   next.usedTeams = [...new Set(next.usedTeams)];
   next.weeklyPicks = next.weeklyPicks ?? {};
+  // Upper-cased and de-blanked, so clearing a pick is sending "" rather than
+  // needing a second endpoint.
+  next.myPicks = Object.fromEntries(
+    Object.entries(next.myPicks ?? {})
+      .map(([w, team]) => [w, String(team ?? "").trim().toUpperCase()])
+      .filter(([, team]) => team.length > 0),
+  );
   next.poolSize = Math.max(1, Math.round(next.poolSize));
   next.horizon = Math.min(12, Math.max(1, Math.round(next.horizon)));
   if (next.entriesAlive !== null) {

@@ -111,6 +111,19 @@ export interface PoolConfig {
   /** Teams already burned, canonical abbrs. */
   usedTeams: string[];
   /**
+   * What YOU picked, week -> abbr. Distinct from both fields around it.
+   *
+   * usedTeams means burned and unpickable, and weeklyPicks is what the POOL
+   * did. Neither is "my pick for this week", and until 2026-09-10 there was no
+   * field that was: taking a team wrote it into usedTeams, so the engine
+   * dropped it from the board and the pick vanished instead of becoming the
+   * answer.
+   *
+   * A pick for a week earlier than the current one is burned, derived rather
+   * than copied, so a week rolls over on its own with no migration and no job.
+   */
+  myPicks: Record<string, string>;
+  /**
    * What the pool ACTUALLY picked, week -> abbr -> percent. Only visible after
    * a week ends, so this is a record of the past rather than an input to the
    * present. It does two jobs: it fits how far the pool leans off the public,
@@ -129,6 +142,7 @@ export const DEFAULT_POOL: PoolConfig = {
   canRebuy: false,
   tieAdvances: false,
   usedTeams: [],
+  myPicks: {},
   weeklyPicks: {},
   horizon: 8,
 };
@@ -159,6 +173,16 @@ export interface SurvivorReport {
   /** The pick the engine would make, and why in one sentence. */
   headline: string;
   reasoning: string[];
+  /** The team you have taken this week, when you have taken one. */
+  myPick: string | null;
+  /**
+   * What taking it cost against the engine's pick, or null when there is
+   * nothing to say: it agrees, or the two are inside the tie band anyway.
+   *
+   * Stated once and never repeated. An overruled engine is a normal thing on a
+   * survivor board and a tool that argues every time is a tool you stop reading.
+   */
+  myPickNote: string | null;
   /** Highest equity. Always candidates[0], named so the UI cannot mislabel it. */
   bestTeam: string | null;
   /**

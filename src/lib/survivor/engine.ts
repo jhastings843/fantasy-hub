@@ -236,7 +236,14 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     field.weeksLogged > 0
       ? field.entriesAlive
       : (pool.entriesAlive ?? pool.poolSize);
+  // Burned is the manual list plus every pick from a week already gone. Derived
+  // rather than copied into usedTeams, so a week rolls over on its own and this
+  // week's pick is still on the board where its own data can be shown.
   const used = new Set(pool.usedTeams);
+  for (const [w, team] of Object.entries(pool.myPicks ?? {})) {
+    if (Number(w) < week && team) used.add(team);
+  }
+  const myPick = (pool.myPicks ?? {})[String(week)] ?? null;
 
   // Weeks that are done but not yet logged. Only count a week as loggable once
   // its results are actually in, or the field maths cannot use it anyway.
@@ -317,12 +324,24 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   const best = candidates[0] ?? null;
   const safest = [...candidates].sort((a, b) => b.winProb - a.winProb)[0] ?? null;
 
-  const plan = best
+  // The plan is built around what you have ACTUALLY taken, not around what was
+  // recommended. Once JAX is yours the rest of the season has to be solved
+  // without JAX, whether or not the engine would have picked it. Anchoring on
+  // `best` here would have shown a plan that quietly assumed a different week 1.
+  const taken = myPick ? (candidates.find((c) => c.team === myPick) ?? null) : null;
+  const anchor = taken ?? best;
+  const plan = anchor
     ? [
-        { week, team: best.team, opponent: best.opponent, home: best.home, winProb: best.winProb },
+        {
+          week,
+          team: anchor.team,
+          opponent: anchor.opponent,
+          home: anchor.home,
+          winProb: anchor.winProb,
+        },
         ...planFuture(
           futureWeeks,
-          availableTeams.filter((t) => t !== best.team),
+          availableTeams.filter((t) => t !== anchor.team),
           games,
         ).plan,
       ]
@@ -443,6 +462,17 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   const tied = tiedWithBest(candidates, calibration.confidence);
   const tieSentence = tieNote(tied, calibration.confidence);
 
+  // Said once, if it is worth saying at all. Silent when the pick is the
+  // engine's own, and silent when the two are inside the tie band, because
+  // "you picked the other coin" is not information.
+  const tiedTeams = new Set(tied.map((c) => c.team));
+  const myPickNote =
+    taken && best && taken.team !== best.team && !tiedTeams.has(taken.team)
+      ? `You took ${taken.team} over ${best.team}. That is ${pct(
+          Math.max(0, best.winProb - taken.winProb),
+        )} less likely to win and ${taken.equityMultiplier.toFixed(2)}x equity against ${best.equityMultiplier.toFixed(2)}x.`
+      : null;
+
   return {
     season,
     week,
@@ -451,16 +481,23 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     pool,
     entriesAlive,
     candidates,
-    headline: best
-      ? tied.length > 1
-        ? `Week ${week}: ${tied.map((c) => c.team).join(" or ")}, effectively tied`
-        : `Week ${week}: ${best.team} over ${best.opponent}`
-      : `Week ${week}: nothing legal left on the board`,
+    // Once a pick is taken it IS the headline. The Thursday email reads this
+    // field, and telling Jack what to pick on a week he has already picked is
+    // the same bug the page had, arriving by mail.
+    headline: taken
+      ? `Week ${week}: you have ${taken.team} over ${taken.opponent}`
+      : best
+        ? tied.length > 1
+          ? `Week ${week}: ${tied.map((c) => c.team).join(" or ")}, effectively tied`
+          : `Week ${week}: ${best.team} over ${best.opponent}`
+        : `Week ${week}: nothing legal left on the board`,
     // The tie goes FIRST when there is one. It changes how every sentence after
     // it should be read, and a reader who stops after one line has then read the
     // most important thing rather than the least.
     reasoning: tieSentence ? [tieSentence, ...reasoning] : reasoning,
     tied: tied.map((c) => c.team),
+    myPick,
+    myPickNote,
     bestTeam: best?.team ?? null,
     safestTeam: safest?.team ?? null,
     safetyGiveUp: best && safest ? Math.max(0, safest.winProb - best.winProb) : 0,

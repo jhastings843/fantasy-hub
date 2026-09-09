@@ -31,6 +31,8 @@ const patchSchema = z.object({
   canRebuy: z.boolean().optional(),
   tieAdvances: z.boolean().optional(),
   usedTeams: z.array(z.string().max(4)).max(32).optional(),
+  // An empty string clears that week's pick, which savePool strips.
+  myPicks: z.record(z.string(), z.string().max(4)).optional(),
   horizon: z.number().int().min(1).max(12).optional(),
   weeklyPicks: z
     .record(z.string(), z.record(z.string(), z.number().min(0).max(100)))
