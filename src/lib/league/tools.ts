@@ -29,6 +29,11 @@ export const TOOLS: ToolDef[] = [
   // and the money never comes back, so the weekly bid decision earns its own
   // tool there and means nothing anywhere else.
   { key: "faab", label: "FAAB", segment: "faab", types: ["guillotine"] },
+  // The same question in the formats where the money comes back and a bad claim
+  // is recoverable, which is why it is a different tool rather than the FAAB tab
+  // widened. The guillotine page is about surviving the week; this one is about
+  // whether a player is worth a roster spot at all.
+  { key: "waivers", label: "Waivers", segment: "waivers", types: ["dynasty", "redraft"] },
   { key: "players", label: "Players", segment: "players", types: ALL },
 ];
 
