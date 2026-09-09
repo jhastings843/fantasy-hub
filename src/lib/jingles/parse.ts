@@ -15,6 +15,8 @@
 
 export type PostKind =
   | "rankings"
+  /** His weekly list: one section per position plus a FLEX 150. */
+  | "weekly_rankings"
   | "targets_fades"
   | "deep_dive"
   | "betting"
@@ -127,6 +129,11 @@ export function detectScoring(title: string, body = ""): Scoring {
 
 export function classifyPost(title: string, body = ""): PostKind {
   const t = title.toLowerCase();
+  // Checked BEFORE the generic rankings branch, which would otherwise swallow
+  // it: "2026 Week 1 Fantasy Football Rankings" contains "rankings". They are
+  // different documents with different row shapes and different lifetimes, and
+  // they must never share a store. See weekly.ts.
+  if (/\bweek\s+\d+\b/.test(t) && /\brankings?\b/.test(t)) return "weekly_rankings";
   if (/\blab\s*\d{2,3}\b|\brankings?\b|\btiers?\b/.test(t)) return "rankings";
   if (/\bbet|odds|picks?\b|\bpreview\b|\bpredictions?\b|spread|parlay|units?\b/.test(t)) {
     return "betting";

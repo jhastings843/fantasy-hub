@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bestLineup, marginalValue, startingSlots, weakestSlots } from "./lineup";
-import type { LineupPlayer } from "./lineup";
+import { bestLineup, marginalValue, startingSlots, weakestSlots } from "./solve";
+import type { LineupPlayer } from "./solve";
 
 // Dah Chopped's real roster shape: eight starters, two flexes, no K, no DST.
 const CHOPPED_ROSTER = [

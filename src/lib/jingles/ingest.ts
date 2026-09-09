@@ -4,6 +4,7 @@ import { getAllPlayers } from "@/lib/sleeper/client";
 import { fetchPosts, type JinglesPost } from "./feed";
 import { inboxConfigured } from "./inbox";
 import { parseMentions, parsePlays, parseRankings, type Scoring } from "./parse";
+import { parseWeekly } from "./weekly";
 import { resolveNames, toCandidates } from "./resolve";
 
 // Turning his posts into something the app can use.
@@ -19,6 +20,12 @@ import { resolveNames, toCandidates } from "./resolve";
 
 const KEY = {
   rankings: (scoring: Scoring) => `jingles:v1:rankings:${scoring}`,
+  // Deliberately its own namespace. The weekly list and the Lab 300 are
+  // different documents with different shapes and different lifetimes, and a
+  // week of rankings landing on top of the season list would silently degrade
+  // the draft board, scout, trade and plan tabs, which all read that key.
+  weekly: (season: string, week: number) => `jingles:v1:weekly:${season}:w${week}`,
+  weeklyLatest: () => `jingles:v1:weekly:latest`,
   previous: (scoring: Scoring) => `jingles:v1:rankings:${scoring}:previous`,
   notes: () => `jingles:v1:notes`,
   seen: () => `jingles:v1:seen`,
@@ -51,6 +58,35 @@ export interface StoredRankings {
   unresolved: { name: string; position: string; team: string | null; reason: string }[];
 }
 
+export interface StoredWeeklyEntry {
+  /** Rank within its own list: the position list, or the FLEX 150. */
+  rank: number;
+  sleeperId: string | null;
+  name: string;
+  position: string;
+  team: string;
+  opponent: string;
+  home: boolean;
+}
+
+export interface StoredWeekly {
+  season: string;
+  week: number;
+  scoring: Scoring;
+  title: string;
+  url: string;
+  postedAt: string;
+  /** His own "Last Updated" line. The field that decides whether a re-read is new. */
+  updatedLabel: string | null;
+  ingestedAt: string;
+  source: "feed" | "inbox";
+  /** QB, RB, WR, TE, DEF, K. */
+  positional: Record<string, StoredWeeklyEntry[]>;
+  /** RB, WR and TE only. He publishes no quarterbacks in this list. */
+  flex: StoredWeeklyEntry[];
+  unresolved: { name: string; position: string; team: string | null; reason: string }[];
+}
+
 export interface StoredNote {
   sleeperId: string;
   name: string;
@@ -70,6 +106,15 @@ export interface IngestReport {
   postsSeen: number;
   postsNew: number;
   rankingsIngested: { scoring: Scoring; count: number; unresolved: number; title: string }[];
+  weeklyIngested: {
+    season: string;
+    week: number;
+    scoring: Scoring;
+    rows: number;
+    unresolved: number;
+    updatedLabel: string | null;
+    changed: boolean;
+  }[];
   notesIngested: number;
   bettingPostsSeen: number;
   skipped: { title: string; reason: string }[];
@@ -97,6 +142,33 @@ async function writeSeen(ids: Set<string>): Promise<void> {
 export async function readRankings(scoring: Scoring): Promise<StoredRankings | null> {
   try {
     return (await redis.get<StoredRankings>(KEY.rankings(scoring))) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** His weekly list for one week, or null if that week was never read. */
+export async function readWeekly(season: string, week: number): Promise<StoredWeekly | null> {
+  try {
+    return (await redis.get<StoredWeekly>(KEY.weekly(season, week))) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The most recent weekly list, whichever week that is.
+ *
+ * A pointer rather than a scan, because there is no key listing on this client
+ * and guessing the current week from the calendar gets bye weeks and a shifting
+ * Tuesday-to-Thursday publication window wrong. What was stored last is what he
+ * published last.
+ */
+export async function latestWeekly(): Promise<StoredWeekly | null> {
+  try {
+    const at = await redis.get<{ season: string; week: number }>(KEY.weeklyLatest());
+    if (!at) return null;
+    return await readWeekly(at.season, at.week);
   } catch {
     return null;
   }
@@ -221,6 +293,144 @@ async function ingestRankings(
   });
 }
 
+/**
+ * Fold his weekly list into the store.
+ *
+ * Three things make this different from ingestRankings, and each one is a bug
+ * that would otherwise have been silent:
+ *
+ * 1. It parses with parseWeekly, because parseRankings returns ZERO rows on the
+ *    real post. The row shapes differ.
+ * 2. It writes to its own key. The Lab 300 is never touched.
+ * 3. It stores only when his "Last Updated" line has changed. He edits this
+ *    post all week as injury news lands, so a re-read that finds the same stamp
+ *    is a no-op rather than a rewrite.
+ */
+async function ingestWeekly(post: JinglesPost, report: IngestReport): Promise<void> {
+  const parsed = parseWeekly(post.html, post.title);
+
+  if (parsed.week === null || parsed.season === null) {
+    report.skipped.push({
+      title: post.title,
+      reason: "could not tell which week this list is for, so it is not safe to file",
+    });
+    return;
+  }
+
+  const rows = [...Object.values(parsed.positional).flat(), ...parsed.flex];
+  if (rows.length === 0) {
+    report.skipped.push({
+      title: post.title,
+      reason: "read as a weekly list but no rows came out of it, so the post shape has changed",
+    });
+    return;
+  }
+
+  const gaps = Object.entries(parsed.missingRanks);
+  if (gaps.length > 0) {
+    // Reported, not refused. A weekly list with one missing rank is still worth
+    // far more than no list, and the alternative is going quiet on a Thursday
+    // morning over a typo of his.
+    report.skipped.push({
+      title: post.title,
+      reason: `stored, but with gaps: ${gaps
+        .map(([pos, ranks]) => `${pos} is missing ${ranks.length}`)
+        .join(", ")}`,
+    });
+  }
+
+  const existing = await readWeekly(parsed.season, parsed.week);
+  const changed = !existing || existing.updatedLabel !== parsed.updatedLabel;
+  if (!changed) {
+    report.weeklyIngested.push({
+      season: parsed.season,
+      week: parsed.week,
+      scoring: parsed.scoring,
+      rows: rows.length,
+      unresolved: existing.unresolved.length,
+      updatedLabel: parsed.updatedLabel,
+      changed: false,
+    });
+    return;
+  }
+
+  const players = await getAllPlayers();
+  const candidates = toCandidates(players);
+  const { resolved, unresolved, ambiguous } = resolveNames(rows, candidates);
+
+  // One id per name, reused across both lists, so a player who appears in his
+  // RB list and his FLEX 150 resolves once and cannot end up with two ids.
+  const idFor = new Map<string, string>();
+  const keyOf = (r: { name: string; position: string; team: string }) =>
+    `${r.name}|${r.position}|${r.team}`;
+  for (const { input, playerId } of resolved) idFor.set(keyOf(input), playerId);
+
+  const store = (r: (typeof rows)[number]): StoredWeeklyEntry => ({
+    rank: r.rank,
+    sleeperId: idFor.get(keyOf(r)) ?? null,
+    name: r.name,
+    position: r.position,
+    team: r.team,
+    opponent: r.opponent,
+    home: r.home,
+  });
+
+  const stored: StoredWeekly = {
+    season: parsed.season,
+    week: parsed.week,
+    scoring: parsed.scoring,
+    title: post.title,
+    url: post.url,
+    postedAt: post.postedAt,
+    updatedLabel: parsed.updatedLabel,
+    ingestedAt: new Date().toISOString(),
+    source: post.source,
+    positional: Object.fromEntries(
+      Object.entries(parsed.positional).map(([pos, list]) => [pos, list.map(store)]),
+    ),
+    flex: parsed.flex.map(store),
+    unresolved: [
+      ...unresolved.map((u) => ({
+        name: u.name,
+        position: u.position,
+        team: u.team,
+        reason: "no Sleeper player matched",
+      })),
+      ...ambiguous.map((a) => ({
+        name: a.input.name,
+        position: a.input.position,
+        team: a.input.team,
+        reason: `matched ${a.candidates.length} players: ${a.candidates.join(", ")}`,
+      })),
+    ],
+  };
+
+  try {
+    await redis.set(KEY.weekly(parsed.season, parsed.week), stored, { ex: TTL });
+    await redis.set(
+      KEY.weeklyLatest(),
+      { season: parsed.season, week: parsed.week },
+      { ex: TTL },
+    );
+  } catch (e) {
+    report.skipped.push({
+      title: post.title,
+      reason: `parsed fine but could not be stored: ${e instanceof Error ? e.message : e}`,
+    });
+    return;
+  }
+
+  report.weeklyIngested.push({
+    season: parsed.season,
+    week: parsed.week,
+    scoring: parsed.scoring,
+    rows: rows.length,
+    unresolved: stored.unresolved.length,
+    updatedLabel: parsed.updatedLabel,
+    changed: true,
+  });
+}
+
 async function ingestNotes(post: JinglesPost, report: IngestReport): Promise<void> {
   const players = await getAllPlayers();
   const candidates = toCandidates(players);
@@ -288,6 +498,7 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
     postsSeen: 0,
     postsNew: 0,
     rankingsIngested: [],
+    weeklyIngested: [],
     notesIngested: 0,
     bettingPostsSeen: 0,
     skipped: [],
@@ -299,7 +510,14 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
   const seen = await readSeen();
 
   for (const post of posts) {
-    if (!options.force && seen.has(post.id)) continue;
+    // A weekly post is never "seen" for good. He edits it in place all week as
+    // injury news and practice reports land, and its own body says so:
+    // "Updated live throughout the week". Marking it seen on Monday would mean
+    // advising off Monday's ranks on Sunday morning, which is the failure this
+    // whole feature exists to avoid. It is cheap to re-read: the store is only
+    // written when his Last Updated line has actually moved.
+    const rereadAlways = post.kind === "weekly_rankings";
+    if (!options.force && !rereadAlways && seen.has(post.id)) continue;
     report.postsNew++;
 
     if (post.truncated) {
@@ -322,6 +540,9 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
     switch (post.kind) {
       case "rankings":
         await ingestRankings(post, report);
+        break;
+      case "weekly_rankings":
+        await ingestWeekly(post, report);
         break;
       case "targets_fades":
       case "deep_dive":

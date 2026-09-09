@@ -3,6 +3,7 @@ import { getUser } from "@/lib/sleeper/client";
 import { getRosterGrades } from "@/lib/rosteraudit/client";
 import { recordGradeSnapshot, snapshotDate } from "@/lib/history/grades";
 import { ingestJingles } from "@/lib/jingles/ingest";
+import { runThursdayEmail } from "@/lib/thursday/run";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,22 @@ export async function GET(request: Request) {
       jingles = { error: e instanceof Error ? e.message : String(e) };
     }
 
-    return Response.json({ ok: true, date: snapshotDate(), results, jingles });
+    // The Thursday email rides along for the same reason, and it must run AFTER
+    // the ingest above: the lineups it sends are read from whatever his weekly
+    // list says right now, and he edits that post through the week. Ingest
+    // first, then advise, or Thursday's email quotes Monday's ranks.
+    //
+    // It decides for itself whether today is Thursday and whether this week has
+    // already gone out, so calling it daily is correct rather than merely safe.
+    let thursday: unknown;
+    try {
+      const res = await runThursdayEmail();
+      thursday = await res.json();
+    } catch (e) {
+      thursday = { error: e instanceof Error ? e.message : String(e) };
+    }
+
+    return Response.json({ ok: true, date: snapshotDate(), results, jingles, thursday });
   } catch (e) {
     return Response.json(
       { ok: false, error: e instanceof Error ? e.message : String(e) },
