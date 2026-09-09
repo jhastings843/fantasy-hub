@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 //   ?dry=1     render and return the HTML without sending
 //   ?force=1   ignore the day gate
 //   ?resend=1  send again even though this week already went out
+//   ?test=1    mark the subject [Test], for looking at a change
 
 /** jackhastings00@gmail.com becomes ja***@gmail.com. */
 function maskAddress(value: string | null): string {
@@ -59,5 +60,6 @@ export async function GET(request: Request) {
     force: params.get("force") === "1",
     dry: params.get("dry") === "1",
     resend: params.get("resend") === "1",
+    test: params.get("test") === "1",
   });
 }

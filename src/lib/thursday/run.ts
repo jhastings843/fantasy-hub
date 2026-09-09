@@ -41,8 +41,17 @@ export async function runThursdayEmail(options: {
   force?: boolean;
   dry?: boolean;
   resend?: boolean;
+  /**
+   * Marks the subject so a preview is distinguishable in the inbox.
+   *
+   * Worth having rather than sending an identical subject twice: the send log
+   * makes a real week unrepeatable, so every look at a change to this email is
+   * a resend of a week that already went out, and three lines reading "Week 1:
+   * LAC over ARI" with different contents is the confusing outcome.
+   */
+  test?: boolean;
 } = {}): Promise<Response> {
-  const { force = false, dry = false, resend = false } = options;
+  const { force = false, dry = false, resend = false, test = false } = options;
 
   const sendDay = configuredSendDay();
   const today = dayInNewYork(new Date());
@@ -86,7 +95,7 @@ export async function runThursdayEmail(options: {
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app",
   };
 
-  const subject = thursdaySubject(input);
+  const subject = `${test ? "[Test] " : ""}${thursdaySubject(input)}`;
   const html = renderThursdayEmail(input);
 
   if (dry) {
