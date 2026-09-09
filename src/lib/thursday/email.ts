@@ -134,6 +134,29 @@ function survivorBlock(input: ThursdayInput): string {
     )
     .join("");
 
+  // The two teams it was chosen over, and why each lost.
+  //
+  // "LAC wins 80.4% of the time" is a fact about LAC, not a reason to pick it.
+  // The reason is always comparative: the alternatives are either less likely
+  // to win, more heavily owned, or needed in a later week. Without them the
+  // pick is an assertion.
+  const runnersUp = survivor.candidates
+    .filter((c) => c.team !== survivor.bestTeam)
+    .slice(0, 2)
+    .map((c, i) => {
+      const bits = [`${pct(c.winProb)} win`, `${pct(c.ownership)} owned`];
+      if (c.futureCost > 0 && c.bestFutureWeek) {
+        bits.push(`wanted in week ${c.bestFutureWeek}`);
+      }
+      return `<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:${i === 0 ? 6 : 3}px;">
+  <span style="font-weight:600;color:${PALETTE.ink};">${i + 2}. ${escapeHtml(c.team)}</span>
+  <span style="color:${PALETTE.muted};"> over ${escapeHtml(c.opponent)}</span>
+  &middot; ${escapeHtml(bits.join(", "))}
+  &middot; ${escapeHtml(equityLine(c, best))}
+</div>`;
+    })
+    .join("");
+
   const plan = survivor.plan
     .slice(1, 4)
     .map((p) => `W${p.week} ${escapeHtml(p.team)}`)
@@ -144,8 +167,26 @@ function survivorBlock(input: ThursdayInput): string {
 <div style="font:700 22px/1.25 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${PALETTE.ink};letter-spacing:-.01em;">${escapeHtml(survivor.headline)}</div>
 ${stats}
 ${why}
+${runnersUp ? `<div style="padding-top:12px;margin-top:12px;border-top:1px solid ${PALETTE.hairline};">${label("What it beat")}${runnersUp}</div>` : ""}
 ${plan ? `<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:12px;border-top:1px solid ${PALETTE.hairline};margin-top:12px;">Then: ${plan}</div>` : ""}`,
   );
+}
+
+/** Why this candidate lost to the pick, in one clause. */
+function equityLine(
+  c: SurvivorReport["candidates"][number],
+  best: SurvivorReport["candidates"][number] | undefined,
+): string {
+  if (!best) return `${c.equityMultiplier.toFixed(2)}x equity`;
+  if (c.winProb < best.winProb - 0.005) {
+    const gap = (best.winProb - c.winProb) * 100;
+    return `${gap.toFixed(1)} points less likely to win`;
+  }
+  if (c.equityMultiplier < best.equityMultiplier) {
+    return `${c.equityMultiplier.toFixed(2)}x equity against ${best.equityMultiplier.toFixed(2)}x`;
+  }
+  if (c.futureCost > 0) return "worth more in a later week";
+  return `${c.equityMultiplier.toFixed(2)}x equity`;
 }
 
 function statCell(name: string, value: string): string {
@@ -187,11 +228,24 @@ function leagueBlock(league: WeeklyLineups["leagues"][number]): string {
     ? `<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.warn};padding-top:4px;">No second quarterback available, so superflex is taking a flex player.</div>`
     : "";
 
+  // Said out loud, because the adjustment is not decoration. The lineup sorts
+  // by the adjusted rank where there is one, so a number this app computed can
+  // override the order he published, and Jack should never have to guess which
+  // of the two picked a starter.
+  const ours = league.advice.adjustmentDecided
+    .map(
+      (d) =>
+        `<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:4px;">
+  <span style="font-weight:600;">${escapeHtml(d.started.name)}</span> starts at ${escapeHtml(d.slot)} on our adjustment, not his ranking. He has him at FLEX ${escapeHtml(String(d.started.flexRank ?? "?"))}, and full PPR here moves him to ${escapeHtml(String(d.started.adjustedFlexRank ?? "?"))}${d.insteadOf ? `, ahead of ${escapeHtml(d.insteadOf.name)}` : ""}.
+</div>`,
+    )
+    .join("");
+
   if (league.advice.changes.length === 0) {
     return card(
       `${head}
 <div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:8px;">Nothing to change.</div>
-${problems}${superflex}`,
+${problems}${superflex}${ours}`,
       { bg: PALETTE.goodBg, border: PALETTE.goodBorder },
     );
   }
@@ -199,7 +253,7 @@ ${problems}${superflex}`,
   return card(
     `${head}
 <div style="padding-top:6px;">${league.advice.changes.map(changeRow).join("")}</div>
-${problems}${superflex}`,
+${problems}${superflex}${ours}`,
   );
 }
 

@@ -33,6 +33,28 @@ const SLOTS = {
   ],
 };
 
+// Deep enough that the flex slots are a real choice. An earlier version of
+// this fixture had exactly as many players as slots, so every "recommendation"
+// was the only legal option and the tests proved nothing.
+const roster = [
+  player({ playerId: "qb1", position: "QB", positionalRank: 3 }),
+  player({ playerId: "qb2", position: "QB", positionalRank: 14 }),
+  player({ playerId: "rb1", position: "RB", positionalRank: 2, flexRank: 2 }),
+  player({ playerId: "rb2", position: "RB", positionalRank: 20, flexRank: 40 }),
+  player({ playerId: "rb4", position: "RB", positionalRank: 30, flexRank: 75 }),
+  player({ playerId: "rb3", position: "RB", positionalRank: 45, flexRank: 120 }),
+  player({ playerId: "wr1", position: "WR", positionalRank: 5, flexRank: 8 }),
+  player({ playerId: "wr2", position: "WR", positionalRank: 30, flexRank: 60 }),
+  player({ playerId: "wr4", position: "WR", positionalRank: 45, flexRank: 100 }),
+  player({ playerId: "wr3", position: "WR", positionalRank: 70, flexRank: 140 }),
+  player({ playerId: "te1", position: "TE", positionalRank: 4, flexRank: 30 }),
+  player({ playerId: "te2", position: "TE", positionalRank: 20, flexRank: 135 }),
+  player({ playerId: "def1", position: "DEF", positionalRank: 6 }),
+];
+
+/** The lineup the advisor recommends for Dah Chopped's slots. */
+const OPTIMAL_CHOPPED = ["qb1", "rb1", "rb2", "wr1", "wr2", "te1", "rb4", "wr4"];
+
 describe("scoreOf", () => {
   it("puts a flex-ranked player above one he only ranked in a position list", () => {
     const flexed = player({ playerId: "a", position: "RB", flexRank: 150, positionalRank: 60 });
@@ -86,27 +108,6 @@ describe("cannotPlay", () => {
 });
 
 describe("adviseLineup", () => {
-  // Deep enough that the flex slots are a real choice. An earlier version of
-  // this fixture had exactly as many players as slots, so every "recommendation"
-  // was the only legal option and the tests proved nothing.
-  const roster = [
-    player({ playerId: "qb1", position: "QB", positionalRank: 3 }),
-    player({ playerId: "qb2", position: "QB", positionalRank: 14 }),
-    player({ playerId: "rb1", position: "RB", positionalRank: 2, flexRank: 2 }),
-    player({ playerId: "rb2", position: "RB", positionalRank: 20, flexRank: 40 }),
-    player({ playerId: "rb4", position: "RB", positionalRank: 30, flexRank: 75 }),
-    player({ playerId: "rb3", position: "RB", positionalRank: 45, flexRank: 120 }),
-    player({ playerId: "wr1", position: "WR", positionalRank: 5, flexRank: 8 }),
-    player({ playerId: "wr2", position: "WR", positionalRank: 30, flexRank: 60 }),
-    player({ playerId: "wr4", position: "WR", positionalRank: 45, flexRank: 100 }),
-    player({ playerId: "wr3", position: "WR", positionalRank: 70, flexRank: 140 }),
-    player({ playerId: "te1", position: "TE", positionalRank: 4, flexRank: 30 }),
-    player({ playerId: "te2", position: "TE", positionalRank: 20, flexRank: 135 }),
-    player({ playerId: "def1", position: "DEF", positionalRank: 6 }),
-  ];
-
-  /** The lineup the advisor recommends for Dah Chopped's slots. */
-  const OPTIMAL_CHOPPED = ["qb1", "rb1", "rb2", "wr1", "wr2", "te1", "rb4", "wr4"];
 
   it("fills every starting slot and ignores the bench slots", () => {
     const a = adviseLineup({
@@ -274,6 +275,70 @@ describe("adviseLineup", () => {
       expect(sf?.recommended).not.toBeNull();
       expect(sf?.recommended?.position).not.toBe("QB");
     });
+  });
+});
+
+describe("adjustmentDecided", () => {
+  it("is empty when nothing was adjusted", () => {
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster,
+      currentStarters: OPTIMAL_CHOPPED,
+    });
+    expect(a.adjustmentDecided).toEqual([]);
+  });
+
+  it("names the slot where our number overrode his ranking", () => {
+    // te2 is FLEX 135 on his list, behind rb3 at 120, so his order benches him.
+    // A tight end premium lifts him to an adjusted 10, which starts him. That
+    // is the app's call and has to be visible as one.
+    const adjusted = roster.map((p) =>
+      p.playerId === "te2" ? { ...p, adjustedFlexRank: 10 } : p,
+    );
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster: adjusted,
+      currentStarters: [],
+    });
+    const decided = a.adjustmentDecided.map((d) => [d.started.playerId, d.insteadOf?.playerId]);
+    expect(decided).toContainEqual(["te2", "wr4"]);
+  });
+
+  it("does not flag a player his own ranking would have started anyway", () => {
+    // rb1 is FLEX 2 and starts either way. Nudging him is not a decision.
+    const adjusted = roster.map((p) =>
+      p.playerId === "rb1" ? { ...p, adjustedFlexRank: 1 } : p,
+    );
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster: adjusted,
+      currentStarters: [],
+    });
+    expect(a.adjustmentDecided.map((d) => d.started.playerId)).not.toContain("rb1");
+  });
+});
+
+describe("flex slot labelling", () => {
+  it("never quotes a bare position rank in a flex comparison", () => {
+    // A tight end he ranked at TE 31 but left out of the FLEX 150. Quoted as
+    // "TE 31" beside a FLEX 78 it reads as the better player, and they are
+    // different lists.
+    const withDeepTe = [
+      ...roster,
+      player({ playerId: "teDeep", position: "TE", positionalRank: 31 }),
+    ];
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster: withDeepTe,
+      currentStarters: OPTIMAL_CHOPPED,
+    });
+    const flex = a.slots.filter((s) => s.slot === "FLEX");
+    const mentions = flex.map((s) => s.reason).join(" ");
+    if (mentions.includes("teDeep")) {
+      expect(mentions).toContain("outside his FLEX 150");
+    }
+    // And the deep tight end never outranks a flex-ranked player.
+    expect(flex.every((s) => s.recommended?.playerId !== "teDeep")).toBe(true);
   });
 });
 

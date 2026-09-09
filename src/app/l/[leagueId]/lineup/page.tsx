@@ -206,6 +206,30 @@ export default async function LineupPage({
         </div>
       )}
 
+      {league.advice.adjustmentDecided.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-cyan-200 bg-cyan-50/60 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+          <Eyebrow>Our call, not his</Eyebrow>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            He ranks for {(result.listScoring ?? "half ppr").replace("_", " ")} and this league is{" "}
+            {league.scoringLabel}. The adjusted rank is this app&rsquo;s, measured from what the
+            scoring difference is worth in projected points. It is what the lineup sorts by, so
+            these slots were decided by our number rather than by his order.
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {league.advice.adjustmentDecided.map((d) => (
+              <li
+                key={d.started.playerId}
+                className="text-sm leading-relaxed text-zinc-700 tabular-nums dark:text-zinc-300"
+              >
+                <span className="font-medium">{d.started.name}</span> at {d.slot}: he has him at
+                FLEX {d.started.flexRank}, we move him to {d.started.adjustedFlexRank}
+                {d.insteadOf ? `, ahead of ${d.insteadOf.name}` : ""}.
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-10">
         <Eyebrow>The full lineup</Eyebrow>
         <div className="mt-3">

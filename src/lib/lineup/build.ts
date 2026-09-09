@@ -142,7 +142,7 @@ export async function buildWeeklyLineups(
         rosterPositions: profile.rosterPositions,
         skewNotes: [],
         scoringLabel: scoringLabel(profile),
-        advice: { slots: [], changes: [], problems: [], superflexFellThrough: false },
+        advice: { slots: [], changes: [], problems: [], superflexFellThrough: false, adjustmentDecided: [] },
         error: e instanceof Error ? e.message : String(e),
       });
     }

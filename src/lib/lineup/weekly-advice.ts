@@ -28,6 +28,15 @@ const CANNOT_PLAY = new Set(["out", "ir", "pup", "sus", "dnr", "na", "doubtful"]
  * position list but left out of the FLEX 150 is genuinely behind the 150 he
  * ranked, and a player he did not rank at all is behind both.
  */
+/**
+ * Slots filled from the FLEX 150 rather than from a position list.
+ *
+ * SUPER_FLEX is deliberately absent: it takes a quarterback by Jack's rule, and
+ * he publishes no quarterbacks in the FLEX 150, so a QB there is quoted from
+ * the QB list.
+ */
+const FLEX_SLOTS = new Set(["FLEX", "WRRB_FLEX", "WRRB_WRT", "REC_FLEX"]);
+
 const BAND_FLEX = 1_000_000;
 const BAND_POSITIONAL = 500_000;
 const BAND_UNRANKED = 1_000;
@@ -71,18 +80,54 @@ export interface LineupAdvice {
   problems: { player: AdvicePlayer; why: string }[];
   /** True when the superflex slot fell through to a non-quarterback. */
   superflexFellThrough: boolean;
+  /**
+   * Slots where the app's scoring adjustment, not his ranking, decided who
+   * starts.
+   *
+   * This is the honest disclosure, and it matters because the adjustment is not
+   * decoration: `scoreOf` sorts by the adjusted rank when there is one, so a
+   * number the app computed can and does override the order he published. Jack
+   * asked to see exactly that. Anything listed here is our call, not his.
+   *
+   * Empty in a league whose scoring already matches the list, because there is
+   * no adjustment to make.
+   */
+  adjustmentDecided: { started: AdvicePlayer; insteadOf: AdvicePlayer | null; slot: string }[];
 }
 
+/**
+ * The rank to quote for this player in this slot.
+ *
+ * A flex slot is a comparison across running backs, receivers and tight ends,
+ * so it has to be quoted from the one list he publishes that ranks them against
+ * each other: the FLEX 150. Quoting a position rank there is not a smaller
+ * answer, it is a wrong one. "Josh Downs (FLEX 78). Next best is Kenyon Sadiq
+ * (TE 31)" reads as though a TE31 beats a FLEX78, and they are different lists
+ * that cannot be compared at all.
+ *
+ * A player he ranked at his position but left out of the FLEX 150 is therefore
+ * labelled as exactly that, rather than given a number that invites the
+ * comparison.
+ */
 function rankLabel(p: AdvicePlayer, slot: string): string {
   if (p.unranked) return "unranked";
-  const flexSlot = slot !== p.position && p.flexRank !== null;
-  if (flexSlot) {
+  const isFlexSlot = FLEX_SLOTS.has(slot);
+
+  if (isFlexSlot) {
+    if (p.flexRank === null) {
+      // Outside the 150. Named at his position so he is identifiable, and
+      // explicitly outside the list so nobody reads it as a flex rank.
+      return p.positionalRank !== null
+        ? `${p.position} ${p.positionalRank}, outside his FLEX 150`
+        : "outside his FLEX 150";
+    }
     const adjusted =
       p.adjustedFlexRank !== null && p.adjustedFlexRank !== p.flexRank
         ? `, ${p.adjustedFlexRank} adjusted`
         : "";
     return `FLEX ${p.flexRank}${adjusted}`;
   }
+
   if (p.positionalRank !== null) return `${p.position} ${p.positionalRank}`;
   return p.flexRank !== null ? `FLEX ${p.flexRank}` : "unranked";
 }
@@ -280,11 +325,57 @@ export function adviseLineup(input: {
     else if (p.unranked) problems.push({ player: p, why: "not in his list this week" });
   }
 
+  // Solve again with the adjustment stripped, and diff the two lineups. That
+  // is the only way to answer "did our number change the answer, or merely
+  // decorate it", and it is cheap: the solver is a sort and a scan.
+  //
+  // Guarded so it runs only when an adjustment exists at all, which keeps the
+  // half-PPR league from paying for a second solve that cannot differ.
+  const hasAdjustment = roster.some(
+    (p) => p.adjustedFlexRank !== null && p.adjustedFlexRank !== p.flexRank,
+  );
+  const adjustmentDecided: LineupAdvice["adjustmentDecided"] = [];
+  if (hasAdjustment) {
+    const raw = adviseLineup({
+      rosterPositions,
+      roster: roster.map((p) => ({ ...p, adjustedFlexRank: null })),
+      currentStarters,
+      superflexPrefersQb,
+    });
+    const rawStarters = new Set(
+      raw.slots.map((s) => s.recommended?.playerId).filter(Boolean) as string[],
+    );
+    const adjustedStarters = new Set(
+      advice.map((s) => s.recommended?.playerId).filter(Boolean) as string[],
+    );
+
+    // Who lost their place, which is not the same as who moved slot. In the
+    // test case a tight end lifted by the premium takes the TE slot and the
+    // tight end who was there slides into a flex slot; the player actually
+    // benched is the one at the bottom of the flex list. Naming the slot's
+    // previous occupant would have said the wrong name.
+    const displacedQueue = raw.slots
+      .map((s) => s.recommended)
+      .filter((p): p is AdvicePlayer => Boolean(p) && !adjustedStarters.has(p!.playerId))
+      .sort((a, b) => scoreOf(a) - scoreOf(b));
+
+    for (const s of advice) {
+      const p = s.recommended;
+      if (!p || rawStarters.has(p.playerId)) continue;
+      adjustmentDecided.push({
+        started: p,
+        insteadOf: displacedQueue.shift() ?? null,
+        slot: s.slot,
+      });
+    }
+  }
+
   return {
     slots: advice,
     changes: advice.filter((s) => s.changed),
     problems,
     superflexFellThrough,
+    adjustmentDecided,
   };
 }
 
