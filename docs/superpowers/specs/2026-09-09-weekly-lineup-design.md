@@ -347,3 +347,45 @@ the tab follows immediately.
 - Projecting anything ourselves. Sleeper's projections are used only to measure
   the size of a scoring difference, never to rank a player.
 - Automatic lineup submission to Sleeper. This tab advises; Jack sets the lineup.
+
+## What actually shipped, 2026-09-09
+
+Built the same day this was written, because Jack wanted both halves in his
+inbox before Week 1 locked. Parts A and B are in; the per-league TAB is not.
+
+Shipped:
+
+- `src/lib/jingles/weekly.ts` and its tests. Verified on the real post: 407
+  rows, no gaps, no duplicates, every row resolved to a Sleeper id.
+- `weekly_rankings` in `classifyPost`, the `jingles:v1:weekly:*` store, and the
+  exemption from the `seen` set.
+- The solver moved to `src/lib/lineup/solve.ts`, re-exported from its old home.
+- `src/lib/lineup/weekly-advice.ts`, pure and tested, plus `build.ts` for the
+  fetching.
+- `src/lib/thursday/*` and `/api/thursday-email`, called by the snapshot cron.
+
+Not shipped, still open: **the tab at `/l/[leagueId]/lineup`**. The email answers
+the same question for all four leagues at once, so the tab is now a convenience
+rather than the only way to see this.
+
+### Three things this design got wrong
+
+**`updatedAt` is called `updatedLabel`** and holds his raw "Last Updated" text
+rather than a parsed timestamp. Its only job is answering "has this changed",
+which a string compare does exactly, where parsing adds a timezone to get wrong.
+
+**Scoring detection needed its own function.** The design said to read the
+scoring from the prose, which is right, but not that the generic detector would
+actively get it wrong. His post names all three scorings because it explains how
+to adjust, and `detectScoring` takes the first it finds, so it called the real
+Week 1 post FULL PPR. Three of the four leagues are full PPR, so they would have
+been told the list matched their scoring and the mismatch warning would have
+gone silent. `weeklyScoring()` looks for him declaring a scoring rather than
+mentioning one.
+
+**"Only what needs changing" is not a slot-by-slot diff.** Comparing each slot
+against Sleeper's starters array reports a permutation as a change. Dah Dynasty
+came back with five, and all five were the same ten players in a different
+order. A change is a player entering the lineup. This only showed up by running
+it against the real rosters, which is the argument for doing that before
+writing the email rather than after.
