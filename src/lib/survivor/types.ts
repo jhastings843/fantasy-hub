@@ -161,6 +161,15 @@ export interface SurvivorReport {
   reasoning: string[];
   /** Highest equity. Always candidates[0], named so the UI cannot mislabel it. */
   bestTeam: string | null;
+  /**
+   * Teams that cannot honestly be separated from bestTeam, including it.
+   *
+   * Length 1 means the pick is genuinely ahead. Longer means the gap is inside
+   * the error in the ownership estimate and any of them is a defensible pick.
+   * Week 1 of 2026 had LAC and JAX 0.06% apart and reported LAC as though that
+   * were a decision.
+   */
+  tied: string[];
   /** Highest raw win probability, which is often a different team. */
   safestTeam: string | null;
   /**

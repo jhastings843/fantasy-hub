@@ -3,6 +3,7 @@ import { normalizeOwnership, ownershipCoverage } from "./yahoo";
 import { applyAvailability, deriveFieldState, type WeekPicks } from "./field";
 import { calibrate, projectOwnership, type Observation } from "./calibration";
 import { notesForTeam } from "./intel-pure";
+import { tieNote, tiedWithBest } from "./tie";
 import { equityMultiplier, fieldSurvival } from "./equity";
 import { futureCost, planFuture } from "./assignment";
 import type {
@@ -437,6 +438,11 @@ export function assembleReport(input: EngineInput): SurvivorReport {
       ? openGames.reduce((a, b) => (a.kickoff < b.kickoff ? a : b)).kickoff
       : null;
 
+  // A pick that cannot be separated from the next one is not a decision, and
+  // reporting it as one is how a 0.06% gap gets read as a recommendation.
+  const tied = tiedWithBest(candidates, calibration.confidence);
+  const tieSentence = tieNote(tied, calibration.confidence);
+
   return {
     season,
     week,
@@ -446,9 +452,15 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     entriesAlive,
     candidates,
     headline: best
-      ? `Week ${week}: ${best.team} over ${best.opponent}`
+      ? tied.length > 1
+        ? `Week ${week}: ${tied.map((c) => c.team).join(" or ")}, effectively tied`
+        : `Week ${week}: ${best.team} over ${best.opponent}`
       : `Week ${week}: nothing legal left on the board`,
-    reasoning,
+    // The tie goes FIRST when there is one. It changes how every sentence after
+    // it should be read, and a reader who stops after one line has then read the
+    // most important thing rather than the least.
+    reasoning: tieSentence ? [tieSentence, ...reasoning] : reasoning,
+    tied: tied.map((c) => c.team),
     bestTeam: best?.team ?? null,
     safestTeam: safest?.team ?? null,
     safetyGiveUp: best && safest ? Math.max(0, safest.winProb - best.winProb) : 0,
