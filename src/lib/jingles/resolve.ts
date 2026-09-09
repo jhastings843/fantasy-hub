@@ -68,7 +68,11 @@ function normalizePosition(position: string): string {
   return p === "DST" ? "DEF" : p;
 }
 
-function normalizeTeam(team: string | null): string | null {
+// Exported because anything comparing a team code he wrote against a team code
+// Sleeper wrote has to go through it. On 2026-09-09 the lineup advice compared
+// them raw and told Jack that two Jacksonville players were on bye in week 1,
+// when there are no byes in week 1: he writes JAC and Sleeper says JAX.
+export function normalizeTeam(team: string | null): string | null {
   if (!team) return null;
   const t = team.toUpperCase();
   // The handful of abbreviations that differ between sources.

@@ -4,8 +4,9 @@ import { getMyLeagues } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
 import { getAllPlayers, getLeague, getLeagueRosters, getUser } from "@/lib/sleeper/client";
 import { getWeekProjections } from "@/lib/guillotine/projections";
+import { normalizeTeam } from "@/lib/jingles/resolve";
 import { scoringSkewNotes, type ScoringSettings } from "@/lib/guillotine/scoring";
-import { adjustedFlexRanks, adviseLineup, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
+import { adjustedFlexRanks, adviseLineup, isOnBye, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
 
 // Everything the lineup advice needs, fetched and joined.
 //
@@ -64,7 +65,9 @@ function listScoringFor(league: ScoringSettings, listPpr: number): ScoringSettin
 
 const PPR_FOR: Record<string, number> = { half_ppr: 0.5, full_ppr: 1, standard: 0 };
 
-export async function buildWeeklyLineups(options: { week?: number } = {}): Promise<WeeklyLineups> {
+export async function buildWeeklyLineups(
+  options: { week?: number; leagueId?: string } = {},
+): Promise<WeeklyLineups> {
   const weekly =
     options.week !== undefined
       ? await readWeeklyForCurrentSeason(options.week)
@@ -106,17 +109,29 @@ export async function buildWeeklyLineups(options: { week?: number } = {}): Promi
   const me = await getUser(username);
 
   // Teams with a game this week, taken from his own list: every row he wrote
-  // carries a matchup, so a team that appears nowhere in 407 rows is on bye.
-  // Read from the rankings rather than from a schedule feed because it is the
-  // same source the ranks came from and so cannot disagree with them.
+  // carries a matchup, so a team that appears nowhere in 407 rows has no game.
+  //
+  // Through normalizeTeam on both sides, which is the fix for the bug this
+  // shipped with. He writes JAC and Sleeper says JAX, so a raw string compare
+  // reported every Jacksonville player as on bye, and in week 1 there are no
+  // byes at all. It cost two lineup changes in the first email that went out.
   const playing = new Set<string>();
   for (const e of [...Object.values(weekly.positional).flat(), ...weekly.flex]) {
-    playing.add(e.team);
-    playing.add(e.opponent);
+    const t = normalizeTeam(e.team);
+    const o = normalizeTeam(e.opponent);
+    if (t) playing.add(t);
+    if (o) playing.add(o);
   }
 
+  // The tab asks for one league; the Thursday email asks for all of them.
+  // Filtered here rather than by the caller so a page never pays for three
+  // leagues of Sleeper calls it is not going to render.
+  const wanted = options.leagueId
+    ? leagues.filter((l) => l.id === options.leagueId)
+    : leagues;
+
   const out: LeagueLineup[] = [];
-  for (const profile of leagues) {
+  for (const profile of wanted) {
     try {
       out.push(await lineupForLeague(profile, weekly, players, me.user_id, playing));
     } catch (e) {
@@ -225,9 +240,21 @@ async function lineupForLeague(
       opponent: m?.opponent ?? null,
       home: m?.home ?? null,
       injuryStatus: p?.injury_status ?? leaguePoints[id]?.injuryStatus ?? null,
-      // A team with no game this week. Defences carry the team code as their
-      // id, so they are covered by the same check.
-      onBye: Boolean(team) && !playing.has(team!.toUpperCase()),
+      // Jack's rule, and it is a better one than deriving this from team codes:
+      // if he ranked the player, the player has a game. Every row in his list
+      // carries a matchup, so he cannot rank someone who is not playing. That
+      // makes the whole class of abbreviation mismatch unable to produce a
+      // false bye, which is exactly how the first version got week 1 wrong.
+      //
+      // The team check is kept for players he did NOT rank, where it is the
+      // only signal available, and it is the weaker half on purpose: an
+      // unranked player is already flagged as unranked, so a wrong bye on top
+      // of that changes nothing about what Jack does.
+      onBye: isOnBye({
+        ranked: pr !== null || fr !== null,
+        team: normalizeTeam(team),
+        teamsPlaying: playing,
+      }),
       unranked: pr === null && fr === null,
     };
   });

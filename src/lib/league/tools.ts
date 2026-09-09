@@ -16,6 +16,11 @@ const ALL: LeagueType[] = ["dynasty", "redraft", "guillotine"];
 
 export const TOOLS: ToolDef[] = [
   { key: "home", label: "League", segment: "", types: ALL },
+  // Second, because in season it is the tab opened most: it answers the one
+  // question that has a deadline every week. Every format has starting slots,
+  // including the guillotine league, where a lineup still has to be set after
+  // waivers clear.
+  { key: "lineup", label: "Lineup", segment: "lineup", types: ALL },
   { key: "plan", label: "Plan", segment: "plan", types: ALL },
   { key: "draft", label: "Draft", segment: "draft", types: ALL },
   // Guillotine has no trades under standard rules.

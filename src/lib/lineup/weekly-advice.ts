@@ -100,6 +100,31 @@ export function scoreOf(p: AdvicePlayer): number {
   return BAND_UNRANKED;
 }
 
+/**
+ * Whether a player has no game this week.
+ *
+ * Jack's rule, and it is stronger than anything derived from team codes: if he
+ * ranked the player, the player has a game. Every row in his list carries a
+ * matchup, so he cannot rank somebody who is not playing.
+ *
+ * The first version of this asked only whether the player's team appeared in
+ * the week's fixtures, comparing the code he writes against the code Sleeper
+ * writes without normalising either. He writes JAC and Sleeper says JAX, so
+ * every Jacksonville player came back on bye, in week 1, when no team is on
+ * bye at all. Two of them were starters and the email told Jack to bench both.
+ *
+ * `teamsPlaying` must already be normalised by the caller.
+ */
+export function isOnBye(input: {
+  ranked: boolean;
+  team: string | null;
+  teamsPlaying: Set<string>;
+}): boolean {
+  if (input.ranked) return false;
+  if (!input.team) return false;
+  return !input.teamsPlaying.has(input.team);
+}
+
 export function cannotPlay(p: AdvicePlayer): boolean {
   if (p.onBye) return true;
   const s = (p.injuryStatus ?? "").trim().toLowerCase();

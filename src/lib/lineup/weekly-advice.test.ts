@@ -3,6 +3,7 @@ import {
   adjustedFlexRanks,
   adviseLineup,
   cannotPlay,
+  isOnBye,
   scoreOf,
   type AdvicePlayer,
 } from "./weekly-advice";
@@ -49,6 +50,26 @@ describe("scoreOf", () => {
     const p = player({ playerId: "a", position: "WR", flexRank: 50, adjustedFlexRank: 10 });
     const q = player({ playerId: "b", position: "WR", flexRank: 20 });
     expect(scoreOf(p)).toBeGreaterThan(scoreOf(q));
+  });
+});
+
+describe("isOnBye", () => {
+  const playing = new Set(["JAX", "CLE", "DET", "NO"]);
+
+  it("never puts a ranked player on bye, whatever the team codes say", () => {
+    // The real regression. He writes JAC, Sleeper says JAX, and week 1 has no
+    // byes at all. Two Jacksonville starters were benched by the first version.
+    expect(isOnBye({ ranked: true, team: "JAC", teamsPlaying: playing })).toBe(false);
+    expect(isOnBye({ ranked: true, team: "NOT_A_TEAM", teamsPlaying: playing })).toBe(false);
+  });
+
+  it("uses the team only for a player he did not rank", () => {
+    expect(isOnBye({ ranked: false, team: "JAX", teamsPlaying: playing })).toBe(false);
+    expect(isOnBye({ ranked: false, team: "PIT", teamsPlaying: playing })).toBe(true);
+  });
+
+  it("does not guess when the team is unknown", () => {
+    expect(isOnBye({ ranked: false, team: null, teamsPlaying: playing })).toBe(false);
   });
 });
 
