@@ -359,10 +359,72 @@ describe("adjustedFlexRanks", () => {
 
   it("lifts a high-reception player in a full-PPR league", () => {
     const list = new Map([["a", 20], ["b", 18], ["c", 16]]);
-    // c catches eight passes a week, so full PPR pays him four more.
+    // c catches eight passes a week, so full PPR pays him four more. That
+    // clears the margin comfortably.
     const league = new Map([["a", 20.5], ["b", 18.5], ["c", 20]]);
     const out = adjustedFlexRanks(flex, list, league);
     expect(out.get("c")).toBeLessThan(out.get("b")!);
+  });
+
+  /**
+   * A full 150-deep list, because the curve is read at a player's rank and a
+   * two-player fixture cannot produce one. An earlier version of these tests
+   * passed a pair at ranks 93 and 108, so both fell off the end of a two-entry
+   * curve, landed on the same baseline, and proved nothing.
+   *
+   * Gradient of 0.08 a rank, which is between the 0.043 and 0.078 measured on
+   * the real Week 1 list through the middle.
+   */
+  function deepList(deltas: Record<string, number>) {
+    const flexList: { playerId: string; rank: number }[] = [];
+    const list = new Map<string, number>();
+    const league = new Map<string, number>();
+    for (let i = 0; i < 150; i++) {
+      const rank = i + 1;
+      const id = ({ 93: "a", 108: "b" } as Record<number, string>)[rank] ?? `p${rank}`;
+      const points = 20 - i * 0.08;
+      flexList.push({ playerId: id, rank });
+      list.set(id, points);
+      league.set(id, points + (deltas[id] ?? 0));
+    }
+    return { flexList, list, league };
+  }
+
+  it("will not overrule his order on a margin a projection cannot resolve", () => {
+    // The real case. Kittle at his rank 108 finished 0.59 points ahead of
+    // Thomas at 93, and 0.59 is inside the error on the delta itself. 61 of the
+    // 62 inversions on the live Week 1 list looked like this.
+    //
+    // Curve gap between the two ranks is 1.20, so a delta advantage of 1.79
+    // leaves b ahead by 0.59, under the margin.
+    const { flexList, list, league } = deepList({ a: 1.69, b: 3.48 });
+    const out = adjustedFlexRanks(flexList, list, league);
+    expect(out.get("a")).toBeLessThan(out.get("b")!);
+  });
+
+  it("still overrules him when the adjustment wins by a real margin", () => {
+    // Same two ranks, delta advantage of 2.5, so b is ahead by 1.30.
+    const { flexList, list, league } = deepList({ a: 1.0, b: 3.5 });
+    const out = adjustedFlexRanks(flexList, list, league);
+    expect(out.get("b")).toBeLessThan(out.get("a")!);
+  });
+
+  it("produces a stable total order rather than whatever a sort does", () => {
+    // A dead zone is not transitive, so the ordering is built by insertion over
+    // his ranks. Same input, same answer, every time.
+    const list = new Map([["a", 10], ["b", 10], ["c", 10]]);
+    const league = new Map([["a", 10.4], ["b", 10.2], ["c", 10.6]]);
+    const three = [
+      { playerId: "a", rank: 1 },
+      { playerId: "b", rank: 2 },
+      { playerId: "c", rank: 3 },
+    ];
+    const first = adjustedFlexRanks(three, list, league);
+    const again = adjustedFlexRanks(three, list, league);
+    expect([...first.entries()]).toEqual([...again.entries()]);
+    // All within a point of each other, so his order survives intact.
+    expect(first.get("a")).toBe(1);
+    expect(first.get("c")).toBe(3);
   });
 
   it("does not move a touchdown-dependent back", () => {

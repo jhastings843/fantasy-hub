@@ -439,6 +439,30 @@ function reasonFor(
  * A player with no projection gets a zero delta and keeps his rank, which is
  * the honest answer rather than a guessed one.
  */
+/**
+ * How much the adjustment has to win by before it may overrule his order.
+ *
+ * Measured, not chosen. On the real Week 1 flex list the points-per-rank
+ * gradient through the middle of his list is 0.043 (ranks 75-100) and 0.078
+ * (50-75), while the average scoring delta is 2.82 for a tight end, 1.98 for a
+ * receiver and 1.15 for a back. A tight end's delta against that gradient is
+ * worth about sixty-five ranks, which is why 139 of 150 players moved and
+ * thirty of them moved fifteen places or more.
+ *
+ * That movement is not wrong in direction. In a full-PPR league with a tight end
+ * premium, tight ends genuinely are worth more than a half-PPR list says. It is
+ * wrong in confidence: of the 62 places the adjustment inverted his order, 61
+ * did it on a margin under half a point, and a weekly projection cannot resolve
+ * half a point. George Kittle beat Brian Thomas by 0.59.
+ *
+ * A point is roughly what the delta itself is uncertain by: it is half a point
+ * per reception, on a reception count that projects with an error over one. So
+ * below a point the honest answer is that we cannot tell them apart, and a
+ * human ranker who watches the tape is the better tiebreak than a projection
+ * that does not.
+ */
+export const ADJUSTMENT_MARGIN = 1.0;
+
 export function adjustedFlexRanks(
   flex: { playerId: string | null; rank: number }[],
   listPoints: Map<string, number>,
@@ -458,12 +482,26 @@ export function adjustedFlexRanks(
     const list = listPoints.get(e.playerId);
     const league = leaguePoints.get(e.playerId);
     const delta = list === undefined || league === undefined ? 0 : league - list;
-    return { playerId: e.playerId, value: base + delta };
+    return { playerId: e.playerId, rank: e.rank, value: base + delta };
   });
 
-  scored.sort((a, b) => b.value - a.value);
+  // Sorted by adjusted value, but only where the adjustment has earned it.
+  //
+  // Two players inside ADJUSTMENT_MARGIN of each other keep HIS order, because
+  // that is the more reliable signal at that distance. This is a comparator
+  // with a dead zone, so it is applied as an insertion pass over his order
+  // rather than as a sort: a dead zone is not transitive and a sort given an
+  // intransitive comparator produces whatever the algorithm happens to do.
+  const byHisRank = [...scored].sort((a, b) => a.rank - b.rank);
+  const ordered: typeof byHisRank = [];
+  for (const player of byHisRank) {
+    // Walk back past anyone this player beats by more than the margin.
+    let at = ordered.length;
+    while (at > 0 && player.value - ordered[at - 1].value > ADJUSTMENT_MARGIN) at--;
+    ordered.splice(at, 0, player);
+  }
 
   const out = new Map<string, number>();
-  scored.forEach((s, i) => out.set(s.playerId, i + 1));
+  ordered.forEach((s, i) => out.set(s.playerId, i + 1));
   return out;
 }
