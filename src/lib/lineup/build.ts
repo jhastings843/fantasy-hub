@@ -22,6 +22,10 @@ export interface LeagueLineup {
   /** How this league's scoring differs from the list, in his own terms. */
   skewNotes: string[];
   scoringLabel: string;
+  /** The whole roster, so a caller can re-solve without fetching again. */
+  roster: AdvicePlayer[];
+  /** Sleeper's own starters array at the moment this was built. */
+  currentStarters: string[];
   advice: LineupAdvice;
   /** Said out loud when a league could not be advised, rather than shown empty. */
   error: string | null;
@@ -142,6 +146,8 @@ export async function buildWeeklyLineups(
         rosterPositions: profile.rosterPositions,
         skewNotes: [],
         scoringLabel: scoringLabel(profile),
+        roster: [],
+        currentStarters: [],
         advice: { slots: [], changes: [], problems: [], superflexFellThrough: false, adjustmentDecided: [] },
         error: e instanceof Error ? e.message : String(e),
       });
@@ -272,6 +278,8 @@ async function lineupForLeague(
     rosterPositions: profile.rosterPositions,
     skewNotes: scoringSkewNotes(leagueScoring, weekly.scoring),
     scoringLabel: scoringLabel(profile),
+    roster,
+    currentStarters: mine.starters ?? [],
     advice,
     error: null,
   };

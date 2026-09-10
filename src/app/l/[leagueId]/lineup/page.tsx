@@ -1,5 +1,7 @@
 import { buildWeeklyLineups, type LeagueLineup } from "@/lib/lineup/build";
 import type { AdvicePlayer, SlotAdvice } from "@/lib/lineup/weekly-advice";
+import { season } from "@/lib/scorecard/pure";
+import { isSettled, readSeason, type Settled as SettledWeek } from "@/lib/scorecard/store";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +143,79 @@ function LineupTable({ league }: { league: LeagueLineup }) {
   );
 }
 
+
+/**
+ * How the advice has actually done, once weeks have been graded.
+ *
+ * Deliberately at the bottom and deliberately blunt. A tool that recommends a
+ * lineup every week and never reports whether it helped is asking to be trusted
+ * on manner alone. The negative case gets the same typography as the positive.
+ */
+function Scorecard({ weeks }: { weeks: SettledWeek[] }) {
+  if (weeks.length === 0) return null;
+  const totals = season(weeks.map((w) => w.verdict));
+  const sign = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
+  const tone = (n: number) =>
+    n > 0
+      ? "text-emerald-600 dark:text-emerald-400"
+      : n < 0
+        ? "text-rose-600 dark:text-rose-400"
+        : "text-zinc-600 dark:text-zinc-400";
+
+  return (
+    <div className="mt-10">
+      <Eyebrow>How this has done, {totals.weeks} {totals.weeks === 1 ? "week" : "weeks"}</Eyebrow>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Against what you actually started
+          </p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${tone(totals.vsStarted)}`}>
+            {sign(totals.vsStarted)}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+            ahead in {totals.weeksAhead}, behind in {totals.weeksBehind}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            What the scoring adjustment added
+          </p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${tone(totals.vsRaw)}`}>
+            {sign(totals.vsRaw)}
+          </p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            against his rankings left alone
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {weeks.map((w) => (
+            <div
+              key={w.week}
+              className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5 text-sm tabular-nums"
+            >
+              <span className="w-16 shrink-0 font-medium">Week {w.week}</span>
+              <span className="text-zinc-600 dark:text-zinc-400">
+                you {w.verdict.started.toFixed(1)}
+              </span>
+              <span className="text-zinc-600 dark:text-zinc-400">
+                advised {w.verdict.advised.toFixed(1)}
+              </span>
+              <span className={tone(w.verdict.vsStarted)}>{sign(w.verdict.vsStarted)}</span>
+              <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500">
+                perfect was {w.verdict.perfect.toFixed(1)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function LineupPage({
   params,
 }: {
@@ -149,6 +224,11 @@ export default async function LineupPage({
   const { leagueId } = await params;
   const result = await buildWeeklyLineups({ leagueId });
   const league = result.leagues[0];
+  // Keyed on the season the rankings are for, not the calendar year: in January
+  // those disagree and the scorecard would silently look at the wrong season.
+  const graded = result.season
+    ? (await readSeason(result.season, leagueId)).filter(isSettled)
+    : [];
 
   if (result.blocked) {
     return (
@@ -261,6 +341,8 @@ export default async function LineupPage({
         ))}
         {league.error && <p className="text-rose-600 dark:text-rose-400">{league.error}</p>}
       </div>
+
+      <Scorecard weeks={graded} />
     </main>
   );
 }

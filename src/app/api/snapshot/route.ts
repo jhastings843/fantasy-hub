@@ -4,6 +4,7 @@ import { getRosterGrades } from "@/lib/rosteraudit/client";
 import { recordGradeSnapshot, snapshotDate } from "@/lib/history/grades";
 import { ingestJingles } from "@/lib/jingles/ingest";
 import { runThursdayEmail } from "@/lib/thursday/run";
+import { settleFinishedWeeks, snapshotWeek } from "@/lib/scorecard/run";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,28 @@ export async function GET(request: Request) {
       thursday = { error: e instanceof Error ? e.message : String(e) };
     }
 
-    return Response.json({ ok: true, date: snapshotDate(), results, jingles, thursday });
+    // The scorecard, which is the only thing that ever checks whether any of
+    // the advice above was right. Two jobs on one daily run: freeze Sunday's
+    // recommendation before the slate locks, and grade any week that has
+    // finished and not been graded. Both decide for themselves whether today is
+    // their day, so calling them daily is correct rather than merely harmless.
+    let scorecard: unknown;
+    try {
+      const frozen = await snapshotWeek();
+      const graded = await settleFinishedWeeks();
+      scorecard = { frozen, graded };
+    } catch (e) {
+      scorecard = { error: e instanceof Error ? e.message : String(e) };
+    }
+
+    return Response.json({
+      ok: true,
+      date: snapshotDate(),
+      results,
+      jingles,
+      thursday,
+      scorecard,
+    });
   } catch (e) {
     return Response.json(
       { ok: false, error: e instanceof Error ? e.message : String(e) },
