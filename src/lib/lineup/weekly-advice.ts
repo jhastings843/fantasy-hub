@@ -121,11 +121,15 @@ function rankLabel(p: AdvicePlayer, slot: string): string {
         ? `${p.position} ${p.positionalRank}, outside his FLEX 150`
         : "outside his FLEX 150";
     }
-    const adjusted =
-      p.adjustedFlexRank !== null && p.adjustedFlexRank !== p.flexRank
-        ? `, ${p.adjustedFlexRank} adjusted`
-        : "";
-    return `FLEX ${p.flexRank}${adjusted}`;
+    // The number that DECIDED comes first. This used to read "FLEX 108, 86
+    // adjusted" against "FLEX 93, 98 adjusted", and skimmed at speed that says
+    // 108 beat 93, which is backwards and is exactly how it was read. The
+    // adjusted rank is what the lineup sorts by, so it leads, and his own
+    // number follows attributed to him.
+    if (p.adjustedFlexRank !== null && p.adjustedFlexRank !== p.flexRank) {
+      return `FLEX ${p.adjustedFlexRank} here, ${p.flexRank} on his list`;
+    }
+    return `FLEX ${p.flexRank}`;
   }
 
   if (p.positionalRank !== null) return `${p.position} ${p.positionalRank}`;
@@ -402,13 +406,15 @@ function reasonFor(
     return `Slot is empty. Start ${rec}.${next}`;
   }
 
+  // "he has him at" cannot front a number that is partly ours. The label now
+  // carries its own attribution, so the sentence just points at it.
   const why = current.onBye
     ? "on bye"
     : cannotPlay(current)
       ? `listed ${current.injuryStatus}`
       : current.unranked
         ? "not in his list this week"
-        : `he has him at ${rankLabel(current, slot)}`;
+        : `at ${rankLabel(current, slot)}`;
 
   return `Start ${rec} over ${current.name}, ${why}.`;
 }

@@ -19,10 +19,10 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 }
 
 function Chip({
-  tone,
+  tone = "zinc",
   children,
 }: {
-  tone: "amber" | "emerald" | "rose" | "zinc" | "cyan";
+  tone?: "amber" | "emerald" | "rose" | "zinc" | "cyan";
   children: React.ReactNode;
 }) {
   const tones = {
@@ -41,11 +41,21 @@ function Chip({
   );
 }
 
-/** His rank for a player, in the list the slot was decided from. */
+/**
+ * The rank chip for a player in a slot.
+ *
+ * Where an adjustment applies, this is the number the lineup was sorted by, and
+ * his own number is shown beside it as a separate, quieter chip. Leading with
+ * his number and appending ours reads as though his decided it.
+ */
 function rankText(p: AdvicePlayer, slot: string): string {
   if (p.unranked) return "unranked";
   const usingFlex = slot !== p.position && p.flexRank !== null;
-  if (usingFlex) return `FLEX ${p.flexRank}`;
+  if (usingFlex) {
+    return p.adjustedFlexRank !== null && p.adjustedFlexRank !== p.flexRank
+      ? `FLEX ${p.adjustedFlexRank}`
+      : `FLEX ${p.flexRank}`;
+  }
   if (p.positionalRank !== null) return `${p.position} ${p.positionalRank}`;
   return p.flexRank !== null ? `FLEX ${p.flexRank}` : "unranked";
 }
@@ -65,8 +75,10 @@ function PlayerLine({ p, slot }: { p: AdvicePlayer; slot: string }) {
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <span className="font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
-      <Chip tone={p.unranked ? "rose" : "zinc"}>{rankText(p, slot)}</Chip>
-      {showAdjusted && <Chip tone="cyan">{p.adjustedFlexRank} adjusted</Chip>}
+      <Chip tone={p.unranked ? "rose" : showAdjusted ? "cyan" : "zinc"}>
+        {rankText(p, slot)}
+      </Chip>
+      {showAdjusted && <Chip>his {p.flexRank}</Chip>}
       <span className="text-sm text-zinc-500 tabular-nums dark:text-zinc-400">
         {matchupText(p)}
       </span>
