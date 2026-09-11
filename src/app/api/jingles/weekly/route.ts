@@ -1,4 +1,7 @@
 import { latestWeekly, readWeekly, type StoredWeeklyEntry } from "@/lib/jingles/ingest";
+import { normalizeTeam } from "@/lib/jingles/resolve";
+import { fixtureMap, type Fixture } from "@/lib/nfl/week";
+import { getSeasonGames } from "@/lib/survivor/odds";
 
 export const dynamic = "force-dynamic";
 
@@ -71,18 +74,43 @@ export async function GET(request: Request) {
   // One row per player, carrying BOTH ranks. Built from the positional lists
   // first because those cover more players than the FLEX 150 does, then the
   // flex rank is folded in where he ranked them there too.
+  // The schedule decides who a team plays and at whose ground, because his post
+  // has been wrong about it. Week 1 had the 49ers "vs LAR" in four sections and
+  // "@ LAR" in a fifth, and Atlas answering a start/sit question with the wrong
+  // venue is the same wrongness as the lineup tab showing it.
+  //
+  // A failed fetch falls back to his own row rather than emptying the field.
+  const fixtures = await getSeasonGames(Number(weekly.season))
+    .then((s) => fixtureMap(s.games.filter((g) => g.week === weekly.week)))
+    .catch(() => new Map<string, Fixture>());
+
+  const matchupOf = (e: StoredWeeklyEntry): { opponent: string; home: boolean } => {
+    const f = fixtures.get(normalizeTeam(e.team) ?? "");
+    return f
+      ? { opponent: f.opponent, home: f.home }
+      : { opponent: normalizeTeam(e.opponent) ?? e.opponent, home: e.home };
+  };
+
+  // One vocabulary for the whole payload. He writes JAC and the schedule says
+  // JAX, so leaving his spelling on `team` while `opponent` came from the
+  // fixture gave Cleveland an opponent of JAX and Jacksonville a team of JAC,
+  // which no consumer can join up. Sleeper's codes win, since a sleeperId sits
+  // on every row anyway.
+  const teamOf = (e: StoredWeeklyEntry) => normalizeTeam(e.team) ?? e.team;
+
   const rows = new Map<string, Row>();
   const keyOf = (e: StoredWeeklyEntry) => e.sleeperId ?? `${norm(e.name)}|${e.position}`;
 
   for (const [position, list] of Object.entries(weekly.positional)) {
     for (const e of list) {
+      const { opponent, home } = matchupOf(e);
       rows.set(keyOf(e), {
         name: e.name,
         position,
-        team: e.team,
-        opponent: e.opponent,
-        home: e.home,
-        matchup: `${e.home ? "vs" : "@"} ${e.opponent}`,
+        team: teamOf(e),
+        opponent,
+        home,
+        matchup: `${home ? "vs" : "@"} ${opponent}`,
         positionRank: e.rank,
         flexRank: null,
         sleeperId: e.sleeperId,
@@ -93,18 +121,20 @@ export async function GET(request: Request) {
     const key = keyOf(e);
     const existing = rows.get(key);
     if (existing) existing.flexRank = e.rank;
-    else
+    else {
+      const { opponent, home } = matchupOf(e);
       rows.set(key, {
         name: e.name,
         position: e.position,
-        team: e.team,
-        opponent: e.opponent,
-        home: e.home,
-        matchup: `${e.home ? "vs" : "@"} ${e.opponent}`,
+        team: teamOf(e),
+        opponent,
+        home,
+        matchup: `${home ? "vs" : "@"} ${opponent}`,
         positionRank: null,
         flexRank: e.rank,
         sleeperId: e.sleeperId,
       });
+    }
   }
 
   const all = [...rows.values()];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lockedTeams, type LockGame } from "./locks";
+import { fixtureMap, lockedTeams, type LockGame } from "./week";
 
 function game(over: Partial<LockGame> & { home: string; away: string }): LockGame {
   return { kickoff: "2026-09-13T17:00:00Z", completed: false, ...over };
@@ -8,8 +8,8 @@ function game(over: Partial<LockGame> & { home: string; away: string }): LockGam
 // The real Week 1 shape on the morning this bug was reported: Thursday night
 // played, everything else still to come.
 const WEEK_1: LockGame[] = [
-  game({ home: "SEA", away: "SF", kickoff: "2026-09-11T00:15:00Z", completed: true }),
-  game({ home: "LAR", away: "NE", kickoff: "2026-09-11T00:15:00Z", completed: true }),
+  game({ home: "SEA", away: "NE", kickoff: "2026-09-10T00:20:00Z", completed: true }),
+  game({ home: "LAR", away: "SF", kickoff: "2026-09-11T00:35:00Z", completed: true }),
   game({ home: "TEN", away: "NYJ", kickoff: "2026-09-13T17:00:00Z" }),
   game({ home: "PHI", away: "WSH", kickoff: "2026-09-13T20:25:00Z" }),
 ];
@@ -61,5 +61,28 @@ describe("lockedTeams", () => {
     // nothing complete.
     const ahead = WEEK_1.map((g) => ({ ...g, completed: false }));
     expect(lockedTeams(ahead, new Date("2026-09-09T12:00:00Z")).size).toBe(0);
+  });
+});
+
+describe("fixtureMap", () => {
+  it("gives both sides of a game, one home and one away", () => {
+    const f = fixtureMap(WEEK_1);
+    expect(f.get("SF")).toEqual({ opponent: "LAR", home: false });
+    expect(f.get("LAR")).toEqual({ opponent: "SF", home: true });
+  });
+
+  it("normalises both teams, so a Sleeper roster can look itself up", () => {
+    const f = fixtureMap(WEEK_1);
+    expect(f.get("WAS")).toEqual({ opponent: "PHI", home: false });
+    expect(f.get("WSH")).toBeUndefined();
+    expect(f.get("PHI")).toEqual({ opponent: "WAS", home: true });
+  });
+
+  it("has nothing to say about a team on bye", () => {
+    expect(fixtureMap(WEEK_1).get("KC")).toBeUndefined();
+  });
+
+  it("covers every team in the slate", () => {
+    expect(fixtureMap(WEEK_1).size).toBe(WEEK_1.length * 2);
   });
 });

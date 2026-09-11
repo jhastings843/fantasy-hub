@@ -8,7 +8,7 @@ import { normalizeTeam } from "@/lib/jingles/resolve";
 import { scoringSkewNotes, type ScoringSettings } from "@/lib/guillotine/scoring";
 import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
 import { getSeasonGames } from "@/lib/survivor/odds";
-import { lockedTeams } from "./locks";
+import { fixtureMap, lockedTeams, type Fixture } from "@/lib/nfl/week";
 import { adjustedFlexRanks, adviseLineup, isOnBye, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
 
 // Everything the lineup advice needs, fetched and joined.
@@ -139,6 +139,7 @@ export async function buildWeeklyLineups(
   ]);
 
   const locked = lockedTeams(schedule, new Date());
+  const fixtures = fixtureMap(schedule);
   for (const playerId of Object.keys(stats)) {
     const team = normalizeTeam(
       (players[playerId] as { team?: string | null } | undefined)?.team ?? null,
@@ -172,7 +173,16 @@ export async function buildWeeklyLineups(
   for (const profile of wanted) {
     try {
       out.push(
-        await lineupForLeague(profile, weekly, players, me.user_id, playing, locked, stats),
+        await lineupForLeague(
+          profile,
+          weekly,
+          players,
+          me.user_id,
+          playing,
+          locked,
+          fixtures,
+          stats,
+        ),
       );
     } catch (e) {
       out.push({
@@ -217,6 +227,7 @@ async function lineupForLeague(
   myUserId: string,
   playing: Set<string>,
   locked: Set<string>,
+  fixtures: Map<string, Fixture>,
   stats: StatRows,
 ): Promise<LeagueLineup> {
   const [league, rosters] = await Promise.all([
@@ -277,6 +288,12 @@ async function lineupForLeague(
     const pr = positionalRank.get(id) ?? null;
     const fr = flexRank.get(id) ?? null;
     const m = meta.get(id) ?? null;
+    // The fixture beats his post on who and where. He had the 49ers at home
+    // against the Rams in four of his five week 1 sections and away in the
+    // fifth, and the schedule has no opinion to be wrong about. His own row is
+    // still the fallback, so a player the schedule does not carry keeps the
+    // matchup he wrote.
+    const fixture = fixtures.get(normalizeTeam(team) ?? "") ?? null;
     return {
       playerId: id,
       name: name || id,
@@ -285,8 +302,8 @@ async function lineupForLeague(
       positionalRank: pr,
       flexRank: fr,
       adjustedFlexRank: adjusted.get(id) ?? null,
-      opponent: m?.opponent ?? null,
-      home: m?.home ?? null,
+      opponent: fixture?.opponent ?? m?.opponent ?? null,
+      home: fixture?.home ?? m?.home ?? null,
       injuryStatus: p?.injury_status ?? leaguePoints[id]?.injuryStatus ?? null,
       // Jack's rule, and it is a better one than deriving this from team codes:
       // if he ranked the player, the player has a game. Every row in his list
