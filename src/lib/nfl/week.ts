@@ -79,3 +79,44 @@ export function fixtureMap(games: LockGame[]): Map<string, Fixture> {
   }
   return out;
 }
+
+/**
+ * How many stat rows a team needs before the feed alone may lock it.
+ *
+ * Measured, not chosen. On Sleeper's week 1 feed the four teams that had
+ * actually played carried 79, 73, 72 and 71 rows, and the one team that had
+ * not carried exactly one: Bryce Cabeldue, a Las Vegas offensive tackle, with
+ * gp 1 for a game two days in the future. Anything between 2 and 70 separates
+ * those cleanly, so this sits near the bottom of that range, where it stays
+ * right even for a feed that fills in gradually.
+ */
+const MIN_STAT_ROWS = 5;
+
+/**
+ * Teams the stat feed says have played, corroborated by more than one row.
+ *
+ * This is the backstop behind the schedule, not the primary signal, and the
+ * corroboration is what makes it safe to keep. The schedule locks on kickoff,
+ * which is exact; this catches the case where the schedule cannot be read at
+ * all, since a player only appears in the stat feed once he has been on the
+ * field.
+ *
+ * The asymmetry is the whole reason for the threshold. A lock that arrives
+ * late costs Jack advice he cannot act on, which is annoying. A lock that
+ * arrives early HIDES advice he could have acted on, and shows him a score for
+ * a game that has not happened. The second is worse, so the backstop is
+ * required to be sure.
+ *
+ * Takes team codes, one per row of the feed, nulls included.
+ */
+export function teamsWithStats(teams: (string | null)[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const raw of teams) {
+    const team = normalizeTeam(raw);
+    if (!team) continue;
+    counts.set(team, (counts.get(team) ?? 0) + 1);
+  }
+  const out = new Set<string>();
+  for (const [team, n] of counts) if (n >= MIN_STAT_ROWS) out.add(team);
+  return out;
+}

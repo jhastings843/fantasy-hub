@@ -8,7 +8,7 @@ import { normalizeTeam } from "@/lib/jingles/resolve";
 import { scoringSkewNotes, type ScoringSettings } from "@/lib/guillotine/scoring";
 import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
 import { getSeasonGames } from "@/lib/survivor/odds";
-import { fixtureMap, lockedTeams, type Fixture } from "@/lib/nfl/week";
+import { fixtureMap, lockedTeams, teamsWithStats, type Fixture } from "@/lib/nfl/week";
 import { adjustedFlexRanks, adviseLineup, isOnBye, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
 
 // Everything the lineup advice needs, fetched and joined.
@@ -127,10 +127,12 @@ export async function buildWeeklyLineups(
   // mode that puts the old bug straight back. ESPN's schedule is the precise
   // one, and it locks on the clock rather than on a stat appearing, so a slot
   // goes cold at kickoff the way Sleeper's does. Sleeper's own stat feed is the
-  // backstop: a player only appears in it once he has been on the field, so a
-  // team with rows has played whatever the schedule fetch did. Neither is
-  // allowed to take the page down, and a failure of one is survivable because
-  // the other is still there.
+  // backstop, for the case where the schedule cannot be read at all.
+  //
+  // The backstop needs corroboration, and finding out why cost a day in
+  // production: one stray Las Vegas row in the week 1 feed locked every Raider
+  // two days before their game. teamsWithStats carries the threshold and the
+  // measurement behind it. Neither signal is allowed to take the page down.
   const [schedule, stats] = await Promise.all([
     getSeasonGames(Number(weekly.season))
       .then((s) => s.games.filter((g) => g.week === weekly.week))
@@ -140,11 +142,12 @@ export async function buildWeeklyLineups(
 
   const locked = lockedTeams(schedule, new Date());
   const fixtures = fixtureMap(schedule);
-  for (const playerId of Object.keys(stats)) {
-    const team = normalizeTeam(
-      (players[playerId] as { team?: string | null } | undefined)?.team ?? null,
-    );
-    if (team) locked.add(team);
+  for (const team of teamsWithStats(
+    Object.keys(stats).map(
+      (id) => (players[id] as { team?: string | null } | undefined)?.team ?? null,
+    ),
+  )) {
+    locked.add(team);
   }
 
   // Teams with a game this week, taken from his own list: every row he wrote

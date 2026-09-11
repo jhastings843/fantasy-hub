@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureMap, lockedTeams, type LockGame } from "./week";
+import { fixtureMap, lockedTeams, teamsWithStats, type LockGame } from "./week";
 
 function game(over: Partial<LockGame> & { home: string; away: string }): LockGame {
   return { kickoff: "2026-09-13T17:00:00Z", completed: false, ...over };
@@ -84,5 +84,39 @@ describe("fixtureMap", () => {
 
   it("covers every team in the slate", () => {
     expect(fixtureMap(WEEK_1).size).toBe(WEEK_1.length * 2);
+  });
+});
+
+// The Friday this shipped, Sleeper's week 1 stat feed carried 79 rows for SF,
+// 73 for SEA, 72 for NE, 71 for LAR, and exactly one for Las Vegas: Bryce
+// Cabeldue, an offensive tackle, with gp 1 and gms_active 1, for a game that
+// kicked off two days later. Reading one row as "this team has played" locked
+// every Raider, and two of them were on Jack's dynasty bench.
+describe("teamsWithStats", () => {
+  const played = (team: string, rows: number) => Array<string>(rows).fill(team);
+
+  it("takes a team the feed is emphatic about", () => {
+    expect(teamsWithStats(played("SF", 79)).has("SF")).toBe(true);
+  });
+
+  it("does not take a whole team's word from one stray row", () => {
+    expect(teamsWithStats(played("LV", 1)).has("LV")).toBe(false);
+  });
+
+  it("separates the real slate from the stray row in the same feed", () => {
+    const feed = [
+      ...played("SF", 79), ...played("SEA", 73),
+      ...played("NE", 72), ...played("LAR", 71),
+      ...played("LV", 1),
+    ];
+    expect([...teamsWithStats(feed)].sort()).toEqual(["LAR", "NE", "SEA", "SF"]);
+  });
+
+  it("normalises codes, so the set can be compared against a Sleeper roster", () => {
+    expect(teamsWithStats(played("JAC", 40)).has("JAX")).toBe(true);
+  });
+
+  it("ignores rows whose player has no team", () => {
+    expect(teamsWithStats([null, null, null, null, null, null]).size).toBe(0);
   });
 });
