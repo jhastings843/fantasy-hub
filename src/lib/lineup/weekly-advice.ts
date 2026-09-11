@@ -58,6 +58,18 @@ export interface AdvicePlayer {
   onBye: boolean;
   /** True when he ranked this player nowhere. */
   unranked: boolean;
+  /**
+   * True once this player's game has kicked off.
+   *
+   * Sleeper freezes a starting slot the moment the player in it takes the
+   * field, so a locked player is not a decision any more: he cannot be taken
+   * out and, if he is on the bench, he cannot be put in. Optional because the
+   * scorecard solves counterfactual lineups that are deliberately unconstrained
+   * by the clock, and absent means unlocked.
+   */
+  locked?: boolean;
+  /** What he actually scored, once there is a real number to quote. */
+  actualPoints?: number | null;
 }
 
 export interface SlotAdvice {
@@ -199,10 +211,32 @@ export function adviseLineup(input: {
 
   const slots = startingSlots(rosterPositions);
   const byId = new Map(roster.map((p) => [p.playerId, p]));
-  const available = roster.filter((p) => !cannotPlay(p));
+  // A locked player is not available to be placed anywhere, whether he is on
+  // the bench or already starting. The starting half is handled below by
+  // seating him in the slot he is already in; here he is simply out of the
+  // pool, which is what stops the solver moving him or promoting him.
+  const available = roster.filter((p) => !p.locked && !cannotPlay(p));
 
   const assigned = new Map<number, AdvicePlayer>();
   const taken = new Set<string>();
+
+  // Slots whose game has been played, seated before anything else decides
+  // anything.
+  //
+  // This runs ahead of the superflex rule and ahead of the solver because it is
+  // not a preference, it is the state of the world: whoever is in this slot
+  // played, and the slot is spent. Note that cannotPlay is deliberately NOT
+  // consulted. Sleeper never clears injury_status after a game, so De'Zhaun
+  // Stribling reads "Out" all weekend having already been on the field, and
+  // filtering him here would hand his locked slot to somebody who cannot
+  // actually occupy it.
+  for (const [index, id] of currentStarters.entries()) {
+    if (!id || id === "0" || index >= slots.length) continue;
+    const p = byId.get(id);
+    if (!p?.locked) continue;
+    assigned.set(index, p);
+    taken.add(p.playerId);
+  }
 
   // SUPER_FLEX is resolved before the solve, not by it.
   //
@@ -223,7 +257,7 @@ export function adviseLineup(input: {
       .filter((p) => p.position === "QB")
       .sort((a, b) => scoreOf(b) - scoreOf(a));
 
-    const seats = [...qbSlotIndexes, ...superflexIndexes];
+    const seats = [...qbSlotIndexes, ...superflexIndexes].filter((i) => !assigned.has(i));
     for (const seat of seats) {
       const pick = quarterbacks.find((q) => !taken.has(q.playerId));
       if (!pick) {
@@ -285,10 +319,14 @@ export function adviseLineup(input: {
 
     // The best eligible player who is not in the lineup at all, which is what
     // makes a recommendation arguable rather than asserted.
-    const alternative =
-      available
-        .filter((p) => !taken.has(p.playerId) && slotAccepts(slot, p.position))
-        .sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? null;
+    //
+    // Null for a locked slot: there is no alternative to a game that has been
+    // played, and naming one invites exactly the change Sleeper will refuse.
+    const alternative = recommended?.locked
+      ? null
+      : (available
+          .filter((p) => !taken.has(p.playerId) && slotAccepts(slot, p.position))
+          .sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? null);
 
     // Who this player is actually replacing. When the slot's current occupant
     // is staying in the lineup elsewhere, the person being dropped is somebody
@@ -324,6 +362,9 @@ export function adviseLineup(input: {
     const p = byId.get(id);
     if (!p) continue;
     if (index >= slots.length) continue;
+    // Nothing here is actionable once he has played, and "listed Out" beside a
+    // man who has already been on the field is not a warning, it is noise.
+    if (p.locked) continue;
     if (p.onBye) problems.push({ player: p, why: "on bye this week" });
     else if (cannotPlay(p)) problems.push({ player: p, why: `listed ${p.injuryStatus}` });
     else if (p.unranked) problems.push({ player: p, why: "not in his list this week" });
@@ -393,6 +434,17 @@ function reasonFor(
   if (!recommended) return "No eligible player for this slot.";
 
   const rec = `${recommended.name} (${rankLabel(recommended, slot)})${matchup(recommended)}`;
+
+  // A played slot is reported, not argued. Everything below this line is a
+  // case for starting somebody, and there is no case to make once the game is
+  // over: the score is the answer.
+  if (recommended.locked) {
+    const scored =
+      typeof recommended.actualPoints === "number"
+        ? ` He scored ${recommended.actualPoints.toFixed(1)}.`
+        : "";
+    return `${rec}. Locked, his game has been played.${scored}`;
+  }
 
   if (!changed) {
     if (!alternative) return `${rec}. Nothing else on the bench can take this slot.`;

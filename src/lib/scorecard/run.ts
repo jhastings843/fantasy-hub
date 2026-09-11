@@ -3,6 +3,7 @@ import { buildWeeklyLineups } from "@/lib/lineup/build";
 import { adviseLineup } from "@/lib/lineup/weekly-advice";
 import { scoreStatLine, type ScoringSettings } from "@/lib/guillotine/scoring";
 import { getLeague, getNflState } from "@/lib/sleeper/client";
+import { getWeekStats } from "@/lib/sleeper/stats";
 import { perfectLineup, scoreLineup, verdict, type ActualPoints } from "./pure";
 import { isSettled, readWeek, writeWeek, type Settled, type Snapshot } from "./store";
 
@@ -17,8 +18,6 @@ import { isSettled, readWeek, writeWeek, type Settled, type Snapshot } from "./s
 // Both ride the daily snapshot cron and decide for themselves whether today is
 // the day, the same pattern the emails use, because Vercel Hobby allows two
 // cron jobs and both are long spoken for.
-
-const STATS = "https://api.sleeper.app/v1/stats/nfl/regular";
 
 function dayInNewYork(now: Date): number {
   const weekday = new Intl.DateTimeFormat("en-US", {
@@ -37,9 +36,10 @@ function dayInNewYork(now: Date): number {
  * fairest test: it grades the advice as it stood at the moment Jack actually had
  * to decide, with his latest in-week edits included.
  *
- * The known impurity, written down rather than hidden: anybody who played on
- * Thursday night is already locked by Sunday morning, so for those players this
- * grades advice Jack could no longer have acted on.
+ * Thursday night is already locked by Sunday morning, and the advised lineup
+ * knows it: a player whose game has been played stays in the slot he is in, so
+ * what gets graded is advice Jack could actually have acted on. The `raw`
+ * lineup below is the deliberate exception.
  *
  * Never overwrites an existing record. A second run in the same week would move
  * the goalposts after some games had been played.
@@ -69,9 +69,14 @@ export async function snapshotWeek(options: { force?: boolean } = {}): Promise<{
     const advised = league.advice.slots.map((s) => s.recommended?.playerId ?? "");
     // His ranking with the adjustment taken away, solved by the SAME function,
     // so the two lineups cannot differ because of anything but the adjustment.
+    // `locked` is stripped along with the adjustment, and for the same reason:
+    // this lineup is the counterfactual "his rankings, nothing else", and a
+    // clock constraint is something else. The advised lineup above keeps its
+    // locks, which is what finally retires the impurity noted at the top of
+    // this file: what it grades is now what Jack could actually have set.
     const raw = adviseLineup({
       rosterPositions: league.rosterPositions,
-      roster: league.roster.map((p) => ({ ...p, adjustedFlexRank: null })),
+      roster: league.roster.map((p) => ({ ...p, adjustedFlexRank: null, locked: false })),
       currentStarters: [],
     }).slots.map((s) => s.recommended?.playerId ?? "");
 
@@ -104,9 +109,7 @@ async function actualPoints(
   scoring: ScoringSettings,
 ): Promise<ActualPoints | null> {
   try {
-    const res = await fetch(`${STATS}/${season}/${week}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Record<string, Record<string, number>>;
+    const rows = await getWeekStats(season, week);
     const out: ActualPoints = {};
     for (const [playerId, stats] of Object.entries(rows)) {
       out[playerId] = Number(scoreStatLine(stats, scoring).toFixed(2));

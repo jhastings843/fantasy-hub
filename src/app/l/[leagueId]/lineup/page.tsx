@@ -74,16 +74,34 @@ function PlayerLine({ p, slot }: { p: AdvicePlayer; slot: string }) {
   const usingFlex = slot !== p.position && p.flexRank !== null;
   const showAdjusted =
     usingFlex && p.adjustedFlexRank !== null && p.adjustedFlexRank !== p.flexRank;
+  // The score replaces the rank once the game is over. A rank is a forecast and
+  // the forecast is spent: nobody wants to know where he was ranked after the
+  // fact, and putting both side by side invites a comparison that means
+  // nothing.
+  const played = p.locked === true;
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="font-medium text-zinc-900 dark:text-zinc-100">{p.name}</span>
+      <span
+        className={
+          played
+            ? "font-medium text-zinc-500 dark:text-zinc-400"
+            : "font-medium text-zinc-900 dark:text-zinc-100"
+        }
+      >
+        {p.name}
+      </span>
       <Chip tone={p.unranked ? "rose" : showAdjusted ? "cyan" : "zinc"}>
         {rankText(p, slot)}
       </Chip>
-      {showAdjusted && <Chip>his {p.flexRank}</Chip>}
+      {showAdjusted && !played && <Chip>his {p.flexRank}</Chip>}
       <span className="text-sm text-zinc-500 tabular-nums dark:text-zinc-400">
         {matchupText(p)}
       </span>
+      {played && typeof p.actualPoints === "number" && (
+        <span className="text-sm font-semibold text-zinc-900 tabular-nums dark:text-zinc-100">
+          {p.actualPoints.toFixed(1)} pts
+        </span>
+      )}
     </span>
   );
 }
@@ -125,6 +143,11 @@ function LineupTable({ league }: { league: LeagueLineup }) {
                   change
                 </span>
               )}
+              {s.recommended?.locked && (
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  played
+                </span>
+              )}
             </div>
             <div className="min-w-0 flex-1">
               {s.recommended ? (
@@ -133,7 +156,11 @@ function LineupTable({ league }: { league: LeagueLineup }) {
                 <span className="text-sm text-zinc-500">Nobody eligible</span>
               )}
               <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                {s.reason}
+                {/* A played slot gets the short version. The full sentence in
+                    s.reason has to stand alone in the Thursday email, so it
+                    repeats the name and the score that are already on the row
+                    above. */}
+                {s.recommended?.locked ? "Locked. Nothing to do here." : s.reason}
               </p>
             </div>
           </div>
@@ -216,6 +243,34 @@ function Scorecard({ weeks }: { weeks: SettledWeek[] }) {
   );
 }
 
+/**
+ * The line under the headline, which has to tell the truth about two different
+ * kinds of settled slot.
+ *
+ * A slot can be settled because it is right, or settled because the game has
+ * been played, and those are not the same news. Reporting the second as the
+ * first is how the page came to claim a lineup matched his rankings on a Friday
+ * when a third of it was already in the books.
+ */
+function subhead(changes: number, locked: number, slots: number): string {
+  const played =
+    locked === 0
+      ? ""
+      : locked === slots
+        ? "Every slot has been played."
+        : `${locked} slot${locked === 1 ? " is" : "s are"} already played and locked.`;
+
+  if (changes > 0) {
+    const rest = "Everything else already matches his rankings. Only these need touching.";
+    return played ? `${played} ${rest}` : rest;
+  }
+  if (locked === slots && slots > 0) return "Every slot has been played. This week is done.";
+  const rest = locked
+    ? "The rest match his rankings."
+    : "Your lineup already matches his rankings for every slot this league starts.";
+  return played ? `${played} ${rest}` : rest;
+}
+
 export default async function LineupPage({
   params,
 }: {
@@ -254,6 +309,10 @@ export default async function LineupPage({
 
   const changes = league.advice.changes;
   const problems = league.advice.problems;
+  // Slots that are spent rather than correct. Without this the page says the
+  // lineup "already matches his rankings", which is not what it means when
+  // three of those slots were settled on Thursday night.
+  const locked = league.advice.slots.filter((s) => s.recommended?.locked);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -264,9 +323,7 @@ export default async function LineupPage({
           : `${changes.length} slot${changes.length === 1 ? "" : "s"} to change.`}
       </h1>
       <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
-        {changes.length === 0
-          ? "Your lineup already matches his rankings for every slot this league starts."
-          : "Everything else already matches his rankings. Only these need touching."}
+        {subhead(changes.length, locked.length, league.advice.slots.length)}
       </p>
 
       {changes.length > 0 && (

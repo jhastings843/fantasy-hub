@@ -6,6 +6,9 @@ import { getAllPlayers, getLeague, getLeagueRosters, getUser } from "@/lib/sleep
 import { getWeekProjections } from "@/lib/guillotine/projections";
 import { normalizeTeam } from "@/lib/jingles/resolve";
 import { scoringSkewNotes, type ScoringSettings } from "@/lib/guillotine/scoring";
+import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
+import { getSeasonGames } from "@/lib/survivor/odds";
+import { lockedTeams } from "./locks";
 import { adjustedFlexRanks, adviseLineup, isOnBye, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
 
 // Everything the lineup advice needs, fetched and joined.
@@ -26,6 +29,8 @@ export interface LeagueLineup {
   roster: AdvicePlayer[];
   /** Sleeper's own starters array at the moment this was built. */
   currentStarters: string[];
+  /** Teams whose game has already kicked off, so their slots cannot move. */
+  lockedTeams: string[];
   advice: LineupAdvice;
   /** Said out loud when a league could not be advised, rather than shown empty. */
   error: string | null;
@@ -39,6 +44,8 @@ export interface WeeklyLineups {
   listScoring: string | null;
   listUpdatedLabel: string | null;
   leagues: LeagueLineup[];
+  /** True once any game in the week has been played. */
+  anyLocked: boolean;
   /** Set when there is no weekly list at all, which is a whole different email. */
   blocked: string | null;
 }
@@ -86,6 +93,7 @@ export async function buildWeeklyLineups(
       listScoring: null,
       listUpdatedLabel: null,
       leagues: [],
+      anyLocked: false,
       blocked:
         "No weekly rankings have been ingested yet. Nothing here is a lineup until his list is in.",
     };
@@ -106,11 +114,37 @@ export async function buildWeeklyLineups(
       listScoring: weekly.scoring,
       listUpdatedLabel: weekly.updatedLabel,
       leagues: [],
+      anyLocked: false,
       blocked: "SLEEPER_USERNAME is not set, so the app cannot tell which roster is yours.",
     };
   }
 
   const me = await getUser(username);
+
+  // What is already out of his hands.
+  //
+  // Two independent signals, unioned, because either one alone has a failure
+  // mode that puts the old bug straight back. ESPN's schedule is the precise
+  // one, and it locks on the clock rather than on a stat appearing, so a slot
+  // goes cold at kickoff the way Sleeper's does. Sleeper's own stat feed is the
+  // backstop: a player only appears in it once he has been on the field, so a
+  // team with rows has played whatever the schedule fetch did. Neither is
+  // allowed to take the page down, and a failure of one is survivable because
+  // the other is still there.
+  const [schedule, stats] = await Promise.all([
+    getSeasonGames(Number(weekly.season))
+      .then((s) => s.games.filter((g) => g.week === weekly.week))
+      .catch(() => []),
+    getWeekStats(weekly.season, weekly.week).catch(() => ({}) as StatRows),
+  ]);
+
+  const locked = lockedTeams(schedule, new Date());
+  for (const playerId of Object.keys(stats)) {
+    const team = normalizeTeam(
+      (players[playerId] as { team?: string | null } | undefined)?.team ?? null,
+    );
+    if (team) locked.add(team);
+  }
 
   // Teams with a game this week, taken from his own list: every row he wrote
   // carries a matchup, so a team that appears nowhere in 407 rows has no game.
@@ -137,7 +171,9 @@ export async function buildWeeklyLineups(
   const out: LeagueLineup[] = [];
   for (const profile of wanted) {
     try {
-      out.push(await lineupForLeague(profile, weekly, players, me.user_id, playing));
+      out.push(
+        await lineupForLeague(profile, weekly, players, me.user_id, playing, locked, stats),
+      );
     } catch (e) {
       out.push({
         leagueId: profile.id,
@@ -148,6 +184,7 @@ export async function buildWeeklyLineups(
         scoringLabel: scoringLabel(profile),
         roster: [],
         currentStarters: [],
+        lockedTeams: [],
         advice: { slots: [], changes: [], problems: [], superflexFellThrough: false, adjustmentDecided: [] },
         error: e instanceof Error ? e.message : String(e),
       });
@@ -162,6 +199,7 @@ export async function buildWeeklyLineups(
     listScoring: weekly.scoring,
     listUpdatedLabel: weekly.updatedLabel,
     leagues: out,
+    anyLocked: locked.size > 0,
     blocked: null,
   };
 }
@@ -178,6 +216,8 @@ async function lineupForLeague(
   players: Awaited<ReturnType<typeof getAllPlayers>>,
   myUserId: string,
   playing: Set<string>,
+  locked: Set<string>,
+  stats: StatRows,
 ): Promise<LeagueLineup> {
   const [league, rosters] = await Promise.all([
     getLeague(profile.id),
@@ -224,6 +264,8 @@ async function lineupForLeague(
           toPointsMap(leaguePoints),
         );
 
+  const actual = scoreRows(stats, leagueScoring);
+
   const roster: AdvicePlayer[] = (mine.players ?? []).map((id) => {
     const p = players[id] as
       | { full_name?: string; first_name?: string; last_name?: string; position?: string | null; team?: string | null; injury_status?: string | null }
@@ -262,6 +304,11 @@ async function lineupForLeague(
         teamsPlaying: playing,
       }),
       unranked: pr === null && fr === null,
+      // Locked on the team, not on the player having a stat line. A receiver
+      // who was inactive on Thursday has no row in the stat feed and is just as
+      // stuck in his slot as the one who caught eight passes.
+      locked: isLocked(normalizeTeam(team), locked),
+      actualPoints: actual[id] ?? null,
     };
   });
 
@@ -280,9 +327,15 @@ async function lineupForLeague(
     scoringLabel: scoringLabel(profile),
     roster,
     currentStarters: mine.starters ?? [],
+    lockedTeams: [...locked].sort(),
     advice,
     error: null,
   };
+}
+
+/** A player with no team cannot be locked, because nothing tells us he played. */
+function isLocked(team: string | null, locked: Set<string>): boolean {
+  return team !== null && locked.has(team);
 }
 
 function scoringNameFor(profile: LeagueProfile): string {

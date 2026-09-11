@@ -454,3 +454,159 @@ describe("adjustedFlexRanks", () => {
     expect(out.get("b")).toBe(1);
   });
 });
+
+// The bug Jack reported on 2026-09-11: the 49ers had played on Thursday, and
+// the app was still telling him to bench De'Zhaun Stribling out of his FLEX for
+// a Jets receiver who played on Sunday. Sleeper locks a slot at kickoff, so
+// that change was not a change he could make.
+describe("adviseLineup with games already played", () => {
+  const CHOPPED = SLOTS.chopped;
+  /** The optimal lineup, which is what a locked player has to beat. */
+  const started = OPTIMAL_CHOPPED;
+
+  it("keeps a locked starter in his slot even when the bench is better", () => {
+    // wr3 is his worst receiver, sitting in a FLEX slot, and his game is over.
+    const starters = [...started];
+    starters[7] = "wr3";
+    const roster2 = roster.map((p) => (p.playerId === "wr3" ? { ...p, locked: true } : p));
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    expect(advice.slots[7].recommended?.playerId).toBe("wr3");
+    expect(advice.slots[7].changed).toBe(false);
+    expect(advice.changes).toHaveLength(0);
+  });
+
+  it("says the slot is locked rather than arguing for the player", () => {
+    const starters = [...started];
+    starters[7] = "wr3";
+    const roster2 = roster.map((p) => (p.playerId === "wr3" ? { ...p, locked: true } : p));
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    expect(advice.slots[7].reason).toMatch(/locked/i);
+  });
+
+  it("does not report a locked starter as a problem, even when he is listed Out", () => {
+    // Exactly Stribling: Sleeper never clears injury_status after the game.
+    const starters = [...started];
+    starters[7] = "wr3";
+    const roster2 = roster.map((p) =>
+      p.playerId === "wr3" ? { ...p, locked: true, injuryStatus: "Out" } : p,
+    );
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    expect(advice.problems).toHaveLength(0);
+    expect(advice.slots[7].recommended?.playerId).toBe("wr3");
+  });
+
+  it("still reports an Out starter whose game has not been played", () => {
+    const starters = [...started];
+    starters[7] = "wr3";
+    const roster2 = roster.map((p) =>
+      p.playerId === "wr3" ? { ...p, injuryStatus: "Out" } : p,
+    );
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    expect(advice.problems.map((p) => p.player.playerId)).toContain("wr3");
+  });
+
+  it("never recommends a bench player whose game has been played", () => {
+    // rb4 is the best bench flex option. With his game gone, the slot has to
+    // fall to the next man rather than to him.
+    const starters = [...started];
+    starters[6] = "rb3";
+    const roster2 = roster.map((p) => (p.playerId === "rb4" ? { ...p, locked: true } : p));
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    const recommended = advice.slots.map((s) => s.recommended?.playerId);
+    expect(recommended).not.toContain("rb4");
+  });
+
+  it("does not offer a played bench player as the next best alternative", () => {
+    const starters = [...started];
+    const roster2 = roster.map((p) => (p.playerId === "rb4" ? { ...p, locked: true } : p));
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    for (const s of advice.slots) {
+      expect(s.alternative?.playerId).not.toBe("rb4");
+    }
+  });
+
+  it("keeps a locked quarterback in the superflex seat", () => {
+    const starters = [
+      "qb1", "rb1", "rb2", "wr1", "wr2", "te1", "rb4", "wr4", "wr3", "qb2",
+    ];
+    const roster2 = roster.map((p) => (p.playerId === "qb2" ? { ...p, locked: true } : p));
+
+    const advice = adviseLineup({
+      rosterPositions: SLOTS.dynasty,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    expect(advice.slots[9].recommended?.playerId).toBe("qb2");
+    expect(advice.slots[9].changed).toBe(false);
+    expect(advice.superflexFellThrough).toBe(false);
+  });
+
+  it("quotes what a locked player actually scored when it is known", () => {
+    const starters = [...started];
+    starters[7] = "wr3";
+    const roster2 = roster.map((p) =>
+      p.playerId === "wr3" ? { ...p, locked: true, actualPoints: 3.2 } : p,
+    );
+
+    const advice = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster2,
+      currentStarters: starters,
+    });
+
+    expect(advice.slots[7].reason).toContain("3.2");
+  });
+
+  it("changes nothing for a roster where no game has been played", () => {
+    const before = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster,
+      currentStarters: started,
+    });
+    const after = adviseLineup({
+      rosterPositions: CHOPPED,
+      roster: roster.map((p) => ({ ...p, locked: false })),
+      currentStarters: started,
+    });
+    expect(after.slots.map((s) => s.recommended?.playerId)).toEqual(
+      before.slots.map((s) => s.recommended?.playerId),
+    );
+  });
+});
