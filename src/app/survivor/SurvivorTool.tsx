@@ -214,7 +214,10 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   const report = reports.find((r) => r.poolId === poolId) ?? reports[0];
 
   const { pool } = report;
-  const usedSet = useMemo(() => new Set(pool.usedTeams), [pool.usedTeams]);
+  // The REAL burn set: the hand-edited list plus every pick from a week already
+  // gone. Reading pool.usedTeams here meant a pick that burned itself when the
+  // week turned was missing from the board with nothing on the grid to say why.
+  const usedSet = useMemo(() => new Set(report.burnedTeams), [report.burnedTeams]);
   const taken = report.myPick
     ? (report.candidates.find((c) => c.team === report.myPick) ?? null)
     : null;
@@ -280,8 +283,21 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
       setPasteError("Could not read two teams out of that. One team and one number per line.");
       return;
     }
-    if (total < 50 || total > 150) {
-      setPasteError(`Those add up to ${total.toFixed(1)}%, which does not look like a distribution.`);
+
+    // A 30-entry pool's screen shows COUNTS, not percentages: "LAC 11, JAX 7"
+    // sums to 30 and the old check rejected it as not a distribution. Anything
+    // that adds up near the entries alive is read as counts and converted.
+    // Percentages are tried first, so a 100-entry pool is unaffected either way.
+    const looksLikePercentages = total >= 50 && total <= 150;
+    const alive = report.entriesAlive;
+    const looksLikeCounts = !looksLikePercentages && total >= alive * 0.75 && total <= alive * 1.25;
+
+    if (looksLikeCounts) {
+      for (const k of Object.keys(picks)) picks[k] = (picks[k] / total) * 100;
+    } else if (!looksLikePercentages) {
+      setPasteError(
+        `Those add up to ${total.toFixed(1)}, which is neither a percentage distribution nor a count of the ${alive} entries alive.`,
+      );
       return;
     }
     setPasteError(null);
@@ -389,7 +405,6 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
                 : "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300"
             }`}
-            title={report.posture.summary}
           >
             {report.posture.mode === "outright" ? "Plays for an outright win" : "Plays for a share"}
             <span className="font-normal tabular-nums opacity-80">
@@ -408,6 +423,9 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             Pool
           </button>
         </div>
+        <p className="max-w-2xl text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          {report.posture.summary}
+        </p>
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
             Survivor
@@ -865,19 +883,25 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             Teams burned
           </h2>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Tap to toggle. {usedSet.size} of 32 used.
+            {usedSet.size} of 32 used. Your picks burn themselves when the week
+            turns; tap only to record one the tool never saw.
           </span>
         </div>
         <ul className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
           {NFL_TEAMS.map((t) => {
             const isUsed = usedSet.has(t.abbr);
+            // Burned by one of your own logged picks rather than by hand. Those
+            // are derived, so a tap here could not clear them and would silently
+            // edit the manual list instead.
+            const byPick = report.burnedByPick[t.abbr];
             return (
               <li key={t.abbr}>
                 <button
                   type="button"
-                  disabled={working}
+                  disabled={working || byPick !== undefined}
                   onClick={() => toggleBurned(t.abbr)}
                   aria-pressed={isUsed}
+                  title={byPick !== undefined ? `Your week ${byPick} pick` : undefined}
                   className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 ${
                     isUsed
                       ? "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
@@ -896,6 +920,11 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                   >
                     {t.abbr}
                   </span>
+                  {byPick !== undefined && (
+                    <span className="text-[9px] font-semibold tabular-nums text-amber-700 dark:text-amber-500">
+                      W{byPick}
+                    </span>
+                  )}
                 </button>
               </li>
             );

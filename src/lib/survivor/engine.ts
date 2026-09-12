@@ -265,8 +265,14 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // rather than copied into usedTeams, so a week rolls over on its own and this
   // week's pick is still on the board where its own data can be shown.
   const used = new Set(pool.usedTeams);
+  // Which week's pick spent each team, so the grid can say "your week 1 pick"
+  // rather than leaving a struck-through logo unexplained.
+  const burnedByPick: Record<string, number> = {};
   for (const [w, team] of Object.entries(pool.myPicks ?? {})) {
-    if (Number(w) < week && team) used.add(team);
+    if (Number(w) < week && team) {
+      used.add(team);
+      burnedByPick[team] = Number(w);
+    }
   }
   const myPick = (pool.myPicks ?? {})[String(week)] ?? null;
 
@@ -516,6 +522,10 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     pool,
     entriesAlive,
     posture,
+    // The REAL burn set, not pool.usedTeams. The grid read the hand-edited list
+    // and so could not show a pick that burned itself when the week turned.
+    burnedTeams: [...used].sort(),
+    burnedByPick,
     candidates,
     // Once a pick is taken it IS the headline. The Thursday email reads this
     // field, and telling Jack what to pick on a week he has already picked is

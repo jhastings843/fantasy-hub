@@ -536,3 +536,53 @@ describe("headline on a broken tie", () => {
     expect(r.headline).toBe("Week 1: you have DET over NO");
   });
 });
+
+describe("burned teams on the report", () => {
+  // The grid was reading pool.usedTeams, which is the HAND-EDITED list only, so a
+  // pick that burned itself when the week turned was missing from the board with
+  // nothing on the grid to say why. The engine already derived the real set for
+  // availability and the notes line; it just never published it.
+  const games = [
+    game(1, "KC", "DEN", 0.8),
+    game(1, "PHI", "NYG", 0.7),
+    game(2, "BUF", "NYJ", 0.66),
+    game(2, "KC", "NYG", 0.75),
+  ];
+  // Between this fixture's week 1 kickoff (Sep 7) and its week 2 kickoff (Sep 8).
+  // A later clock leaves no future games at all and currentWeek runs to 18.
+  const IN_WEEK_2 = new Date("2026-09-07T18:00:00Z");
+
+  it("includes a pick from a week already gone", () => {
+    const r = report(
+      games.map((g) => (g.week === 1 ? { ...g, completed: true } : g)),
+      EVEN,
+      { myPicks: { "1": "KC" } },
+      IN_WEEK_2,
+    );
+    expect(r.week).toBe(2);
+    expect(r.burnedTeams).toContain("KC");
+  });
+
+  it("does not burn this week's pick, which is still the answer", () => {
+    const r = report(games, EVEN, { myPicks: { "1": "KC" } });
+    expect(r.week).toBe(1);
+    expect(r.burnedTeams).not.toContain("KC");
+    expect(r.candidates.map((c) => c.team)).toContain("KC");
+  });
+
+  it("includes teams burned by hand", () => {
+    const r = report(games, EVEN, { usedTeams: ["PHI"] });
+    expect(r.burnedTeams).toContain("PHI");
+  });
+
+  it("says which teams a pick burned, so the grid can explain itself", () => {
+    const r = report(
+      games.map((g) => (g.week === 1 ? { ...g, completed: true } : g)),
+      EVEN,
+      { usedTeams: ["PHI"], myPicks: { "1": "KC" } },
+      IN_WEEK_2,
+    );
+    expect(r.burnedByPick).toEqual({ KC: 1 });
+    expect(r.burnedTeams).toEqual(expect.arrayContaining(["KC", "PHI"]));
+  });
+});

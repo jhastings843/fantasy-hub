@@ -175,6 +175,14 @@ export interface SurvivorReport {
   entriesAlive: number;
   /** What the pool is playing for: an outright win or a share of one. */
   posture: Posture;
+  /**
+   * Every team spent, which is pool.usedTeams plus every pick from a week
+   * already gone. Published because the two are NOT the same list and the grid
+   * was rendering the shorter one.
+   */
+  burnedTeams: string[];
+  /** team -> the week whose pick burned it. Absent for teams burned by hand. */
+  burnedByPick: Record<string, number>;
 
   /** Every legal pick this week, best first. */
   candidates: Candidate[];
