@@ -44,6 +44,45 @@ function Chip({
 }
 
 /**
+ * Slot colours, by position.
+ *
+ * Data encoding rather than decoration, which is why it is allowed to break the
+ * one-accent rule the rest of the app follows: the table is fourteen rows of
+ * near-identical text and the position is the thing you scan for. Tints only
+ * (100/800), so none of them competes with the amber that means "act on this".
+ * Anything unrecognised falls back to zinc rather than inventing a colour.
+ */
+const SLOT_TONES: Record<string, string> = {
+  QB: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
+  RB: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
+  WR: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
+  TE: "bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-300",
+  K: "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300",
+  DEF: "bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300",
+  DST: "bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300",
+  FLEX: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  SUPER_FLEX: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/50 dark:text-fuchsia-300",
+  BN: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+};
+
+function slotTone(slot: string): string {
+  return (
+    SLOT_TONES[slot.toUpperCase()] ??
+    "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+  );
+}
+
+function SlotBadge({ slot }: { slot: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${slotTone(slot)}`}
+    >
+      {slot.replace("SUPER_FLEX", "SFLEX")}
+    </span>
+  );
+}
+
+/**
  * The rank chip for a player in a slot.
  *
  * Where an adjustment applies, this is the number the lineup was sorted by, and
@@ -110,7 +149,7 @@ function ChangeCard({ slot }: { slot: SlotAdvice }) {
   return (
     <div className="rounded-2xl border border-amber-300 bg-amber-50/60 p-4 transition-colors dark:border-amber-900/60 dark:bg-amber-950/20">
       <div className="flex items-center gap-2">
-        <Chip tone="amber">{slot.slot}</Chip>
+        <SlotBadge slot={slot.slot} />
         <Eyebrow>Change this</Eyebrow>
       </div>
       <div className="mt-2 text-base">
@@ -134,10 +173,19 @@ function LineupTable({ league }: { league: LeagueLineup }) {
         {league.advice.slots.map((s) => (
           <div
             key={`${s.slot}-${s.index}`}
-            className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
+            // Three row states, readable without reading: a slot that needs
+            // touching is washed amber and carries a left rule, a slot whose
+            // game is over is dimmed, everything else is plain.
+            className={`flex flex-col gap-1.5 border-l-2 px-4 py-3 transition-colors sm:flex-row sm:items-center sm:gap-4 ${
+              s.changed
+                ? "border-l-amber-400 bg-amber-50/70 dark:border-l-amber-500 dark:bg-amber-950/20"
+                : s.recommended?.locked
+                  ? "border-l-transparent bg-zinc-50/80 dark:bg-zinc-950/40"
+                  : "border-l-transparent"
+            }`}
           >
             <div className="flex w-full items-center gap-2 sm:w-28 sm:shrink-0">
-              <Chip tone={s.changed ? "amber" : "zinc"}>{s.slot}</Chip>
+              <SlotBadge slot={s.slot} />
               {s.changed && (
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                   change
@@ -314,17 +362,76 @@ export default async function LineupPage({
   // three of those slots were settled on Thursday night.
   const locked = league.advice.slots.filter((s) => s.recommended?.locked);
 
+  // The page is force-dynamic, so this IS the moment the roster and the injury
+  // list were read. "Fri 11:04pm ET" rather than a date, because the only thing
+  // worth knowing is whether it is older than the last news you saw.
+  const checkedAt = `${new Date()
+    .toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+    .replace(/\s*AM$/, "am")
+    .replace(/\s*PM$/, "pm")} ET`;
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <Eyebrow>Week {result.week}</Eyebrow>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
-        {changes.length === 0
-          ? "Nothing to change."
-          : `${changes.length} slot${changes.length === 1 ? "" : "s"} to change.`}
-      </h1>
-      <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
-        {subhead(changes.length, locked.length, league.advice.slots.length)}
-      </p>
+      {/* The state of the week, in colour. "Nothing to change" and "3 slots to
+          change" used to be identical typography, so which one you were looking
+          at took a sentence to work out. */}
+      <div
+        className={`rounded-2xl border p-5 sm:p-6 ${
+          changes.length === 0
+            ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20"
+            : "border-amber-300 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20"
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+            Week {result.week}
+          </span>
+          <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            {league.leagueName}
+          </span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            {league.scoringLabel}
+          </span>
+        </div>
+        <h1
+          className={`mt-3 text-3xl font-semibold tracking-tight sm:text-4xl ${
+            changes.length === 0
+              ? "text-emerald-900 dark:text-emerald-200"
+              : "text-amber-900 dark:text-amber-200"
+          }`}
+        >
+          {changes.length === 0
+            ? "Nothing to change."
+            : `${changes.length} slot${changes.length === 1 ? "" : "s"} to change.`}
+        </h1>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+          {subhead(changes.length, locked.length, league.advice.slots.length)}
+        </p>
+        {/* Two different "last updated", because they answer different
+            questions: when HE last touched the rankings, and when this page last
+            pulled the roster and the injuries. */}
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/5 pt-3 text-xs text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+          {result.listUpdatedLabel && (
+            <span>
+              Rankings updated{" "}
+              <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                {result.listUpdatedLabel}
+              </span>
+            </span>
+          )}
+          <span>
+            Roster and injuries checked{" "}
+            <span className="font-semibold text-zinc-700 tabular-nums dark:text-zinc-300">
+              {checkedAt}
+            </span>
+          </span>
+        </div>
+      </div>
 
       {changes.length > 0 && (
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
@@ -388,9 +495,8 @@ export default async function LineupPage({
 
       <div className="mt-8 max-w-2xl space-y-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
         <p>
-          {result.listTitle}
-          {result.listUpdatedLabel ? `, last updated ${result.listUpdatedLabel}` : ""}. He ranks
-          for {(result.listScoring ?? "half ppr").replace("_", " ")}. This league is{" "}
+          {result.listTitle}. He ranks for{" "}
+          {(result.listScoring ?? "half ppr").replace("_", " ")}. This league is{" "}
           {league.scoringLabel}.
         </p>
         {league.skewNotes.map((n) => (
