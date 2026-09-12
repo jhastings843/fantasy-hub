@@ -176,3 +176,50 @@ describe("calibrate", () => {
     expect(extreme.alpha).toBeLessThanOrEqual(4);
   });
 });
+
+describe("calibrate, by pool size", () => {
+  // A 30-entry pool's distribution is a much noisier measurement than a
+  // 500-entry pool's: one person is 3.3 percentage points, and a 30% share has a
+  // sampling SD of 8.4 points against 2.0 points at 500 entries. Information
+  // goes as the entry count, so a week of 30-entry data is worth about a
+  // sixteenth of a week of 500-entry data and cannot be allowed to move the
+  // chalk factor as far.
+  function chalkyWeek(week: number) {
+    return {
+      week,
+      publicPicks: { KC: 0.4, PHI: 0.3, BUF: 0.2, NYJ: 0.1 },
+      poolPicks: { KC: 0.7, PHI: 0.2, BUF: 0.07, NYJ: 0.03 },
+    };
+  }
+
+  it("matches the old weeks-only shrinkage at 500 entries", () => {
+    // The anchor: 500 entries reproduces weeks/(weeks+2) exactly, so adding
+    // pool size did not quietly re-tune the pool this was calibrated on.
+    const one = calibrate([chalkyWeek(1)], 500);
+    const raw = one.rawAlpha;
+    expect(one.alpha).toBeCloseTo(1 + (raw - 1) / 3, 9);
+  });
+
+  it("moves far less on one week of a 30-entry pool", () => {
+    const big = calibrate([chalkyWeek(1)], 500);
+    const small = calibrate([chalkyWeek(1)], 30);
+    expect(small.rawAlpha).toBeCloseTo(big.rawAlpha, 9);
+    expect(Math.abs(small.alpha - 1)).toBeLessThan(Math.abs(big.alpha - 1) / 5);
+  });
+
+  it("never reports better than medium confidence for a 30-entry pool", () => {
+    const weeks = Array.from({ length: 12 }, (_, i) => chalkyWeek(i + 1));
+    expect(calibrate(weeks, 30).confidence).not.toBe("good");
+    expect(calibrate(weeks, 500).confidence).toBe("good");
+  });
+
+  it("still says low after one week however many entries there are", () => {
+    // The weeks cap stays: one week is a coincidence at any pool size.
+    expect(calibrate([chalkyWeek(1)], 5000).confidence).toBe("low");
+  });
+
+  it("says when the entry count is what is holding confidence down", () => {
+    const weeks = Array.from({ length: 8 }, (_, i) => chalkyWeek(i + 1));
+    expect(calibrate(weeks, 30).summary).toMatch(/30 entries|entry count|entries a week/i);
+  });
+});

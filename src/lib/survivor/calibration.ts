@@ -145,11 +145,50 @@ function confidenceFor(weeks: number): Calibration["confidence"] {
 }
 
 /**
+ * The pool this shrinkage was originally tuned against, and the reason the
+ * formula below reduces to the old one. With 500 entries a week,
+ * T/(T+SHRINK_ENTRIES) is exactly weeks/(weeks+2), so the deliberate "one week
+ * moves it a third of the way" choice is preserved rather than re-tuned.
+ */
+const REFERENCE_ENTRIES = 500;
+const SHRINK_ENTRIES = 1000;
+
+/**
+ * Confidence from how much of the pool has actually been observed, which is not
+ * the same question as how many weeks have gone by.
+ *
+ * A logged week measures the pool's distribution with sampling error that goes
+ * as 1/sqrt(entries): at 500 entries a 30% share is measured to about 2 points,
+ * at 30 entries to about 8.4, and one person is 3.3 points all by themselves.
+ * Information goes as the entry count, so a small pool's chalk factor is a
+ * genuinely weaker estimate no matter how patient you are. Twelve logged weeks
+ * of a 30-entry pool carry less information than one week of a 500-entry one.
+ */
+function confidenceFromEntries(weight: number): Calibration["confidence"] {
+  if (weight >= 0.3) return "good";
+  if (weight >= 0.15) return "medium";
+  return "low";
+}
+
+const RANK: Calibration["confidence"][] = ["none", "low", "medium", "good"];
+
+/** The weaker of two confidence readings. */
+function weaker(
+  a: Calibration["confidence"],
+  b: Calibration["confidence"],
+): Calibration["confidence"] {
+  return RANK.indexOf(a) <= RANK.indexOf(b) ? a : b;
+}
+
+/**
  * Fit alpha and shrink it toward 1 by the number of weeks observed. One week of
  * data is a coincidence, not a tendency, so a single observation only moves the
  * factor a third of the way toward its own best fit.
  */
-export function calibrate(obs: Observation[]): Calibration {
+export function calibrate(
+  obs: Observation[],
+  entriesPerWeek: number = REFERENCE_ENTRIES,
+): Calibration {
   const usable = obs.filter(
     (o) => Object.keys(o.poolPicks).filter((t) => t in o.publicPicks).length >= 2,
   );
@@ -164,13 +203,25 @@ export function calibrate(obs: Observation[]): Calibration {
     };
   }
   const rawAlpha = fitAlpha(usable);
-  const shrunk = 1 + (rawAlpha - 1) * (weeks / (weeks + 2));
+  // Shrink on entries observed, not weeks. See REFERENCE_ENTRIES: at 500 this is
+  // identical to weeks/(weeks+2), and below it a week simply counts for less.
+  const observed = Math.max(1, entriesPerWeek) * weeks;
+  const weight = observed / (observed + SHRINK_ENTRIES);
+  const shrunk = 1 + (rawAlpha - 1) * weight;
   const alpha = Math.min(MAX_ALPHA, Math.max(MIN_ALPHA, shrunk));
+
+  const byWeeks = confidenceFor(weeks);
+  const byEntries = confidenceFromEntries(weight);
+  const confidence = weaker(byWeeks, byEntries);
+
   return {
     alpha,
     rawAlpha,
     weeks,
-    confidence: confidenceFor(weeks),
-    summary: describe(alpha, weeks),
+    confidence,
+    summary:
+      RANK.indexOf(byEntries) < RANK.indexOf(byWeeks)
+        ? `${describe(alpha, weeks)} Confidence is capped by pool size rather than by patience: at ${Math.round(entriesPerWeek)} entries a week, one person is ${((1 / Math.max(1, entriesPerWeek)) * 100).toFixed(1)} points of the distribution, so the fit stays a weak estimate however many weeks are logged.`
+        : describe(alpha, weeks),
   };
 }

@@ -200,9 +200,13 @@ function survivorBlock(survivor: SurvivorReport, poolName: string | null): strin
     .map((p) => `W${p.week} ${escapeHtml(p.team)}`)
     .join(" &middot; ");
 
+  // What the pool is playing for, which is what decided a tie if there was one.
+  const posture = `<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:4px;">${escapeHtml(survivor.posture.summary)}</div>`;
+
   return card(
     `${label(poolName ? `Survivor pick, ${poolName}` : "Survivor pick")}
 <div style="font:700 22px/1.25 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${PALETTE.ink};letter-spacing:-.01em;">${escapeHtml(survivor.headline)}</div>
+${posture}
 ${stats}
 ${why}
 ${runnersUp ? `<div style="padding-top:12px;margin-top:12px;border-top:1px solid ${PALETTE.hairline};">${label("What it beat")}${runnersUp}</div>` : ""}

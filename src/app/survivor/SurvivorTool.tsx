@@ -381,6 +381,24 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
           <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
             {32 - usedSet.size} teams left
           </span>
+          {/* What the pool is playing for. Drives which end of a tie the board
+              takes, so it belongs next to the pick rather than buried. */}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              report.posture.mode === "outright"
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                : "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300"
+            }`}
+            title={report.posture.summary}
+          >
+            {report.posture.mode === "outright" ? "Plays for an outright win" : "Plays for a share"}
+            <span className="font-normal tabular-nums opacity-80">
+              ~{report.posture.expectedSurvivors < 10
+                ? report.posture.expectedSurvivors.toFixed(1)
+                : Math.round(report.posture.expectedSurvivors)}{" "}
+              left at 18
+            </span>
+          </span>
           <button
             type="button"
             onClick={() => setShowSettings((s) => !s)}

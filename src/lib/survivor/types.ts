@@ -159,6 +159,7 @@ export interface FuturePlan {
 }
 
 import type { FieldState } from "./field";
+import type { Posture } from "./posture";
 import type { Calibration } from "./calibration";
 
 export interface SurvivorReport {
@@ -172,6 +173,8 @@ export interface SurvivorReport {
 
   pool: PoolConfig;
   entriesAlive: number;
+  /** What the pool is playing for: an outright win or a share of one. */
+  posture: Posture;
 
   /** Every legal pick this week, best first. */
   candidates: Candidate[];

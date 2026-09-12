@@ -30,6 +30,13 @@ export const STRATEGY_ARTICLES: StrategyArticle[] = [
     takeaway: "Ownership above win probability is the fade signal. Below it, chalk is fine.",
   },
   {
+    id: "pool-size",
+    title: "Pool size does not change the pick. It changes what you are playing for.",
+    hook: "Thirty entries and five hundred entries produced identical boards. What differs is how the season ends.",
+    body: "The intuition is that a small pool should play chalk and a big one should get clever, and the equity formula flatly refuses to agree: run the same real slate at 30 entries and at 500 and the boards come back identical to five decimals. The finite-pool correction in the equity multiplier only bites when very little of the field survives a week, and at a normal 80% field survival rate the correction has already vanished at 30 entries, never mind 500. The published work is still right, it is just about something else. Bergman and Imbrogno find that a longer planning horizon wins in larger pools because you have to assume you will need to last longer, and the practitioner guides make the same point in reverse: a pool that resolves by Thanksgiving does not need to hoard elite teams. So the quantity that separates two pools is how many entries are expected to be alive when the season runs out. Below about one, surviving is winning and ties on the board go to the safer team. Well above one, the prize gets split and ties go to the team fewer rivals can follow you onto. That is the only place pool size is allowed to move a pick, because anywhere else the equity number has already priced it and moving it again would be counting the same effect twice.",
+    takeaway: "Ask how many entries survive to week 18, not how many started. Under one, take the safe team. Over one, take the lonely one.",
+  },
+  {
     id: "future-value",
     title: "Every pick costs you the weeks you could have used that team.",
     hook: "Burn cost is the survival you give up later by spending a team now.",

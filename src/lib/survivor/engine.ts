@@ -3,10 +3,11 @@ import { normalizeOwnership, ownershipCoverage } from "./yahoo";
 import { applyAvailability, deriveFieldState, type WeekPicks } from "./field";
 import { calibrate, projectOwnership, type Observation } from "./calibration";
 import { notesForTeam } from "./intel-pure";
-import { tieNote, tiedWithBest } from "./tie";
+import { orderTieByPosture, tieNote, tiedWithBest } from "./tie";
 import { equityMultiplier, fieldSurvival } from "./equity";
 import { futureCost, planFuture } from "./assignment";
 import { DEFAULT_POOL_ID } from "./pools";
+import { fieldWeeklySurvival, poolPosture } from "./posture";
 import type {
   Candidate,
   CandidateFlag,
@@ -71,7 +72,17 @@ function buildFlags(
 ): CandidateFlag[] {
   const flags: CandidateFlag[] = [];
 
-  if (c.ownership >= 0.2) {
+  // Past about two thirds of the field on one team the week stops being a pick
+  // and becomes a single result the whole pool is riding. Threshold from the
+  // practitioner sources, which treat 65% as the point where a game decides the
+  // pool rather than your entry.
+  if (c.ownership >= 0.65) {
+    flags.push({
+      kind: "chalk",
+      severity: "danger",
+      text: `${pct(c.ownership)} of the field is on this. If it wins, almost nobody is eliminated and the week gains you nothing; if it loses, the pool is gutted and anyone who went elsewhere is suddenly in front. That asymmetry is the decision this week, not the ${pct(c.winProb)} win probability.`,
+    });
+  } else if (c.ownership >= 0.2) {
     flags.push({
       kind: "chalk",
       severity: c.ownership > c.winProb ? "warn" : "info",
@@ -210,7 +221,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
         Object.entries(o.picks).map(([k, v]) => [k, v / 100]),
       ),
     }));
-  const calibration = calibrate(observations);
+  const calibration = calibrate(observations, pool.poolSize);
 
   // If the pool's own numbers for THIS week are somehow known, they beat any
   // projection. Otherwise project: take the public distribution, bend it by the
@@ -239,6 +250,17 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     field.weeksLogged > 0
       ? field.entriesAlive
       : (pool.entriesAlive ?? pool.poolSize);
+  // What the pool is playing FOR, which is not the same question as which pick
+  // is best this week. See posture.ts: pool size barely touches the weekly
+  // equity number, and decides instead whether surviving wins outright or ends
+  // in a split.
+  const posture = poolPosture({
+    entriesAlive,
+    week,
+    lastWeek: LAST_WEEK,
+    weeklySurvival: fieldWeeklySurvival(weekGames, ownership),
+  });
+
   // Burned is the manual list plus every pick from a week already gone. Derived
   // rather than copied into usedTeams, so a week rolls over on its own and this
   // week's pick is still on the board where its own data can be shown.
@@ -323,6 +345,15 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   }
 
   candidates.sort((a, b) => b.score - a.score);
+  // Inside the band the engine has already said these teams cannot be separated,
+  // so the pool's shape is free information rather than the same effect counted
+  // twice. In place, so everything downstream keeps reading candidates[0] as the
+  // pick and nothing can disagree about which team that is.
+  candidates.splice(
+    0,
+    candidates.length,
+    ...orderTieByPosture(candidates, calibration.confidence, posture.tiebreak),
+  );
 
   const best = candidates[0] ?? null;
   const safest = [...candidates].sort((a, b) => b.winProb - a.winProb)[0] ?? null;
@@ -463,7 +494,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // A pick that cannot be separated from the next one is not a decision, and
   // reporting it as one is how a 0.06% gap gets read as a recommendation.
   const tied = tiedWithBest(candidates, calibration.confidence);
-  const tieSentence = tieNote(tied, calibration.confidence);
+  const tieSentence = tieNote(tied, calibration.confidence, posture.tiebreak);
 
   // Said once, if it is worth saying at all. Silent when the pick is the
   // engine's own, and silent when the two are inside the tie band, because
@@ -484,6 +515,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     generatedAt: now.toISOString(),
     pool,
     entriesAlive,
+    posture,
     candidates,
     // Once a pick is taken it IS the headline. The Thursday email reads this
     // field, and telling Jack what to pick on a week he has already picked is
@@ -491,8 +523,14 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     headline: taken
       ? `Week ${week}: you have ${taken.team} over ${taken.opponent}`
       : best
-        ? tied.length > 1
-          ? `Week ${week}: ${tied.map((c) => c.team).join(" or ")}, effectively tied`
+        ? // A tie is a caveat on the pick, not a substitute for naming one. The
+          // posture breaks it for a stated reason, so the headline says which
+          // team and then says the others were close.
+          tied.length > 1
+          ? `Week ${week}: ${best.team} over ${best.opponent}, with ${tied
+              .filter((c) => c.team !== best.team)
+              .map((c) => c.team)
+              .join(" and ")} effectively tied`
           : `Week ${week}: ${best.team} over ${best.opponent}`
         : `Week ${week}: nothing legal left on the board`,
     // The tie goes FIRST when there is one. It changes how every sentence after

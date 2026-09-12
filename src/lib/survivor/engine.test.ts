@@ -429,3 +429,110 @@ describe("assembleReport", () => {
     expect(r.notes.some((n) => n.includes("no line posted"))).toBe(true);
   });
 });
+
+describe("pool posture", () => {
+  // A slate built from the real Week 1 2026 numbers, where the top two land
+  // inside the tie band pulling opposite ways: LAC is safer (80.0% to 78.7%) and
+  // JAX is less owned (26.9% to 33.1%). This is the case the two pools exist to
+  // answer differently.
+  const SLATE = [
+    game(1, "LAC", "ARI", 0.8),
+    game(1, "JAX", "CLE", 0.7867),
+    game(1, "DET", "NO", 0.7335),
+    game(1, "PIT", "ATL", 0.696),
+    game(1, "PHI", "WAS", 0.6854),
+    game(2, "LAC", "DET", 0.6),
+    game(2, "JAX", "PIT", 0.62),
+    game(2, "PHI", "ARI", 0.75),
+    game(2, "CLE", "NO", 0.55),
+    game(2, "ATL", "WAS", 0.58),
+  ];
+  // Ownership concentrated on the favourites, as a real board's is. This
+  // matters more than it looks: an earlier version of this fixture left real
+  // ownership on the underdogs, which dropped field survival to 0.68, and at
+  // that rate even 500 entries thin past one before week 18 and BOTH pools read
+  // outright. The posture is a statement about the whole season, so the fixture
+  // has to be plausible about the whole season.
+  const PICKS = { LAC: 0.4, JAX: 0.3, DET: 0.15, PIT: 0.08, PHI: 0.07 };
+
+  const big = report(SLATE, PICKS, { poolSize: 500 });
+  const small = report(SLATE, PICKS, { poolSize: 30 });
+
+  it("agrees the two teams cannot be separated on equity", () => {
+    expect(big.tied).toEqual(expect.arrayContaining(["LAC", "JAX"]));
+    expect(small.tied).toEqual(expect.arrayContaining(["LAC", "JAX"]));
+  });
+
+  it("takes the safer team in the pool that will thin to one entry", () => {
+    expect(small.posture.mode).toBe("outright");
+    expect(small.bestTeam).toBe("LAC");
+  });
+
+  it("takes the less owned team in the pool that will end up splitting", () => {
+    expect(big.posture.mode).toBe("shared");
+    expect(big.bestTeam).toBe("JAX");
+  });
+
+  it("reports how many entries it expects to be left", () => {
+    expect(big.posture.expectedSurvivors).toBeGreaterThan(small.posture.expectedSurvivors);
+  });
+
+  it("does not let the posture reorder teams outside the band", () => {
+    // DET is lightly owned at 15.5% and would be promoted by a naive leverage
+    // rule, but it is a real distance behind on equity.
+    expect(big.candidates[2].team).toBe("DET");
+    expect(small.candidates[2].team).toBe("DET");
+  });
+
+  it("plans the season around the team it actually recommends", () => {
+    expect(big.plan[0].team).toBe("JAX");
+    expect(small.plan[0].team).toBe("LAC");
+  });
+});
+
+describe("mass-elimination chalk", () => {
+  it("flags a team the field has piled onto past 65%", () => {
+    const games = [game(1, "KC", "DEN", 0.78), game(1, "BUF", "NYJ", 0.62)];
+    const r = report(games, { KC: 0.7, BUF: 0.2, NYJ: 0.1 });
+    const kc = r.candidates.find((c) => c.team === "KC");
+    const flag = kc?.flags.find((f) => f.kind === "chalk");
+    expect(flag?.severity).toBe("danger");
+    expect(flag?.text).toMatch(/70/);
+  });
+
+  it("leaves ordinary chalk alone", () => {
+    const games = [game(1, "KC", "DEN", 0.78), game(1, "BUF", "NYJ", 0.62)];
+    const r = report(games, { KC: 0.35, BUF: 0.45, NYJ: 0.2 });
+    const kc = r.candidates.find((c) => c.team === "KC");
+    expect(kc?.flags.find((f) => f.kind === "chalk")?.severity).not.toBe("danger");
+  });
+});
+
+describe("headline on a broken tie", () => {
+  const SLATE = [
+    game(1, "LAC", "ARI", 0.8),
+    game(1, "JAX", "CLE", 0.7867),
+    game(1, "DET", "NO", 0.7335),
+    game(1, "PIT", "ATL", 0.696),
+    game(1, "PHI", "WAS", 0.6854),
+    game(2, "LAC", "DET", 0.6),
+    game(2, "JAX", "PIT", 0.62),
+    game(2, "PHI", "ARI", 0.75),
+    game(2, "CLE", "NO", 0.55),
+    game(2, "ATL", "WAS", 0.58),
+  ];
+  const PICKS = { LAC: 0.4, JAX: 0.3, DET: 0.15, PIT: 0.08, PHI: 0.07 };
+
+  it("names the pick and keeps the tie as a caveat", () => {
+    // "LAC or JAX, effectively tied" was the right headline while nothing could
+    // separate them. It is no longer an answer now that the posture does, and a
+    // headline that does not name a team is not a recommendation.
+    const r = report(SLATE, PICKS, { poolSize: 30 });
+    expect(r.headline).toBe("Week 1: LAC over ARI, with JAX effectively tied");
+  });
+
+  it("still leads with a taken pick over any of this", () => {
+    const r = report(SLATE, PICKS, { poolSize: 30, myPicks: { "1": "DET" } });
+    expect(r.headline).toBe("Week 1: you have DET over NO");
+  });
+});

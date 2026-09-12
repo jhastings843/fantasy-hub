@@ -69,6 +69,7 @@ export function tiedWithBest(
 export function tieNote(
   tied: Candidate[],
   confidence: Calibration["confidence"],
+  tiebreak?: "safety" | "leverage",
 ): string | null {
   if (tied.length < 2) return null;
 
@@ -78,7 +79,12 @@ export function tieNote(
       ? `${names[0]} and ${names[1]}`
       : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
-  const gap = tied[0].score - tied[tied.length - 1].score;
+  // The SPREAD across the band, not tied[0] minus the last one. Those were the
+  // same number only while this array was sorted by score, and breaking a tie
+  // toward leverage deliberately puts a slightly lower-scoring team first. The
+  // live board printed "-0.54% of equity separates them" before this.
+  const scores = tied.map((c) => c.score);
+  const gap = Math.max(...scores) - Math.min(...scores);
   const asPercent = (Math.exp(gap) - 1) * 100;
 
   const why =
@@ -86,5 +92,52 @@ export function tieNote(
       ? "Ownership is still the national number with no weeks logged, so a gap this small is inside the error."
       : `Ownership is fitted on ${confidence} confidence, so a gap this small is inside the error.`;
 
-  return `${list} are effectively tied: ${asPercent.toFixed(2)}% of equity separates them. ${why} Take whichever you prefer.`;
+  // Without a posture the honest ending is a shrug. With one, something can
+  // separate them after all, and the note has to say what it was rather than
+  // presenting a decision the reader cannot audit.
+  const chosen = tied[0];
+  const ending =
+    tiebreak === "safety"
+      ? `Taking ${chosen.team} as the safer of them at ${(chosen.winProb * 100).toFixed(1)}% to win, because this pool is expected to thin to one entry and surviving is what wins it.`
+      : tiebreak === "leverage"
+        ? `Taking ${chosen.team} as the less owned of them at ${(chosen.ownership * 100).toFixed(1)}% of the field, because this pool is expected to end with several entries splitting and fewer rivals can follow you here.`
+        : "Take whichever you prefer.";
+
+  return `${list} are effectively tied: ${asPercent.toFixed(2)}% of equity separates them. ${why} ${ending}`;
+}
+
+/**
+ * Order the teams inside the tie band by what the pool is actually playing for,
+ * leaving everything outside the band exactly where the equity ranking put it.
+ *
+ * This is the only place the pool's shape is allowed to change a pick, and the
+ * reason it is allowed here is that the band is the engine's own statement that
+ * these teams cannot be separated on equity. Outside the band the gap is real
+ * and a posture must not overrule it: leverage would happily promote a team
+ * seven percent behind on equity because it is lightly owned, which is the
+ * mistake this function is shaped to make impossible.
+ *
+ * safety   the field is expected to thin past one entry, so surviving is
+ *          winning and the higher win probability takes it.
+ * leverage a crowd is expected to be left sharing the prize, so the team fewer
+ *          rivals can follow you onto takes it.
+ */
+export function orderTieByPosture(
+  candidates: Candidate[],
+  confidence: Calibration["confidence"],
+  tiebreak: "safety" | "leverage",
+): Candidate[] {
+  if (candidates.length < 2) return [...candidates];
+
+  const band = tieBandFor(confidence);
+  const best = candidates[0].score;
+  const tiedCount = candidates.filter((c) => best - c.score <= band).length;
+  if (tiedCount < 2) return [...candidates];
+
+  const head = candidates.slice(0, tiedCount);
+  const tail = candidates.slice(tiedCount);
+  head.sort((a, b) =>
+    tiebreak === "safety" ? b.winProb - a.winProb : a.ownership - b.ownership,
+  );
+  return [...head, ...tail];
 }
