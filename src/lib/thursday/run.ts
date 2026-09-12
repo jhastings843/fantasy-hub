@@ -1,5 +1,6 @@
 import "server-only";
-import { buildReport } from "@/lib/survivor/report";
+import { buildReports } from "@/lib/survivor/report";
+import type { SurvivorReport } from "@/lib/survivor/types";
 import { buildWeeklyLineups } from "@/lib/lineup/build";
 import { sendEmail } from "@/lib/guillotine/send";
 import { renderThursdayEmail, thursdaySubject, totalChanges } from "./email";
@@ -67,18 +68,18 @@ export async function runThursdayEmail(options: {
   // down is not a reason to withhold the other. A Thursday with a pick and no
   // lineups is still worth sending, and the email says which half is missing.
   const [survivorResult, lineups] = await Promise.all([
-    buildReport().then(
-      (r) => ({ report: r, error: null as string | null }),
+    buildReports().then(
+      (r) => ({ reports: r, error: null as string | null }),
       (e: unknown) => ({
-        report: null,
+        reports: [] as SurvivorReport[],
         error: e instanceof Error ? e.message : String(e),
       }),
     ),
     buildWeeklyLineups(),
   ]);
 
-  const week = survivorResult.report?.week ?? lineups.week;
-  const season = String(survivorResult.report?.season ?? lineups.season ?? "");
+  const week = survivorResult.reports[0]?.week ?? lineups.week;
+  const season = String(survivorResult.reports[0]?.season ?? lineups.season ?? "");
 
   if (week === null || !season) {
     return Response.json({
@@ -88,7 +89,7 @@ export async function runThursdayEmail(options: {
   }
 
   const input = {
-    survivor: survivorResult.report,
+    survivors: survivorResult.reports,
     survivorError: survivorResult.error,
     lineups,
     generatedAt: new Date().toISOString(),

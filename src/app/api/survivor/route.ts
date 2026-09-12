@@ -1,21 +1,44 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { buildReport, SEASON } from "@/lib/survivor/report";
+import { buildReport, buildReports, SEASON } from "@/lib/survivor/report";
 import { getPool, savePool } from "@/lib/survivor/state";
+import { DEFAULT_POOL_ID, isPoolId } from "@/lib/survivor/pools";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET  /api/survivor  -> the full weekly report
- * POST /api/survivor  -> update the pool, then return the report rebuilt on it
+ * GET  /api/survivor            -> the main pool's report
+ * GET  /api/survivor?pool=<id>  -> that pool's report
+ * GET  /api/survivor?pool=all   -> { pools: [...] }, one entry per pool
+ * POST /api/survivor?pool=<id>  -> update that pool, then return it rebuilt
+ *
+ * The bare GET keeps returning a single report so anything already reading it
+ * (the Atlas endpoint, a bookmark) did not break when the second pool arrived.
  *
  * Same report object the page renders, so an answer read here and an answer
  * read on screen cannot disagree.
  */
-export async function GET() {
+
+/** Query string to pool id, or an error message for a 400. */
+function requestedPool(req: Request): { id: string } | { error: string } {
+  const raw = new URL(req.url).searchParams.get("pool");
+  if (!raw) return { id: DEFAULT_POOL_ID };
+  if (!isPoolId(raw)) return { error: `unknown pool "${raw}"` };
+  return { id: raw };
+}
+
+export async function GET(req: Request) {
+  const wantsAll = new URL(req.url).searchParams.get("pool") === "all";
+  const target = wantsAll ? { id: "all" } : requestedPool(req);
+  if ("error" in target) {
+    return NextResponse.json({ error: target.error }, { status: 400 });
+  }
+
   try {
-    const report = await buildReport();
-    return NextResponse.json(report);
+    if (wantsAll) {
+      return NextResponse.json({ pools: await buildReports() });
+    }
+    return NextResponse.json(await buildReport(target.id));
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "failed to build report" },
@@ -25,6 +48,7 @@ export async function GET() {
 }
 
 const patchSchema = z.object({
+  name: z.string().min(1).max(60).optional(),
   poolSize: z.number().int().min(1).max(1_000_000).optional(),
   entriesAlive: z.number().int().min(1).max(1_000_000).nullable().optional(),
   strikes: z.number().int().min(1).max(5).optional(),
@@ -40,6 +64,11 @@ const patchSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const target = requestedPool(req);
+  if ("error" in target) {
+    return NextResponse.json({ error: target.error }, { status: 400 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -56,8 +85,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    await savePool(SEASON, parsed.data);
-    const report = await buildReport();
+    await savePool(SEASON, target.id, parsed.data);
+    const report = await buildReport(target.id);
     return NextResponse.json(report);
   } catch (e) {
     return NextResponse.json(
@@ -68,6 +97,10 @@ export async function POST(req: Request) {
 }
 
 /** The stored pool on its own, for the config form. */
-export async function PUT() {
-  return NextResponse.json(await getPool(SEASON));
+export async function PUT(req: Request) {
+  const target = requestedPool(req);
+  if ("error" in target) {
+    return NextResponse.json({ error: target.error }, { status: 400 });
+  }
+  return NextResponse.json(await getPool(SEASON, target.id));
 }

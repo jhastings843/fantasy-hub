@@ -1,4 +1,5 @@
 import type { SurvivorReport } from "@/lib/survivor/types";
+import { poolMeta } from "@/lib/survivor/pools";
 import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
 
@@ -42,7 +43,8 @@ function escapeHtml(value: string): string {
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 export interface ThursdayInput {
-  survivor: SurvivorReport | null;
+  /** One per pool, in the order the pools are configured. Empty when the report failed. */
+  survivors: SurvivorReport[];
   survivorError: string | null;
   lineups: WeeklyLineups;
   generatedAt: string;
@@ -56,15 +58,37 @@ export interface ThursdayInput {
  * to change" is genuinely useful information at 8am on a Thursday.
  */
 export function thursdaySubject(input: ThursdayInput): string {
-  const { survivor, lineups } = input;
-  const week = survivor?.week ?? lineups.week;
-  const pick = survivor ? `${survivor.bestTeam} over ${opponentOf(survivor)}` : "no survivor pick";
+  const { survivors, lineups } = input;
+  const week = survivors[0]?.week ?? lineups.week;
   const changes = totalChanges(lineups);
   const tail =
     changes === 0
       ? "lineups all set"
       : `${changes} lineup change${changes === 1 ? "" : "s"}`;
-  return `Week ${week}: ${pick}, ${tail}`;
+  return `Week ${week}: ${subjectPick(survivors)}, ${tail}`;
+}
+
+/**
+ * The pick half of the subject line.
+ *
+ * Both pools usually name the same team, and printing it twice reads as a bug
+ * rather than as agreement, so agreement is stated once. Disagreement gets both
+ * teams with the pool sizes attached, because which pool is which is the whole
+ * question at that point.
+ */
+function subjectPick(survivors: SurvivorReport[]): string {
+  if (survivors.length === 0) return "no survivor pick";
+
+  const first = survivors[0];
+  const allAgree = survivors.every((s) => s.bestTeam === first.bestTeam);
+  if (allAgree) {
+    const pick = `${first.bestTeam} over ${opponentOf(first)}`;
+    return survivors.length > 1 ? `${pick} in both pools` : pick;
+  }
+
+  return survivors
+    .map((s) => `${s.bestTeam} (${poolMeta(s.poolId).short})`)
+    .join(" / ");
 }
 
 function opponentOf(survivor: SurvivorReport): string {
@@ -88,15 +112,29 @@ function label(text: string): string {
   return `<div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};padding-bottom:6px;">${escapeHtml(text)}</div>`;
 }
 
-function survivorBlock(input: ThursdayInput): string {
-  const { survivor, survivorError } = input;
+/**
+ * Every pool's pick, one card each.
+ *
+ * The pool is named on the card whenever there is more than one, because a
+ * screenshot of the wrong pool's board is indistinguishable from the right one
+ * otherwise, and the two pools carry different burned teams.
+ */
+function survivorSection(input: ThursdayInput): string {
+  const { survivors, survivorError } = input;
 
-  if (!survivor) {
+  if (survivors.length === 0) {
     return card(
       `${label("Survivor")}<div style="font:400 14px/1.55 -apple-system,sans-serif;color:${PALETTE.body};">No pick this week. ${escapeHtml(survivorError ?? "The report could not be built.")}</div>`,
       { bg: PALETTE.warnBg, border: PALETTE.warnBorder },
     );
   }
+
+  return survivors
+    .map((s) => survivorBlock(s, survivors.length > 1 ? s.pool.name : null))
+    .join("");
+}
+
+function survivorBlock(survivor: SurvivorReport, poolName: string | null): string {
 
   const best = survivor.candidates.find((c) => c.team === survivor.bestTeam);
   // "Wed 8:20p" rather than "Wed 8:20 PM". The stat cells are a quarter of a
@@ -163,7 +201,7 @@ function survivorBlock(input: ThursdayInput): string {
     .join(" &middot; ");
 
   return card(
-    `${label("Survivor pick")}
+    `${label(poolName ? `Survivor pick, ${poolName}` : "Survivor pick")}
 <div style="font:700 22px/1.25 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${PALETTE.ink};letter-spacing:-.01em;">${escapeHtml(survivor.headline)}</div>
 ${stats}
 ${why}
@@ -279,7 +317,7 @@ export function renderThursdayEmail(input: ThursdayInput): string {
   ${[...skew].map((n) => escapeHtml(n)).join(" ")}
 </div>`;
 
-  const week = input.survivor?.week ?? lineups.week;
+  const week = input.survivors[0]?.week ?? lineups.week;
 
   return `<!doctype html>
 <html lang="en">
@@ -307,7 +345,7 @@ export function renderThursdayEmail(input: ThursdayInput): string {
             </div>
           </td>
         </tr>
-        <tr><td>${survivorBlock(input)}</td></tr>
+        <tr><td>${survivorSection(input)}</td></tr>
         <tr><td style="padding-top:6px;">${lineupSection}</td></tr>
         <tr>
           <td style="padding-top:4px;">

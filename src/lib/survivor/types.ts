@@ -99,6 +99,8 @@ export interface CandidateFlag {
 }
 
 export interface PoolConfig {
+  /** Display name. Seeded from the pool's meta, renameable per pool. */
+  name: string;
   /** Entries at the start of the season. */
   poolSize: number;
   /** Entries still alive. Falls back to poolSize before week 1. */
@@ -136,6 +138,7 @@ export interface PoolConfig {
 }
 
 export const DEFAULT_POOL: PoolConfig = {
+  name: "Survivor pool",
   poolSize: 500,
   entriesAlive: null,
   strikes: 1,
@@ -160,6 +163,8 @@ import type { Calibration } from "./calibration";
 
 export interface SurvivorReport {
   season: number;
+  /** Which pool this board is for. The name for display lives on pool. */
+  poolId: string;
   week: number;
   /** When the slate locks, i.e. the first kickoff of the week. */
   locksAt: string | null;

@@ -6,6 +6,7 @@ import { notesForTeam } from "./intel-pure";
 import { tieNote, tiedWithBest } from "./tie";
 import { equityMultiplier, fieldSurvival } from "./equity";
 import { futureCost, planFuture } from "./assignment";
+import { DEFAULT_POOL_ID } from "./pools";
 import type {
   Candidate,
   CandidateFlag,
@@ -153,6 +154,8 @@ function buildFlags(
 
 export interface EngineInput {
   season: number;
+  /** Which pool this board is for. Echoed into the report so no consumer can mislabel it. */
+  poolId?: string;
   games: Game[];
   /** Yahoo's distribution for EVERY week. Past weeks calibrate, this week prices. */
   publicByWeek: Record<string, Ownership>;
@@ -475,6 +478,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
 
   return {
     season,
+    poolId: input.poolId ?? DEFAULT_POOL_ID,
     week,
     locksAt,
     generatedAt: now.toISOString(),

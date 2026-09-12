@@ -104,3 +104,27 @@ describe("isOverOwned", () => {
     expect(isOverOwned(0.75, 0.7)).toBe(false);
   });
 });
+
+describe("pool size", () => {
+  // Measured against the real week 1 2026 slate while adding the second pool.
+  // A 30-entry board and a 500-entry board came back IDENTICAL to five decimals,
+  // and the reason is here rather than in a comment on the page: the finite-pool
+  // term (1-(1-r)^N)/r is indistinguishable from 1/r once (1-r)^N vanishes, and
+  // at r = 0.80 that happens long before N reaches 30. These two tests pin where
+  // entry count does and does not matter, so nobody has to re-derive it.
+  it("does not separate 30 entries from 500 when most of the field survives", () => {
+    const small = equityMultiplier(0.8, 0.8, 30);
+    const big = equityMultiplier(0.8, 0.8, 500);
+    expect(small).toBeCloseTo(big, 9);
+  });
+
+  it("does separate them when almost none of the field survives", () => {
+    // r = 0.09, so (1-r)^30 is 0.06 and (1-r)^500 is nothing. This is the week
+    // where the entry count earns its place in the formula: heavily burned late
+    // season, field piled onto teams that lose.
+    const small = equityMultiplier(0.6, 0.09, 30);
+    const big = equityMultiplier(0.6, 0.09, 500);
+    expect(big).toBeGreaterThan(small);
+    expect(big - small).toBeGreaterThan(0.3);
+  });
+});

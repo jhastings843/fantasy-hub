@@ -1,7 +1,7 @@
 import { AlertTriangle, BookOpen, ChevronDown, ArrowUpRight } from "lucide-react";
 import { RESOURCES } from "@/lib/resources/data";
 import { STRATEGY_ARTICLES } from "@/lib/survivor/strategy";
-import { buildReport } from "@/lib/survivor/report";
+import { buildReports } from "@/lib/survivor/report";
 import SurvivorTool from "./SurvivorTool";
 
 export const dynamic = "force-dynamic";
@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 export default async function SurvivorPage() {
   const survivorTools = RESOURCES.filter((r) => r.category === "survivor_tools");
 
-  let report = null;
+  let reports: Awaited<ReturnType<typeof buildReports>> = [];
   let error: string | null = null;
   try {
-    report = await buildReport();
+    reports = await buildReports();
   } catch (e) {
     error = e instanceof Error ? e.message : "Could not build this week's report.";
   }
@@ -32,7 +32,7 @@ export default async function SurvivorPage() {
           </div>
         )}
 
-        {report && <SurvivorTool report={report} />}
+        {reports.length > 0 && <SurvivorTool reports={reports} />}
 
         <section className="flex flex-col gap-3">
           <header className="flex items-center gap-2">

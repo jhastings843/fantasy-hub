@@ -197,15 +197,21 @@ function TakenPick({
   );
 }
 
-export default function SurvivorTool({ report }: { report: SurvivorReport }) {
+export default function SurvivorTool({ reports }: { reports: SurvivorReport[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [poolId, setPoolId] = useState(reports[0].poolId);
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [paste, setPaste] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
+
+  // Every pool's board arrives in one payload, so switching is instant and both
+  // are priced off the same ownership pull. A stale id (a pool removed between
+  // renders) falls back to the first rather than blanking the page.
+  const report = reports.find((r) => r.poolId === poolId) ?? reports[0];
 
   const { pool } = report;
   const usedSet = useMemo(() => new Set(pool.usedTeams), [pool.usedTeams]);
@@ -216,7 +222,7 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
   async function patch(body: Record<string, unknown>) {
     setBusy(true);
     try {
-      const res = await fetch("/api/survivor", {
+      const res = await fetch(`/api/survivor?pool=${encodeURIComponent(report.poolId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -313,6 +319,50 @@ export default function SurvivorTool({ report }: { report: SurvivorReport }) {
 
   return (
     <div className="flex flex-col gap-8">
+      {reports.length > 1 && (
+        <div
+          role="tablist"
+          aria-label="Survivor pool"
+          className="flex gap-1 rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          {reports.map((r) => {
+            const active = r.poolId === report.poolId;
+            return (
+              <button
+                key={r.poolId}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setPoolId(r.poolId)}
+                className={`flex min-h-11 flex-1 flex-col justify-center rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                  active
+                    ? "bg-amber-100 dark:bg-amber-950/50"
+                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                }`}
+              >
+                <span
+                  className={`text-sm font-semibold ${
+                    active
+                      ? "text-amber-900 dark:text-amber-200"
+                      : "text-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  {r.pool.name}
+                </span>
+                {/* Each pool's own answer, so agreement or disagreement is
+                    visible without switching tabs. */}
+                <span className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                  {r.myPick ?? r.bestTeam ?? "nothing left"}
+                  {r.myPick ? " taken" : ""}
+                  {" \u00b7 "}
+                  {r.pool.usedTeams.length} burned
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
