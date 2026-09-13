@@ -218,6 +218,11 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   // gone. Reading pool.usedTeams here meant a pick that burned itself when the
   // week turned was missing from the board with nothing on the grid to say why.
   const usedSet = useMemo(() => new Set(report.burnedTeams), [report.burnedTeams]);
+  // SPENT, not burned. A team taken this week is still on this week's board,
+  // because it is the answer, and it is still gone for the rest of the season.
+  // Every count on the page reads this one: Jack had JAX taken in the 500 and
+  // LAC in the 30-player and nothing on the page said either was used up.
+  const spentSet = useMemo(() => new Set(report.spentTeams), [report.spentTeams]);
   const taken = report.myPick
     ? (report.candidates.find((c) => c.team === report.myPick) ?? null)
     : null;
@@ -255,9 +260,16 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
     void patch({ myPicks: { ...report.pool.myPicks, [String(report.week)]: "" } });
   }
 
-  /** Burn or un-burn a team by hand, for weeks the tool did not see. */
+  /**
+   * Burn or un-burn a team by hand, for weeks the tool did not see.
+   *
+   * Seeded from pool.usedTeams, the HAND-EDITED list, and not from the derived
+   * burn set. Seeding from the derived set meant one tap copied every
+   * pick-derived burn into the manual list permanently, after which clearing a
+   * pick left the team burned by a row nobody had typed.
+   */
   function toggleBurned(team: string) {
-    const next = new Set(usedSet);
+    const next = new Set(report.pool.usedTeams);
     if (next.has(team)) next.delete(team);
     else next.add(team);
     void patch({ usedTeams: [...next] });
@@ -371,7 +383,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                   {r.myPick ?? r.bestTeam ?? "nothing left"}
                   {r.myPick ? " taken" : ""}
                   {" \u00b7 "}
-                  {r.pool.usedTeams.length} burned
+                  {r.spentTeams.length} spent
                 </span>
               </button>
             );
@@ -395,7 +407,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             {report.entriesAlive.toLocaleString()} entries alive
           </span>
           <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-            {32 - usedSet.size} teams left
+            {32 - spentSet.size} teams left
           </span>
           {/* What the pool is playing for. Drives which end of a tie the board
               takes, so it belongs next to the pick rather than buried. */}
@@ -883,8 +895,8 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             Teams burned
           </h2>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {usedSet.size} of 32 used. Your picks burn themselves when the week
-            turns; tap only to record one the tool never saw.
+            {spentSet.size} of 32 used, this week&rsquo;s pick included. Your picks
+            spend themselves, so tap only to record one the tool never saw.
           </span>
         </div>
         <ul className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
@@ -894,18 +906,30 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             // are derived, so a tap here could not clear them and would silently
             // edit the manual list instead.
             const byPick = report.burnedByPick[t.abbr];
+            // Taken THIS week: spent, but not struck through, because it is the
+            // answer and its numbers are what the rest of the page is about.
+            // Left plain it read as available, which is the whole complaint.
+            const isTaken = report.myPick === t.abbr;
             return (
               <li key={t.abbr}>
                 <button
                   type="button"
-                  disabled={working || byPick !== undefined}
+                  disabled={working || byPick !== undefined || isTaken}
                   onClick={() => toggleBurned(t.abbr)}
-                  aria-pressed={isUsed}
-                  title={byPick !== undefined ? `Your week ${byPick} pick` : undefined}
+                  aria-pressed={isUsed || isTaken}
+                  title={
+                    isTaken
+                      ? `Your pick this week, so it is spent from next week on`
+                      : byPick !== undefined
+                        ? `Your week ${byPick} pick`
+                        : undefined
+                  }
                   className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 ${
-                    isUsed
-                      ? "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
-                      : "border-zinc-200 bg-white hover:border-amber-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-800"
+                    isTaken
+                      ? "border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950"
+                      : isUsed
+                        ? "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
+                        : "border-zinc-200 bg-white hover:border-amber-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-800"
                   }`}
                 >
                   <span className={isUsed ? "opacity-30 grayscale" : ""}>
@@ -920,6 +944,11 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                   >
                     {t.abbr}
                   </span>
+                  {isTaken && (
+                    <span className="text-[9px] font-semibold tabular-nums text-amber-700 dark:text-amber-500">
+                      W{report.week}
+                    </span>
+                  )}
                   {byPick !== undefined && (
                     <span className="text-[9px] font-semibold tabular-nums text-amber-700 dark:text-amber-500">
                       W{byPick}
@@ -1136,7 +1165,7 @@ function PoolSettings({
         className="inline-flex items-center gap-1.5 self-start rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:border-rose-300 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-40 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-rose-800 dark:hover:text-rose-400"
       >
         <RotateCcw size={13} aria-hidden />
-        Clear all burned teams
+        Clear hand-burned teams
       </button>
     </section>
   );

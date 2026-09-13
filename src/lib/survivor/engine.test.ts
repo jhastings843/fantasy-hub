@@ -570,6 +570,71 @@ describe("burned teams on the report", () => {
     expect(r.candidates.map((c) => c.team)).toContain("KC");
   });
 
+  // Jack, 2026-09-13: "Once i select what team i took, hub should know that
+  // team is burned." He had JAX taken in the 500 and LAC in the 30-player and
+  // neither showed as spent anywhere on the page.
+  //
+  // Both things are true at once and the old model had room for only one of
+  // them. A team taken this week is STILL ON THIS WEEK'S BOARD, because it is
+  // the answer and its numbers are what he is looking at. It is also GONE for
+  // the rest of the season, because he has spent it. burnedTeams answers the
+  // first question and spentTeams answers the second.
+  it("counts this week's pick as spent for the rest of the season", () => {
+    const r = report(games, EVEN, { myPicks: { "1": "KC" } });
+    expect(r.spentTeams).toContain("KC");
+    // And the board still works: it is pickable and it is the headline.
+    expect(r.burnedTeams).not.toContain("KC");
+    expect(r.candidates.map((c) => c.team)).toContain("KC");
+  });
+
+  it("spent covers hand-burned teams and old picks too, so it is one list", () => {
+    const r = report(
+      games.map((g) => (g.week === 1 ? { ...g, completed: true } : g)),
+      EVEN,
+      { usedTeams: ["PHI"], myPicks: { "1": "KC" } },
+      IN_WEEK_2,
+    );
+    expect(r.spentTeams).toEqual(expect.arrayContaining(["KC", "PHI"]));
+  });
+
+  it("spends nothing when no pick has been taken", () => {
+    const r = report(games, EVEN, {});
+    expect(r.spentTeams).toEqual([]);
+  });
+
+  // THE ONE THAT WAS LIVE IN THE 500 POOL ON 2026-09-13. Its stored state had
+  // myPicks {"1":"JAX"} AND usedTeams ["JAX"], written by the older UI that
+  // burned a team when you took it. The hand-burn deleted JAX from its own
+  // board, so `taken` resolved to null and the headline told Jack to pick
+  // something else while his actual pick sat struck through. The 30-player pool
+  // had no such row and behaved completely differently, which is why the two
+  // boards disagreed about the same week.
+  //
+  // The pick wins. A team you have taken is on this week's board whatever the
+  // manual list says, because the manual list is for weeks the tool never saw.
+  it("puts this week's pick on the board even if it is also hand-burned", () => {
+    const r = report(games, EVEN, { usedTeams: ["KC"], myPicks: { "1": "KC" } });
+    expect(r.candidates.map((c) => c.team)).toContain("KC");
+    expect(r.myPick).toBe("KC");
+    expect(r.headline).toContain("you have KC");
+    // Still spent for the rest of the season, which was never in doubt.
+    expect(r.spentTeams).toContain("KC");
+  });
+
+  it("and still plans around it from next week on", () => {
+    const r = report(games, EVEN, { usedTeams: ["KC"], myPicks: { "1": "KC" } });
+    expect(r.plan.filter((p) => p.week > r.week).map((p) => p.team)).not.toContain("KC");
+  });
+
+  // THE ONE THAT COSTS HIM A WEEK. If this week's pick is not removed from the
+  // future solver, the plan can hand him the same team again in a later week,
+  // and a plan built on a team he cannot use is worse than no plan.
+  it("never plans to use this week's pick again later", () => {
+    const r = report(games, EVEN, { myPicks: { "1": "KC" } });
+    const later = r.plan.filter((p) => p.week > r.week);
+    expect(later.map((p) => p.team)).not.toContain("KC");
+  });
+
   it("includes teams burned by hand", () => {
     const r = report(games, EVEN, { usedTeams: ["PHI"] });
     expect(r.burnedTeams).toContain("PHI");

@@ -181,6 +181,20 @@ export interface SurvivorReport {
    * was rendering the shorter one.
    */
   burnedTeams: string[];
+  /**
+   * Every team SPENT, which is burnedTeams plus the pick taken this week.
+   *
+   * The two lists answer different questions and conflating them is what
+   * confused Jack on 2026-09-13: he had JAX taken in the 500 and LAC in the
+   * 30-player and neither counted as gone anywhere on the page. A team taken
+   * this week is still on this week's board, because it is the answer and its
+   * numbers are the thing being read. It is also gone for every week after,
+   * because he has spent it.
+   *
+   * burnedTeams is "cannot be picked now". spentTeams is "cannot be picked
+   * again". Counts and future planning want the second one.
+   */
+  spentTeams: string[];
   /** team -> the week whose pick burned it. Absent for teams burned by hand. */
   burnedByPick: Record<string, number>;
 

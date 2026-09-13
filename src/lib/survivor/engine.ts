@@ -275,6 +275,20 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     }
   }
   const myPick = (pool.myPicks ?? {})[String(week)] ?? null;
+  // THE PICK WINS OVER A STALE HAND-BURN. The 500 pool's stored state carried
+  // myPicks {"1":"JAX"} and usedTeams ["JAX"] together, written by the older UI
+  // that burned a team when you took it. Leaving both in force deleted JAX from
+  // its own board: no candidate, so `taken` was null, so the headline named a
+  // different team while the grid struck JAX through. The manual list exists for
+  // weeks the tool never saw, and it does not get to overrule a pick for a week
+  // the tool is looking straight at.
+  if (myPick) used.delete(myPick);
+  // Spent is burned PLUS this week's pick. Kept as a separate set rather than
+  // folded into `used`, because `used` is what candidate generation subtracts
+  // and adding this week's pick there deletes the pick from its own board. That
+  // was the 2026-09-10 bug and it is not worth reintroducing to fix a count.
+  const spent = new Set(used);
+  if (myPick) spent.add(myPick);
 
   // Weeks that are done but not yet logged. Only count a week as loggable once
   // its results are actually in, or the field maths cannot use it anyway.
@@ -289,6 +303,10 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // Teams still on the board for the rest of the season, which is what the
   // future-value solver gets to work with.
   const availableTeams = NFL_TEAMS.map((t) => t.abbr).filter((t) => !used.has(t));
+  // What is left for the weeks AFTER this one, which is not the same list. A
+  // team taken this week cannot be taken again, so pricing future value against
+  // a pool that still contains it prices a season he cannot play.
+  const futureTeams = NFL_TEAMS.map((t) => t.abbr).filter((t) => !spent.has(t));
 
   // Future value solves the WHOLE remaining season, not a rolling window.
   // The first live run priced almost every team's future cost at 0.000, and
@@ -302,7 +320,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // than falling off a cliff.
   const futureWeeks: number[] = [];
   for (let w = week + 1; w <= LAST_WEEK; w++) futureWeeks.push(w);
-  const basePlan = planFuture(futureWeeks, availableTeams, games);
+  const basePlan = planFuture(futureWeeks, futureTeams, games);
 
   const candidates: Candidate[] = [];
   for (const g of openGames) {
@@ -314,7 +332,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
 
       const r = fieldSurvival(team, weekGames, ownership);
       const m = equityMultiplier(winProb, r, entriesAlive);
-      const fv = futureCost(team, basePlan.value, futureWeeks, availableTeams, games);
+      const fv = futureCost(team, basePlan.value, futureWeeks, futureTeams, games);
       const inPlan = basePlan.plan.find((p) => p.team === team);
 
       const partial: Omit<Candidate, "flags" | "score"> = {
@@ -525,6 +543,9 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     // The REAL burn set, not pool.usedTeams. The grid read the hand-edited list
     // and so could not show a pick that burned itself when the week turned.
     burnedTeams: [...used].sort(),
+    // Everything gone for the season, this week's pick included. The counts on
+    // the page read this, so taking a team visibly spends it.
+    spentTeams: [...spent].sort(),
     burnedByPick,
     candidates,
     // Once a pick is taken it IS the headline. The Thursday email reads this
