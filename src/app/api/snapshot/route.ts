@@ -60,6 +60,15 @@ export async function GET(request: Request) {
       }),
     );
 
+    // Every rider below catches its own failure so the others still run. That
+    // is right, and it is also how the top-level answer came to say ok:true on
+    // a morning the Thursday email had failed. ok means all of it worked, and
+    // failures names what did not, so whatever reads this gets the truth.
+    const failures: string[] = [];
+    for (const r of results) {
+      if ("error" in r) failures.push(`snapshot ${r.league}: ${r.error}`);
+    }
+
     // Pull anything new from Jingles Labs on the same run. This rides along
     // here rather than on a schedule of its own because Vercel Hobby allows two
     // cron jobs and both are spoken for; he posts a few times a week, so daily
@@ -69,7 +78,9 @@ export async function GET(request: Request) {
     try {
       jingles = await ingestJingles();
     } catch (e) {
-      jingles = { error: e instanceof Error ? e.message : String(e) };
+      const message = e instanceof Error ? e.message : String(e);
+      jingles = { error: message };
+      failures.push(`jingles: ${message}`);
     }
 
     // The Thursday email rides along for the same reason, and it must run AFTER
@@ -82,9 +93,15 @@ export async function GET(request: Request) {
     let thursday: unknown;
     try {
       const res = await runThursdayEmail();
-      thursday = await res.json();
+      const body = (await res.json()) as { ok?: boolean; error?: string };
+      thursday = body;
+      // A refused send comes back as a 500 Response, not a throw, so catching
+      // exceptions alone let it through as a success.
+      if (body.ok === false) failures.push(`thursday: ${body.error ?? `status ${res.status}`}`);
     } catch (e) {
-      thursday = { error: e instanceof Error ? e.message : String(e) };
+      const message = e instanceof Error ? e.message : String(e);
+      thursday = { error: message };
+      failures.push(`thursday: ${message}`);
     }
 
     // The scorecard, which is the only thing that ever checks whether any of
@@ -98,11 +115,14 @@ export async function GET(request: Request) {
       const graded = await settleFinishedWeeks();
       scorecard = { frozen, graded };
     } catch (e) {
-      scorecard = { error: e instanceof Error ? e.message : String(e) };
+      const message = e instanceof Error ? e.message : String(e);
+      scorecard = { error: message };
+      failures.push(`scorecard: ${message}`);
     }
 
     return Response.json({
-      ok: true,
+      ok: failures.length === 0,
+      failures,
       date: snapshotDate(),
       results,
       jingles,
