@@ -626,6 +626,47 @@ describe("burned teams on the report", () => {
     expect(r.plan.filter((p) => p.week > r.week).map((p) => p.team)).not.toContain("KC");
   });
 
+  // THE ONE JACK WAS ACTUALLY LOOKING AT, on Sunday afternoon in Week 1.
+  //
+  // Candidates are built from openGames, which drops any game whose kickoff has
+  // passed. JAX had already kicked off, so JAX was not a candidate, so `taken`
+  // resolved to null and the 500 board went back to recommending LAC while his
+  // pick was locked in and unchangeable. A pick does not stop being your pick
+  // when the ball is in the air.
+  //
+  // Needs its own fixture: the shared one puts both Week 1 games at the same
+  // kickoff, so the week rolls the moment either starts and there is no moment
+  // where one game is live and another is still to come. That moment is the
+  // whole scenario, so it has to be built.
+  const SUNDAY = [
+    game(1, "KC", "DEN", 0.8, { kickoff: "2026-09-07T17:00:00Z" }),
+    game(1, "PHI", "NYG", 0.7, { kickoff: "2026-09-07T21:00:00Z" }),
+    game(2, "BUF", "NYJ", 0.66),
+    game(2, "KC", "NYG", 0.75),
+  ];
+  // KC has kicked off, PHI has not, so it is still Week 1 with a live board.
+  const MID_SUNDAY = new Date("2026-09-07T19:00:00Z");
+
+  it("still names a pick whose game has already kicked off", () => {
+    const r = report(SUNDAY, EVEN, { myPicks: { "1": "KC" } }, MID_SUNDAY);
+    expect(r.week).toBe(1);
+    expect(r.myPick).toBe("KC");
+    expect(r.headline).toContain("you have KC");
+    expect(r.spentTeams).toContain("KC");
+  });
+
+  it("and does not offer a kicked-off pick as the recommendation", () => {
+    const r = report(SUNDAY, EVEN, { myPicks: { "1": "KC" } }, MID_SUNDAY);
+    // It is the answer, not a suggestion: nobody can act on it any more.
+    expect(r.candidates.map((c) => c.team)).not.toContain("KC");
+  });
+
+  it("anchors the plan on the locked pick, not on what it would have chosen", () => {
+    const r = report(SUNDAY, EVEN, { myPicks: { "1": "KC" } }, MID_SUNDAY);
+    expect(r.plan[0]?.team).toBe("KC");
+    expect(r.plan.filter((p) => p.week > r.week).map((p) => p.team)).not.toContain("KC");
+  });
+
   // THE ONE THAT COSTS HIM A WEEK. If this week's pick is not removed from the
   // future solver, the plan can hand him the same team again in a later week,
   // and a plan built on a team he cannot use is worse than no plan.

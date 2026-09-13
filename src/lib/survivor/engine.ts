@@ -322,14 +322,18 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   for (let w = week + 1; w <= LAST_WEEK; w++) futureWeeks.push(w);
   const basePlan = planFuture(futureWeeks, futureTeams, games);
 
-  const candidates: Candidate[] = [];
-  for (const g of openGames) {
-    for (const [team, opponent, home, winProb] of [
-      [g.home, g.away, true, g.homeWinProb] as const,
-      [g.away, g.home, false, 1 - g.homeWinProb] as const,
-    ]) {
-      if (used.has(team)) continue;
-
+  /**
+   * One candidate, priced. Pulled out of the loop so a pick whose game has
+   * already kicked off can be built the same way, from the same numbers, rather
+   * than being described by a second code path that could drift from this one.
+   */
+  function candidateFor(
+    g: (typeof weekGames)[number],
+    team: string,
+    opponent: string,
+    home: boolean,
+    winProb: number,
+  ): Candidate {
       const r = fieldSurvival(team, weekGames, ownership);
       const m = equityMultiplier(winProb, r, entriesAlive);
       const fv = futureCost(team, basePlan.value, futureWeeks, futureTeams, games);
@@ -353,7 +357,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
         bestFutureWinProb: inPlan?.winProb ?? null,
       };
 
-      candidates.push({
+      return {
         ...partial,
         flags: buildFlags(
           partial,
@@ -364,7 +368,17 @@ export function assembleReport(input: EngineInput): SurvivorReport {
         // The ranking number: the log of the equity this pick gains you this
         // week, minus the log-survival it costs you in the weeks to come.
         score: Math.log(Math.max(m, 1e-9)) - fv,
-      });
+      };
+  }
+
+  const candidates: Candidate[] = [];
+  for (const g of openGames) {
+    for (const [team, opponent, home, winProb] of [
+      [g.home, g.away, true, g.homeWinProb] as const,
+      [g.away, g.home, false, 1 - g.homeWinProb] as const,
+    ]) {
+      if (used.has(team)) continue;
+      candidates.push(candidateFor(g, team, opponent, home, winProb));
     }
   }
 
@@ -386,7 +400,31 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // recommended. Once JAX is yours the rest of the season has to be solved
   // without JAX, whether or not the engine would have picked it. Anchoring on
   // `best` here would have shown a plan that quietly assumed a different week 1.
-  const taken = myPick ? (candidates.find((c) => c.team === myPick) ?? null) : null;
+  // A PICK DOES NOT STOP BEING YOUR PICK WHEN THE BALL IS IN THE AIR. candidates
+  // comes from openGames, which drops a game once it has kicked off, so looking
+  // for the pick only in there meant the board forgot it at kickoff and went
+  // back to recommending someone else. That is what Jack was reading on Sunday
+  // afternoon in Week 1 with JAX already playing.
+  //
+  // Built from the week's games rather than pushed into candidates, because it
+  // is the answer and not a suggestion: nobody can act on a locked pick, so it
+  // must never be able to sort to the top of a list of things to do.
+  const taken =
+    myPick
+      ? (candidates.find((c) => c.team === myPick) ??
+        (() => {
+          const g = weekGames.find((x) => x.home === myPick || x.away === myPick);
+          if (!g) return null;
+          const home = g.home === myPick;
+          return candidateFor(
+            g,
+            myPick,
+            home ? g.away : g.home,
+            home,
+            home ? g.homeWinProb : 1 - g.homeWinProb,
+          );
+        })())
+      : null;
   const anchor = taken ?? best;
   const plan = anchor
     ? [
