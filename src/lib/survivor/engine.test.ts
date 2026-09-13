@@ -661,6 +661,28 @@ describe("burned teams on the report", () => {
     expect(r.candidates.map((c) => c.team)).not.toContain("KC");
   });
 
+  // The page needs the pick's NUMBERS, not just its name, to draw the card.
+  // It used to find them by searching candidates, which is the same lookup the
+  // engine had already got wrong, duplicated one layer up: the server said "you
+  // have JAX" in the headline while the page drew a "TAKE THIS" card for
+  // somebody else, because JAX had kicked off and was not in candidates. The
+  // engine publishes the priced pick so there is one answer, not two.
+  it("publishes the priced pick, so the page does not have to find it", () => {
+    const r = report(SUNDAY, EVEN, { myPicks: { "1": "KC" } }, MID_SUNDAY);
+    expect(r.myPickCandidate?.team).toBe("KC");
+    expect(r.myPickCandidate?.opponent).toBe("DEN");
+    expect(r.candidates.map((c) => c.team)).not.toContain("KC");
+  });
+
+  it("publishes it for a pick that has not kicked off either", () => {
+    const r = report(games, EVEN, { myPicks: { "1": "KC" } });
+    expect(r.myPickCandidate?.team).toBe("KC");
+  });
+
+  it("and nothing when no pick is taken", () => {
+    expect(report(games, EVEN, {}).myPickCandidate).toBeNull();
+  });
+
   it("anchors the plan on the locked pick, not on what it would have chosen", () => {
     const r = report(SUNDAY, EVEN, { myPicks: { "1": "KC" } }, MID_SUNDAY);
     expect(r.plan[0]?.team).toBe("KC");

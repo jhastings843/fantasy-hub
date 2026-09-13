@@ -608,6 +608,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     reasoning: tieSentence ? [tieSentence, ...reasoning] : reasoning,
     tied: tied.map((c) => c.team),
     myPick,
+    myPickCandidate: taken,
     myPickNote,
     bestTeam: best?.team ?? null,
     safestTeam: safest?.team ?? null,

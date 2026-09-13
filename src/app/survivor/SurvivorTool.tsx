@@ -223,9 +223,11 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   // Every count on the page reads this one: Jack had JAX taken in the 500 and
   // LAC in the 30-player and nothing on the page said either was used up.
   const spentSet = useMemo(() => new Set(report.spentTeams), [report.spentTeams]);
-  const taken = report.myPick
-    ? (report.candidates.find((c) => c.team === report.myPick) ?? null)
-    : null;
+  // Read from the report rather than searched for in candidates. Searching was
+  // the bug behind the two screenshots: candidates drops a game once it kicks
+  // off, so the 500 board drew a TAKE THIS card for LAC while its own headline
+  // said "you have JAX". The engine prices the pick; the page just draws it.
+  const taken = report.myPickCandidate;
 
   async function patch(body: Record<string, unknown>) {
     setBusy(true);

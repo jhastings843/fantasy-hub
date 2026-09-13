@@ -206,6 +206,16 @@ export interface SurvivorReport {
   /** The team you have taken this week, when you have taken one. */
   myPick: string | null;
   /**
+   * That pick, priced, so the page can draw its card without looking it up.
+   *
+   * Published because the page WAS looking it up, in candidates, which is the
+   * same lookup the engine had already got wrong and which drops a team once
+   * its game kicks off. The result was a server saying "you have JAX" in the
+   * headline while the page drew a TAKE THIS card recommending someone else.
+   * One answer, computed once.
+   */
+  myPickCandidate: Candidate | null;
+  /**
    * What taking it cost against the engine's pick, or null when there is
    * nothing to say: it agrees, or the two are inside the tie band anyway.
    *
