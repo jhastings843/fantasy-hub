@@ -1,5 +1,5 @@
 import "server-only";
-import { cachedWithFallback } from "@/lib/redis/cached";
+import { cachedWithFallback, invalidate } from "@/lib/redis/cached";
 import { parseInjuries, type EspnInjuryFeed } from "./intel-pure";
 import type { InjuryNote } from "./types";
 
@@ -11,6 +11,11 @@ const ESPN_INJURIES =
  * feed, it is the one line that explains why a 78% favourite is really a 68%
  * favourite and the market has not caught up yet.
  */
+/** Drop the cached injury notes so the next read is live. */
+export async function revalidateInjuries(): Promise<void> {
+  await invalidate("survivor:injuries:v2");
+}
+
 export async function getInjuries(): Promise<InjuryNote[]> {
   const res = await cachedWithFallback<InjuryNote[]>({
     key: "survivor:injuries:v2",

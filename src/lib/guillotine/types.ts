@@ -3,6 +3,7 @@
 import type { Phase, BudgetPlan } from "./budget";
 import type { ChopLineResult, PostureCall, TeamRisk } from "./chop-line";
 import type { MarketModel, Tier } from "./market";
+import type { SeasonOutlook } from "./outlook";
 
 /** A player with everything the advisor needs to price him. */
 export interface PoolPlayer {
@@ -72,6 +73,13 @@ export type ReportState =
   | "pre_draft"
   | "no_projections";
 
+export interface Wallet {
+  rosterId: number;
+  name: string;
+  isMine: boolean;
+  remaining: number;
+}
+
 export interface WeeklyFaabReport {
   state: ReportState;
   /** Set when state is anything but ok: why there is no advice. */
@@ -107,6 +115,10 @@ export interface WeeklyFaabReport {
   };
 
   budget: BudgetPlan;
+  /** The same pacing rules, projected forward instead of asserted weekly. */
+  season: SeasonOutlook;
+  /** Every living team's FAAB, richest first. Who can outbid you, by name. */
+  wallets: Wallet[];
   market: MarketModel;
   card: BidCard;
 

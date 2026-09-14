@@ -1,5 +1,6 @@
 import "server-only";
 import { cached } from "@/lib/redis/cached";
+import { redis } from "@/lib/redis/client";
 import { scoreStatLine, type ScoringSettings } from "./scoring";
 
 // Sleeper's projection feed, scored under one league's settings.
@@ -76,6 +77,36 @@ function toProjected(row: RawProjectionRow, scoring: ScoringSettings): Projected
         ? row.player.injury_status
         : null,
   };
+}
+
+/**
+ * Drop every cached week projection.
+ *
+ * This is the only live source of a player's injury status in the app, which
+ * is not obvious and was worth finding out: getAllPlayers is slimmed and drops
+ * injury_status entirely, so the lineup's status field falls through to this
+ * feed. At a six hour TTL a player ruled out at 11:30 on a Sunday would still
+ * read as questionable at kickoff, and the alarm built to catch exactly that
+ * would say nothing.
+ *
+ * Scanned rather than keyed, because the caller knows neither which leagues
+ * nor which week are cached, and the keyspace here is a handful of entries.
+ */
+export async function revalidateProjections(): Promise<number> {
+  let cursor = "0";
+  let dropped = 0;
+  do {
+    const [next, keys] = await redis.scan(cursor, {
+      match: "guillotine:v1:proj:*",
+      count: 200,
+    });
+    cursor = String(next);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+      dropped += keys.length;
+    }
+  } while (cursor !== "0");
+  return dropped;
 }
 
 /** Projected points for one week, scored under this league's settings. */

@@ -14,9 +14,23 @@ export interface SendResult {
   id?: string;
 }
 
+/**
+ * Sending the weekly guide, at most once.
+ *
+ * `key` becomes Resend's Idempotency-Key, which is the only guard that still
+ * works when our own bookkeeping fails. The send log stops a second attempt
+ * when Redis is healthy; when the email went out and the receipt write did
+ * not, the next run has no idea and will try again. Resend answers that
+ * second attempt with the first one's result rather than a second email.
+ *
+ * Keyed by email, season and week, because that is what makes two attempts
+ * "the same email". Resend holds these for 24 hours, which is longer than any
+ * retry window here.
+ */
 export async function sendEmail(
   subject: string,
   html: string,
+  key?: string,
 ): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.FAAB_EMAIL_TO;
@@ -34,6 +48,7 @@ export async function sendEmail(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      ...(key ? { "Idempotency-Key": key } : {}),
     },
     body: JSON.stringify({ from, to: [to], subject, html }),
   });

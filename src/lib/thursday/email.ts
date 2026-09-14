@@ -2,6 +2,18 @@ import type { SurvivorReport } from "@/lib/survivor/types";
 import { poolMeta } from "@/lib/survivor/pools";
 import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
+import {
+  card,
+  emailPage,
+  escapeHtml,
+  generatedLine,
+  label,
+  PALETTE,
+  pct,
+  statCell,
+  GOOD,
+  WARN,
+} from "@/lib/email/shell";
 
 // The Thursday morning email: this week's survivor pick, and the lineup slots
 // that actually need touching.
@@ -16,31 +28,7 @@ import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
 // is already right gets one line saying so. What is left is the part Jack has
 // to act on before kickoff.
 
-const PALETTE = {
-  ink: "#18181b",
-  body: "#52525b",
-  muted: "#a1a1aa",
-  hairline: "#e4e4e7",
-  surface: "#ffffff",
-  page: "#fafaf9",
-  accent: "#2563eb",
-  good: "#047857",
-  goodBg: "#ecfdf5",
-  goodBorder: "#a7f3d0",
-  warn: "#b45309",
-  warnBg: "#fffbeb",
-  warnBorder: "#fde68a",
-};
 
-function escapeHtml(value: string): string {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 export interface ThursdayInput {
   /** One per pool, in the order the pools are configured. Empty when the report failed. */
@@ -100,17 +88,7 @@ export function totalChanges(lineups: WeeklyLineups): number {
   return lineups.leagues.reduce((n, l) => n + l.advice.changes.length, 0);
 }
 
-function card(inner: string, tint?: { bg: string; border: string }): string {
-  const bg = tint?.bg ?? PALETTE.surface;
-  const border = tint?.border ?? PALETTE.hairline;
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${bg};border:1px solid ${border};border-radius:12px;margin-bottom:12px;">
-  <tr><td style="padding:16px 18px;">${inner}</td></tr>
-</table>`;
-}
 
-function label(text: string): string {
-  return `<div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};padding-bottom:6px;">${escapeHtml(text)}</div>`;
-}
 
 /**
  * Every pool's pick, one card each.
@@ -125,7 +103,7 @@ function survivorSection(input: ThursdayInput): string {
   if (survivors.length === 0) {
     return card(
       `${label("Survivor")}<div style="font:400 14px/1.55 -apple-system,sans-serif;color:${PALETTE.body};">No pick this week. ${escapeHtml(survivorError ?? "The report could not be built.")}</div>`,
-      { bg: PALETTE.warnBg, border: PALETTE.warnBorder },
+      WARN,
     );
   }
 
@@ -231,12 +209,6 @@ function equityLine(
   return `${c.equityMultiplier.toFixed(2)}x equity`;
 }
 
-function statCell(name: string, value: string): string {
-  return `<td width="25%" style="padding-right:8px;">
-  <div style="font:600 16px/1.2 -apple-system,sans-serif;color:${PALETTE.ink};">${escapeHtml(value)}</div>
-  <div style="font:400 10px/1.3 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};padding-top:2px;">${escapeHtml(name)}</div>
-</td>`;
-}
 
 function changeRow(slot: SlotAdvice): string {
   return `<div style="padding:8px 0;border-top:1px solid ${PALETTE.hairline};">
@@ -255,7 +227,7 @@ function leagueBlock(league: WeeklyLineups["leagues"][number]): string {
   if (league.error) {
     return card(
       `${head}<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.warn};padding-top:8px;">Could not be checked: ${escapeHtml(league.error)}</div>`,
-      { bg: PALETTE.warnBg, border: PALETTE.warnBorder },
+      WARN,
     );
   }
 
@@ -288,7 +260,7 @@ function leagueBlock(league: WeeklyLineups["leagues"][number]): string {
       `${head}
 <div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:8px;">Nothing to change.</div>
 ${problems}${superflex}${ours}`,
-      { bg: PALETTE.goodBg, border: PALETTE.goodBorder },
+      GOOD,
     );
   }
 
@@ -306,7 +278,7 @@ export function renderThursdayEmail(input: ThursdayInput): string {
   const lineupSection = lineups.blocked
     ? card(
         `${label("Lineups")}<div style="font:400 14px/1.55 -apple-system,sans-serif;color:${PALETTE.body};">${escapeHtml(lineups.blocked)}</div>`,
-        { bg: PALETTE.warnBg, border: PALETTE.warnBorder },
+        WARN,
       )
     : `${label(changes === 0 ? "Lineups, all set" : `Lineups, ${changes} to change`)}${lineups.leagues.map(leagueBlock).join("")}`;
 
@@ -323,51 +295,16 @@ export function renderThursdayEmail(input: ThursdayInput): string {
 
   const week = input.survivors[0]?.week ?? lineups.week;
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>${escapeHtml(thursdaySubject(input))}</title>
-</head>
-<body style="margin:0;padding:0;background:${PALETTE.page};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
-    changes === 0 ? "Nothing to change in any league." : `${changes} slots to change before kickoff.`,
-  )}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PALETTE.page};padding:20px 12px;">
-  <tr>
-    <td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-        <tr>
-          <td style="padding-bottom:16px;">
-            <div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};">
-              Thursday &middot; Week ${escapeHtml(String(week ?? ""))}
-            </div>
-            <div style="font:600 20px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${PALETTE.ink};padding-top:4px;letter-spacing:-.01em;">
-              Before kickoff
-            </div>
-          </td>
-        </tr>
-        <tr><td>${survivorSection(input)}</td></tr>
-        <tr><td style="padding-top:6px;">${lineupSection}</td></tr>
-        <tr>
-          <td style="padding-top:4px;">
-            <a href="${escapeHtml(input.appUrl)}/survivor" style="display:inline-block;background:${PALETTE.accent};color:#ffffff;font:600 14px/1 -apple-system,sans-serif;padding:12px 18px;border-radius:10px;text-decoration:none;">Open survivor</a>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding-top:18px;">
-            ${provenance}
-            <div style="font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:6px;">
-              Generated ${escapeHtml(new Date(input.generatedAt).toLocaleString("en-US", { timeZone: "America/New_York" }))} ET.
-            </div>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-</body>
-</html>`;
+  return emailPage({
+    title: thursdaySubject(input),
+    kicker: `Thursday \u00b7 Week ${week ?? ""}`,
+    heading: "Before kickoff",
+    preheader:
+      changes === 0
+        ? "Nothing to change in any league."
+        : `${changes} slots to change before kickoff.`,
+    body: `${survivorSection(input)}<div style="padding-top:6px;">${lineupSection}</div>`,
+    cta: { href: `${input.appUrl}/survivor`, text: "Open survivor" },
+    footnote: `${provenance}<div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
+  });
 }

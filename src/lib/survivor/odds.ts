@@ -1,5 +1,5 @@
 import "server-only";
-import { cachedWithFallback } from "@/lib/redis/cached";
+import { cachedWithFallback, invalidate } from "@/lib/redis/cached";
 import type { Game, TeamWeek } from "./types";
 import { noVig, ratingWinProb, spreadToWinProb } from "./probability";
 
@@ -148,6 +148,16 @@ export interface SeasonGames {
  * reads this on every render. A short or failed fetch falls back to the last
  * complete copy rather than caching a hole in the schedule.
  */
+/**
+ * Drop the cached slate so the next read goes to ESPN.
+ *
+ * Only the live key, never the last-known-good copy beside it: a forced
+ * refresh that fails should fall back to the lines we had, not to nothing.
+ */
+export async function revalidateGames(season: number): Promise<void> {
+  await invalidate(`survivor:games:${season}:v2`);
+}
+
 export async function getSeasonGames(season: number): Promise<SeasonGames> {
   const res = await cachedWithFallback<Game[]>({
     key: `survivor:games:${season}:v2`,

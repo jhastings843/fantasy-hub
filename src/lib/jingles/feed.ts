@@ -1,5 +1,6 @@
 import "server-only";
-import { cached } from "@/lib/redis/cached";
+import { cached, invalidate } from "@/lib/redis/cached";
+import { redis } from "@/lib/redis/client";
 import { classifyPost, htmlToLines, type PostKind } from "./parse";
 import { fetchInboxPosts, inboxConfigured, slugFrom } from "./inbox";
 
@@ -79,6 +80,11 @@ function looksTruncated(html: string): boolean {
 }
 
 /** Posts from the public RSS feed. Free posts arrive whole. */
+/** Drop the cached feed so the next read sees a post made minutes ago. */
+export async function revalidateFeed(): Promise<void> {
+  await invalidate("jingles:v1:feed");
+}
+
 export async function fetchFeedPosts(): Promise<JinglesPost[]> {
   return cached(`jingles:v1:feed`, TTL, async () => {
     const xml = await get(`${PUBLICATION}/feed`, "application/rss+xml, application/xml");
@@ -185,10 +191,32 @@ export async function fetchPosts(): Promise<JinglesPost[]> {
  *
  * Opened only when there is something to look for, and only when the mailbox
  * is configured. On a day when everything is free this costs one boolean.
+ *
+ * And at most twice an hour. This used to run once a day from the snapshot
+ * cron; the pulse calls it up to 96 times, and a paid post sitting in the feed
+ * makes "something to look for" true on every one of them, so without this it
+ * would be dozens of IMAP logins a day against Jack's own Gmail. Half an hour
+ * of delay on a post that has been sitting there all morning costs nothing.
  */
+const INBOX_COOLDOWN_SECONDS = 30 * 60;
+
+async function inboxIsCoolingDown(): Promise<boolean> {
+  try {
+    const claim = await redis.set("jingles:v1:inbox:cooldown", Date.now(), {
+      nx: true,
+      ex: INBOX_COOLDOWN_SECONDS,
+    });
+    return claim !== "OK";
+  } catch {
+    // An unreachable cache must not stop the ingest reading a paid post.
+    return false;
+  }
+}
+
 async function fillFromInbox(posts: JinglesPost[]): Promise<JinglesPost[]> {
   const wanted = posts.filter((p) => p.truncated && p.kind !== "other");
   if (!wanted.length || !inboxConfigured()) return posts;
+  if (await inboxIsCoolingDown()) return posts;
 
   const mail = await fetchInboxPosts();
   if (!mail.size) return posts;

@@ -1,5 +1,5 @@
 import "server-only";
-import { cachedWithFallback } from "@/lib/redis/cached";
+import { cachedWithFallback, invalidate } from "@/lib/redis/cached";
 import { redis } from "@/lib/redis/client";
 import { archiveNeedsWrite, mergePublicPicks, parseYahoo } from "./yahoo";
 import type { Ownership, OwnershipSnapshot } from "./types";
@@ -69,6 +69,11 @@ async function readArchive(season: number): Promise<Record<string, Ownership>> {
   } catch {
     return {};
   }
+}
+
+/** Drop the cached Yahoo pull so the next read is live. */
+export async function revalidatePublicPicks(season: number): Promise<void> {
+  await invalidate(`survivor:yahoo:${season}:v3`);
 }
 
 export async function getPublicPicks(

@@ -8,6 +8,7 @@ import {
 } from "@/lib/sleeper/client";
 import { profileFromSleeper } from "@/lib/league/detect";
 import { planBudget } from "./budget";
+import { seasonOutlook } from "./outlook";
 import { callPosture, simulateChop, toSimTeam, type SimTeam } from "./chop-line";
 import { readLeagueState, seasonBids, writeSnapshot } from "./league-state";
 import { buildMarket, type ObservedBid, type Tier } from "./market";
@@ -16,7 +17,7 @@ import { buildBidCard, finalFourBars } from "./recommend";
 import { snapshotFrom } from "./roster-diff";
 import { scoringSkewNotes } from "./scoring";
 import type { LeagueProfile } from "@/lib/league/types";
-import type { PoolPlayer, WeeklyFaabReport } from "./types";
+import type { PoolPlayer, Wallet, WeeklyFaabReport } from "./types";
 
 // The one assembly. The page, the API and the email all call this, so a number
 // shown in the app and a number sent in the email cannot disagree. That lesson
@@ -76,6 +77,17 @@ function fallbackReport(
       weakSlots: [],
       byeAlerts: [],
     },
+    season: {
+      spent: 0,
+      remaining: 0,
+      holdFloor: 0,
+      onPace: true,
+      aheadBy: 0,
+      next: [],
+      inversionWeek: null,
+      pacingOffWeek: null,
+    },
+    wallets: [],
     budget: {
       phase: "field",
       phaseNote: "",
@@ -266,6 +278,26 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     return { week: bid.week, tier, amount: bid.amount };
   });
 
+  const season = seasonOutlook({
+    budget: budgetTotal,
+    remaining: myFaab,
+    teamsAlive: state.aliveRosterIds.length,
+    totalTeams: profile.teams,
+    week,
+  });
+
+  // Named wallets rather than the single maxRivalBid number the plan carries.
+  // "A rival can outbid you" is a fact you cannot act on; "the two teams above
+  // you in the table are the ones who can" tells you which claims to skip.
+  const wallets: Wallet[] = state.aliveRosterIds
+    .map((id) => ({
+      rosterId: id,
+      name: teamName(id),
+      isMine: id === myRoster.roster_id,
+      remaining: state.faabRemaining[id] ?? 0,
+    }))
+    .sort((a, b) => b.remaining - a.remaining);
+
   const market = buildMarket(budgetTotal, budget.phase, observed);
 
   // --- The pool ---
@@ -361,6 +393,8 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
       byeAlerts,
     },
     budget,
+    season,
+    wallets,
     market,
     card,
     caveats,

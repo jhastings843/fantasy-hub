@@ -91,6 +91,147 @@ function Stat({
   );
 }
 
+
+/**
+ * The season, drawn.
+ *
+ * The pacing card next to it answers "what can I spend today". This answers
+ * "am I spending this season well", which is the question the hold curve has
+ * always been computing and never showing: how much of the budget is gone
+ * against how much the curve wants held, what the next three weeks look like
+ * if nothing goes wrong, and when the whole pacing idea switches off.
+ */
+function SeasonPlan({ report }: { report: WeeklyFaabReport }) {
+  const { season, league } = report;
+  const budget = Math.max(1, league.budget);
+  // Three segments, because the budget is three different things at once: gone,
+  // available now, and held back by the curve. A single bar with a marker made
+  // the marker look like a target when it is a ceiling.
+  const spentPct = Math.min(100, (season.spent / budget) * 100);
+  // Held is capped at what is actually left, so a wallet behind the curve
+  // cannot draw a reserve bigger than the money in it. The two always sum to
+  // the remaining balance, and with spent that is the whole budget.
+  const held = Math.min(season.holdFloor, season.remaining);
+  const heldPct = (held / budget) * 100;
+  const spendablePct = Math.max(0, 100 - spentPct - heldPct);
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <Eyebrow>The season plan</Eyebrow>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+            season.onPace
+              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+              : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+          }`}
+        >
+          {season.onPace
+            ? `${money(Math.abs(season.aheadBy))} ahead of the curve`
+            : `${money(Math.abs(season.aheadBy))} behind the curve`}
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+          <div className="h-full bg-zinc-900 dark:bg-zinc-100" style={{ width: `${spentPct}%` }} />
+          <div className="h-full bg-emerald-500" style={{ width: `${spendablePct}%` }} />
+          <div className="h-full bg-zinc-200 dark:bg-zinc-700" style={{ width: `${heldPct}%` }} />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-zinc-900 dark:bg-zinc-100" aria-hidden />
+            <span className="tabular-nums">{money(season.spent)} spent</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+            <span className="tabular-nums">
+              {money(Math.max(0, season.remaining - held))} the curve frees
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-zinc-200 dark:bg-zinc-700" aria-hidden />
+            <span className="tabular-nums">{money(held)} the curve holds</span>
+          </span>
+        </div>
+      </div>
+
+      {season.next.length > 0 ? (
+        <div className="mt-5 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
+          <div className="grid grid-cols-3 gap-3">
+            {season.next.map((w) => (
+              <div key={w.week}>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                  Week {w.week}
+                </div>
+                <div className="mt-0.5 text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {money(w.weeklyCap)}
+                </div>
+                <div className="mt-0.5 text-xs leading-snug text-zinc-500 tabular-nums">
+                  hold {money(w.holdFloor)} &middot; {w.teamsAlive} alive
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+            One chop a week, and no week where you are in danger. This
+            week&rsquo;s actual ceiling is {money(report.budget.weeklyCap)}, because posture
+            moves it: a red week lifts its own ceiling, so treat these as the
+            floor on your freedom rather than a cap on it.
+          </p>
+        </div>
+      ) : null}
+
+      <p className="mt-4 flex items-start gap-2 border-t border-zinc-200/70 pt-4 text-xs leading-relaxed text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+        <Info size={13} className="mt-0.5 shrink-0 text-zinc-400" aria-hidden />
+        {[
+          season.inversionWeek
+            ? `Six teams left projects to week ${season.inversionWeek}, where the format inverts and ceiling starts beating floor.`
+            : "The field has already inverted: outscore the survivors rather than avoid finishing last.",
+          season.pacingOffWeek
+            ? `Pacing itself runs until four teams, projected week ${season.pacingOffWeek}, after which unspent money is worth nothing.`
+            : "Pacing is off, so unspent money is a wasted asset from here.",
+        ].join(" ")}
+      </p>
+
+      {report.wallets.length > 0 ? (
+        <div className="mt-5 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+            Who can outbid you
+          </div>
+          <ul className="mt-3 flex flex-col gap-2">
+            {report.wallets.slice(0, 8).map((w) => (
+              <li key={w.rosterId} className="flex items-center gap-3">
+                <span
+                  className={`w-32 shrink-0 truncate text-xs ${
+                    w.isMine
+                      ? "font-semibold text-zinc-900 dark:text-zinc-100"
+                      : "text-zinc-600 dark:text-zinc-400"
+                  }`}
+                >
+                  {w.name}
+                  {w.isMine ? " (you)" : ""}
+                </span>
+                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <span
+                    className={`block h-full rounded-full ${
+                      w.isMine ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                    }`}
+                    style={{ width: `${Math.max(2, (w.remaining / budget) * 100)}%` }}
+                  />
+                </span>
+                <span className="w-14 shrink-0 text-right text-xs font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {money(w.remaining)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 function Verdict({ report }: { report: WeeklyFaabReport }) {
   const style = POSTURE_STYLE[report.posture.posture];
   const risk = report.risk.myChopProbability;
@@ -368,6 +509,8 @@ export default async function FaabPage({
             </>
           ) : null}
         </Card>
+
+        <SeasonPlan report={report} />
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Card>

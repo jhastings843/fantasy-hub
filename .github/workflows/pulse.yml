@@ -1,0 +1,75 @@
+# The heartbeat.
+#
+# Vercel Hobby allows two cron jobs and both are taken, and a Hobby cron fires
+# once a day, so the app could never refresh itself between page views. This
+# calls /api/pulse every fifteen minutes and the app decides what that means:
+# a gameday refresh, the hourly top-up, the overnight pull, or nothing.
+#
+# The tempo deliberately does NOT live in this cron expression. GitHub schedules
+# in UTC and the NFL runs on Eastern, so a window written here would be an hour
+# wrong for four months of the year. src/lib/pulse/tempo.ts decides, and it has
+# tests.
+#
+# Two things worth knowing about GitHub's scheduler: it can run several minutes
+# late under load, which is why nothing here is timed to the minute, and it
+# disables scheduled workflows on a repository with no activity for 60 days,
+# which a season of commits comfortably avoids.
+#
+# Secrets and variables this needs:
+#   secrets.CRON_SECRET  the same value as the Vercel environment variable
+#   vars.APP_URL         optional, defaults to the production deployment
+
+name: pulse
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Force a tier (live, hourly, overnight)"
+        required: false
+        default: ""
+
+# One at a time. A live run can take most of a minute and overlapping calls
+# would double every upstream fetch for no benefit.
+concurrency:
+  group: pulse
+  cancel-in-progress: false
+
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the pulse
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          TIER: ${{ inputs.tier }}
+        run: |
+          url="$APP_URL/api/pulse"
+          if [ -n "$TIER" ]; then url="$url?tier=$TIER"; fi
+
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            --max-time 120 --retry 2 --retry-delay 15 --retry-all-errors \
+            "$url")
+
+          echo "HTTP $status"
+          # The receipt is small and reading it in the Actions log is how a
+          # quiet failure gets noticed without opening the app.
+          jq -r '
+            "tier: \(.tier) (\(.window))",
+            "jobs: " + ([.jobs[] | "\(.job)=\(if .ok then .detail else "FAILED: " + .error end)"] | join(" | ")),
+            (if (.sends | length) > 0 then "sends: " + ([.sends[] | "\(.id)=\(.status)"] | join(" | ")) else "sends: none due" end)
+          ' response.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # A failing upstream is reported, not fatal: a red cross every time
+          # Yahoo has a bad afternoon is a signal nobody keeps reading. Only a
+          # heartbeat that could not reach the app at all fails the run.
+          if [ "$status" != "200" ]; then
+            echo "::error::pulse returned HTTP $status"
+            head -c 2000 response.json
+            exit 1
+          fi

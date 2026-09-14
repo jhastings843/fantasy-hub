@@ -5,6 +5,8 @@ import { buildWeeklyLineups } from "@/lib/lineup/build";
 import { sendEmail } from "@/lib/guillotine/send";
 import { renderThursdayEmail, thursdaySubject, totalChanges } from "./email";
 import { alreadySent, clearSent, recordSent } from "./sent-log";
+import { recordBaseline, type Baselines } from "@/lib/survivor/baseline";
+import { withSendLock } from "@/lib/email/sent-log";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -38,7 +40,27 @@ export function dayInNewYork(now: Date): number {
  * The whole job, separated from the request so the snapshot cron can call it
  * directly rather than making an HTTP request to itself.
  */
-export async function runThursdayEmail(options: {
+/** The job, behind its lock. See withSendLock: two callers, one send. */
+export function runThursdayEmail(options: {
+  force?: boolean;
+  dry?: boolean;
+  resend?: boolean;
+  /**
+   * Marks the subject so a preview is distinguishable in the inbox.
+   *
+   * Worth having rather than sending an identical subject twice: the send log
+   * makes a real week unrepeatable, so every look at a change to this email is
+   * a resend of a week that already went out, and three lines reading "Week 1:
+   * LAC over ARI" with different contents is the confusing outcome.
+   */
+  test?: boolean;
+} = {}): Promise<Response> {
+  // A preview is not a send, so it never waits on one.
+  if (options?.dry) return runThursdayEmailLocked(options);
+  return withSendLock("thursday", () => runThursdayEmailLocked(options));
+}
+
+async function runThursdayEmailLocked(options: {
   force?: boolean;
   dry?: boolean;
   resend?: boolean;
@@ -116,10 +138,22 @@ export async function runThursdayEmail(options: {
   }
   if (previous && resend) await clearSent(season, week);
 
-  const result = await sendEmail(subject, html);
+  const result = await sendEmail(subject, html, `thursday:${season}:w${week}`);
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }
+
+  // The number Jack is now carrying around, so Sunday can tell him if it
+  // moved. Written after the send, because a pick he was never told about is
+  // not a baseline for anything.
+  const baselines: Baselines = {};
+  for (const report of survivorResult.reports) {
+    baselines[report.poolId] = {
+      pick: report.myPick,
+      winProb: report.myPickCandidate?.winProb ?? null,
+    };
+  }
+  await recordBaseline(season, week, baselines);
 
   await recordSent(season, week, {
     sentAt: new Date().toISOString(),

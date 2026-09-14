@@ -240,6 +240,74 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
     </tr>
   </table>`;
 
+  // The season, not just the week.
+  //
+  // The pacing numbers above are correct and unreadable as a plan: "week
+  // ceiling $20" says nothing about whether $20 is tight because it is
+  // September or tight because the money is gone. This is the same curve,
+  // drawn forward, plus the names of the teams who can outbid you.
+  const s = report.season;
+  const paceLine = s.onPace
+    ? `Spent ${money(s.spent)} of ${money(report.league.budget)}. The curve says hold ${money(s.holdFloor)} at this point, so you are ${money(Math.abs(s.aheadBy))} ahead of it.`
+    : `Spent ${money(s.spent)} of ${money(report.league.budget)}. The curve says hold ${money(s.holdFloor)} at this point, so you are ${money(Math.abs(s.aheadBy))} behind it. Bid like the money is scarcer than the ceiling suggests.`;
+
+  const trajectory = s.next.length
+    ? s.next
+        .map(
+          (w) =>
+            `<span style="white-space:nowrap;">W${w.week}: ${money(w.weeklyCap)} ceiling, hold ${money(w.holdFloor)}</span>`,
+        )
+        .join(' <span style="color:' + PALETTE.muted + '">&middot;</span> ')
+    : "";
+
+  const wallets = report.wallets
+    .slice(0, 6)
+    .map((w) => {
+      const share = report.league.budget > 0 ? w.remaining / report.league.budget : 0;
+      const bar = Math.max(2, Math.round(share * 100));
+      return `<tr>
+      <td style="padding:3px 8px 3px 0;font:${w.isMine ? "600" : "400"} 12px/1.5 -apple-system,sans-serif;color:${w.isMine ? PALETTE.ink : PALETTE.body};white-space:nowrap;">${escapeHtml(w.name)}${w.isMine ? " (you)" : ""}</td>
+      <td width="55%" style="padding:3px 8px 3px 0;">
+        <div style="background:${PALETTE.hairline};border-radius:3px;height:6px;">
+          <div style="background:${w.isMine ? POSTURE_COLOR.green.ink : PALETTE.muted};width:${bar}%;height:6px;border-radius:3px;"></div>
+        </div>
+      </td>
+      <td style="padding:3px 0;font:${w.isMine ? "600" : "400"} 12px/1.5 -apple-system,sans-serif;color:${PALETTE.ink};text-align:right;white-space:nowrap;">${money(w.remaining)}</td>
+    </tr>`;
+    })
+    .join("");
+
+  const seasonBlock = `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${PALETTE.hairline};border-radius:12px;background:${PALETTE.surface};margin-bottom:20px;">
+    <tr>
+      <td style="padding:16px 18px;">
+        <div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};">The season plan</div>
+        <div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.body};padding-top:8px;">${escapeHtml(paceLine)}</div>
+        ${
+          trajectory
+            ? `<div style="font:400 12px/1.7 -apple-system,sans-serif;color:${PALETTE.body};padding-top:10px;">${trajectory}</div>
+        <div style="font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:4px;">Assuming one chop a week and no week where you are in danger, which lifts the ceiling on its own.</div>`
+            : ""
+        }
+        <div style="font:400 12px/1.6 -apple-system,sans-serif;color:${PALETTE.body};padding-top:10px;">${
+          s.inversionWeek
+            ? `Six teams left projects to <strong style="color:${PALETTE.ink};">week ${s.inversionWeek}</strong>, where the format inverts and ceiling starts beating floor.`
+            : "The field is already small enough that the format has inverted: outscore the survivors rather than avoid last."
+        }${
+          s.pacingOffWeek
+            ? ` Pacing itself does not stop until four teams, projected <strong style="color:${PALETTE.ink};">week ${s.pacingOffWeek}</strong>, and money unspent after that is worth nothing.`
+            : " Pacing is already off, so unspent money is a wasted asset."
+        }</div>
+        ${
+          wallets
+            ? `<div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};padding:14px 0 6px;">Who can outbid you</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${wallets}</table>`
+            : ""
+        }
+      </td>
+    </tr>
+  </table>`;
+
   const notes = [...report.league.scoringNotes, ...report.caveats];
   const notesBlock = notes.length
     ? `
@@ -258,7 +326,7 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
   </table>`
     : "";
 
-  return wrap(verdict + chopLine + claims + pacing + notesBlock, report, link);
+  return wrap(verdict + chopLine + claims + pacing + seasonBlock + notesBlock, report, link);
 }
 
 function wrap(inner: string, report: WeeklyFaabReport, link: string): string {
