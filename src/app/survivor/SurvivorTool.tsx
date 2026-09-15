@@ -15,6 +15,7 @@ import {
   Shield,
   TrendingUp,
 } from "lucide-react";
+import { formatPickPaste, parsePickPaste } from "@/lib/survivor/paste";
 import { NFL_TEAMS, logoUrl } from "@/lib/survivor/teams";
 import type { Candidate, CandidateFlag, SurvivorReport } from "@/lib/survivor/types";
 
@@ -207,6 +208,10 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   const [pasteOpen, setPasteOpen] = useState(false);
   const [paste, setPaste] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
+  // Which finished week the paste box is pointed at, per pool. Unset means the
+  // default: the newest week still missing its picks. Set means Jack opened an
+  // older week to correct it, which is the only way a bad paste gets fixed.
+  const [weekChoice, setWeekChoice] = useState<Record<string, number>>({});
 
   // Every pool's board arrives in one payload, so switching is instant and both
   // are priced off the same ownership pull. A stale id (a pool removed between
@@ -278,56 +283,51 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   }
 
   /**
-   * Accepts what a pool's distribution screen actually looks like when you copy
-   * it: a team key and a number per line, in any order, with or without a
-   * percent sign.
+   * Parses the paste (lib/survivor/paste.ts, tested there) and writes it over
+   * whichever week the box is pointed at, so re-saving an edited week replaces
+   * the old numbers rather than stacking on them.
    */
   function submitPaste() {
-    const valid = new Set(NFL_TEAMS.map((t) => t.abbr));
-    const picks: Record<string, number> = {};
-    for (const line of paste.split("\n")) {
-      const m = line.trim().match(/^([A-Za-z]{2,4})\b[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*%?/);
-      if (!m) continue;
-      const abbr = m[1].toUpperCase();
-      if (!valid.has(abbr)) continue;
-      picks[abbr] = Number(m[2]);
-    }
-    const total = Object.values(picks).reduce((a, b) => a + b, 0);
-    if (Object.keys(picks).length < 2) {
-      setPasteError("Could not read two teams out of that. One team and one number per line.");
-      return;
-    }
-
-    // A 30-entry pool's screen shows COUNTS, not percentages: "LAC 11, JAX 7"
-    // sums to 30 and the old check rejected it as not a distribution. Anything
-    // that adds up near the entries alive is read as counts and converted.
-    // Percentages are tried first, so a 100-entry pool is unaffected either way.
-    const looksLikePercentages = total >= 50 && total <= 150;
-    const alive = report.entriesAlive;
-    const looksLikeCounts = !looksLikePercentages && total >= alive * 0.75 && total <= alive * 1.25;
-
-    if (looksLikeCounts) {
-      for (const k of Object.keys(picks)) picks[k] = (picks[k] / total) * 100;
-    } else if (!looksLikePercentages) {
-      setPasteError(
-        `Those add up to ${total.toFixed(1)}, which is neither a percentage distribution nor a count of the ${alive} entries alive.`,
-      );
+    const parsed = parsePickPaste(paste, {
+      entriesAlive: report.entriesAlive,
+      poolSize: pool.poolSize,
+    });
+    if (!parsed.ok) {
+      setPasteError(parsed.error);
       return;
     }
     setPasteError(null);
     setPasteOpen(false);
     setPaste("");
     void patch({
-      weeklyPicks: { ...pool.weeklyPicks, [String(logWeek)]: picks },
+      weeklyPicks: { ...pool.weeklyPicks, [String(logWeek)]: parsed.picks },
     });
+  }
+
+  /** Point the box at a week and load what is saved for it, if anything. */
+  function openWeek(week: number) {
+    setWeekChoice((prev) => ({ ...prev, [report.poolId]: week }));
+    setPaste(formatPickPaste(pool.weeklyPicks[String(week)] ?? {}));
+    setPasteError(null);
+    setPasteOpen(true);
   }
 
   // The week the log box writes to: the most recent finished week still missing
   // its pool picks, falling back to the last completed week for corrections.
-  const logWeek =
+  const defaultLogWeek =
     report.unloggedWeeks.length > 0
       ? report.unloggedWeeks[report.unloggedWeeks.length - 1]
       : Math.max(1, report.week - 1);
+  const logWeek = weekChoice[report.poolId] ?? defaultLogWeek;
+  // Every week that has finished, plus anything logged under an odd key, so a
+  // saved week can always be reached to edit or delete it.
+  const finishedWeeks = useMemo(() => {
+    const weeks = new Set<number>();
+    for (let w = 1; w < report.week; w++) weeks.add(w);
+    for (const k of Object.keys(pool.weeklyPicks)) if (Number(k) > 0) weeks.add(Number(k));
+    return [...weeks].sort((a, b) => a - b);
+  }, [report.week, pool.weeklyPicks]);
+  const logWeekSaved = Boolean(pool.weeklyPicks[String(logWeek)]);
 
   const best = report.candidates[0] ?? null;
   const safest =
@@ -697,23 +697,55 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             {!nothingToLogYet && (
               <button
                 type="button"
-                onClick={() => setPasteOpen((o) => !o)}
+                onClick={() => (pasteOpen ? setPasteOpen(false) : openWeek(logWeek))}
                 className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
                   report.unloggedWeeks.length > 0
                     ? "bg-amber-500 text-white hover:bg-amber-600"
                     : "border border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:text-zinc-400"
                 }`}
               >
-                {pasteOpen ? "Close" : `Paste Week ${logWeek} picks`}
+                {pasteOpen
+                  ? "Close"
+                  : report.unloggedWeeks.length > 0
+                    ? `Paste Week ${logWeek} picks`
+                    : "Edit logged weeks"}
               </button>
             )}
           </div>
 
           {pasteOpen && (
             <div className="flex flex-col gap-2 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
+              {finishedWeeks.length > 1 && (
+                <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Week to log">
+                  {finishedWeeks.map((w) => {
+                    const saved = Boolean(pool.weeklyPicks[String(w)]);
+                    const active = w === logWeek;
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => openWeek(w)}
+                        className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold tabular-nums transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                          active
+                            ? "border-amber-500 bg-amber-500 text-white"
+                            : saved
+                              ? "border-zinc-300 bg-white text-zinc-700 hover:border-amber-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                              : "border-dashed border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                        }`}
+                      >
+                        Wk {w}
+                        {saved ? <Check size={11} aria-label="logged" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                One team per line, team code then percentage. Any separator, and
-                a partial list is fine.
+                {logWeekSaved
+                  ? `Week ${logWeek} as saved. Change any line and update, or delete the week to log it again from scratch.`
+                  : "One team per line, team code then percentage (or a head count in a small pool). Any separator, and a partial list is fine."}
               </p>
               <textarea
                 value={paste}
@@ -735,9 +767,9 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                   onClick={submitPaste}
                   className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
                 >
-                  Save Week {logWeek}
+                  {logWeekSaved ? "Update" : "Save"} Week {logWeek}
                 </button>
-                {pool.weeklyPicks[String(logWeek)] && (
+                {logWeekSaved && (
                   <button
                     type="button"
                     disabled={working}
@@ -746,6 +778,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                       delete next[String(logWeek)];
                       void patch({ weeklyPicks: next });
                       setPasteOpen(false);
+                      setPaste("");
                     }}
                     className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:border-rose-300 hover:text-rose-700 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-400"
                   >
