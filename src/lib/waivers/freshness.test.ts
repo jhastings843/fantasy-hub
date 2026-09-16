@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isFreshForRun, rankWire, usageFrom, usageText, weekStartEt } from "./freshness";
+import { isFreshForRun, mergeWire, rankWire, usageFrom, usageText, weekStartEt } from "./freshness";
 
 // Tuesday 2026-09-15, 10pm ET.
 const TUESDAY = new Date("2026-09-16T02:00:00Z");
@@ -64,5 +64,15 @@ describe("usage", () => {
 
   it("is null when the player has no row", () => {
     expect(usageFrom(undefined, undefined, 1)).toBeNull();
+  });
+});
+
+describe("mergeWire", () => {
+  it("leads with the research and fills in behind without repeats", () => {
+    const merged = mergeWire(
+      [{ playerId: "a" }, { playerId: "b" }],
+      [{ playerId: "b" }, { playerId: "c" }, { playerId: "a" }, { playerId: "d" }],
+    );
+    expect(merged.map((p) => p.playerId)).toEqual(["a", "b", "c", "d"]);
   });
 });

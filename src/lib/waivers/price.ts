@@ -89,6 +89,9 @@ export interface ClaimCandidate {
   weekGain: number;
   /** Offensive snaps last week, when known. A role shows up here before it shows up in a ranking. */
   lastWeekSnaps?: number | null;
+  /** The web consensus tier and bid percent, when this week's research named him. */
+  researchTier?: ClaimTier | null;
+  researchPercent?: number | null;
 }
 
 export interface ObservedClaim {
@@ -146,7 +149,23 @@ function starterBar(position: string, ctx: PricingContext): number {
   return Math.max(1, Math.round(perTeam * ctx.teams));
 }
 
+const TIER_ORDER: ClaimTier[] = ["winner", "starter", "multiweek", "streamer", "filler", "stash"];
+
+/** The stronger of two tiers, so a consensus call can lift but never lower one. */
+function strongerTier(a: ClaimTier, b: ClaimTier | null | undefined): ClaimTier {
+  if (!b) return a;
+  return TIER_ORDER.indexOf(b) < TIER_ORDER.indexOf(a) ? b : a;
+}
+
 export function classifyClaim(c: ClaimCandidate, ctx: PricingContext): ClaimTier {
+  const own = classifyOwn(c, ctx);
+  // The research is this week's opinion and the season list may not be; when
+  // the consensus rates a player higher than the rank does, the consensus
+  // wins. It never lowers a tier the lineup math already earned.
+  return strongerTier(own, c.researchTier);
+}
+
+function classifyOwn(c: ClaimCandidate, ctx: PricingContext): ClaimTier {
   const streamerPosition =
     STREAMER_POSITIONS.has(c.position) || (c.position === "QB" && !isSuperflex(ctx.rosterPositions));
   if (streamerPosition) return c.weekGain > 0 ? "streamer" : "stash";
@@ -233,7 +252,13 @@ function marketFor(tier: ClaimTier, c: ClaimCandidate, ctx: PricingContext): num
   const blended = (prior * PRIOR_WEIGHT + total) / (PRIOR_WEIGHT + seen.length);
   const rank = ctx.trending.get(c.playerId);
   const heat = rank != null && rank <= HEAT_RANKS ? 1 + (HEAT_MAX * (HEAT_RANKS + 1 - rank)) / HEAT_RANKS : 1;
-  return blended * heat;
+  const modelled = blended * heat;
+  // Published consensus bids run high against what leagues actually pay, so
+  // the research is one voice in the market number, not the whole of it.
+  if (c.researchPercent != null && c.researchPercent > 0) {
+    return (modelled + (ctx.budget * c.researchPercent) / 100) / 2;
+  }
+  return modelled;
 }
 
 export function priceClaim(c: ClaimCandidate, ctx: PricingContext): ClaimPrice {
@@ -268,6 +293,9 @@ export function priceClaim(c: ClaimCandidate, ctx: PricingContext): ClaimPrice {
     } else if (ctx.trajectory === "rebuild" && young) {
       why.push("Young enough to matter next year, which is what a rebuild buys.");
     }
+  }
+  if (c.researchPercent != null) {
+    why.push(`This week's waiver columns put him at about ${c.researchPercent}% of budget.`);
   }
   if (longShot) {
     why.push(

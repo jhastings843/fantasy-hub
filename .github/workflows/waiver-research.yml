@@ -1,0 +1,55 @@
+name: Waiver research
+
+# Tuesday's waiver consensus, researched on the open web by Claude and cached
+# for the waiver pages. Runs Tuesday morning and again Tuesday evening
+# (Eastern), so a Tuesday injury update is in the evening pass. Separate from
+# the pulse because a web-search turn runs a minute or two and the pulse
+# shares a 50-second budget across everything it does.
+#
+# GitHub cron is UTC. 13:00 UTC is 9am EDT (8am EST); 00:00 UTC Wednesday is
+# 8pm EDT Tuesday (7pm EST).
+
+on:
+  schedule:
+    - cron: "0 13 * * 2"
+    - cron: "0 0 * * 3"
+  workflow_dispatch:
+    inputs:
+      format:
+        description: "all, dynasty or redraft"
+        default: "all"
+      force:
+        description: "Re-research even if this week is cached (1 to force)"
+        default: ""
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Research this week's waiver consensus
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          FORMAT: ${{ inputs.format || 'all' }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          url="$APP_URL/api/waiver-research?format=$FORMAT"
+          if [ -n "$FORCE" ]; then url="$url&force=$FORCE"; fi
+
+          status=$(curl -sS -X POST -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            --max-time 320 \
+            "$url")
+
+          echo "HTTP $status"
+          jq -r '
+            "week: \(.week)",
+            (.results | to_entries[] | "\(.key): " + (if .value.ok then "\(.value.targets) targets" + (if .value.cached then " (cached)" else "" end) + " | " + (.value.top | join(", ")) else "FAILED: " + .value.error end))
+          ' response.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::waiver research returned HTTP $status"
+            head -c 2000 response.json
+            exit 1
+          fi

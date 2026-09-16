@@ -27,6 +27,8 @@ export interface WaiverPlayer extends AdvicePlayer {
   tier: string | null;
   /** What he actually did last week. Null before any week has been played. */
   lastWeek?: LastWeekUsage | null;
+  /** The web consensus on him this week, when the research named him. */
+  research?: { tier: string; faabPercent: number; note: string } | null;
 }
 
 export interface StartableTarget {

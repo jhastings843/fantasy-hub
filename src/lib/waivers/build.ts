@@ -21,7 +21,10 @@ import {
 } from "@/lib/sleeper/client";
 import { seasonWinningBids } from "@/lib/sleeper/transactions";
 import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
-import { isFreshForRun, rankWire, staleNote, usageFrom, type WireCandidate } from "./freshness";
+import { isFreshForRun, mergeWire, rankWire, staleNote, usageFrom, type WireCandidate } from "./freshness";
+import { resolveNames, toCandidates } from "@/lib/jingles/resolve";
+import { readWaiverResearch } from "./research";
+import type { ClaimTier } from "./price";
 import {
   classifyClaim,
   pacingFor,
@@ -187,7 +190,33 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       .filter((p) => isStartableIn(p.position, startable));
     source = { label: lab.title, fresh: true, note: null };
   } else {
-    const trending = await getTrendingAdds(100).catch(() => []);
+    const format = profile.type === "dynasty" ? "dynasty" : "redraft";
+    const [trending, research] = await Promise.all([
+      getTrendingAdds(100).catch(() => []),
+      readWaiverResearch(season, nflWeek, format),
+    ]);
+
+    // The week's web consensus, matched to Sleeper ids by name, position and
+    // team. Anyone owned in this league or at a position it cannot start is
+    // dropped; an unmatched name is logged and skipped rather than guessed.
+    const resolvedResearch = research
+      ? resolveNames(
+          research.targets.map((t) => ({ name: t.name, position: t.position, team: t.team, target: t })),
+          toCandidates(players),
+        ).resolved
+      : [];
+    const researchPlayers: WaiverPlayer[] = resolvedResearch
+      .filter((r) => !owned.has(r.playerId))
+      .map((r) => ({
+        ...toPlayer(r.playerId),
+        research: {
+          tier: r.input.target.tier,
+          faabPercent: r.input.target.faabPercent,
+          note: r.input.target.note,
+        },
+      }))
+      .filter((p) => isStartableIn(p.position, startable));
+
     const candidates: WireCandidate[] = trending
       .filter((t) => !owned.has(t.player_id))
       .map((t) => ({ player: toPlayer(t.player_id), adds: t.count }))
@@ -198,14 +227,19 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
         lastWeek: player.lastWeek ?? null,
         onBye: player.onBye,
       }));
-    freeAgents = rankWire(candidates).map((c) => ({
+    const trendingPlayers = rankWire(candidates).map((c) => ({
       ...toPlayer(c.playerId),
       tier: `${c.adds.toLocaleString()} adds`,
     }));
+    freeAgents = mergeWire(researchPlayers, trendingPlayers);
+
+    const researched = research
+      ? ` This week's waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and lead the list; Sleeper's most-added players fill in behind them.`
+      : " No web research has run for this week yet, so the list is Sleeper's most-added players, filtered by who actually played.";
     source = {
-      label: "Sleeper trending adds",
+      label: research ? "Web consensus and Sleeper trending adds" : "Sleeper trending adds",
       fresh: false,
-      note: staleNote(lab.title, lab.postedAt),
+      note: staleNote(lab.title, lab.postedAt) + researched,
     };
   }
 
@@ -268,6 +302,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       emptySlots,
     };
 
+    const researchById = new Map(
+      freeAgents.filter((p) => p.research).map((p) => [p.playerId, p.research!]),
+    );
     const candidateFor = (id: string, position: string, weekGain: number): ClaimCandidate => ({
       playerId: id,
       position,
@@ -275,6 +312,8 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       seasonPositionRank: lab.byId[id]?.positionRank ?? null,
       weekGain,
       lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
+      researchTier: (researchById.get(id)?.tier as ClaimTier | undefined) ?? null,
+      researchPercent: researchById.get(id)?.faabPercent ?? null,
     });
 
     // Historical bids are tiered by the player's season rank alone; what he

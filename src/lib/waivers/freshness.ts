@@ -106,3 +106,14 @@ export function usageText(u: LastWeekUsage): string {
   if (u.carries > 0) parts.push(`${u.carries} car`);
   return `Wk ${u.week}: ${parts.join(", ")}`;
 }
+
+/**
+ * The wire with a second opinion. Research targets lead, in the order the
+ * consensus ranked them; trending adds fill in behind, skipping anyone the
+ * research already named. Both halves have already been filtered to players
+ * this league can start and does not own.
+ */
+export function mergeWire<T extends { playerId: string }>(research: T[], trending: T[]): T[] {
+  const seen = new Set(research.map((r) => r.playerId));
+  return [...research, ...trending.filter((t) => !seen.has(t.playerId))];
+}

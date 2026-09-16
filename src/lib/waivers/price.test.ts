@@ -79,6 +79,18 @@ describe("classifyClaim", () => {
     expect(classifyClaim(cand({ seasonPositionRank: null, lastWeekSnaps: 12 }), ctx())).toBe("stash");
   });
 
+  it("lets the week's consensus lift a tier but never lower one", () => {
+    expect(classifyClaim(cand({ seasonPositionRank: 60, researchTier: "starter" }), ctx())).toBe("starter");
+    expect(classifyClaim(cand({ seasonPositionRank: 10, researchTier: "stash" }), ctx())).toBe("winner");
+  });
+
+  it("folds the consensus bid into the market number", () => {
+    const quiet = priceClaim(cand({ seasonPositionRank: 60, weekGain: 3 }), ctx());
+    const loud = priceClaim(cand({ seasonPositionRank: 60, weekGain: 3, researchPercent: 40 }), ctx());
+    expect(loud.marketExpected).toBeGreaterThan(quiet.marketExpected);
+    expect(loud.reason).toContain("40% of budget");
+  });
+
   it("treats K, DEF and a one-QB league's QB as streamers", () => {
     expect(classifyClaim(cand({ position: "DEF", weekGain: 2 }), ctx())).toBe("streamer");
     expect(classifyClaim(cand({ position: "QB", weekGain: 4, seasonPositionRank: 5 }), ctx())).toBe("streamer");

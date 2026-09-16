@@ -53,6 +53,16 @@ function seasonChip(p: WaiverPlayer) {
   );
 }
 
+function ResearchLine({ p }: { p: WaiverPlayer }) {
+  if (!p.research) return null;
+  return (
+    <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+      <Chip tone="cyan">Consensus {p.research.faabPercent}%</Chip>{" "}
+      {p.research.note}
+    </p>
+  );
+}
+
 function UsageLine({ p }: { p: WaiverPlayer }) {
   if (!p.lastWeek) return null;
   const quiet = p.lastWeek.snaps < 10 && !p.onBye;
@@ -110,6 +120,7 @@ function StartRow({ t }: { t: StartableTarget }) {
         Would start at {t.slot} this week
         {t.displaces ? `, ahead of ${t.displaces.name}` : ""}.
       </p>
+      <ResearchLine p={t.player} />
       <UsageLine p={t.player} />
       <BidLine price={t.price} />
       {t.price ? (
@@ -141,6 +152,7 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
             "You have a free roster spot, so this one costs nothing."
           )}
         </p>
+        <ResearchLine p={t.player} />
         <UsageLine p={t.player} />
         <BidLine price={t.price} />
         {t.price ? (
@@ -230,7 +242,7 @@ export default async function WaiversPage({
 
       {seasonUpgrades.length > 0 && (
         <div className="mt-8">
-          <Eyebrow>{w.source.fresh ? "Worth a claim for the season" : "Most added on Sleeper, filtered by who played"}</Eyebrow>
+          <Eyebrow>{w.source.fresh ? "Worth a claim for the season" : w.source.label}</Eyebrow>
           <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
             <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {seasonUpgrades.map((t) => (
