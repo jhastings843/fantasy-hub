@@ -169,3 +169,45 @@ describe("waiverTargets", () => {
     });
   });
 });
+
+describe("waiverTargets in given order (the wire is ranking)", () => {
+  const slots = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "BN", "BN"];
+  const wp = (id: string, position: string, seasonRank: number | null, positionalRank: number | null = null): WaiverPlayer => ({
+    playerId: id,
+    name: id,
+    position,
+    team: "NE",
+    positionalRank,
+    flexRank: null,
+    adjustedFlexRank: null,
+    opponent: null,
+    home: null,
+    injuryStatus: null,
+    onBye: false,
+    unranked: positionalRank === null,
+    seasonRank,
+    seasonPositionRank: null,
+    tier: null,
+  });
+  // Eight starters ranked well, plus a ranked bench asset and an unranked body.
+  const roster = [
+    wp("qb", "QB", 5, 5), wp("rb1", "RB", 8, 8), wp("rb2", "RB", 20, 20), wp("wr1", "WR", 9, 9),
+    wp("wr2", "WR", 15, 15), wp("te", "TE", 12, 12), wp("rb3", "RB", 40, 40), wp("wr3", "WR", 44, 44),
+    wp("asset", "RB", 117), wp("body", "WR", null),
+  ];
+  const wire = [wp("hot", "RB", null), wp("warm", "WR", null), wp("cool", "TE", null)];
+
+  it("keeps the caller's order and never drops a ranked asset", () => {
+    const report = waiverTargets({ rosterPositions: slots, roster, freeAgents: wire, seasonOrder: "given" });
+    expect(report.seasonUpgrades.map((t) => t.player.playerId)).toEqual(["hot"]);
+    expect(report.seasonUpgrades[0].dropFor?.playerId).toBe("body");
+    expect(report.seasonUpgrades[0].placesBetter).toBeNull();
+  });
+
+  it("offers nothing when the only drops are ranked assets", () => {
+    // Same full roster, but the last bench spot holds a ranked player too.
+    const tight = roster.map((p) => (p.playerId === "body" ? wp("asset2", "WR", 130) : p));
+    const report = waiverTargets({ rosterPositions: slots, roster: tight, freeAgents: wire, seasonOrder: "given" });
+    expect(report.seasonUpgrades).toEqual([]);
+  });
+});

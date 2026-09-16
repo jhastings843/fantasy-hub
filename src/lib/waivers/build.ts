@@ -20,6 +20,8 @@ import {
   getUser,
 } from "@/lib/sleeper/client";
 import { seasonWinningBids } from "@/lib/sleeper/transactions";
+import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
+import { isFreshForRun, rankWire, staleNote, usageFrom, type WireCandidate } from "./freshness";
 import {
   classifyClaim,
   pacingFor,
@@ -57,6 +59,8 @@ export interface WaiverContext {
   report: WaiverReport;
   /** Budget pacing for the season. Null when the league has no FAAB. */
   pacing: Pacing | null;
+  /** Where the season-long ranking came from, and whether it is this week's. */
+  source: { label: string; fresh: boolean; note: string | null };
   blocked: string | null;
 }
 
@@ -78,19 +82,33 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     return blank(leagueId, "SLEEPER_USERNAME is not set, so the app cannot tell which roster is yours.", profile);
   }
 
-  const [weekly, lab, players, rosters, league, me] = await Promise.all([
+  const [latest, lab, players, rosters, league, me, nflState] = await Promise.all([
     latestWeekly(),
     labForScoring(scoringForLeague(profile)),
     getAllPlayers(),
     getLeagueRosters(profile.id),
     getLeague(profile.id),
     getUser(username),
+    getNflState().catch(() => null),
   ]);
 
   const mine = rosters.find((r) => r.owner_id === me.user_id);
   if (!mine) {
     return blank(leagueId, "No roster on this league belongs to you.", profile);
   }
+
+  // The NFL's week, not his. His weekly list is only this week's list when
+  // its week number says so; a week-1 list read in week 2 ranks last week's
+  // matchups, and "would start for you" off that is a guess dressed as advice.
+  const nflWeek = nflState?.week ?? latest?.week ?? 1;
+  const season = nflState?.season ?? profile.season;
+  const weekly = latest && latest.week === nflWeek ? latest : null;
+
+  // What everyone did last week, scored under this league's own settings.
+  const lastWeekNum = nflWeek - 1;
+  const stats: StatRows =
+    lastWeekNum >= 1 ? await getWeekStats(season, lastWeekNum).catch((): StatRows => ({})) : {};
+  const scored = scoreRows(stats, league.scoring_settings ?? {});
 
   const owned = new Set<string>();
   const startable = startablePositions(profile.rosterPositions);
@@ -124,7 +142,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       | undefined;
     const name =
       raw?.full_name ?? [raw?.first_name, raw?.last_name].filter(Boolean).join(" ").trim() ?? id;
-    const season = lab.byId[id];
+    const onList = lab.byId[id];
     const pr = index.positional.get(id) ?? null;
     const fr = index.flex.get(id) ?? null;
     const m = index.meta.get(id) ?? null;
@@ -145,20 +163,51 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
         teamsPlaying: playing,
       }),
       unranked: pr === null && fr === null,
-      seasonRank: season?.rank ?? null,
-      seasonPositionRank: season ? `${season.position}${season.positionRank}` : null,
-      tier: season ? lab.tierFor(id) : null,
+      lastWeek: usageFrom(stats[id], scored[id], lastWeekNum),
+      seasonRank: onList?.rank ?? null,
+      seasonPositionRank: onList ? `${onList.position}${onList.positionRank}` : null,
+      tier: onList ? lab.tierFor(id) : null,
     };
   };
 
   // Only players his season list names. Scanning every unowned player in the
   // NFL turns a waiver page into a phone book, and anybody he has not ranked in
   // three hundred is not a claim worth surfacing unaided.
-  const freeAgents = lab.list
-    .filter((e) => !owned.has(e.sleeperId))
-    .map((e) => toPlayer(e.sleeperId))
-    // Sleeper uses DEF, which matches roster slots; the Lab list uses DST.
-    .filter((p) => isStartableIn(p.position, startable));
+  // His season list counts only if he has touched it since this week began.
+  // Otherwise the wire itself is the ranking: who all of Sleeper is adding,
+  // minus anyone who did not actually play last week.
+  const labFresh = isFreshForRun(lab.postedAt);
+  let freeAgents: WaiverPlayer[];
+  let source: WaiverContext["source"];
+  if (labFresh) {
+    freeAgents = lab.list
+      .filter((e) => !owned.has(e.sleeperId))
+      .map((e) => toPlayer(e.sleeperId))
+      // Sleeper uses DEF, which matches roster slots; the Lab list uses DST.
+      .filter((p) => isStartableIn(p.position, startable));
+    source = { label: lab.title, fresh: true, note: null };
+  } else {
+    const trending = await getTrendingAdds(100).catch(() => []);
+    const candidates: WireCandidate[] = trending
+      .filter((t) => !owned.has(t.player_id))
+      .map((t) => ({ player: toPlayer(t.player_id), adds: t.count }))
+      .filter(({ player }) => isStartableIn(player.position, startable))
+      .map(({ player, adds }) => ({
+        playerId: player.playerId,
+        adds,
+        lastWeek: player.lastWeek ?? null,
+        onBye: player.onBye,
+      }));
+    freeAgents = rankWire(candidates).map((c) => ({
+      ...toPlayer(c.playerId),
+      tier: `${c.adds.toLocaleString()} adds`,
+    }));
+    source = {
+      label: "Sleeper trending adds",
+      fresh: false,
+      note: staleNote(lab.title, lab.postedAt),
+    };
+  }
 
   const roster = (mine.players ?? []).map(toPlayer);
 
@@ -171,6 +220,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     rosterPositions: profile.rosterPositions,
     roster,
     freeAgents,
+    seasonOrder: labFresh ? "rank" : "given",
   });
 
   // --- Pricing ---
@@ -181,11 +231,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // rebuilder and a contender are told different numbers for the same man.
   let pacing: Pacing | null = null;
   if (budgetTotal !== null && budgetLeft !== null && profile.type !== "guillotine") {
-    const nflState = await getNflState().catch(() => null);
-    // The NFL week, not the week of his latest post: pacing and the bid
-    // history are about where the season is, and his weekly list can lag a
-    // day behind the calendar.
-    const week = nflState?.week ?? weekly?.week ?? 1;
+    const week = nflWeek;
     const isDynasty = profile.type === "dynasty";
 
     const [bids, trendingRows, grades] = await Promise.all([
@@ -228,6 +274,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       age: players[id]?.age ?? null,
       seasonPositionRank: lab.byId[id]?.positionRank ?? null,
       weekGain,
+      lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
     });
 
     // Historical bids are tiered by the player's season rank alone; what he
@@ -256,19 +303,22 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   return {
     leagueId: profile.id,
     leagueName: profile.name,
-    week: weekly?.week ?? null,
+    week: nflWeek,
     budgetLeft,
     budgetTotal,
     freeAgentCount: freeAgents.length,
     listTitle: weekly?.title ?? null,
     listUpdatedLabel: weekly?.updatedLabel ?? null,
-    seasonListTitle: lab.title,
+    seasonListTitle: labFresh ? lab.title : "Sleeper trending adds",
     seasonListMatchesScoring: lab.matchesLeagueScoring,
     report,
     pacing,
+    source,
     blocked: weekly
       ? null
-      : "No weekly rankings ingested yet, so the this-week half of this page is empty. The season-long claims below still stand.",
+      : latest
+        ? `His latest weekly list is for week ${latest.week} and this is week ${nflWeek}, so the this-week half of this page waits for his new post. The claims below still stand.`
+        : "No weekly rankings ingested yet, so the this-week half of this page is empty. The season-long claims below still stand.",
   };
 }
 
@@ -307,6 +357,7 @@ function blank(leagueId: string, why: string, profile?: LeagueProfile): WaiverCo
     seasonListMatchesScoring: true,
     report: EMPTY,
     pacing: null,
+    source: { label: "", fresh: false, note: null },
     blocked: why,
   };
 }

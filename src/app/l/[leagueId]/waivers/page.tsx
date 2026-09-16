@@ -1,5 +1,6 @@
 import { buildWaivers } from "@/lib/waivers/build";
 import type { SeasonTarget, StartableTarget, WaiverPlayer } from "@/lib/waivers/rank";
+import { usageText } from "@/lib/waivers/freshness";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,17 @@ function seasonChip(p: WaiverPlayer) {
   );
 }
 
+function UsageLine({ p }: { p: WaiverPlayer }) {
+  if (!p.lastWeek) return null;
+  const quiet = p.lastWeek.snaps < 10 && !p.onBye;
+  return (
+    <p className={`mt-1 text-xs tabular-nums ${quiet ? "text-rose-600 dark:text-rose-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+      {usageText(p.lastWeek)}
+      {quiet ? ". Barely played." : ""}
+    </p>
+  );
+}
+
 function matchupText(p: WaiverPlayer): string {
   if (!p.opponent) return "";
   return `${p.home ? "vs" : "@"} ${p.opponent}`;
@@ -98,6 +110,7 @@ function StartRow({ t }: { t: StartableTarget }) {
         Would start at {t.slot} this week
         {t.displaces ? `, ahead of ${t.displaces.name}` : ""}.
       </p>
+      <UsageLine p={t.player} />
       <BidLine price={t.price} />
       {t.price ? (
         <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
@@ -128,6 +141,7 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
             "You have a free roster spot, so this one costs nothing."
           )}
         </p>
+        <UsageLine p={t.player} />
         <BidLine price={t.price} />
         {t.price ? (
           <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
@@ -191,6 +205,12 @@ export default async function WaiversPage({
         </p>
       ) : null}
 
+      {w.source.note && (
+        <div className="mt-6 max-w-2xl rounded-2xl border border-rose-200 bg-rose-50/60 p-4 text-sm leading-relaxed text-zinc-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-zinc-300">
+          {w.source.note}
+        </div>
+      )}
+
       {w.blocked && (
         <div className="mt-6 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm leading-relaxed text-zinc-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-zinc-300">
           {w.blocked}
@@ -210,7 +230,7 @@ export default async function WaiversPage({
 
       {seasonUpgrades.length > 0 && (
         <div className="mt-8">
-          <Eyebrow>Worth a claim for the season</Eyebrow>
+          <Eyebrow>{w.source.fresh ? "Worth a claim for the season" : "Most added on Sleeper, filtered by who played"}</Eyebrow>
           <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
             <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {seasonUpgrades.map((t) => (

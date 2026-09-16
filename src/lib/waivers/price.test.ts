@@ -74,6 +74,11 @@ describe("classifyClaim", () => {
     expect(p.longShot).toBe(false);
   });
 
+  it("lifts an unranked player with a full role last week to multiweek", () => {
+    expect(classifyClaim(cand({ seasonPositionRank: null, lastWeekSnaps: 48 }), ctx())).toBe("multiweek");
+    expect(classifyClaim(cand({ seasonPositionRank: null, lastWeekSnaps: 12 }), ctx())).toBe("stash");
+  });
+
   it("treats K, DEF and a one-QB league's QB as streamers", () => {
     expect(classifyClaim(cand({ position: "DEF", weekGain: 2 }), ctx())).toBe("streamer");
     expect(classifyClaim(cand({ position: "QB", weekGain: 4, seasonPositionRank: 5 }), ctx())).toBe("streamer");

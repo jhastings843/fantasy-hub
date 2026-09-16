@@ -1,6 +1,7 @@
 import { bestLineup, marginalValue, type LineupPlayer } from "@/lib/lineup/solve";
 import { cannotPlay, scoreOf, type AdvicePlayer } from "@/lib/lineup/weekly-advice";
 import type { ClaimPrice } from "./price";
+import type { LastWeekUsage } from "./freshness";
 
 // Who to claim, and who to drop for them.
 //
@@ -24,6 +25,8 @@ export interface WaiverPlayer extends AdvicePlayer {
   /** "WR54", for identifying a player at a glance. */
   seasonPositionRank: string | null;
   tier: string | null;
+  /** What he actually did last week. Null before any week has been played. */
+  lastWeek?: LastWeekUsage | null;
 }
 
 export interface StartableTarget {
@@ -85,9 +88,20 @@ export function waiverTargets(input: {
   freeAgents: WaiverPlayer[];
   /** How many of each list to return. */
   limit?: number;
+  /**
+   * "rank" orders season claims by his list and only offers a claim that
+   * beats the drop by rank. "given" trusts the order the caller passed, for
+   * the weeks his list is stale and the wire is doing the ranking; there is
+   * no rank to compare, so the only rule is not to drop a real asset.
+   */
+  seasonOrder?: "rank" | "given";
+  /** In "given" mode, never propose dropping a player ranked this high. */
+  protectRankedWithin?: number;
 }): WaiverReport {
   const { rosterPositions, roster, freeAgents } = input;
   const limit = input.limit ?? 8;
+  const givenOrder = input.seasonOrder === "given";
+  const protectWithin = input.protectRankedWithin ?? 150;
 
   const byId = new Map(roster.map((p) => [p.playerId, p]));
   const available = roster.filter((p) => !cannotPlay(p));
@@ -127,9 +141,11 @@ export function waiverTargets(input: {
   // those, every claim is a swap and has to name its price.
   const openSpots = Math.max(0, rosterPositions.length - roster.length);
 
-  const seasonUpgrades: SeasonTarget[] = freeAgents
-    .filter((p) => p.seasonRank !== null)
-    .sort(bySeasonRank)
+  const seasonPool = givenOrder
+    ? freeAgents
+    : freeAgents.filter((p) => p.seasonRank !== null).sort(bySeasonRank);
+
+  const seasonUpgrades: SeasonTarget[] = seasonPool
     .slice(0, limit)
     .map((player, i) => {
       if (i < openSpots) return { player, dropFor: null, placesBetter: null };
@@ -138,7 +154,7 @@ export function waiverTargets(input: {
       // times over.
       const dropFor = droppable[i - openSpots] ?? null;
       const placesBetter =
-        dropFor && dropFor.seasonRank !== null && player.seasonRank !== null
+        !givenOrder && dropFor && dropFor.seasonRank !== null && player.seasonRank !== null
           ? dropFor.seasonRank - player.seasonRank
           : null;
       return { player, dropFor, placesBetter };
@@ -149,6 +165,11 @@ export function waiverTargets(input: {
       // No free spot and nobody droppable: the roster is all starters, and a
       // claim with no stated cost is not advice.
       if (t.dropFor === null) return false;
+      // The wire is doing the ranking: a most-added player is worth a look,
+      // but not at the price of a player his list still rates.
+      if (givenOrder) {
+        return t.dropFor.seasonRank === null || t.dropFor.seasonRank > protectWithin;
+      }
       // An unranked player is beaten by anybody he ranked.
       if (t.dropFor.seasonRank === null) return true;
       return t.player.seasonRank !== null && t.player.seasonRank < t.dropFor.seasonRank;

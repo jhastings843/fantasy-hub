@@ -1,4 +1,5 @@
 import type { WaiverContext } from "@/lib/waivers/build";
+import { usageText } from "@/lib/waivers/freshness";
 import {
   card,
   emailPage,
@@ -57,6 +58,10 @@ export function midweekSubject(input: MidweekInput): string {
   return `${head}: ${n} claim${n === 1 ? "" : "s"} worth making`;
 }
 
+function usageNote(p: { lastWeek?: { week: number; points: number; snaps: number; targets: number; carries: number } | null }): string {
+  return p.lastWeek ? ` ${usageText(p.lastWeek)}.` : "";
+}
+
 function bidText(
   price: { bid: number; walkAway: number; longShot: boolean; marketExpected: number } | undefined,
 ): string {
@@ -99,6 +104,7 @@ function leagueCard(league: WaiverContext): string {
           }`,
         )
       : "";
+  const stale = league.source.note ? small(league.source.note) : "";
 
   const starts = league.report.startable
     .slice(0, PER_KIND)
@@ -109,7 +115,7 @@ function leagueCard(league: WaiverContext): string {
           t.player.positionalRank != null
             ? `He has him ${t.player.position}${t.player.positionalRank} this week.`
             : "Unranked this week, so this is the season list talking."
-        }${bidText(t.price)}`,
+        }${usageNote(t.player)}${bidText(t.price)}`,
         "start",
       ),
     )
@@ -122,7 +128,7 @@ function leagueCard(league: WaiverContext): string {
         t.player.name,
         `${t.player.seasonPositionRank ?? "Ranked"} on the season list${
           t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
-        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${bidText(t.price)}`,
+        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${usageNote(t.player)}${bidText(t.price)}`,
         "season",
       ),
     )
@@ -135,7 +141,7 @@ function leagueCard(league: WaiverContext): string {
     );
   }
 
-  return card(`${head}${budget}<div style="padding-top:4px;">${starts}${season}</div>`);
+  return card(`${head}${stale}${budget}<div style="padding-top:4px;">${starts}${season}</div>`);
 }
 
 export function renderMidweekEmail(input: MidweekInput): string {

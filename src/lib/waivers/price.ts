@@ -62,6 +62,13 @@ const PRIOR_WEIGHT = 3;
 const HEAT_RANKS = 25;
 const HEAT_MAX = 0.6;
 
+/**
+ * Snaps that mark a real role. The sources put the line at 60% for a back
+ * and 70% for a receiver; 35 of a typical 60-play game is the round number
+ * that covers both without pretending to precision the feed does not have.
+ */
+const ROLE_SNAPS = 35;
+
 /** Positions a one-QB league treats as streamers. */
 const STREAMER_POSITIONS = new Set(["K", "DEF"]);
 
@@ -80,6 +87,8 @@ export interface ClaimCandidate {
   seasonPositionRank: number | null;
   /** Points he adds to this week's best lineup. Zero when he does not start. */
   weekGain: number;
+  /** Offensive snaps last week, when known. A role shows up here before it shows up in a ranking. */
+  lastWeekSnaps?: number | null;
 }
 
 export interface ObservedClaim {
@@ -146,6 +155,9 @@ export function classifyClaim(c: ClaimCandidate, ctx: PricingContext): ClaimTier
   if (c.seasonPositionRank != null && c.seasonPositionRank <= bar * 0.4) return "winner";
   if (c.seasonPositionRank != null && c.seasonPositionRank <= bar) return "starter";
   if (c.weekGain >= STARTER_GAIN) return "multiweek";
+  // No season rank but a full role last week: the ranking has not caught up
+  // to the depth chart, which is the usual shape of a real waiver target.
+  if (c.seasonPositionRank == null && (c.lastWeekSnaps ?? 0) >= ROLE_SNAPS) return "multiweek";
   if (c.weekGain > 0) return "filler";
   return "stash";
 }
