@@ -5,7 +5,9 @@ import { normalizeTeam } from "@/lib/jingles/resolve";
 import { resolveLeague } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
 import { isOnBye } from "@/lib/lineup/weekly-advice";
+import { startablePositions } from "@/lib/redraft/draft-board";
 import { getAllPlayers, getLeague, getLeagueRosters, getUser } from "@/lib/sleeper/client";
+import { isStartableIn } from "./pool";
 import { waiverTargets, type WaiverPlayer, type WaiverReport } from "./rank";
 
 // Everything the waiver advice needs, fetched and joined.
@@ -23,7 +25,7 @@ export interface WaiverContext {
   /** FAAB left, when the league uses a budget. */
   budgetLeft: number | null;
   budgetTotal: number | null;
-  /** How many players are unowned across the whole league. */
+  /** Unowned players on the season list eligible for this league's starting slots. */
   freeAgentCount: number;
   listTitle: string | null;
   listUpdatedLabel: string | null;
@@ -67,6 +69,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   }
 
   const owned = new Set<string>();
+  const startable = startablePositions(profile.rosterPositions);
   for (const r of rosters) for (const id of r.players ?? []) owned.add(id);
 
   // Teams with a game this week, so a free agent on bye is not offered as a
@@ -129,7 +132,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // three hundred is not a claim worth surfacing unaided.
   const freeAgents = lab.list
     .filter((e) => !owned.has(e.sleeperId))
-    .map((e) => toPlayer(e.sleeperId));
+    .map((e) => toPlayer(e.sleeperId))
+    // Sleeper uses DEF, which matches roster slots; the Lab list uses DST.
+    .filter((p) => isStartableIn(p.position, startable));
 
   const roster = (mine.players ?? []).map(toPlayer);
 

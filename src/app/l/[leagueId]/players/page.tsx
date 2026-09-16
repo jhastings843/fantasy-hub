@@ -21,6 +21,8 @@ import { computeTeamSummaries } from "@/lib/dynasty/power-rankings";
 import { PlayerSearch, type SearchablePlayer } from "./PlayerSearch";
 import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
+import { startablePositions } from "@/lib/redraft/draft-board";
+import { isStartableIn } from "@/lib/waivers/pool";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +174,7 @@ export default async function PlayersPage({
   const me = await getUser(username);
   const league = await getLeague(leagueId);
   const leagueType = profileFromSleeper(league).type;
+  const startable = startablePositions(profileFromSleeper(league).rosterPositions);
 
   const [rosters, users, allPlayers, raValues, movers] = await Promise.all([
     getLeagueRosters(leagueId),
@@ -214,20 +217,13 @@ export default async function PlayersPage({
   // Build the searchable index across the whole NFL slim set. Skip
   // players with no name or no position (mostly noise rows).
   const searchablePlayers: SearchablePlayer[] = [];
+  const waiverPool: SearchablePlayer[] = [];
   for (const p of Object.values(allPlayers)) {
     const name = nameOf(p);
     if (!name) continue;
     const position = p.position ?? null;
-    if (
-      position &&
-      !TRACKED_POSITIONS.includes(position as (typeof TRACKED_POSITIONS)[number])
-    ) {
-      // Skip K/DEF/etc. for the searchable pool — Jack only cares about
-      // skill positions.
-      continue;
-    }
     const v = raValues[p.player_id];
-    searchablePlayers.push({
+    const player: SearchablePlayer = {
       id: p.player_id,
       name,
       position,
@@ -236,11 +232,19 @@ export default async function PlayersPage({
       photoUrl: v?.photoUrl ?? null,
       rostered: rosteredIds.has(p.player_id),
       ownerName: ownerByPlayerId.get(p.player_id) ?? null,
-    });
+    };
+    // Waivers follow league slots so eligible defenses survive the search restriction.
+    if (isStartableIn(position, startable)) waiverPool.push(player);
+    if (
+      !position ||
+      TRACKED_POSITIONS.includes(position as (typeof TRACKED_POSITIONS)[number])
+    ) {
+      searchablePlayers.push(player);
+    }
   }
 
   // Waiver fits: unrostered, in my weakest positions, sorted by value.
-  const waiverFits = searchablePlayers
+  const waiverFits = waiverPool
     .filter((p) => !p.rostered)
     .filter((p) => p.position && myWeakPositions.includes(p.position))
     .filter((p) => p.value > 0)
@@ -248,7 +252,7 @@ export default async function PlayersPage({
     .slice(0, 12);
 
   // Top waivers overall (any position) as a fallback list.
-  const topWaiversOverall = searchablePlayers
+  const topWaiversOverall = waiverPool
     .filter((p) => !p.rostered)
     .filter((p) => p.value > 0)
     .sort((a, b) => b.value - a.value)
