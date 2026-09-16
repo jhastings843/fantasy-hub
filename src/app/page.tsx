@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BookOpen, Compass, ShieldCheck } from "lucide-react";
+import { RefreshButton } from "@/components/RefreshButton";
 import { getMyLeagues } from "@/lib/league/discover";
 import { leaguePath } from "@/lib/league/tools";
 import {
@@ -78,15 +79,18 @@ export default async function Home() {
       </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Your leagues
-          </h2>
-          {leagues.length > 0 && (
-            <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-              {leagues.length} active
-            </span>
-          )}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Your leagues
+            </h2>
+            {leagues.length > 0 && (
+              <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                {leagues.length} active
+              </span>
+            )}
+          </div>
+          <RefreshButton all label="Refresh all leagues" />
         </div>
 
         {error && (

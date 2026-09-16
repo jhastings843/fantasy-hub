@@ -11,13 +11,16 @@ import { RefreshCw } from "lucide-react";
 //
 // Pass leagueId so the refresh lands on the league being viewed. Without it the
 // route falls back to SLEEPER_LEAGUE_ID, which is the dynasty league and almost
-// never what the button is sitting next to.
+// never what the button is sitting next to. Pass all to refresh every league
+// on the account at once, which is what the home page wants.
 export function RefreshButton({
   label = "Refresh league",
   leagueId,
+  all = false,
 }: {
   label?: string;
   leagueId?: string;
+  all?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
@@ -30,7 +33,9 @@ export function RefreshButton({
       const res = await fetch("/api/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leagueId ? { leagueId } : {}),
+        body: JSON.stringify(
+          all ? { all: true } : leagueId ? { leagueId } : {},
+        ),
       });
       if (!res.ok) throw new Error(await res.text());
       router.refresh();
