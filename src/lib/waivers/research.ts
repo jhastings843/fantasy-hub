@@ -33,8 +33,8 @@ const TargetSchema = z.object({
   team: z.string().nullable(),
   position: z.enum(["QB", "RB", "WR", "TE", "K", "DEF"]),
   tier: z.enum(RESEARCH_TIERS),
-  /** Consensus bid as a percent of the original budget. */
-  faabPercent: z.number(),
+  /** Consensus bid as a percent of the original budget. Null when no source gave one. */
+  faabPercent: z.number().nullable(),
   /** One or two sentences: the role change and why the room is chasing him. */
   note: z.string(),
   sources: z.array(z.string()),
@@ -54,6 +54,8 @@ export interface WaiverResearch {
   generatedAt: string;
   targets: ResearchTarget[];
   sources: string[];
+  /** The start of what the research wrote, kept so an odd list can be read back. */
+  proseExcerpt: string;
 }
 
 const KEY = (season: string, week: number, format: ResearchFormat) =>
@@ -73,7 +75,9 @@ export async function readWaiverResearch(
 
 function researchPrompt(format: ResearchFormat, season: string, week: number): string {
   const played = week - 1;
-  const common = `It is the ${season} NFL season. Week ${played} has just been played and week ${week} waivers process on Wednesday. Search this week's waiver wire columns and threads, then produce the consensus list of the best ${format === "dynasty" ? 25 : 20} waiver claims. For every player give: full name, NFL team, position, the role or usage change behind the recommendation (snaps, routes, targets, carries, a starter's injury, a depth chart promotion), a tier, and the consensus FAAB bid as a percent of the ORIGINAL budget with the range the sources give. Only include players likely to be on waivers in a typical 12-team league (rostered under about 60 percent). Skip anyone whose case is one touchdown on the same snap count. Name your sources with URLs.`;
+  const common = `It is the ${season} NFL season. Week ${played} has just been played and week ${week} waivers process on Wednesday. Search this week's waiver wire columns and threads, then produce the consensus list of the best ${format === "dynasty" ? 25 : 20} waiver claims. For every player give: full name, NFL team, position, the role or usage change behind the recommendation (snaps, routes, targets, carries, a starter's injury, a depth chart promotion), a tier, and the consensus FAAB bid as a percent of the ORIGINAL budget with the range the sources give. Only include players likely to be on waivers in a typical 12-team league (rostered under about 60 percent). Skip anyone whose case is one touchdown on the same snap count. Name your sources with URLs.
+
+Write every player as its own block with these labelled lines: Name, Team, Position, Tier, FAAB (the bid as a percent of the original budget, with the range the sources give; convert dollar bids against that source's budget, so $12 of $100 is 12% and $150 of $1000 is 15%; if no source gives a bid, write "FAAB: none"), Why (one or two sentences on the role change), Sources. The FAAB line matters most: search the columns that publish bids (FantasyPros gives three bid levels, RotoBaller publishes a FAAB bidding column) and quote them.`;
 
   if (format === "dynasty") {
     return `${common}
@@ -130,25 +134,43 @@ export async function researchWaiverTargets(
     throw new Error("Waiver research was refused by the model");
   }
 
-  const prose = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
-  if (!prose.trim()) throw new Error("Waiver research returned no text");
+  // A paused turn leaves its text in the resumed history, not in the final
+  // response; the first version read only the final response and got an
+  // empty dynasty list out of a run that had found six sources.
+  const textOf = (content: Anthropic.MessageParam["content"] | Anthropic.ContentBlock[]): string =>
+    typeof content === "string"
+      ? content
+      : content
+          .filter((b): b is Anthropic.TextBlock => typeof b === "object" && b.type === "text")
+          .map((b) => b.text)
+          .join("\n");
+  const prose = [
+    ...messages.filter((m) => m.role === "assistant").map((m) => textOf(m.content)),
+    textOf(response.content),
+  ]
+    .join("\n")
+    .trim();
+  if (!prose) throw new Error("Waiver research returned no text");
 
-  const parsed = await client.messages.parse({
-    model: MODEL,
-    max_tokens: 8000,
-    output_config: { effort: "low", format: zodOutputFormat(ResearchSchema) },
-    messages: [
-      {
-        role: "user",
-        content: `Extract every recommended player from the research below into the schema. faabPercent is the consensus midpoint as a percent of the original budget (a $12 bid on $100 is 12; a $150 bid on $1000 is 15). Keep the note to one or two sentences about the role change. Use the NFL team abbreviation Sleeper uses (JAX not JAC, LAR, LAC, KC, GB, NE, NO, SF, TB, WAS, LV, ARI, ATL, BAL, BUF, CAR, CHI, CIN, CLE, DAL, DEN, DET, HOU, IND, MIA, MIN, NYG, NYJ, PHI, PIT, SEA, TEN).\n\n${prose}`,
-      },
-    ],
-  });
-  const out = parsed.parsed_output;
+  const extract = async (instruction: string) => {
+    const parsed = await client.messages.parse({
+      model: MODEL,
+      max_tokens: 8000,
+      output_config: { effort: "low", format: zodOutputFormat(ResearchSchema) },
+      messages: [{ role: "user", content: `${instruction}\n\n${prose}` }],
+    });
+    return parsed.parsed_output;
+  };
+  let out = await extract(
+    "Extract every recommended player from the research below into the schema. faabPercent is the consensus bid as a percent of the ORIGINAL budget, taken from the FAAB line (a $12 bid on $100 is 12; a $150 bid on $1000 is 15); use null only when the research says no source gave a bid. Keep the note to one or two sentences about the role change. Use the NFL team abbreviation Sleeper uses (JAX not JAC, LAR, LAC, KC, GB, NE, NO, SF, TB, WAS, LV, ARI, ATL, BAL, BUF, CAR, CHI, CIN, CLE, DAL, DEN, DET, HOU, IND, MIA, MIN, NYG, NYJ, PHI, PIT, SEA, TEN).",
+  );
+  if (!out || out.targets.length === 0) {
+    out = await extract(
+      "The text below is fantasy football waiver research. List every player it recommends claiming, one entry each, with the tier that best fits the description and the FAAB percent if one is stated (null otherwise). Do not return an empty list if the text names any players.",
+    );
+  }
   if (!out) throw new Error("Waiver research could not be parsed");
+  if (out.targets.length === 0) throw new Error("Waiver research named no players");
 
   const result: WaiverResearch = {
     season,
@@ -157,6 +179,7 @@ export async function researchWaiverTargets(
     generatedAt: new Date().toISOString(),
     targets: out.targets,
     sources: out.sources,
+    proseExcerpt: prose.slice(0, 4000),
   };
   await redis.set(KEY(season, week, format), result, { ex: RESEARCH_TTL });
   return result;

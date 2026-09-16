@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         week: research.week,
         targets: research.targets.length,
         generatedAt: research.generatedAt,
-        top: research.targets.slice(0, 5).map((t) => `${t.name} ${t.faabPercent}%`),
+        top: research.targets.slice(0, 5).map((t) => `${t.name} ${t.faabPercent ?? "?"}%`),
       };
     } catch (e) {
       results[format] = { ok: false, error: e instanceof Error ? e.message : String(e) };

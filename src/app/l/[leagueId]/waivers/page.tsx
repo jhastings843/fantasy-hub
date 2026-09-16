@@ -57,7 +57,9 @@ function ResearchLine({ p }: { p: WaiverPlayer }) {
   if (!p.research) return null;
   return (
     <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-      <Chip tone="cyan">Consensus {p.research.faabPercent}%</Chip>{" "}
+      <Chip tone="cyan">
+        {p.research.faabPercent != null ? `Consensus ${p.research.faabPercent}%` : "Consensus pick"}
+      </Chip>{" "}
       {p.research.note}
     </p>
   );

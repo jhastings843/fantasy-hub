@@ -60,10 +60,12 @@ export function midweekSubject(input: MidweekInput): string {
 
 function usageNote(p: {
   lastWeek?: { week: number; points: number; snaps: number; targets: number; carries: number } | null;
-  research?: { faabPercent: number; note: string } | null;
+  research?: { faabPercent: number | null; note: string } | null;
 }): string {
   const usage = p.lastWeek ? ` ${usageText(p.lastWeek)}.` : "";
-  const research = p.research ? ` Consensus ${p.research.faabPercent}% of budget: ${p.research.note}` : "";
+  const research = p.research
+    ? ` Consensus${p.research.faabPercent != null ? ` ${p.research.faabPercent}% of budget` : " pick"}: ${p.research.note}`
+    : "";
   return `${usage}${research}`;
 }
 
