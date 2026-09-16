@@ -57,6 +57,17 @@ export function midweekSubject(input: MidweekInput): string {
   return `${head}: ${n} claim${n === 1 ? "" : "s"} worth making`;
 }
 
+function bidText(
+  price: { bid: number; walkAway: number; longShot: boolean; marketExpected: number } | undefined,
+): string {
+  if (!price) return "";
+  const stop = price.walkAway > price.bid ? `, stop at ${money(price.walkAway)}` : "";
+  const lose = price.longShot
+    ? ` Likely loses; the room should pay about ${money(price.marketExpected)}.`
+    : "";
+  return ` Bid ${money(price.bid)}${stop}.${lose}`;
+}
+
 function playerLine(
   name: string,
   detail: string,
@@ -82,7 +93,11 @@ function leagueCard(league: WaiverContext): string {
 
   const budget =
     league.budgetLeft != null && league.budgetTotal
-      ? small(`${money(league.budgetLeft)} of ${money(league.budgetTotal)} FAAB left.`)
+      ? small(
+          `${money(league.budgetLeft)} of ${money(league.budgetTotal)} FAAB left.${
+            league.pacing ? ` ${league.pacing.note}` : ""
+          }`,
+        )
       : "";
 
   const starts = league.report.startable
@@ -94,7 +109,7 @@ function leagueCard(league: WaiverContext): string {
           t.player.positionalRank != null
             ? `He has him ${t.player.position}${t.player.positionalRank} this week.`
             : "Unranked this week, so this is the season list talking."
-        }`,
+        }${bidText(t.price)}`,
         "start",
       ),
     )
@@ -107,7 +122,7 @@ function leagueCard(league: WaiverContext): string {
         t.player.name,
         `${t.player.seasonPositionRank ?? "Ranked"} on the season list${
           t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
-        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.`,
+        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${bidText(t.price)}`,
         "season",
       ),
     )

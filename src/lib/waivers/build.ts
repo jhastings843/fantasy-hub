@@ -6,7 +6,29 @@ import { resolveLeague } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
 import { isOnBye } from "@/lib/lineup/weekly-advice";
 import { startablePositions } from "@/lib/redraft/draft-board";
-import { getAllPlayers, getLeague, getLeagueRosters, getUser } from "@/lib/sleeper/client";
+import { inferTrajectory } from "@/lib/dynasty/season-plan";
+import { bestLineup } from "@/lib/lineup/solve";
+import { cannotPlay, scoreOf } from "@/lib/lineup/weekly-advice";
+import { getRosterGrades } from "@/lib/rosteraudit/client";
+import type { RAGradesByRosterId } from "@/lib/rosteraudit/types";
+import {
+  getAllPlayers,
+  getLeague,
+  getLeagueRosters,
+  getNflState,
+  getTrendingAdds,
+  getUser,
+} from "@/lib/sleeper/client";
+import { seasonWinningBids } from "@/lib/sleeper/transactions";
+import {
+  classifyClaim,
+  pacingFor,
+  priceClaim,
+  type ClaimCandidate,
+  type ObservedClaim,
+  type Pacing,
+  type PricingContext,
+} from "./price";
 import { isStartableIn } from "./pool";
 import { waiverTargets, type WaiverPlayer, type WaiverReport } from "./rank";
 
@@ -33,6 +55,8 @@ export interface WaiverContext {
   /** False when the season list is for different scoring than this league. */
   seasonListMatchesScoring: boolean;
   report: WaiverReport;
+  /** Budget pacing for the season. Null when the league has no FAAB. */
+  pacing: Pacing | null;
   blocked: string | null;
 }
 
@@ -143,6 +167,92 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   const budgetLeft =
     budgetTotal !== null && typeof used === "number" ? budgetTotal - used : budgetTotal;
 
+  const report = waiverTargets({
+    rosterPositions: profile.rosterPositions,
+    roster,
+    freeAgents,
+  });
+
+  // --- Pricing ---
+  //
+  // Only when the league runs a budget. The inputs are the league's own
+  // winning bids, Sleeper's trending adds (how contested a claim is), my
+  // record, and in dynasty the roster's trajectory from RosterAudit, so a
+  // rebuilder and a contender are told different numbers for the same man.
+  let pacing: Pacing | null = null;
+  if (budgetTotal !== null && budgetLeft !== null && profile.type !== "guillotine") {
+    const nflState = await getNflState().catch(() => null);
+    // The NFL week, not the week of his latest post: pacing and the bid
+    // history are about where the season is, and his weekly list can lag a
+    // day behind the calendar.
+    const week = nflState?.week ?? weekly?.week ?? 1;
+    const isDynasty = profile.type === "dynasty";
+
+    const [bids, trendingRows, grades] = await Promise.all([
+      seasonWinningBids(profile.id, week).catch(() => []),
+      getTrendingAdds().catch(() => []),
+      isDynasty
+        ? getRosterGrades(profile.id, me.user_id).catch((): RAGradesByRosterId => ({}))
+        : Promise.resolve<RAGradesByRosterId>({}),
+    ]);
+
+    const trajectory = isDynasty ? inferTrajectory(grades[mine.roster_id] ?? null) : null;
+    const trending = new Map(trendingRows.map((t, i) => [t.player_id, i + 1]));
+
+    const available = roster.filter((p) => !cannotPlay(p));
+    const lineup = bestLineup(
+      available.map((p) => ({ playerId: p.playerId, position: p.position, points: scoreOf(p) })),
+      profile.rosterPositions,
+    );
+    const emptySlots = lineup.slots.filter((slot) => slot.player === null).length;
+
+    const base: Omit<PricingContext, "observed"> = {
+      type: isDynasty ? "dynasty" : "redraft",
+      budget: budgetTotal,
+      remaining: budgetLeft,
+      week,
+      teams: profile.teams,
+      rosterPositions: profile.rosterPositions,
+      record: {
+        wins: mine.settings?.wins ?? 0,
+        losses: mine.settings?.losses ?? 0,
+      },
+      trajectory,
+      trending,
+      emptySlots,
+    };
+
+    const candidateFor = (id: string, position: string, weekGain: number): ClaimCandidate => ({
+      playerId: id,
+      position,
+      age: players[id]?.age ?? null,
+      seasonPositionRank: lab.byId[id]?.positionRank ?? null,
+      weekGain,
+    });
+
+    // Historical bids are tiered by the player's season rank alone; what he
+    // was worth to the buyer's lineup that week is not recoverable.
+    const observed: ObservedClaim[] = bids.map((bid) => {
+      const position = players[bid.playerId]?.position ?? "WR";
+      const tier = classifyClaim(candidateFor(bid.playerId, position, 0), { ...base, observed: [] });
+      return { tier, amount: bid.amount };
+    });
+    const ctx: PricingContext = { ...base, observed };
+
+    for (const t of report.startable) {
+      const gain = Math.max(0, scoreOf(t.player) - (t.displaces ? scoreOf(t.displaces) : 0));
+      t.price = priceClaim(candidateFor(t.player.playerId, t.player.position, gain), ctx);
+    }
+    for (const t of report.seasonUpgrades) {
+      const starts = report.startable.find((s) => s.player.playerId === t.player.playerId);
+      const gain = starts
+        ? Math.max(0, scoreOf(starts.player) - (starts.displaces ? scoreOf(starts.displaces) : 0))
+        : 0;
+      t.price = priceClaim(candidateFor(t.player.playerId, t.player.position, gain), ctx);
+    }
+    pacing = pacingFor(ctx);
+  }
+
   return {
     leagueId: profile.id,
     leagueName: profile.name,
@@ -154,11 +264,8 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     listUpdatedLabel: weekly?.updatedLabel ?? null,
     seasonListTitle: lab.title,
     seasonListMatchesScoring: lab.matchesLeagueScoring,
-    report: waiverTargets({
-      rosterPositions: profile.rosterPositions,
-      roster,
-      freeAgents,
-    }),
+    report,
+    pacing,
     blocked: weekly
       ? null
       : "No weekly rankings ingested yet, so the this-week half of this page is empty. The season-long claims below still stand.",
@@ -199,6 +306,7 @@ function blank(leagueId: string, why: string, profile?: LeagueProfile): WaiverCo
     seasonListTitle: "",
     seasonListMatchesScoring: true,
     report: EMPTY,
+    pacing: null,
     blocked: why,
   };
 }

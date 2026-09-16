@@ -57,6 +57,25 @@ function matchupText(p: WaiverPlayer): string {
   return `${p.home ? "vs" : "@"} ${p.opponent}`;
 }
 
+function BidLine({ price }: { price: StartableTarget["price"] }) {
+  if (!price) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span className="text-sm tabular-nums">
+        <span className="text-zinc-500 dark:text-zinc-400">Bid </span>
+        <span className="font-semibold text-zinc-900 dark:text-zinc-100">${price.bid}</span>
+        {price.walkAway > price.bid ? (
+          <span className="text-zinc-500 dark:text-zinc-400">, stop at ${price.walkAway}</span>
+        ) : null}
+      </span>
+      <Chip tone={price.tier === "winner" || price.tier === "starter" ? "amber" : "zinc"}>
+        {price.tierLabel}
+      </Chip>
+      {price.longShot ? <Chip tone="rose">likely loses at ${price.marketExpected}</Chip> : null}
+    </div>
+  );
+}
+
 function StartRow({ t }: { t: StartableTarget }) {
   return (
     <div className="rounded-2xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
@@ -79,6 +98,12 @@ function StartRow({ t }: { t: StartableTarget }) {
         Would start at {t.slot} this week
         {t.displaces ? `, ahead of ${t.displaces.name}` : ""}.
       </p>
+      <BidLine price={t.price} />
+      {t.price ? (
+        <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          {t.price.reason}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -103,6 +128,12 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
             "You have a free roster spot, so this one costs nothing."
           )}
         </p>
+        <BidLine price={t.price} />
+        {t.price ? (
+          <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            {t.price.reason}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -153,6 +184,12 @@ export default async function WaiversPage({
           </span>
         </div>
       )}
+
+      {w.pacing ? (
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+          {w.pacing.note}
+        </p>
+      ) : null}
 
       {w.blocked && (
         <div className="mt-6 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm leading-relaxed text-zinc-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-zinc-300">

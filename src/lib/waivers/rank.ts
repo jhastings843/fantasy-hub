@@ -1,5 +1,6 @@
 import { bestLineup, marginalValue, type LineupPlayer } from "@/lib/lineup/solve";
 import { cannotPlay, scoreOf, type AdvicePlayer } from "@/lib/lineup/weekly-advice";
+import type { ClaimPrice } from "./price";
 
 // Who to claim, and who to drop for them.
 //
@@ -31,6 +32,8 @@ export interface StartableTarget {
   slot: string;
   /** The player he would push out of the lineup. */
   displaces: WaiverPlayer | null;
+  /** What to bid, once the league's budget and market are known. */
+  price?: ClaimPrice;
 }
 
 export interface SeasonTarget {
@@ -46,6 +49,8 @@ export interface SeasonTarget {
   dropFor: WaiverPlayer | null;
   /** How many places better on the season list. */
   placesBetter: number | null;
+  /** What to bid, once the league's budget and market are known. */
+  price?: ClaimPrice;
 }
 
 export interface WaiverReport {

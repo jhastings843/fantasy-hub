@@ -28,6 +28,7 @@ const KEY = {
     `sleeper:v1:user:${userId}:leagues:nfl:${season}`,
   nflState: () => `sleeper:v1:state:nfl`,
   matchups: (id: string, week: number) => `sleeper:v1:league:${id}:matchups:w${week}`,
+  trendingAdds: () => `sleeper:v1:players:nfl:trending:add`,
 };
 
 // TTLs are aggressive on anything that responds to live league
@@ -58,6 +59,9 @@ const TTL = {
   // Only completed weeks are read, and those change only on a stat
   // correction, which the NFL issues within a day or two of the game.
   matchups: 60 * 60,
+  // Add counts move all day Tuesday. Half an hour is fresh enough to price
+  // a claim and slow enough not to hammer the endpoint from every page.
+  trendingAdds: 30 * 60,
 };
 
 async function sleeperFetch<T>(path: string): Promise<T> {
@@ -236,4 +240,20 @@ export async function getLeagueMatchups(
   const unplayed = rows.length === 0 || rows.every((m) => !m.points);
   if (unplayed) await invalidate(KEY.matchups(leagueId, week));
   return rows;
+}
+
+export interface SleeperTrendingAdd {
+  player_id: string;
+  count: number;
+}
+
+/**
+ * The most-added players on Sleeper over the last day, hottest first. This
+ * is the only public read on how contested a claim is across all leagues,
+ * which is most of what a FAAB price is.
+ */
+export function getTrendingAdds(limit = 50): Promise<SleeperTrendingAdd[]> {
+  return cached(KEY.trendingAdds(), TTL.trendingAdds, () =>
+    sleeperFetch<SleeperTrendingAdd[]>(`/players/nfl/trending/add?lookback_hours=24&limit=${limit}`),
+  );
 }
