@@ -319,6 +319,18 @@ function Chain({ chain, index }: { chain: BidChain; index: number }) {
         )}
       </div>
 
+      {chain.targets.length > 1 ? (
+        <p className="border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-xs leading-relaxed text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
+          Submit all {chain.targets.length}, in this order. Only one can win: once
+          a claim lands, {chain.drop?.name ?? "the drop"} is gone and Sleeper voids
+          the rest. The most this chain costs is{" "}
+          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+            {money(Math.max(...chain.targets.map((t) => t.bid)))}
+          </span>
+          , not the bids added together.
+        </p>
+      ) : null}
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
         {chain.targets.map((target, i) => (
           <li key={target.player.playerId} className="px-4 py-3">

@@ -135,7 +135,11 @@ function chainBlock(
         </table>
       </td>
     </tr>
-    ${claims}
+    ${claims}${
+        chain.targets.length > 1
+          ? `<tr><td style="padding:8px 14px 10px;border-top:1px solid ${PALETTE.hairline};font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};">Submit all ${chain.targets.length}. Only one can win: once a claim lands, ${escapeHtml(chain.drop?.name ?? "the drop")} is gone and Sleeper voids the rest. The most this chain costs is <strong style="color:${PALETTE.ink};">${money(Math.max(...chain.targets.map((t) => t.bid)))}</strong>, not the bids added together.</td></tr>`
+          : ""
+      }
   </table>`;
 }
 

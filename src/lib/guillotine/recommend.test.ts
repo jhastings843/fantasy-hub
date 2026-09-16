@@ -351,3 +351,34 @@ describe("summary honesty", () => {
     expect(card.summary).not.toContain("the one that matters");
   });
 });
+
+describe("chain order matches Sleeper's processing order", () => {
+  it("never lets a fallback outbid the target ahead of it", () => {
+    const budget = planBudget({
+      budget: 1000,
+      remaining: 1000,
+      teamsAlive: 15,
+      totalTeams: 16,
+      posture: "green",
+      rivalRemaining: Array(14).fill(1000),
+    });
+    const market = buildMarket(1000, budget.phase, []);
+    // Two multiweek players who both replace the same weak flex. The one
+    // with the smaller lineup gain must not carry the bigger bid.
+    const card = buildBidCard({
+      ...input({ budget, market, posture: "green" }),
+      candidates: [
+        player("a", "WR", 9, { rosPoints: 9 }),
+        player("b", "RB", 8.5, { rosPoints: 8.5 }),
+        player("c", "WR", 8, { rosPoints: 8 }),
+      ],
+      leaguePlayers: [{ position: "WR", rosPoints: 30 }, { position: "RB", rosPoints: 30 }],
+    });
+    for (const chain of card.chains) {
+      for (let i = 1; i < chain.targets.length; i++) {
+        expect(chain.targets[i].bid).toBeLessThanOrEqual(chain.targets[i - 1].bid);
+        expect(chain.targets[i].walkAway).toBeLessThanOrEqual(chain.targets[i - 1].walkAway);
+      }
+    }
+  });
+});

@@ -324,6 +324,21 @@ export function buildBidCard(input: RecommendInput): BidCard {
     }
   }
 
+  // Sleeper processes claims by bid amount, highest first, and offers no
+  // other way to order your own claims. So a fallback that outbids the target
+  // ahead of it is processed first and wins first. Bids must not rise down a
+  // chain, or the order on the card is not the order Sleeper runs.
+  for (const chain of chains) {
+    for (let i = 1; i < chain.targets.length; i++) {
+      const prev = chain.targets[i - 1];
+      const cur = chain.targets[i];
+      if (cur.bid > prev.bid) cur.bid = prev.bid;
+      if (cur.walkAway > prev.walkAway) cur.walkAway = prev.walkAway;
+      if (cur.walkAway < cur.bid) cur.walkAway = cur.bid;
+    }
+  }
+  maxPossibleSpend = worstCase(chains);
+
   const sitOut = chains.length === 0 || budget.weeklyCap < 1;
 
   // Two chains can both plan to replace the same starter, because each target
