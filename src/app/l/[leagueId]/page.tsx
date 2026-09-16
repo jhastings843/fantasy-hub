@@ -2,10 +2,12 @@ import Link from "next/link";
 import {
   getAllPlayers,
   getLeague,
+  getLeagueMatchups,
   getLeagueRosters,
   getLeagueUsers,
   getUser,
 } from "@/lib/sleeper/client";
+import type { SleeperMatchup } from "@/lib/sleeper/types";
 import type {
   SleeperPlayer,
   SleeperPlayersById,
@@ -149,7 +151,13 @@ export default async function LeaguePage({
   // Grades and their history come from RosterAudit, which is dynasty-only.
   // Asking for a redraft league answers 400, so don't ask.
   const tracksGrades = profile.type === "dynasty";
-  const [rosters, users, players, fcValues, grades, gradeHistory] =
+  // Sleeper's own count of scored weeks. The record on each roster is the
+  // sum of those weeks, and in a league with a median game each week adds
+  // two results, so the page says which weeks the record covers.
+  const scoredWeeks = Number(league.settings?.last_scored_leg ?? 0) || 0;
+  const medianGame = league.settings?.league_average_match === 1;
+
+  const [rosters, users, players, fcValues, grades, gradeHistory, lastMatchups] =
     await Promise.all([
       getLeagueRosters(leagueId),
       getLeagueUsers(leagueId),
@@ -163,7 +171,24 @@ export default async function LeaguePage({
       tracksGrades
         ? getGradeHistory(leagueId).catch((): GradeSnapshot[] => [])
         : Promise.resolve<GradeSnapshot[]>([]),
+      scoredWeeks >= 1
+        ? getLeagueMatchups(leagueId, scoredWeeks).catch((): SleeperMatchup[] => [])
+        : Promise.resolve<SleeperMatchup[]>([]),
     ]);
+
+  // Last week, per roster: what they scored and whether they beat the team
+  // they were paired with. The median game, where the league runs one, is
+  // folded into the record already and is not repeated here.
+  const lastWeek = new Map<number, { points: number; beat: boolean | null }>();
+  for (const m of lastMatchups) {
+    const opponent = lastMatchups.find(
+      (o) => o.matchup_id != null && o.matchup_id === m.matchup_id && o.roster_id !== m.roster_id,
+    );
+    lastWeek.set(m.roster_id, {
+      points: m.points ?? 0,
+      beat: opponent ? (m.points ?? 0) > (opponent.points ?? 0) : null,
+    });
+  }
 
   // Log today's grades once the page has been sent, so tomorrow's visit can
   // say what moved. Never let a logging failure surface as a page error.
@@ -583,9 +608,17 @@ export default async function LeaguePage({
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Standings
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Standings
+            </h2>
+            {scoredWeeks >= 1 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Through week {scoredWeeks}
+                {medianGame ? ", two results a week: your matchup and the league median" : ""}
+              </p>
+            ) : null}
+          </div>
           <ol className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
             {standings.map((r, i) => {
               const isMe = r.roster_id === myRoster?.roster_id;
@@ -622,6 +655,22 @@ export default async function LeaguePage({
                       {teamValue(r).toLocaleString()} val
                       {totalFpts(r) > 0 ? ` · ${totalFpts(r).toFixed(0)} PF` : ""}
                     </span>
+                    {lastWeek.has(r.roster_id) ? (
+                      <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                        Wk {scoredWeeks}: {lastWeek.get(r.roster_id)!.points.toFixed(1)}
+                        {lastWeek.get(r.roster_id)!.beat === null ? "" : (
+                          <span
+                            className={
+                              lastWeek.get(r.roster_id)!.beat
+                                ? " font-semibold text-emerald-600 dark:text-emerald-400"
+                                : " font-semibold text-rose-600 dark:text-rose-400"
+                            }
+                          >
+                            {lastWeek.get(r.roster_id)!.beat ? " W" : " L"}
+                          </span>
+                        )}
+                      </span>
+                    ) : null}
                   </div>
                 </li>
               );

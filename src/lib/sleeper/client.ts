@@ -129,6 +129,9 @@ export function getAllPlayers(): Promise<SleeperPlayersById> {
   });
 }
 
+/** Fantasy weeks a season can hold. Sleeper schedules through week 18. */
+const SEASON_WEEKS = 18;
+
 export async function revalidateLeague(leagueId: string): Promise<void> {
   await invalidate(
     KEY.league(leagueId),
@@ -139,6 +142,11 @@ export async function revalidateLeague(leagueId: string): Promise<void> {
     // sets the order an hour before the draft should show up on refresh, not
     // whenever the list's own TTL happens to lapse.
     KEY.drafts(leagueId),
+    // The scoreboard and the NFL week, so a refresh pressed because "last
+    // week is wrong" can actually fix last week. Stat corrections land days
+    // after the game and the weekly cache would otherwise outlive them.
+    KEY.nflState(),
+    ...Array.from({ length: SEASON_WEEKS }, (_, i) => KEY.matchups(leagueId, i + 1)),
   );
 }
 
@@ -215,11 +223,17 @@ export function getNflState(): Promise<SleeperNflState> {
 }
 
 /** Every roster's score for one week. Sleeper returns [] for a week not yet played. */
-export function getLeagueMatchups(
+export async function getLeagueMatchups(
   leagueId: string,
   week: number,
 ): Promise<SleeperMatchup[]> {
-  return cached(KEY.matchups(leagueId, week), TTL.matchups, () =>
+  const rows = await cached(KEY.matchups(leagueId, week), TTL.matchups, () =>
     sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`),
   );
+  // A week nobody has scored in yet is a schedule, not a result, and it
+  // changes the moment the first game kicks off. Do not let it sit in the
+  // cache for an hour; the next read fetches again.
+  const unplayed = rows.length === 0 || rows.every((m) => !m.points);
+  if (unplayed) await invalidate(KEY.matchups(leagueId, week));
+  return rows;
 }
