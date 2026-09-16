@@ -79,6 +79,12 @@ describe("classifyClaim", () => {
     expect(classifyClaim(cand({ seasonPositionRank: null, lastWeekSnaps: 12 }), ctx())).toBe("stash");
   });
 
+  it("does not let the consensus turn a one-QB quarterback into starter money", () => {
+    const qb = cand({ position: "QB", weekGain: 6, researchTier: "starter" });
+    expect(classifyClaim(qb, ctx())).toBe("streamer");
+    expect(classifyClaim(qb, ctx({ type: "dynasty", rosterPositions: DYNASTY_SLOTS }))).toBe("starter");
+  });
+
   it("lets the week's consensus lift a tier but never lower one", () => {
     expect(classifyClaim(cand({ seasonPositionRank: 60, researchTier: "starter" }), ctx())).toBe("starter");
     expect(classifyClaim(cand({ seasonPositionRank: 10, researchTier: "stash" }), ctx())).toBe("winner");

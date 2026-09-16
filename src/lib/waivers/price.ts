@@ -157,18 +157,24 @@ function strongerTier(a: ClaimTier, b: ClaimTier | null | undefined): ClaimTier 
   return TIER_ORDER.indexOf(b) < TIER_ORDER.indexOf(a) ? b : a;
 }
 
+function isStreamerPosition(c: ClaimCandidate, ctx: PricingContext): boolean {
+  return STREAMER_POSITIONS.has(c.position) || (c.position === "QB" && !isSuperflex(ctx.rosterPositions));
+}
+
 export function classifyClaim(c: ClaimCandidate, ctx: PricingContext): ClaimTier {
   const own = classifyOwn(c, ctx);
-  // The research is this week's opinion and the season list may not be; when
-  // the consensus rates a player higher than the rank does, the consensus
-  // wins. It never lowers a tier the lineup math already earned.
+  // A streamer position stays a streamer whatever a column calls him: in a
+  // one-QB league the room does not pay starter money for a quarterback,
+  // and the columns that rate him one are written for deeper formats.
+  if (isStreamerPosition(c, ctx)) return own;
+  // Otherwise the research is this week's opinion and the season list may
+  // not be; when the consensus rates a player higher than the rank does,
+  // the consensus wins. It never lowers a tier the lineup math earned.
   return strongerTier(own, c.researchTier);
 }
 
 function classifyOwn(c: ClaimCandidate, ctx: PricingContext): ClaimTier {
-  const streamerPosition =
-    STREAMER_POSITIONS.has(c.position) || (c.position === "QB" && !isSuperflex(ctx.rosterPositions));
-  if (streamerPosition) return c.weekGain > 0 ? "streamer" : "stash";
+  if (isStreamerPosition(c, ctx)) return c.weekGain > 0 ? "streamer" : "stash";
 
   const bar = starterBar(c.position, ctx);
   if (c.seasonPositionRank != null && c.seasonPositionRank <= bar * 0.4) return "winner";
