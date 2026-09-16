@@ -11,6 +11,8 @@ import {
   suggestLevelers,
   tierForMatch,
   verdictLabel,
+  packageKey,
+  type PositionalImpact,
   type BestTradeIdea,
   type LeagueWideMatch,
   type LeagueWideMatchTier,
@@ -109,7 +111,7 @@ function PlayerRowItem({
         </span>
       </div>
       <span className="shrink-0 text-sm font-semibold tabular-nums">
-        {p.value > 0 ? p.value.toLocaleString() : "—"}
+        {p.value > 0 ? p.value.toLocaleString() : "-"}
       </span>
     </label>
   );
@@ -284,6 +286,13 @@ function verdictBadgeClass(v: TradeVerdict): string {
     case "decline":
       return "bg-rose-500 text-white";
   }
+}
+
+function partnerSummary(partner: { verdict: TradeVerdict; positionalImpact: PositionalImpact[] }) {
+  const holes = partner.positionalImpact
+    .filter((impact) => impact.holeChange === "closes" || (impact.holeChange === "stays_hole" && impact.delta > 0))
+    .map((impact) => `${impact.holeChange === "closes" ? "Fills" : "Improves"} their ${impact.position} hole`);
+  return `For them: ${verdictLabel(partner.verdict)}${holes.length ? ` · ${holes.join(" · ")}` : ""}`;
 }
 
 export default function TradeBuilder({
@@ -548,7 +557,7 @@ export default function TradeBuilder({
   const pct = baseline > 0 ? Math.round((delta / baseline) * 100) : 0;
   const verdict =
     baseline === 0
-      ? "—"
+      ? "-"
       : Math.abs(pct) <= 10
         ? "Even"
         : delta > 0
@@ -716,9 +725,9 @@ export default function TradeBuilder({
             </p>
           </div>
           <ul className="grid gap-3 md:grid-cols-2">
-            {bestTrades.map((idea, i) => (
+            {bestTrades.map((idea) => (
               <li
-                key={`${idea.partnerRosterId}-${i}`}
+                key={`${idea.partnerRosterId}-${packageKey(idea.send)}-${packageKey(idea.receive)}`}
                 className="group flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-500/10 dark:border-zinc-800/80 dark:bg-zinc-900/80 dark:hover:border-amber-800"
               >
                 <div className="flex items-baseline justify-between gap-3">
@@ -780,6 +789,9 @@ export default function TradeBuilder({
                     ))}
                   </div>
                 </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {partnerSummary(idea.partner)}
+                </p>
                 <ul className="flex flex-col gap-0.5">
                   {idea.reasoning.map((r) => (
                     <li
@@ -917,7 +929,7 @@ export default function TradeBuilder({
                         className="truncate flex-1"
                       />
                       <span className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
-                        {p.value > 0 ? p.value.toLocaleString() : "—"}
+                        {p.value > 0 ? p.value.toLocaleString() : "-"}
                       </span>
                       <button
                         type="button"
@@ -1100,8 +1112,8 @@ export default function TradeBuilder({
                   </div>
                   <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300">
                     {delta > 0
-                      ? `You're up ${delta.toLocaleString()} — add to your side`
-                      : `You're down ${Math.abs(delta).toLocaleString()} — ask for more`}
+                      ? `You're up ${delta.toLocaleString()}; add to your side`
+                      : `You're down ${Math.abs(delta).toLocaleString()}; ask for more`}
                   </span>
                 </summary>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
@@ -1326,7 +1338,7 @@ export default function TradeBuilder({
         {partnerId === ANYONE && (
           <section className="flex flex-col gap-3">
             <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              You get — auto-matches across the league
+              You get: auto-matches across the league
             </h2>
             {mySel.size === 0 && myPickIds.size === 0 ? (
               <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
@@ -1410,9 +1422,9 @@ export default function TradeBuilder({
                         </span>
                       </summary>
                       <ul className="flex flex-col gap-2 pt-1">
-                        {list.map((m, i) => (
+                        {list.map((m) => (
                           <li
-                            key={`${m.partnerRosterId}-${m.receivePlayers[0]?.id ?? i}`}
+                            key={`${m.partnerRosterId}-${packageKey(m.receivePlayers)}`}
                             className={`flex flex-col gap-2 rounded-2xl border bg-white/80 p-3 backdrop-blur dark:bg-zinc-900/80 ${meta.borderCls}`}
                           >
                             <div className="flex items-baseline justify-between gap-2">
@@ -1425,6 +1437,9 @@ export default function TradeBuilder({
                                 </span>
                               )}
                             </div>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                              {partnerSummary(m.partner)}
+                            </p>
                             {m.receivePlayers.map((p) => (
                               <div
                                 key={p.id}

@@ -13,20 +13,28 @@ export interface TradeFit {
 
 const TRADE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
+export function tradeRooms(team: TeamSummary, totalTeams: number) {
+  return {
+    surplus: TRADE_POSITIONS.filter((pos) => (team.positionRanks[pos] ?? 99) <= 4),
+    deficit: TRADE_POSITIONS.filter((pos) =>
+      (team.positionRanks[pos] ?? 99) >= Math.max(1, totalTeams - 2)),
+  };
+}
+
 export function suggestTradeFits(
   myTeam: TeamSummary,
   partner: TeamSummary,
   totalTeams: number,
 ): TradeFit[] {
   const fits: TradeFit[] = [];
-  const strongThreshold = 4;
-  const weakThreshold = totalTeams - 3;
+  const yours = tradeRooms(myTeam, totalTeams);
+  const theirs = tradeRooms(partner, totalTeams);
 
   for (const pos of TRADE_POSITIONS) {
     const myRank = myTeam.positionRanks[pos] ?? 99;
     const theirRank = partner.positionRanks[pos] ?? 99;
 
-    if (myRank <= strongThreshold && theirRank >= weakThreshold) {
+    if (yours.surplus.includes(pos) && theirs.deficit.includes(pos)) {
       const candidates = myTeam.players
         .filter((p) => p.position === pos)
         .sort((a, b) => a.value - b.value);
@@ -42,7 +50,7 @@ export function suggestTradeFits(
       }
     }
 
-    if (theirRank <= strongThreshold && myRank >= weakThreshold) {
+    if (theirs.surplus.includes(pos) && yours.deficit.includes(pos)) {
       const candidates = partner.players
         .filter((p) => p.position === pos)
         .sort((a, b) => a.value - b.value);

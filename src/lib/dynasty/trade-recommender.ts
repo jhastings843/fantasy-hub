@@ -9,9 +9,29 @@
 // - suggestCounters: counter-offer suggestions when verdict is unfavorable
 
 import type { PlayerRow, TeamSummary } from "./power-rankings";
+import { tradeRooms } from "./trade-fits";
 import type { RAPick } from "@/lib/rosteraudit/types";
 
 const TRADE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
+
+export function packageKey(players: PlayerRow[]): string {
+  return players.map((p) => p.id).sort().join(",");
+}
+
+function bundleValue(players: PlayerRow[]): number {
+  return players.reduce((sum, p) => sum + p.value, 0);
+}
+
+function playerBundles(players: PlayerRow[]): PlayerRow[][] {
+  const candidates = [...players].sort((a, b) => b.value - a.value || a.id.localeCompare(b.id)).slice(0, 15);
+  const bundles = candidates.map((p) => [p]);
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      bundles.push([candidates[i], candidates[j]]);
+    }
+  }
+  return bundles;
+}
 
 function pickValue(p: RAPick, isSuperflex: boolean): number {
   return isSuperflex ? p.valueSf : p.value1qb;
@@ -23,7 +43,7 @@ function pickValue(p: RAPick, isSuperflex: boolean): number {
 
 export type BestTradeKind = "position_fit" | "youth_arbitrage";
 
-export interface BestTradeIdea {
+export interface BestTradeIdea extends BilateralScore {
   partnerRosterId: number;
   partnerName: string;
   send: PlayerRow[];
@@ -113,139 +133,45 @@ export function findBestTrades(
     return [];
   }
 
+  // Fifteen candidates yield at most 120 bundles per side. Surplus-only
+  // additions keep packages from stripping two scarce starters at once.
+  const surplus = new Set<string>(tradeRooms(myTeam, totalTeams).surplus);
+  const sendBundles = playerBundles(myTeam.players.filter((p) => p.value > 200))
+    .filter((bundle) => bundle.length === 1 || bundle.some((p) =>
+      surplus.has(p.position)));
+
   for (const partner of allTeams) {
     if (partner.rosterId === myTeam.rosterId) continue;
-
-    for (const recvPos of myWeakPositions) {
-      const partnerRank = partner.positionRanks[recvPos] ?? 99;
-      // Partner must be strictly stronger than us at this position.
-      if (partnerRank >= (myTeam.positionRanks[recvPos] ?? 99)) continue;
-
-      // Receive candidates: prefer young upside at the weak position.
-      // Sort by an effective score (value + youth bonus) so a 6500-value
-      // 22-year-old beats a 6800-value 28-year-old.
-      const theirCandidates = partner.players
-        .filter((p) => p.position === recvPos && p.value > 200)
-        .map((p) => ({
-          p,
-          effective: p.value + (isYoung(p) ? 600 : 0) - (isAging(p) ? 400 : 0),
-        }))
-        .sort((a, b) => b.effective - a.effective)
-        .slice(1, 6)
-        .map((x) => x.p);
-
-      for (const recvPlayer of theirCandidates) {
-        // Find one of my players at fair value. Bias the sort heavily
-        // toward older / less-coveted send candidates so we don't keep
-        // recommending the same young centerpiece players.
-        const myCandidates = myTeam.players
-          .filter((p) => {
-            if (p.position === recvPos) return false; // don't trade WITHIN the same position
-            const baseline = Math.max(recvPlayer.value, p.value);
-            const pct =
-              baseline > 0 ? Math.abs(recvPlayer.value - p.value) / baseline : 1;
-            return p.value > 200 && pct <= 0.20;
-          })
-          .map((p) => ({
-            p,
-            myRank: myTeam.positionRanks[p.position] ?? 99,
-            valueDist: Math.abs(p.value - recvPlayer.value),
-            // "Send-suitability": low if young + valuable, high if older
-            // or in a position where we have surplus. Lower = better
-            // candidate to keep, so we want HIGH suitability values
-            // sorted to the front.
-            suitability:
-              (isAging(p) ? 1.5 : 0) -
-              (isYoung(p) ? 2.0 : 0) +
-              ((totalTeams - (myTeam.positionRanks[p.position] ?? 99)) /
-                totalTeams) *
-                1.0,
-          }))
-          .sort(
-            (a, b) =>
-              b.suitability - a.suitability ||
-              a.myRank - b.myRank ||
-              a.valueDist - b.valueDist,
-          )
-          .slice(0, 4);
-
-        for (const { p: sendPlayer } of myCandidates) {
-          const beforeRank = myTeam.positionRanks[recvPos] ?? 99;
-          const afterRank = projectedRank(
-            myTeam,
-            allTeams,
-            recvPos,
-            [sendPlayer],
-            [recvPlayer],
-          );
-          if (afterRank >= beforeRank) continue;
-
-          const sendPosRank = myTeam.positionRanks[sendPlayer.position] ?? 99;
-          const positionalJump = beforeRank - afterRank;
-          const baseline = Math.max(recvPlayer.value, sendPlayer.value);
-          const valuePct =
-            baseline > 0 ? Math.abs(recvPlayer.value - sendPlayer.value) / baseline : 1;
-          const valueParityBonus = 1 - valuePct;
-          const surplusBonus = Math.max(0, (totalTeams - sendPosRank) / totalTeams);
-
-          // Age arbitrage: positive when we send older for younger.
-          const sendAge = sendPlayer.age ?? 25;
-          const recvAge = recvPlayer.age ?? 25;
-          const ageDelta = sendAge - recvAge;
-          const ageBonus = Math.max(-3, Math.min(6, ageDelta));
-
-          const score =
-            positionalJump * 10 +
-            valueParityBonus * 4 +
-            surplusBonus * 3 +
-            ageBonus * 2;
-
-          const reasoning: string[] = [];
-          reasoning.push(
-            `Improves ${recvPos} room (#${beforeRank} → projected #${afterRank})`,
-          );
-          if (sendPosRank <= median) {
-            reasoning.push(
-              `Trades from your ${sendPlayer.position} surplus (you're #${sendPosRank} of ${totalTeams})`,
-            );
-          } else {
-            reasoning.push(
-              `Sends a ${sendPlayer.position} you can spare (you're #${sendPosRank} of ${totalTeams})`,
-            );
-          }
-          if (ageDelta >= 3) {
-            reasoning.push(
-              `Gets younger by ${ageDelta.toFixed(0)} years (${sendPlayer.name} ${sendAge.toFixed(0)} → ${recvPlayer.name} ${recvAge.toFixed(0)})`,
-            );
-          }
-          const delta = recvPlayer.value - sendPlayer.value;
-          if (Math.abs(delta) <= 100) {
-            reasoning.push("Value is essentially even");
-          } else if (delta > 0) {
-            reasoning.push(`You gain +${delta.toLocaleString()} in value`);
-          } else {
-            reasoning.push(
-              `You give up ${Math.abs(delta).toLocaleString()} in value`,
-            );
-          }
-
-          ideas.push({
-            partnerRosterId: partner.rosterId,
-            partnerName: partner.ownerName,
-            send: [sendPlayer],
-            receive: [recvPlayer],
-            myValue: sendPlayer.value,
-            theirValue: recvPlayer.value,
-            reasoning,
-            positionalGain: {
-              position: recvPos,
-              from: beforeRank,
-              to: afterRank,
-            },
-            score,
-            kind: "position_fit",
-          });
-        }
+    const deficits = new Set<string>(tradeRooms(partner, totalTeams).deficit);
+    const receiveBundles = playerBundles(partner.players.filter((p) => p.value > 200));
+    for (const send of sendBundles) {
+      for (const receive of receiveBundles) {
+        const myValue = bundleValue(send);
+        const theirValue = bundleValue(receive);
+        if (Math.abs(myValue - theirValue) / Math.max(myValue, theirValue) > 0.2) continue;
+        const recvPos = myWeakPositions.find((pos) =>
+          receive.some((p) => p.position === pos) &&
+          (partner.positionRanks[pos] ?? 99) < (myTeam.positionRanks[pos] ?? 99) &&
+          projectedRank(myTeam, allTeams, pos, send, receive) < (myTeam.positionRanks[pos] ?? 99));
+        if (!recvPos) continue;
+        const bilateral = scoreBoth(myTeam, partner, allTeams, send, receive, totalTeams);
+        if (!bilateral.mutual) continue;
+        const from = myTeam.positionRanks[recvPos] ?? 99;
+        const to = projectedRank(myTeam, allTeams, recvPos, send, receive);
+        const fillsDeficit = send.some((p) => deficits.has(p.position));
+        ideas.push({
+          ...bilateral,
+          partnerRosterId: partner.rosterId,
+          partnerName: partner.ownerName,
+          send,
+          receive,
+          myValue,
+          theirValue,
+          reasoning: [`Improves ${recvPos} room (#${from} → projected #${to})`],
+          positionalGain: { position: recvPos, from, to },
+          score: bilateral.mutualScore + (fillsDeficit ? 3 : 0),
+          kind: "position_fit",
+        });
       }
     }
   }
@@ -295,13 +221,13 @@ export function findBestTrades(
           myTeam,
           allTeams,
           youngPlayer.position,
-          [],
+          [oldPlayer],
           [youngPlayer],
         );
 
         const reasoning: string[] = [
           `Sells aging ${oldPlayer.name} (age ${sendAge.toFixed(0)}) for ${ageDelta.toFixed(0)}-year-younger upside`,
-          `${youngPlayer.name} is ${recvAge.toFixed(0)} — long dynasty runway`,
+          `${youngPlayer.name} is ${recvAge.toFixed(0)}; long dynasty runway`,
         ];
         if (Math.abs(valueDelta) <= 200) {
           reasoning.push("Value is essentially even");
@@ -313,7 +239,10 @@ export function findBestTrades(
           );
         }
 
+        const bilateral = scoreBoth(myTeam, partner, allTeams, [oldPlayer], [youngPlayer], totalTeams);
+        if (!bilateral.mutual) continue;
         ideas.push({
+          ...bilateral,
           partnerRosterId: partner.rosterId,
           partnerName: partner.ownerName,
           send: [oldPlayer],
@@ -333,18 +262,17 @@ export function findBestTrades(
     }
   }
 
-  // Dedupe by (partner, sendPlayerId, recvPlayerId) — keep the best
-  // scoring for each unique pair.
+  // Canonical bundle keys merge proposals reached through different fits.
   const seen = new Map<string, BestTradeIdea>();
   for (const idea of ideas) {
-    const key = `${idea.partnerRosterId}-${idea.send[0]?.id}-${idea.receive[0]?.id}`;
+    const key = `${idea.partnerRosterId}-${packageKey(idea.send)}-${packageKey(idea.receive)}`;
     const existing = seen.get(key);
     if (!existing || idea.score > existing.score) {
       seen.set(key, idea);
     }
   }
 
-  // Diversify: cap each unique send player at 2 appearances in the
+  // Diversify: cap each unique send bundle at 2 appearances in the
   // final list so the same one or two pieces don't dominate every row,
   // and try to mix at least one youth-arbitrage idea into the top.
   const sorted = [...seen.values()].sort((a, b) => b.score - a.score);
@@ -354,7 +282,7 @@ export function findBestTrades(
 
   // First pass: take ideas in score order while respecting the cap.
   for (const idea of sorted) {
-    const sendId = idea.send[0]?.id;
+    const sendId = packageKey(idea.send);
     if (sendId) {
       const c = sendCount.get(sendId) ?? 0;
       if (c >= SEND_CAP) continue;
@@ -365,7 +293,7 @@ export function findBestTrades(
   }
 
   // Ensure at least one youth_arbitrage idea makes the list when we
-  // have one — the user explicitly wants that flavor surfaced.
+  // have one; the user explicitly wants that flavor surfaced.
   if (
     final.length > 0 &&
     !final.some((i) => i.kind === "youth_arbitrage") &&
@@ -394,7 +322,7 @@ export function findBestTrades(
 // competitive trade option across all partner teams.
 // ---------------------------------------------------------------
 
-export interface LeagueWideMatch {
+export interface LeagueWideMatch extends BilateralScore {
   partnerRosterId: number;
   partnerName: string;
   receivePlayers: PlayerRow[];
@@ -418,9 +346,9 @@ export function findLeagueWideMatches({
   // Allow trades where you lose at most this many absolute value
   // points (so "fair" trades still surface but clear losses are
   // omitted). Set to 0 for strictly non-losing trades.
+  totalTeams = allTeams.length,
   maxLoss = 100,
-  // Cap on advantage — trades more lopsided than this are unrealistic
-  // (no one will accept a +3,000 value loss) so filter them out.
+  // Bound the candidate search; bilateral scoring decides acceptability.
   maxAdvantage = 2000,
   // Cap total to keep the list manageable.
   limit = 18,
@@ -431,6 +359,7 @@ export function findLeagueWideMatches({
   allTeams: TeamSummary[];
   weakestPositions: string[];
   isSuperflex?: boolean;
+  totalTeams?: number;
   maxLoss?: number;
   maxAdvantage?: number;
   limit?: number;
@@ -452,84 +381,53 @@ export function findLeagueWideMatches({
   for (const partner of allTeams) {
     if (partner.rosterId === myTeam.rosterId) continue;
 
-    for (const p of partner.players) {
-      if (p.value <= 0) continue;
-
-      const delta = p.value - mySendValue;
-      // Omit clear losses (anything where I give up more than maxLoss
-      // value points beyond what I receive).
-      if (delta < -maxLoss) continue;
-      // Omit trades that are too lopsided in your favor — partner
-      // wouldn't accept them even if RA values say so.
-      if (delta > maxAdvantage) continue;
-
-      // Skip if receiving them would create a same-team conflict on my
-      // post-trade roster.
-      const wouldConflict = !!(
-        p.team &&
-        p.position &&
-        myPostTradePositions.has(`${p.team}-${p.position}`)
-      );
-      if (wouldConflict) continue;
-
-      // Skip the partner's #1 player at any position (they won't trade
-      // their best). Heuristic: skip if this is their highest-valued
-      // player in this position AND that value is meaningful.
-      const partnerPosBest = partner.players
-        .filter((x) => x.position === p.position)
-        .reduce((max, x) => (x.value > max ? x.value : max), 0);
-      if (p.value === partnerPosBest && p.value > 1500) {
-        continue;
+    const giving = myTeam.players.filter((p) => mySendPlayerIds.has(p.id));
+    // Singles retain the full roster; only pair enumeration is capped.
+    const candidates = partner.players.filter((p) => p.value > 0);
+    const bundles = [
+      ...candidates.map((p) => [p]),
+      ...playerBundles(candidates).filter((bundle) => bundle.length === 2),
+    ];
+    for (const receivePlayers of bundles) {
+      const receiveValue = bundleValue(receivePlayers);
+      const delta = receiveValue - mySendValue;
+      if (delta < -maxLoss || delta > maxAdvantage) continue;
+      const occupied = new Set(myPostTradePositions);
+      let conflict = false;
+      for (const p of receivePlayers) {
+        if (!p.team || !p.position) continue;
+        const key = `${p.team}-${p.position}`;
+        if (occupied.has(key)) conflict = true;
+        occupied.add(key);
       }
-
-      const isFit = !!(p.position && weakestPositions.includes(p.position));
-      const baseline = Math.max(p.value, mySendValue);
-      const pctDelta = baseline > 0 ? delta / baseline : 0;
-
-      let score = 0;
-      score += delta / 50;
-      if (isFit) score += 25;
-      if (p.age != null && p.age <= 23) score += 6;
-      if (p.age != null && p.age >= 27) score -= 3;
-
-      const reasoning: string[] = [];
-      if (isFit && p.position) {
-        reasoning.push(`Fills your weak ${p.position} room`);
-      }
-      if (delta >= 1000) {
-        reasoning.push(`+${delta.toLocaleString()} value — major steal`);
-      } else if (delta >= 500) {
-        reasoning.push(`+${delta.toLocaleString()} value — clear edge`);
-      } else if (delta >= 100) {
-        reasoning.push(`+${delta.toLocaleString()} value gain`);
-      } else if (Math.abs(delta) <= 100) {
-        reasoning.push("Value is essentially even");
-      }
-      if (p.age != null && p.age <= 23) {
-        reasoning.push(`Age ${p.age} — long dynasty runway`);
-      }
-
+      if (conflict) continue;
+      const bilateral = scoreBoth(myTeam, partner, allTeams, giving, receivePlayers,
+        totalTeams, mySendValue, receiveValue);
+      if (!bilateral.mutual) continue;
+      const fitPositions = [...new Set(receivePlayers
+        .map((p) => p.position).filter((pos) => weakestPositions.includes(pos)))];
       matches.push({
+        ...bilateral,
         partnerRosterId: partner.rosterId,
         partnerName: partner.ownerName,
-        receivePlayers: [p],
+        receivePlayers,
         sendValue: mySendValue,
-        receiveValue: p.value,
+        receiveValue,
         delta,
-        pctDelta,
-        isFit,
-        fitPositions: isFit && p.position ? [p.position] : [],
+        pctDelta: delta / Math.max(receiveValue, mySendValue),
+        isFit: fitPositions.length > 0,
+        fitPositions,
         conflictWarning: false,
-        reasoning,
-        score,
+        reasoning: fitPositions.map((pos) => `Fills your weak ${pos} room`),
+        score: bilateral.mutualScore,
       });
     }
   }
 
-  // Cap to one per (partner, position) — best score wins.
+  // Canonical asset keys keep distinct packages and collapse order duplicates.
   const bestPerKey = new Map<string, LeagueWideMatch>();
   for (const m of matches) {
-    const key = `${m.partnerRosterId}-${m.receivePlayers[0]?.position ?? "X"}`;
+    const key = `${m.partnerRosterId}-${packageKey(m.receivePlayers)}`;
     const existing = bestPerKey.get(key);
     if (!existing || m.score > existing.score) {
       bestPerKey.set(key, m);
@@ -537,7 +435,7 @@ export function findLeagueWideMatches({
   }
 
   return [...bestPerKey.values()]
-    .sort((a, b) => b.delta - a.delta)
+    .sort((a, b) => b.mutualScore - a.mutualScore || b.delta - a.delta)
     .slice(0, limit);
 }
 
@@ -778,7 +676,7 @@ export interface CounterSuggestion {
   playerToRemove?: PlayerRow;
 }
 
-export interface TradeAssessment {
+export interface TradeAssessment extends BilateralScore {
   verdict: TradeVerdict;
   myValue: number;
   theirValue: number;
@@ -799,6 +697,120 @@ const VERDICT_LABEL: Record<TradeVerdict, string> = {
 
 export function verdictLabel(v: TradeVerdict): string {
   return VERDICT_LABEL[v];
+}
+
+export function scoreSideFor(
+  team: TeamSummary,
+  allTeams: TeamSummary[],
+  giving: PlayerRow[],
+  receiving: PlayerRow[],
+  totalTeams: number,
+) {
+  const given = bundleValue(giving);
+  const received = bundleValue(receiving);
+  const baseline = Math.max(given, received);
+  const pctDelta = baseline > 0 ? (received - given) / baseline : 0;
+  // Compute positional impact (only for positions touched).
+  const touchedPositions = new Set<string>();
+  for (const p of [...giving, ...receiving]) {
+    touchedPositions.add(p.position);
+  }
+
+  // A "hole" is a bottom-3 ranked position room. Used to flag trades
+  // that turn a healthy room into a hole (opens) or plug an existing
+  // hole (closes), since those swings outweigh raw value delta.
+  const holeThreshold = Math.max(1, totalTeams - 2);
+
+  const positionalImpact: PositionalImpact[] = [];
+  for (const pos of touchedPositions) {
+    const beforeRank = team.positionRanks[pos] ?? 99;
+    const afterRank = projectedRank(
+      team,
+      allTeams,
+      pos,
+      giving.filter((p) => p.position === pos),
+      receiving.filter((p) => p.position === pos),
+    );
+    const wasHole = beforeRank >= holeThreshold;
+    const willBeHole = afterRank >= holeThreshold;
+    let holeChange: HoleChange;
+    if (!wasHole && willBeHole) holeChange = "opens";
+    else if (wasHole && !willBeHole) holeChange = "closes";
+    else if (wasHole && willBeHole && afterRank > beforeRank)
+      holeChange = "deepens";
+    else if (wasHole) holeChange = "stays_hole";
+    else holeChange = "stays_strong";
+    positionalImpact.push({
+      position: pos,
+      beforeRank,
+      afterRank,
+      delta: beforeRank - afterRank,
+      holeChange,
+    });
+  }
+
+  // Score positional impact: sum of (delta * how-weak-it-was) so improving
+  // a weak room counts more than improving an already-strong one. On top
+  // of that, opening a hole is a heavier penalty and closing a hole is a
+  // heavier bonus than the rank delta alone would suggest.
+  let positionalScore = 0;
+  for (const imp of positionalImpact) {
+    const weakness = Math.max(0, imp.beforeRank - 6);
+    positionalScore += imp.delta * (1 + weakness * 0.3);
+    if (imp.holeChange === "opens") positionalScore -= 5;
+    else if (imp.holeChange === "closes") positionalScore += 5;
+    else if (imp.holeChange === "deepens") positionalScore -= 2;
+  }
+
+  // Combine: pct * 100 + positional score * 5 (roughly comparable scales)
+  const overallScore = pctDelta * 100 + positionalScore * 5;
+
+  return { positionalScore, positionalImpact, overallScore, pctDelta };
+}
+
+function verdictFor(score: number): TradeVerdict {
+  if (score >= 18) return "accept";
+  if (score >= 6) return "lean_accept";
+  if (score > -6) return "even";
+  if (score > -18) return "lean_decline";
+  return "decline";
+}
+
+interface BilateralScore {
+  partner: { score: number; verdict: TradeVerdict; positionalImpact: PositionalImpact[] };
+  mutual: boolean;
+  mutualScore: number;
+}
+
+function scoreBoth(
+  team: TeamSummary,
+  partner: TeamSummary | null,
+  allTeams: TeamSummary[],
+  giving: PlayerRow[],
+  receiving: PlayerRow[],
+  totalTeams: number,
+  givenValue = bundleValue(giving),
+  receivedValue = bundleValue(receiving),
+) {
+  const mine = scoreSideFor(team, allTeams, giving, receiving, totalTeams);
+  const theirs = partner ? scoreSideFor(partner, allTeams, receiving, giving, totalTeams) : null;
+  // Picks affect value parity but cannot fill a current positional hole.
+  const baseline = Math.max(givenValue, receivedValue);
+  const pctDelta = baseline > 0 ? (receivedValue - givenValue) / baseline : 0;
+  const score = pctDelta * 100 + mine.positionalScore * 5;
+  const partnerScore = theirs ? -pctDelta * 100 + theirs.positionalScore * 5 : -100;
+  return {
+    score,
+    verdict: verdictFor(score),
+    positionalImpact: mine.positionalImpact,
+    partner: {
+      score: partnerScore,
+      verdict: verdictFor(partnerScore),
+      positionalImpact: theirs?.positionalImpact ?? [],
+    },
+    mutual: partner !== null && score > -6 && partnerScore > -6,
+    mutualScore: Math.min(score, partnerScore),
+  };
 }
 
 export function evaluateTrade(
@@ -837,67 +849,10 @@ export function evaluateTrade(
   const baseline = Math.max(myValue, theirValue);
   const pctDelta = baseline > 0 ? delta / baseline : 0;
 
-  // Compute positional impact (only for positions touched).
-  const touchedPositions = new Set<string>();
-  for (const p of [...proposal.myPlayers, ...proposal.theirPlayers]) {
-    touchedPositions.add(p.position);
-  }
-
-  // A "hole" is a bottom-3 ranked position room. Used to flag trades
-  // that turn a healthy room into a hole (opens) or plug an existing
-  // hole (closes), since those swings outweigh raw value delta.
-  const holeThreshold = Math.max(1, totalTeams - 2);
-
-  const positionalImpact: PositionalImpact[] = [];
-  for (const pos of touchedPositions) {
-    const beforeRank = myTeam.positionRanks[pos] ?? 99;
-    const afterRank = projectedRank(
-      myTeam,
-      allTeams,
-      pos,
-      proposal.myPlayers.filter((p) => p.position === pos),
-      proposal.theirPlayers.filter((p) => p.position === pos),
-    );
-    const wasHole = beforeRank >= holeThreshold;
-    const willBeHole = afterRank >= holeThreshold;
-    let holeChange: HoleChange;
-    if (!wasHole && willBeHole) holeChange = "opens";
-    else if (wasHole && !willBeHole) holeChange = "closes";
-    else if (wasHole && willBeHole && afterRank > beforeRank)
-      holeChange = "deepens";
-    else if (wasHole) holeChange = "stays_hole";
-    else holeChange = "stays_strong";
-    positionalImpact.push({
-      position: pos,
-      beforeRank,
-      afterRank,
-      delta: beforeRank - afterRank,
-      holeChange,
-    });
-  }
-
-  // Score positional impact: sum of (delta * how-weak-it-was) so improving
-  // a weak room counts more than improving an already-strong one. On top
-  // of that, opening a hole is a heavier penalty and closing a hole is a
-  // heavier bonus than the rank delta alone would suggest.
-  let positionalScore = 0;
-  for (const imp of positionalImpact) {
-    const weakness = Math.max(0, imp.beforeRank - 6);
-    positionalScore += imp.delta * (1 + weakness * 0.3);
-    if (imp.holeChange === "opens") positionalScore -= 5;
-    else if (imp.holeChange === "closes") positionalScore += 5;
-    else if (imp.holeChange === "deepens") positionalScore -= 2;
-  }
-
-  // Combine: pct * 100 + positional score * 5 (roughly comparable scales)
-  const overallScore = pctDelta * 100 + positionalScore * 5;
-
-  let verdict: TradeVerdict;
-  if (overallScore >= 18) verdict = "accept";
-  else if (overallScore >= 6) verdict = "lean_accept";
-  else if (overallScore > -6) verdict = "even";
-  else if (overallScore > -18) verdict = "lean_decline";
-  else verdict = "decline";
+  const { verdict, positionalImpact, partner: partnerAssessment, mutual, mutualScore } = scoreBoth(
+    myTeam, partner, allTeams, proposal.myPlayers, proposal.theirPlayers,
+    totalTeams, myValue, theirValue,
+  );
 
   const reasoning: string[] = [];
   if (Math.abs(pctDelta) >= 0.05) {
@@ -990,7 +945,7 @@ export function evaluateTrade(
         counters.push({
           type: "remove_player",
           side: "remove_from_my_side",
-          description: `Pull ${candidate.name} from your side — you're already thin at ${imp.position}`,
+          description: `Pull ${candidate.name} from your side; you're already thin at ${imp.position}`,
           playerToRemove: candidate,
         });
       }
@@ -1017,7 +972,7 @@ export function evaluateTrade(
         counters.push({
           type: "ask_for_player",
           side: "add_to_their_side",
-          description: `Ask for ${partnerCandidate.name} (their ${pos}) — your weakest spot`,
+          description: `Ask for ${partnerCandidate.name} (their ${pos}); your weakest spot`,
           playerToAdd: partnerCandidate,
         });
       }
@@ -1033,5 +988,8 @@ export function evaluateTrade(
     reasoning,
     positionalImpact,
     counters: counters.slice(0, 3),
+    partner: partnerAssessment,
+    mutual,
+    mutualScore,
   };
 }
