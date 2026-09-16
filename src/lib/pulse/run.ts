@@ -20,7 +20,8 @@ import { runFaabEmail, configuredSendDay } from "@/lib/guillotine/run";
 import { runThursdayEmail, configuredSendDay as thursdaySendDay } from "@/lib/thursday/run";
 import { runMidweekEmail } from "@/lib/midweek/run";
 import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
-import { tempoFor, type PulseTier, type SendId, type Tempo } from "./tempo";
+import { refreshAllLeagues } from "@/lib/refresh/run";
+import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 
 // The heartbeat.
 //
@@ -147,6 +148,34 @@ async function recordTierRun(tier: PulseTier): Promise<void> {
   }
 }
 
+const TIMED_JOB_GAP_MS = 12 * 60 * 60 * 1000;
+
+// Separate leases prevent overlapping pulses from refreshing the same slot;
+// only success blocks retries after the lease expires.
+async function claimTimedJob(id: TimedJobId): Promise<boolean> {
+  try {
+    const last = await redis.get<number>(`pulse:ran:job:${id}`);
+    if (typeof last === "number" && Date.now() - last < TIMED_JOB_GAP_MS) return false;
+    const lease = await redis.set(`pulse:lease:job:${id}`, Date.now(), {
+      nx: true,
+      ex: LEASE_SECONDS,
+    });
+    return lease === "OK";
+  } catch {
+    return true;
+  }
+}
+
+async function recordTimedJobRun(id: TimedJobId): Promise<void> {
+  try {
+    await redis.set(`pulse:ran:job:${id}`, Date.now(), {
+      ex: Math.ceil((TIMED_JOB_GAP_MS * 4) / 1000),
+    });
+  } catch {
+    /* Worst case the refresh runs again sooner than it needed to. */
+  }
+}
+
 async function withTimeout<T>(work: Promise<T>, ms: number, name: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -161,10 +190,14 @@ async function withTimeout<T>(work: Promise<T>, ms: number, name: string): Promi
   }
 }
 
-async function job(name: string, work: () => Promise<string>): Promise<JobResult> {
+async function job(
+  name: string,
+  work: () => Promise<string>,
+  budgetMs = JOB_TIMEOUT_MS,
+): Promise<JobResult> {
   const started = Date.now();
   try {
-    const detail = await withTimeout(work(), JOB_TIMEOUT_MS, name);
+    const detail = await withTimeout(work(), Math.min(JOB_TIMEOUT_MS, budgetMs), name);
     return { job: name, ok: true, ms: Date.now() - started, detail };
   } catch (e) {
     return {
@@ -276,6 +309,17 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
   }
 }
 
+async function timedJob(id: TimedJobId): Promise<string> {
+  switch (id) {
+    case "refresh-all-early":
+    case "refresh-all-late": {
+      const result = await refreshAllLeagues();
+      if (!result.ok) throw new Error(result.error ?? "League refresh failed");
+      return `${result.refreshed} leagues refreshed`;
+    }
+  }
+}
+
 /** Each send, told to ignore its own day gate because tempo already applied it. */
 async function runSend(id: SendId): Promise<Response> {
   switch (id) {
@@ -361,6 +405,18 @@ export async function runPulse(
       : `${tempo.window}, already done`;
 
   const jobs = await Promise.all(jobsFor(tier).map((j) => job(j.name, j.work)));
+
+  for (const id of tempo.dueJobs) {
+    let left = DEADLINE_MS - (Date.now() - started);
+    if (left < MIN_SEND_MS) continue;
+    if (!(await claimTimedJob(id))) continue;
+    // Claiming needs Redis, so account for that time before starting work.
+    left = DEADLINE_MS - (Date.now() - started);
+    if (left < MIN_SEND_MS) continue;
+    const result = await job(id, () => timedJob(id), left);
+    jobs.push(result);
+    if (result.ok) await recordTimedJobRun(id);
+  }
 
   // Sends run after the refresh on purpose: an email built from numbers this
   // run just pulled is the whole point of pulling them.

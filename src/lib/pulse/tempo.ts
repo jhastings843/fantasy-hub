@@ -21,6 +21,8 @@ export type PulseTier = "live" | "hourly" | "overnight" | "idle";
 /** The emails, by the moment each one belongs to. */
 export type SendId = "faab" | "midweek" | "thursday" | "sunday" | "alarm";
 
+export type TimedJobId = "refresh-all-early" | "refresh-all-late";
+
 export interface EtClock {
   /** 0 = Sunday. */
   day: number;
@@ -37,6 +39,7 @@ export interface Tempo {
   et: EtClock;
   /** Sends whose time has passed today. The send log decides if they go. */
   dueSends: SendId[];
+  dueJobs: TimedJobId[];
 }
 
 export interface SendDays {
@@ -48,6 +51,7 @@ export interface SendDays {
 
 const SUN = 0;
 const MON = 1;
+const WED = 3;
 const THU = 4;
 
 /**
@@ -132,6 +136,13 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
   ];
 }
 
+function jobTimes(): { id: TimedJobId; day: number; at: number }[] {
+  return [
+    { id: "refresh-all-early", day: WED, at: 3 * 60 + 30 },
+    { id: "refresh-all-late", day: WED, at: 5 * 60 + 35 },
+  ];
+}
+
 function inWindow(minutes: number, w: { from: number; to: number }): boolean {
   return minutes >= w.from && minutes < w.to;
 }
@@ -174,5 +185,11 @@ export function tempoFor(now: Date, days: SendDays = {}): Tempo {
           .map((s) => s.id)
       : [];
 
-  return { tier, window, et, dueSends };
+  // League activity still matters outside the email season. Keeping jobs due
+  // all day lets a delayed heartbeat catch up after waivers have processed.
+  const dueJobs = jobTimes()
+    .filter((j) => j.day === et.day && minutes >= j.at)
+    .map((j) => j.id);
+
+  return { tier, window, et, dueSends, dueJobs };
 }

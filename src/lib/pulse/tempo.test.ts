@@ -9,6 +9,40 @@ import { tempoFor } from "./tempo";
 /** An ET wall-clock time written as the UTC instant it happens at. */
 const at = (iso: string) => new Date(iso);
 
+describe("tempoFor, timed jobs", () => {
+  it("refreshes after the early Wednesday waivers while the tier is idle", () => {
+    // Wednesday 2026-09-16, 3:30am ET.
+    const tempo = tempoFor(at("2026-09-16T07:30:00Z"));
+    expect(tempo.tier).toBe("idle");
+    expect(tempo.dueJobs).toEqual(["refresh-all-early"]);
+  });
+
+  it("does not refresh before its time", () => {
+    // Wednesday 2026-09-16, 3:15am ET.
+    expect(tempoFor(at("2026-09-16T07:15:00Z")).dueJobs).toEqual([]);
+  });
+
+  it("keeps both jobs due after the late Wednesday waivers", () => {
+    // Wednesday 2026-09-16, 5:35am ET.
+    const tempo = tempoFor(at("2026-09-16T09:35:00Z"));
+    expect(tempo.tier).toBe("idle");
+    expect(tempo.dueJobs).toEqual(["refresh-all-early", "refresh-all-late"]);
+    // Wednesday 11:59pm ET is already Thursday in UTC.
+    expect(tempoFor(at("2026-09-17T03:59:00Z")).dueJobs).toEqual(tempo.dueJobs);
+    expect(tempoFor(at("2026-09-17T04:00:00Z")).dueJobs).toEqual([]);
+  });
+
+  it("does not refresh on Tuesday", () => {
+    // Tuesday 2026-09-15, 3:30am ET.
+    expect(tempoFor(at("2026-09-15T07:30:00Z")).dueJobs).toEqual([]);
+  });
+
+  it("refreshes in March outside the email season", () => {
+    // Wednesday 2027-03-10, 3:30am ET. Standard time is still UTC-5.
+    expect(tempoFor(at("2027-03-10T08:30:00Z")).dueJobs).toEqual(["refresh-all-early"]);
+  });
+});
+
 describe("tempoFor, tiers", () => {
   it("is live through Sunday afternoon", () => {
     // Sunday 2026-09-13, 12:15pm ET.
