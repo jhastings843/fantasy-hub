@@ -34,22 +34,28 @@ jobs:
           FORMAT: ${{ inputs.format || 'all' }}
           FORCE: ${{ inputs.force }}
         run: |
-          url="$APP_URL/api/waiver-research?format=$FORMAT"
-          if [ -n "$FORCE" ]; then url="$url&force=$FORCE"; fi
-
-          status=$(curl -sS -X POST -o response.json -w '%{http_code}' \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            --max-time 320 \
-            "$url")
-
-          echo "HTTP $status"
-          jq -r '
-            "week: \(.week)",
-            (.results | to_entries[] | "\(.key): " + (if .value.ok then "\(.value.targets) targets" + (if .value.cached then " (cached)" else "" end) + " | " + (.value.top | join(", ")) else "FAILED: " + .value.error end))
-          ' response.json | tee -a "$GITHUB_STEP_SUMMARY"
-
-          if [ "$status" != "200" ]; then
-            echo "::error::waiver research returned HTTP $status"
-            head -c 2000 response.json
-            exit 1
-          fi
+          # One format per request: a search turn runs a couple of minutes
+          # and the function has a five-minute ceiling, so the two formats
+          # cannot share one call.
+          if [ "$FORMAT" = "all" ]; then formats="dynasty redraft"; else formats="$FORMAT"; fi
+          failed=0
+          for f in $formats; do
+            url="$APP_URL/api/waiver-research?format=$f"
+            if [ -n "$FORCE" ]; then url="$url&force=$FORCE"; fi
+            status=$(curl -sS -X POST -o "response-$f.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              --max-time 320 \
+              "$url")
+            echo "$f: HTTP $status"
+            if [ "$status" = "200" ]; then
+              jq -r '
+                "week: \(.week)",
+                (.results | to_entries[] | "\(.key): " + (if .value.ok then "\(.value.targets) targets" + (if .value.cached then " (cached)" else "" end) + " | " + (.value.top | join(", ")) else "FAILED: " + .value.error end))
+              ' "response-$f.json" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::$f research returned HTTP $status"
+              head -c 1000 "response-$f.json"; echo
+              failed=1
+            fi
+          done
+          exit $failed

@@ -17,6 +17,9 @@ import { redis } from "@/lib/redis/client";
 
 const MODEL = "claude-opus-5";
 
+/** Searches per format. Six covers the columns named in the prompt. */
+const SEARCH_USES = 6;
+
 /** Long enough that a Tuesday morning run still serves Wednesday's page. */
 const RESEARCH_TTL = 5 * 24 * 60 * 60;
 
@@ -101,20 +104,25 @@ export async function researchWaiverTargets(
   ];
 
   // A long search turn can pause; resume until it ends on its own.
+  // Medium effort and a search cap keep one format inside a five-minute
+  // function budget. The columns are short and the list is twenty names;
+  // this is reading, not reasoning.
   let response = await client.messages.create({
     model: MODEL,
-    max_tokens: 16000,
+    max_tokens: 12000,
+    output_config: { effort: "medium" },
     system:
       "You are a fantasy football waiver wire analyst. You read this week's published waiver columns and community threads and report their consensus faithfully, with the disagreements kept visible. You never invent a player, a role change, or a bid.",
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 10 }],
+    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
     messages,
   });
   for (let resumes = 0; response.stop_reason === "pause_turn" && resumes < 4; resumes++) {
     messages.push({ role: "assistant", content: response.content });
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 16000,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 10 }],
+      max_tokens: 12000,
+      output_config: { effort: "medium" },
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
       messages,
     });
   }
@@ -131,7 +139,7 @@ export async function researchWaiverTargets(
   const parsed = await client.messages.parse({
     model: MODEL,
     max_tokens: 8000,
-    output_config: { format: zodOutputFormat(ResearchSchema) },
+    output_config: { effort: "low", format: zodOutputFormat(ResearchSchema) },
     messages: [
       {
         role: "user",
