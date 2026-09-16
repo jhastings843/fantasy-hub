@@ -191,10 +191,15 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     source = { label: lab.title, fresh: true, note: null };
   } else {
     const format = profile.type === "dynasty" ? "dynasty" : "redraft";
-    const [trending, research] = await Promise.all([
+    const [trending, ownResearch, redraftResearch] = await Promise.all([
       getTrendingAdds(100).catch(() => []),
       readWaiverResearch(season, nflWeek, format),
+      format === "dynasty" ? readWaiverResearch(season, nflWeek, "redraft") : Promise.resolve(null),
     ]);
+    // The redraft consensus is a fair second-best for dynasty when the
+    // dynasty pass has not run: the role changes are the same players.
+    const research = ownResearch ?? redraftResearch;
+    const borrowed = !ownResearch && !!redraftResearch;
 
     // The week's web consensus, matched to Sleeper ids by name, position and
     // team. Anyone owned in this league or at a position it cannot start is
@@ -234,7 +239,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     freeAgents = mergeWire(researchPlayers, trendingPlayers);
 
     const researched = research
-      ? ` This week's waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and lead the list; Sleeper's most-added players fill in behind them.`
+      ? ` This week's ${borrowed ? "redraft " : ""}waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and lead the list; Sleeper's most-added players fill in behind them.`
       : " No web research has run for this week yet, so the list is Sleeper's most-added players, filtered by who actually played.";
     source = {
       label: research ? "Web consensus and Sleeper trending adds" : "Sleeper trending adds",

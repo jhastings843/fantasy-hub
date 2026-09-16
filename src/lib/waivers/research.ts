@@ -75,14 +75,14 @@ export async function readWaiverResearch(
 
 function researchPrompt(format: ResearchFormat, season: string, week: number): string {
   const played = week - 1;
-  const common = `It is the ${season} NFL season. Week ${played} has just been played and week ${week} waivers process on Wednesday. Search this week's waiver wire columns and threads, then produce the consensus list of the best ${format === "dynasty" ? 25 : 20} waiver claims. For every player give: full name, NFL team, position, the role or usage change behind the recommendation (snaps, routes, targets, carries, a starter's injury, a depth chart promotion), a tier, and the consensus FAAB bid as a percent of the ORIGINAL budget with the range the sources give. Only include players likely to be on waivers in a typical 12-team league (rostered under about 60 percent). Skip anyone whose case is one touchdown on the same snap count. Name your sources with URLs.
+  const common = `It is the ${season} NFL season. Week ${played} has just been played and week ${week} waivers process on Wednesday. Search this week's waiver wire columns and threads, then produce the consensus list of the best 20 waiver claims. For every player give: full name, NFL team, position, the role or usage change behind the recommendation (snaps, routes, targets, carries, a starter's injury, a depth chart promotion), a tier, and the consensus FAAB bid as a percent of the ORIGINAL budget with the range the sources give. Only include players likely to be on waivers in a typical 12-team league (rostered under about 60 percent). Skip anyone whose case is one touchdown on the same snap count. Name your sources with URLs.
 
 Write every player as its own block with these labelled lines: Name, Team, Position, Tier, FAAB (the bid as a percent of the original budget, with the range the sources give; convert dollar bids against that source's budget, so $12 of $100 is 12% and $150 of $1000 is 15%; if no source gives a bid, write "FAAB: none"), Why (one or two sentences on the role change), Sources. The FAAB line matters most: search the columns that publish bids (FantasyPros gives three bid levels, RotoBaller publishes a FAAB bidding column) and quote them.`;
 
   if (format === "dynasty") {
     return `${common}
 
-League shape: 12-team dynasty, superflex, full PPR, $1000 FAAB for the season. Sources to check: Dynasty Nerds waiver wire week ${week}, Dynasty Daddy waiver wire, FantasyPros dynasty waiver wire, r/DynastyFF waiver threads, plus the redraft columns for role changes. Include rookies and young players with rising usage and say whether each player matters more to a contender or a rebuilder. Tiers: winner (young player into an every-down or high-target role), starter (starts every week the rest of the year), multiweek (starts for 3 to 6 weeks), streamer (one week at QB, TE, K or DEF), filler (enters a lineup this week only), stash (developmental, no lineup path yet).`;
+League shape: 12-team dynasty, superflex, full PPR, $1000 FAAB for the season. Sources to check: Dynasty Nerds waiver wire week ${week}, Dynasty Daddy waiver wire, FantasyPros dynasty waiver wire, r/DynastyFF waiver threads, plus the redraft columns (FantasyPros, RotoBaller) for role changes. If dynasty-specific columns for this week are thin, build the list from the redraft columns and judge the dynasty angle yourself; never return an empty list when the redraft columns name players. Include rookies and young players with rising usage and say whether each player matters more to a contender or a rebuilder. Tiers: winner (young player into an every-down or high-target role), starter (starts every week the rest of the year), multiweek (starts for 3 to 6 weeks), streamer (one week at QB, TE, K or DEF), filler (enters a lineup this week only), stash (developmental, no lineup path yet).`;
   }
   return `${common}
 
@@ -169,8 +169,20 @@ export async function researchWaiverTargets(
       "The text below is fantasy football waiver research. List every player it recommends claiming, one entry each, with the tier that best fits the description and the FAAB percent if one is stated (null otherwise). Do not return an empty list if the text names any players.",
     );
   }
-  if (!out) throw new Error("Waiver research could not be parsed");
-  if (out.targets.length === 0) throw new Error("Waiver research named no players");
+  if (!out || out.targets.length === 0) {
+    // Keep what the model wrote so the failure can be read back, then fail
+    // loudly: an empty list must never be cached as this week's answer.
+    try {
+      await redis.set(
+        `${KEY(season, week, format)}:debug`,
+        { stopReason: response.stop_reason, prose: prose.slice(0, 6000), at: new Date().toISOString() },
+        { ex: 2 * 24 * 60 * 60 },
+      );
+    } catch {
+      /* the error below is the one that matters */
+    }
+    throw new Error(out ? "Waiver research named no players" : "Waiver research could not be parsed");
+  }
 
   const result: WaiverResearch = {
     season,
