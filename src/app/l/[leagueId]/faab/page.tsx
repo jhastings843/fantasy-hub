@@ -582,6 +582,75 @@ export default async function FaabPage({
                 </li>
               ))}
             </ul>
+            <div className="mt-4 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                If one starter sits
+              </div>
+              {report.me.fragility.worstOneOut ? (
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+                  Lose {report.me.fragility.worstOneOut.name} and you project{" "}
+                  <span
+                    className={`font-semibold tabular-nums ${
+                      report.me.fragility.fragile
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-zinc-800 dark:text-zinc-200"
+                    }`}
+                  >
+                    {report.me.fragility.worstOneOut.total.toFixed(1)}
+                  </span>
+                  . The low score usually lands below{" "}
+                  {report.risk.chopLineRange[1].toFixed(0)}.
+                </p>
+              ) : null}
+              {report.me.fragility.shakyStarters.length > 0 ? (
+                <p className="mt-1.5 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                  Tagged: {report.me.fragility.shakyStarters.join(", ")}
+                </p>
+              ) : null}
+              {report.me.fragility.thinSlots.length > 0 ? (
+                <ul className="mt-1.5 flex flex-col gap-1">
+                  {report.me.fragility.thinSlots.slice(0, 3).map((t) => (
+                    <li key={t} className="text-xs text-zinc-600 dark:text-zinc-400">
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            {report.me.lastWeek ? (
+              <div className="mt-4 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                  Last week
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-3">
+                  <Stat
+                    label="Scored"
+                    value={report.me.lastWeek.score.toFixed(1)}
+                    hint={`Week ${report.me.lastWeek.week}`}
+                  />
+                  <Stat
+                    label="Finished"
+                    value={`${report.me.lastWeek.rankFromBottom} of ${report.me.lastWeek.teams}`}
+                    hint="From the bottom"
+                    accent={
+                      report.me.lastWeek.rankFromBottom <= 3
+                        ? "text-rose-600 dark:text-rose-400"
+                        : undefined
+                    }
+                  />
+                  <Stat
+                    label="Clear of chop"
+                    value={report.me.lastWeek.margin.toFixed(1)}
+                    hint={`Low was ${report.me.lastWeek.lowest.toFixed(1)}`}
+                    accent={
+                      report.me.lastWeek.margin < 10
+                        ? "text-rose-600 dark:text-rose-400"
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+            ) : null}
             {report.me.byeAlerts.length > 0 ? (
               <div className="mt-4 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">

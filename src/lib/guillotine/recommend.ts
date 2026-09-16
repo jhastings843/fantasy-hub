@@ -37,6 +37,9 @@ const URGENCY: Record<Posture, number> = {
 /** Byes this many weeks out are worth acting on now, not later. */
 const BYE_HORIZON = 3;
 
+/** A bid under this share of the market number is price enforcement, not a plan to win. */
+const PRICE_ENFORCEMENT_RATIO = 0.5;
+
 /** Never show more than this many chains; a longer card is not a plan. */
 const MAX_CHAINS = 3;
 
@@ -252,11 +255,14 @@ export function buildBidCard(input: RecommendInput): BidCard {
     .filter((t) => t.weekGain > 0 || t.tier === "championship")
     .sort((a, b) => b.weekGain - a.weekGain || b.player.rosPoints - a.player.rosPoints);
 
-  // Group into chains by the slot each target would fill, so alternatives for
-  // the same hole sit together and share a drop.
+  // Group into chains by the starter each target would push out, so every
+  // alternative for the same hole sits in one chain and shares a drop. The
+  // first version grouped by slot instead, and an RB and a WR who both
+  // replaced the same weak flex became two chains that split the weekly cap
+  // between them, so the top target got half the money it deserved.
   const byNeed = new Map<string, BidTarget[]>();
   for (const target of scored) {
-    const key = target.slot ?? target.player.position;
+    const key = target.displaces?.playerId ?? target.slot ?? target.player.position;
     const list = byNeed.get(key) ?? [];
     if (list.length < MAX_TARGETS_PER_CHAIN) list.push(target);
     byNeed.set(key, list);
@@ -279,10 +285,10 @@ export function buildBidCard(input: RecommendInput): BidCard {
   let chains: BidChain[] = [...byNeed.entries()]
     .sort((a, b) => (b[1][0]?.weekGain ?? 0) - (a[1][0]?.weekGain ?? 0))
     .slice(0, MAX_CHAINS)
-    .map(([need, targets], index) => {
+    .map(([, targets], index) => {
       const drop = droppable[index] ?? null;
       return {
-        need: needLabel(need, targets[0], emptySlots),
+        need: needLabel(targets, emptySlots),
         drop: drop ? { playerId: drop.playerId, name: drop.name } : null,
         targets,
       };
@@ -340,14 +346,16 @@ export function buildBidCard(input: RecommendInput): BidCard {
   };
 }
 
-function needLabel(
-  slotOrPosition: string,
-  top: BidTarget | undefined,
-  emptySlots: Set<string>,
-): string {
-  if (!top) return slotOrPosition;
+function needLabel(targets: BidTarget[], emptySlots: Set<string>): string {
+  const top = targets[0];
+  if (!top) return "";
+  const slotOrPosition = top.slot ?? top.player.position;
   if (top.displaces) {
-    return `${slotOrPosition} over ${top.displaces.name} (${top.displaces.points.toFixed(1)})`;
+    // A chain can hold an RB and a WR who both replace the same flex starter,
+    // so name the hole by who leaves rather than by one position.
+    const positions = [...new Set(targets.map((t) => t.player.position))];
+    const who = positions.length === 1 ? positions[0] : positions.join("/");
+    return `${who} over ${top.displaces.name} (${top.displaces.points.toFixed(1)})`;
   }
   // "Currently empty" used to be the catch-all here, which quietly lied: a
   // player who simply does not crack the lineup was announced as filling a hole
@@ -369,9 +377,16 @@ function summarize(
   }
 
   const top = chains[0]?.targets[0];
-  const lead = top
-    ? `${top.player.name} at $${top.bid} is the one that matters`
-    : "See the chains below";
+  const count = `${chains.length} ${chains.length === 1 ? "chain" : "chains"}, at most $${maxSpend} if every claim lands.`;
+  if (!top) return `${count} See the chains below.`;
 
-  return `${chains.length} ${chains.length === 1 ? "chain" : "chains"}, at most $${maxSpend} if every claim lands. ${lead}. ${TIER_MEANING[top?.tier ?? "bandaid"]}`;
+  // A bid well under the market number is a price-enforcing bid: it exists to
+  // make the winner pay more, and it will almost certainly lose. The summary
+  // used to call that "the one that matters", which read as a plan to land
+  // the player. Saying it will lose is the honest version.
+  if (top.bid < top.marketExpected * PRICE_ENFORCEMENT_RATIO) {
+    return `${count} ${top.player.name} at $${top.bid} will almost certainly lose against a market near $${Math.round(top.marketExpected)}. That is the point of a ${posture} week: make the winner pay, keep your money. ${TIER_MEANING[top.tier]}`;
+  }
+
+  return `${count} ${top.player.name} at $${top.bid} is the one that matters. ${TIER_MEANING[top.tier]}`;
 }

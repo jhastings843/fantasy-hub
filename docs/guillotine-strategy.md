@@ -197,3 +197,41 @@ hole, and a faster clock: pace on eliminations remaining, never on the date.
 Budget size changes resolution, not economics. $1 is 0.1% of $1000 but a full
 1% of $100, so convert every published dollar figure to a percentage before
 applying it. Dah Chopped is $1000, so RotoWire's figures apply as written.
+
+## What last week's score is worth
+
+Researched 2026-09-15, after a week where this team scored 59.7 against a
+109 projection, finished second to last, and the report called it safe.
+
+The instinct is to shrink the projection toward the scoreboard. The evidence
+says not to, or barely:
+
+- Weekly projections already update on snaps, targets, carries, injuries and
+  inactives (RotoWire, which is Sleeper's source). Adding the raw score on top
+  double counts what was real about the week.
+- A trailing five-game fantasy average predicted the next week worse than a
+  current projection did (MAE 5.54 vs 4.96 over 6,953 player-weeks). If five
+  games lose to the projection, one game gets almost no weight.
+- Week 1 regresses hard: players who opened with 25+ points averaged 16 the
+  rest of the way. Direction is informative, magnitude is not.
+- The only fitted blend in the literature (Footballguys) gave four games of
+  production about 21% against projection and ADP. A shrinkage that gives one
+  game 25% is several times too aggressive.
+- Fantasy Life's guillotine guidance: do not panic on normal September
+  weakness; judge the roster forward against the field.
+
+So the engine shows last week's finish and does not model it. What does move
+the posture is forward-looking lineup quality, which every source endorses
+and none of the raw-score methods capture:
+
+- A starter left in the submitted lineup who will not play, or an empty slot.
+  Free to fix, so it is a caveat, not a posture change.
+- The one-absence floor: the best lineup with its most important starter
+  removed. If that lands inside the range where the low score falls, a green
+  week becomes yellow: buy cover before the week you need it.
+- Two or more starters with a questionable or doubtful tag. Doubtful is
+  simulated as a zero, per the "zero for likely inactives" rule above.
+- Thin slots: where the bench replacement gives up six or more points.
+
+Points left on the bench in hindsight are not used as a predictor; the
+sources are explicit that a surprise bench eruption is another noisy outcome.

@@ -4,6 +4,7 @@ import type {
   SleeperDraft,
   SleeperDraftPick,
   SleeperLeague,
+  SleeperMatchup,
   SleeperPlayer,
   SleeperPlayersById,
   SleeperRoster,
@@ -26,6 +27,7 @@ const KEY = {
   userLeagues: (userId: string, season: string) =>
     `sleeper:v1:user:${userId}:leagues:nfl:${season}`,
   nflState: () => `sleeper:v1:state:nfl`,
+  matchups: (id: string, week: number) => `sleeper:v1:league:${id}:matchups:w${week}`,
 };
 
 // TTLs are aggressive on anything that responds to live league
@@ -53,6 +55,9 @@ const TTL = {
   // The NFL week only turns over once a week, but a stale week number would
   // point every projection lookup at the wrong slate, so this stays short.
   nflState: 30 * 60,
+  // Only completed weeks are read, and those change only on a stat
+  // correction, which the NFL issues within a day or two of the game.
+  matchups: 60 * 60,
 };
 
 async function sleeperFetch<T>(path: string): Promise<T> {
@@ -206,5 +211,15 @@ export interface SleeperNflState {
 export function getNflState(): Promise<SleeperNflState> {
   return cached(KEY.nflState(), TTL.nflState, () =>
     sleeperFetch<SleeperNflState>(`/state/nfl`),
+  );
+}
+
+/** Every roster's score for one week. Sleeper returns [] for a week not yet played. */
+export function getLeagueMatchups(
+  leagueId: string,
+  week: number,
+): Promise<SleeperMatchup[]> {
+  return cached(KEY.matchups(leagueId, week), TTL.matchups, () =>
+    sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`),
   );
 }

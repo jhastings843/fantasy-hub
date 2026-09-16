@@ -209,6 +209,16 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
               : "Your floor clears it, so only an unusual week puts you in danger."
           }
         </div>
+        ${
+          report.me.fragility.worstOneOut
+            ? `<div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.body};padding-top:8px;">If one starter sits: lose ${escapeHtml(report.me.fragility.worstOneOut.name)} and you project <strong style="color:${report.me.fragility.fragile ? POSTURE_COLOR.red.ink : PALETTE.ink};">${report.me.fragility.worstOneOut.total.toFixed(1)}</strong>.${report.me.fragility.shakyStarters.length > 0 ? ` Tagged: ${escapeHtml(report.me.fragility.shakyStarters.join(", "))}.` : ""}</div>`
+            : ""
+        }
+        ${
+          report.me.lastWeek
+            ? `<div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:8px;">Last week: <strong style="color:${report.me.lastWeek.margin < 10 ? POSTURE_COLOR.red.ink : PALETTE.ink};">${report.me.lastWeek.score.toFixed(1)}</strong>, ${report.me.lastWeek.rankFromBottom} of ${report.me.lastWeek.teams} from the bottom, ${report.me.lastWeek.margin.toFixed(1)} clear of the low score.</div>`
+            : ""
+        }
       </td>
     </tr>
   </table>`;

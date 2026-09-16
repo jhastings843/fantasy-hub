@@ -195,3 +195,27 @@ describe("toSimTeam", () => {
     expect(sim.starters.reduce((t, s) => t + s.points, 0)).toBeCloseTo(82, 5);
   });
 });
+
+describe("last week in the posture detail", () => {
+  const field = [team(1, 13, true), ...Array.from({ length: 12 }, (_, i) => team(i + 2, 13))];
+
+  it("names last week's finish without moving the number", () => {
+    const r = simulateChop(field, { simulations: 2000 });
+    const call = callPosture(r, {
+      week: 1,
+      score: 59.7,
+      rankFromBottom: 2,
+      teams: 16,
+      lowest: 52,
+      margin: 7.7,
+    });
+    expect(call.detail).toContain("Last week you scored 59.7");
+    expect(call.detail).toContain("2nd lowest of 16");
+    expect(r.teams.find((t) => t.isMine)!.projected).toBeCloseTo(13 * 8);
+  });
+
+  it("says nothing about last week before one has been played", () => {
+    const call = callPosture(simulateChop(field, { simulations: 2000 }), null);
+    expect(call.detail).not.toContain("Last week");
+  });
+});

@@ -326,3 +326,28 @@ describe("buildBidCard", () => {
     expect(card.chains.length).toBeLessThanOrEqual(3);
   });
 });
+
+describe("summary honesty", () => {
+  it("says a price-enforcing bid will lose instead of calling it the one that matters", () => {
+    const budget = planBudget({
+      budget: 1000,
+      remaining: 1000,
+      teamsAlive: 15,
+      totalTeams: 16,
+      posture: "green",
+      rivalRemaining: Array(14).fill(1000),
+    });
+    const market = buildMarket(1000, budget.phase, []);
+    const star = player("star", "RB", 22, { rosPoints: 22, fromChoppedRoster: true });
+    const card = buildBidCard({
+      ...input({ budget, market, posture: "green" }),
+      candidates: [star],
+      leaguePlayers: [{ position: "RB", rosPoints: 22 }],
+    });
+    const top = card.chains[0]?.targets[0];
+    expect(top).toBeDefined();
+    expect(top!.bid).toBeLessThan(top!.marketExpected / 2);
+    expect(card.summary).toContain("will almost certainly lose");
+    expect(card.summary).not.toContain("the one that matters");
+  });
+});

@@ -10,7 +10,9 @@ import { profileFromSleeper } from "@/lib/league/detect";
 import { planBudget } from "./budget";
 import { seasonOutlook } from "./outlook";
 import { callPosture, simulateChop, toSimTeam, type SimTeam } from "./chop-line";
-import { readLeagueState, seasonBids, writeSnapshot } from "./league-state";
+import { readLeagueState, seasonBids, seasonResults, writeSnapshot } from "./league-state";
+import { lastWeekFor } from "./results";
+import { assessFragility, submittedLineupNote, type Fragility } from "./fragility";
 import { buildMarket, type ObservedBid, type Tier } from "./market";
 import { getByeWeeks, getSeasonRates, getWeekProjections } from "./projections";
 import { buildBidCard, finalFourBars } from "./recommend";
@@ -33,8 +35,25 @@ import type { PoolPlayer, Wallet, WeeklyFaabReport } from "./types";
  */
 const POOL_PER_POSITION = 30;
 
-/** Sleeper statuses that mean the player will not take a snap this week. */
-const UNAVAILABLE = new Set(["Out", "IR", "NA", "PUP", "Sus", "Suspended", "DNR"]);
+/**
+ * Sleeper statuses that mean the player will not take a snap this week.
+ * Doubtful is in the list on purpose: the strategy doc's conservative
+ * projection is "zero for likely inactives", and doubtful players sit out far
+ * more often than they play.
+ */
+const UNAVAILABLE = new Set(["Out", "IR", "NA", "PUP", "Sus", "Suspended", "DNR", "Doubtful"]);
+
+const EMPTY_FRAGILITY: Fragility = {
+  bestTotal: 0,
+  submittedTotal: null,
+  submittedGap: 0,
+  submittedHoles: [],
+  shakyStarters: [],
+  worstOneOut: null,
+  thinSlots: [],
+  fragile: false,
+  reasons: [],
+};
 
 function fallbackReport(
   state: WeeklyFaabReport["state"],
@@ -76,6 +95,8 @@ function fallbackReport(
       starters: [],
       weakSlots: [],
       byeAlerts: [],
+      lastWeek: null,
+      fragility: EMPTY_FRAGILITY,
     },
     season: {
       spent: 0,
@@ -178,11 +199,12 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     );
   }
 
-  const [weekProjections, seasonRates, byes, state] = await Promise.all([
+  const [weekProjections, seasonRates, byes, state, results] = await Promise.all([
     getWeekProjections(leagueId, profile.season, week, scoring),
     getSeasonRates(leagueId, profile.season, scoring),
     getByeWeeks(leagueId, profile.season, week, scoring),
     readLeagueState(leagueId, week, rosters, budgetTotal),
+    seasonResults(leagueId, week - 1),
   ]);
 
   if (Object.keys(weekProjections).length === 0) {
@@ -235,11 +257,36 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
       // this out: Josh Jacobs carried it with no week-1 stat line at all.
       points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints,
     }));
-    return toSimTeam(rosterId, teamName(rosterId), rosterId === myRoster.roster_id, players, profile.rosterPositions);
+    return toSimTeam(
+      rosterId,
+      teamName(rosterId),
+      rosterId === myRoster.roster_id,
+      players,
+      profile.rosterPositions,
+    );
   });
 
+  const lastWeek = lastWeekFor(results, myRoster.roster_id);
   const risk = simulateChop(simTeams);
-  const posture = callPosture(risk);
+
+  // Forward-looking: what one absence does to my roster, and whether the
+  // lineup as set on Sleeper has a hole in it. Uses the same zeroing rule as
+  // the simulation, so a ruled-out starter counts for nothing in both.
+  const myPlayersForFragility = poolFor(myRoster.players ?? []).map((p) => ({
+    playerId: p.playerId,
+    position: p.position,
+    points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints,
+    name: p.name,
+    injuryStatus: p.injuryStatus,
+  }));
+  const fragility = assessFragility({
+    players: myPlayersForFragility,
+    submittedStarters: myRoster.starters ?? [],
+    rosterPositions: profile.rosterPositions,
+    chopLineRange: risk.chopLineRange,
+  });
+
+  const posture = callPosture(risk, lastWeek, fragility);
 
   // --- Budget ---
 
@@ -347,9 +394,16 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     .map((p) => `${p.name} is on bye in week ${p.byeWeek}`);
 
   const caveats = [...state.caveats];
+  const lineupNote = submittedLineupNote(fragility);
+  if (lineupNote) caveats.unshift(lineupNote);
   for (const name of card.sharedDisplacement) {
     caveats.push(
       `Two of these groups would both replace ${name}. Winning both is legal, but the second upgrade is worth less than its stated gain, because the first already took that slot.`,
+    );
+  }
+  if (results.length === 0 && week > 1) {
+    caveats.push(
+      `Sleeper returned no scores for the completed weeks, so last week's finish cannot be shown.`,
     );
   }
   if (market.history.length === 0 && week > 2) {
@@ -391,6 +445,8 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
         .slice(0, 2)
         .map((s) => `${s.slot} ${s.name} (${s.points.toFixed(1)})`),
       byeAlerts,
+      lastWeek,
+      fragility,
     },
     budget,
     season,

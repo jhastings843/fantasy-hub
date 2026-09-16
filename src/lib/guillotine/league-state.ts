@@ -1,7 +1,9 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
 import { cached } from "@/lib/redis/cached";
+import { getLeagueMatchups } from "@/lib/sleeper/client";
 import type { SleeperRoster } from "@/lib/sleeper/types";
+import type { WeekResult } from "./results";
 import {
   aliveFromRosters,
   choppedSince,
@@ -135,6 +137,35 @@ export async function seasonBids(leagueId: string, throughWeek: number): Promise
     weeks.map(async (week) => winningBidsFrom(await getWeekTransactions(leagueId, week), week)),
   );
   return perWeek.flat();
+}
+
+/**
+ * Every completed week's scores, one call per week. A week Sleeper has no
+ * scores for (not yet played, or a fetch failure) is left out rather than
+ * recorded as zeros, so a bad fetch cannot read as a league-wide collapse.
+ */
+export async function seasonResults(
+  leagueId: string,
+  throughWeek: number,
+): Promise<WeekResult[]> {
+  const weeks = Array.from({ length: Math.max(0, throughWeek) }, (_, i) => i + 1);
+  const perWeek = await Promise.all(
+    weeks.map(async (week): Promise<WeekResult | null> => {
+      try {
+        const matchups = await getLeagueMatchups(leagueId, week);
+        const scores = matchups
+          .filter((m) => typeof m.points === "number")
+          .map((m) => ({ rosterId: m.roster_id, points: m.points }));
+        // A week where every roster is at zero has not been played. That is
+        // what Sleeper returns for a future week that already has a schedule.
+        if (scores.length === 0 || scores.every((s) => s.points === 0)) return null;
+        return { week, scores };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return perWeek.filter((r): r is WeekResult => r !== null);
 }
 
 export { snapshotFrom, aliveFromRosters } from "./roster-diff";

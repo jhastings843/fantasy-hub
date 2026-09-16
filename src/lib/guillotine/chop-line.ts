@@ -14,6 +14,8 @@
 // hold your money and 19% means spend it.
 
 import { bestLineup, type LineupPlayer } from "./lineup";
+import { describeLastWeek, type LastWeek } from "./results";
+import type { Fragility } from "./fragility";
 
 /**
  * How much a player's weekly score bounces around his projection, as a share
@@ -213,7 +215,11 @@ export interface PostureCall {
  * average with four. A team carrying twice its share of the risk is in trouble
  * whether that is 12% in September or 50% in December.
  */
-export function callPosture(result: ChopLineResult): PostureCall {
+export function callPosture(
+  result: ChopLineResult,
+  lastWeek: LastWeek | null = null,
+  fragility: Fragility | null = null,
+): PostureCall {
   const risk = result.myChopProbability;
   const baseline = result.baselineRisk;
   const margin = result.myMargin;
@@ -228,7 +234,43 @@ export function callPosture(result: ChopLineResult): PostureCall {
 
   const ratio = baseline > 0 ? risk / baseline : 1;
   const pct = (risk * 100).toFixed(1);
+  const call = escalateForFragility(callFor(result, ratio, pct), pct, fragility);
+  return { ...call, detail: `${call.detail}${scoreboardNote(lastWeek)}` };
+}
 
+/**
+ * A green read that rests on every starter playing is not green. When one
+ * ordinary absence would put the roster inside the chop range, the week is
+ * selective: buy the cheap cover before the week you need it. Fragility never
+ * makes a week red, because red is for danger that is already here.
+ */
+function escalateForFragility(
+  call: PostureCall,
+  pct: string,
+  fragility: Fragility | null,
+): PostureCall {
+  if (!fragility?.fragile) return call;
+  const why = fragility.reasons.join(" ");
+  if (call.posture === "green") {
+    return {
+      posture: "yellow",
+      headline: `Selective. ${pct}% chance you are chopped this week, but only if everyone plays`,
+      detail: `The simulation likes your best lineup, and the roster behind it is thin. ${why} Buy cover for that slot now, while it is cheap.`,
+    };
+  }
+  return { ...call, detail: `${call.detail} ${why}` };
+}
+
+/**
+ * Last week's finish, for context. It does not move the posture: a single
+ * week is mostly noise and the projections already reflect what was real
+ * about it. It is here so a reader can see it next to the forecast.
+ */
+function scoreboardNote(lastWeek: LastWeek | null): string {
+  return lastWeek ? ` ${describeLastWeek(lastWeek)}` : "";
+}
+
+function callFor(result: ChopLineResult, ratio: number, pct: string): PostureCall {
   if (ratio >= 1.6) {
     return {
       posture: "red",

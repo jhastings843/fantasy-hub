@@ -4,6 +4,8 @@ import type { Phase, BudgetPlan } from "./budget";
 import type { ChopLineResult, PostureCall, TeamRisk } from "./chop-line";
 import type { MarketModel, Tier } from "./market";
 import type { SeasonOutlook } from "./outlook";
+import type { LastWeek } from "./results";
+import type { Fragility } from "./fragility";
 
 /** A player with everything the advisor needs to price him. */
 export interface PoolPlayer {
@@ -112,6 +114,10 @@ export interface WeeklyFaabReport {
     starters: { slot: string; name: string; points: number; injuryStatus: string | null }[];
     weakSlots: string[];
     byeAlerts: string[];
+    /** How last week actually went. Null before the first week is played. */
+    lastWeek: LastWeek | null;
+    /** How close the roster is to a bad week, looking forward. */
+    fragility: Fragility;
   };
 
   budget: BudgetPlan;

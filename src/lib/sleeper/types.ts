@@ -99,3 +99,12 @@ export interface SleeperTradedPick {
 }
 
 export type SleeperPlayersById = Record<string, SleeperPlayer>;
+
+/** One roster's line in a week's matchups. Points are the week's actual total. */
+export interface SleeperMatchup {
+  roster_id: number;
+  matchup_id: number | null;
+  points: number;
+  players?: string[] | null;
+  starters?: string[] | null;
+}

@@ -70,6 +70,37 @@ export async function GET(request: Request) {
         report.risk.myMargin == null ? null : Number(report.risk.myMargin.toFixed(1)),
       weakestSlots: report.me.weakSlots,
       byeAlerts: report.me.byeAlerts,
+      fragility: {
+        fragile: report.me.fragility.fragile,
+        reasons: report.me.fragility.reasons,
+        worstOneOut: report.me.fragility.worstOneOut
+          ? {
+              name: report.me.fragility.worstOneOut.name,
+              slot: report.me.fragility.worstOneOut.slot,
+              projectedWithout: Number(report.me.fragility.worstOneOut.total.toFixed(1)),
+            }
+          : null,
+        shakyStarters: report.me.fragility.shakyStarters,
+        thinSlots: report.me.fragility.thinSlots,
+        lineupAsSet:
+          report.me.fragility.submittedTotal == null
+            ? null
+            : {
+                projected: Number(report.me.fragility.submittedTotal.toFixed(1)),
+                underBest: Number(report.me.fragility.submittedGap.toFixed(1)),
+                holes: report.me.fragility.submittedHoles,
+              },
+      },
+      lastWeek: report.me.lastWeek
+        ? {
+            week: report.me.lastWeek.week,
+            score: Number(report.me.lastWeek.score.toFixed(1)),
+            rankFromBottom: report.me.lastWeek.rankFromBottom,
+            teams: report.me.lastWeek.teams,
+            lowest: Number(report.me.lastWeek.lowest.toFixed(1)),
+            marginOverLowest: Number(report.me.lastWeek.margin.toFixed(1)),
+          }
+        : null,
     },
 
     field: {
