@@ -36,7 +36,8 @@ function cand(over: Partial<ClaimCandidate> = {}): ClaimCandidate {
     position: "WR",
     age: 26,
     seasonPositionRank: null,
-    weekGain: 0,
+    weekGain: null,
+    startsThisWeek: false,
     ...over,
   };
 }
@@ -61,6 +62,42 @@ describe("classifyClaim", () => {
     expect(classifyClaim(cand({ seasonPositionRank: 60, weekGain: 3 }), ctx())).toBe("multiweek");
     expect(classifyClaim(cand({ seasonPositionRank: 60, weekGain: 0.8 }), ctx())).toBe("filler");
     expect(classifyClaim(cand({ seasonPositionRank: 60 }), ctx())).toBe("stash");
+  });
+
+  it("calls a rank-only start a filler, because nobody measured the gain", () => {
+    // He cracks the lineup by the solver's ranking, but the projection feed
+    // has no number for one of the two players. That is a start, not a
+    // multiweek starter: two points of gain has to be two points.
+    const c = cand({
+      seasonPositionRank: 60,
+      weekGain: null,
+      startsThisWeek: true,
+      weekSlot: { slot: "FLEX", over: "Denzel Boston", from: 80, to: 70 },
+    });
+    expect(classifyClaim(c, ctx())).toBe("filler");
+    const p = priceClaim(c, ctx());
+    expect(p.reason).toContain("Cracks this week's lineup at FLEX over Denzel Boston");
+    expect(p.reason).toContain("70 against 80");
+    expect(p.reason).not.toContain("Adds");
+  });
+
+  it("says projected points when it has them, and calls them that", () => {
+    const p = priceClaim(cand({ seasonPositionRank: 60, weekGain: 3.2, startsThisWeek: true }), ctx());
+    expect(p.reason).toContain("Adds 3.2 projected points to this week's lineup");
+  });
+
+  it("pays more for a player who starts than one who sits, even without a point figure", () => {
+    const starts = priceClaim(cand({ seasonPositionRank: 60, startsThisWeek: true }), ctx());
+    const sits = priceClaim(cand({ seasonPositionRank: 60, startsThisWeek: false }), ctx());
+    expect(starts.walkAway).toBeGreaterThan(sits.walkAway);
+  });
+
+  it("bids nothing when there is nothing left to spend", () => {
+    const p = priceClaim(cand({ seasonPositionRank: 28, weekGain: 3 }), ctx({ remaining: 0 }));
+    expect(p.bid).toBe(0);
+    expect(p.walkAway).toBe(0);
+    expect(p.reason).toContain("$0");
+    expect(p.reason).not.toContain("expect to lose");
   });
 
   it("prices a defense at a dollar or two, not the QB streamer rate", () => {

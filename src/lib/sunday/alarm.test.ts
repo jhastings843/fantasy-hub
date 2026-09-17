@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lockAlarms } from "./alarm";
+import { lockAlarms, unseenAlarms } from "./alarm";
 
 const pool = {
   pool: "500-entry pool",
@@ -107,5 +107,38 @@ describe("lockAlarms", () => {
       slots: [{ ...slot, player: null }],
     });
     expect(out.map((r) => r.kind)).toEqual(["no-pick", "empty-slot", "line-move"]);
+  });
+});
+
+describe("alarm keys and what counts as new", () => {
+  it("keys a problem by what it is about, not by the words", () => {
+    const [doubtful] = lockAlarms({ pools: [], slots: [{ ...slot, status: "Doubtful" }] });
+    const [out] = lockAlarms({ pools: [], slots: [{ ...slot, status: "Out" }] });
+    expect(doubtful.key).toBe(out.key);
+    expect(doubtful.key).toContain("Rome Odunze");
+  });
+
+  it("keeps two empty slots in the same league apart", () => {
+    const out = lockAlarms({
+      pools: [],
+      slots: [
+        { ...slot, slot: "WR2", player: null },
+        { ...slot, slot: "TE", player: null },
+      ],
+    });
+    expect(new Set(out.map((r) => r.key)).size).toBe(2);
+  });
+
+  it("reports only problems the week's earlier alarm did not cover", () => {
+    const reasons = lockAlarms({
+      pools: [{ ...pool, pick: null, winProb: null }],
+      slots: [{ ...slot, status: "Out" }],
+    });
+    const sentKeys = [reasons[0].key];
+    // The 11:45 alarm went out about the pool. At 12:30 the receiver is ruled
+    // out: that is new information, and the week's one email must not eat it.
+    expect(unseenAlarms(reasons, sentKeys).map((r) => r.kind)).toEqual(["unavailable"]);
+    expect(unseenAlarms(reasons, reasons.map((r) => r.key))).toEqual([]);
+    expect(unseenAlarms(reasons, [])).toHaveLength(2);
   });
 });

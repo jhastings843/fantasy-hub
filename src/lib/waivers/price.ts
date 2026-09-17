@@ -79,14 +79,32 @@ const STREAMER_POSITIONS = new Set(["K", "DEF"]);
  */
 const KICKER_DEFENSE_PRIOR = 0.01;
 
+/** How a claim enters this week's lineup, for the explanation. */
+export interface WeekSlot {
+  slot: string;
+  /** The starter he pushes out, or null when the slot was empty. */
+  over: string | null;
+  /** The displaced starter's rank and his, in whichever ranking the solver used. */
+  from: number | null;
+  to: number | null;
+}
+
 export interface ClaimCandidate {
   playerId: string;
   position: string;
   age: number | null;
   /** "WR54" parsed to 54, when he is on the season list. */
   seasonPositionRank: number | null;
-  /** Points he adds to this week's best lineup. Zero when he does not start. */
-  weekGain: number;
+  /**
+   * Projected points he adds to this week's best lineup, from the weekly
+   * projection feed. Null when the feed has no number for him or for the man
+   * he displaces: a gain nobody measured is not a gain of zero, and it is not
+   * a rank gap dressed as points either.
+   */
+  weekGain: number | null;
+  /** He cracks this week's best lineup by rank, whatever the projections say. */
+  startsThisWeek: boolean;
+  weekSlot?: WeekSlot | null;
   /** Offensive snaps last week, when known. A role shows up here before it shows up in a ranking. */
   lastWeekSnaps?: number | null;
   /** The web consensus tier and bid percent, when this week's research named him. */
@@ -173,23 +191,30 @@ export function classifyClaim(c: ClaimCandidate, ctx: PricingContext): ClaimTier
   return strongerTier(own, c.researchTier);
 }
 
+/** He enters this week's lineup, by measured points or by the solver's rank. */
+function starts(c: ClaimCandidate): boolean {
+  return c.startsThisWeek || (c.weekGain ?? 0) > 0;
+}
+
 function classifyOwn(c: ClaimCandidate, ctx: PricingContext): ClaimTier {
-  if (isStreamerPosition(c, ctx)) return c.weekGain > 0 ? "streamer" : "stash";
+  if (isStreamerPosition(c, ctx)) return starts(c) ? "streamer" : "stash";
 
   const bar = starterBar(c.position, ctx);
   if (c.seasonPositionRank != null && c.seasonPositionRank <= bar * 0.4) return "winner";
   if (c.seasonPositionRank != null && c.seasonPositionRank <= bar) return "starter";
-  if (c.weekGain >= STARTER_GAIN) return "multiweek";
+  // Multiweek money needs a measured gain. A start the feed cannot size is
+  // a start, and a start alone is filler money.
+  if (c.weekGain != null && c.weekGain >= STARTER_GAIN) return "multiweek";
   // No season rank but a full role last week: the ranking has not caught up
   // to the depth chart, which is the usual shape of a real waiver target.
   if (c.seasonPositionRank == null && (c.lastWeekSnaps ?? 0) >= ROLE_SNAPS) return "multiweek";
-  if (c.weekGain > 0) return "filler";
+  if (starts(c)) return "filler";
   return "stash";
 }
 
 function needFactor(c: ClaimCandidate, ctx: PricingContext): number {
-  let f = c.weekGain >= BIG_GAIN ? 1.25 : c.weekGain > 0 ? 1.0 : 0.75;
-  if (ctx.emptySlots > 0 && c.weekGain > 0) f += 0.1;
+  let f = (c.weekGain ?? 0) >= BIG_GAIN ? 1.25 : starts(c) ? 1.0 : 0.75;
+  if (ctx.emptySlots > 0 && starts(c)) f += 0.1;
   return f;
 }
 
@@ -227,7 +252,7 @@ function timelineFactor(c: ClaimCandidate, ctx: PricingContext): number {
   switch (ctx.trajectory) {
     case "contender":
     case "compete":
-      return young ? 1 : c.weekGain > 0 ? 1.2 : 0.6;
+      return young ? 1 : starts(c) ? 1.2 : 0.6;
     case "rebuild":
       return young ? 1.3 : 0.3;
     case "reload":
@@ -279,17 +304,27 @@ export function priceClaim(c: ClaimCandidate, ctx: PricingContext): ClaimPrice {
     urgencyFactor(ctx) *
     timingFactor(ctx) *
     timelineFactor(c, ctx);
-  const ceiling = Math.max(1, Math.min(spendable, Math.round(raw)));
+  // Nothing left means a $0 claim, which Sleeper accepts and which lands
+  // only when nobody else bids. It does not mean a dollar he does not have.
+  const broke = spendable <= 0;
+  const ceiling = broke ? 0 : Math.max(1, Math.min(spendable, Math.round(raw)));
 
   const marketExpected = marketFor(tier, c, ctx);
   const market = unroundBid(marketExpected, ceiling);
   // A long shot is a real gap, not a rounding one: a $1 ceiling against a
   // $1.20 market is not a bid that "will lose".
-  const longShot = marketExpected > ceiling + Math.max(1, ceiling * 0.1);
-  const bid = Math.max(1, Math.min(ceiling, longShot ? ceiling : market));
+  const longShot = !broke && marketExpected > ceiling + Math.max(1, ceiling * 0.1);
+  const bid = broke ? 0 : Math.max(1, Math.min(ceiling, longShot ? ceiling : market));
 
   const why: string[] = [TIER_MEANING[tier]];
-  if (c.weekGain > 0) why.push(`Adds ${c.weekGain.toFixed(1)} to this week's lineup.`);
+  if (c.weekGain != null && c.weekGain > 0) {
+    why.push(`Adds ${c.weekGain.toFixed(1)} projected points to this week's lineup.`);
+  } else if (c.startsThisWeek) {
+    const w = c.weekSlot;
+    const where = w ? ` at ${w.slot}${w.over ? ` over ${w.over}` : ""}` : "";
+    const ranks = w && w.to != null && w.from != null ? ` (ranked ${w.to} against ${w.from})` : "";
+    why.push(`Cracks this week's lineup${where}${ranks}; no projection says by how much.`);
+  }
   const rank = ctx.trending.get(c.playerId);
   if (rank != null && rank <= HEAT_RANKS) why.push(`Top ${rank} most-added on Sleeper today, so the room is bidding.`);
   if (ctx.type === "dynasty" && c.age != null && ctx.trajectory) {
@@ -303,7 +338,9 @@ export function priceClaim(c: ClaimCandidate, ctx: PricingContext): ClaimPrice {
   if (c.researchPercent != null) {
     why.push(`This week's waiver columns put him at about ${c.researchPercent}% of budget.`);
   }
-  if (longShot) {
+  if (broke) {
+    why.push("No FAAB left to spend, so this is a $0 claim: it lands only if nobody else bids.");
+  } else if (longShot) {
     why.push(
       `The room should pay about $${Math.round(marketExpected)}, above what he is worth to you. Bid your ceiling and expect to lose.`,
     );

@@ -24,6 +24,8 @@ export interface SentRecord {
   messageId?: string;
   /** For the alarm, which sends only sometimes: what set it off. */
   note?: string;
+  /** For the alarm: the problems raised so far this week, so a new one can still go out. */
+  keys?: string[];
 }
 
 export async function alreadySent(

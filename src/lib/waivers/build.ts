@@ -21,6 +21,11 @@ import {
 } from "@/lib/sleeper/client";
 import { seasonWinningBids } from "@/lib/sleeper/transactions";
 import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
+import { getWeekProjections, type ProjectionsByPlayer } from "@/lib/guillotine/projections";
+import type { ScoringSettings } from "@/lib/guillotine/scoring";
+import { getSeasonGames } from "@/lib/survivor/odds";
+import { fixtureMap } from "@/lib/nfl/week";
+import { claimGain, type ClaimGain } from "./gain";
 import { isFreshForRun, mergeWire, rankWire, staleNote, usageFrom, type WireCandidate } from "./freshness";
 import { resolveNames, toCandidates } from "@/lib/jingles/resolve";
 import { readWaiverResearch } from "./research";
@@ -109,9 +114,21 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
 
   // What everyone did last week, scored under this league's own settings.
   const lastWeekNum = nflWeek - 1;
-  const stats: StatRows =
-    lastWeekNum >= 1 ? await getWeekStats(season, lastWeekNum).catch((): StatRows => ({})) : {};
-  const scored = scoreRows(stats, league.scoring_settings ?? {});
+  const leagueScoring = (league.scoring_settings ?? {}) as ScoringSettings;
+  // This week's projections under league scoring, the same feed and cache
+  // entry the lineup page reads. Two things come from it that nothing else
+  // in the app can supply: a player's injury status (the player catalog is
+  // slimmed and has none) and a projected point figure to size a claim by.
+  // The schedule is the second signal on who has a game, for the weeks his
+  // list is stale and there is no list to read matchups from.
+  const [stats, projections, games] = await Promise.all([
+    lastWeekNum >= 1 ? getWeekStats(season, lastWeekNum).catch((): StatRows => ({})) : Promise.resolve<StatRows>({}),
+    getWeekProjections(profile.id, season, nflWeek, leagueScoring).catch((): ProjectionsByPlayer => ({})),
+    getSeasonGames(Number(season))
+      .then((s) => s.games.filter((g) => g.week === nflWeek))
+      .catch(() => []),
+  ]);
+  const scored = scoreRows(stats, leagueScoring);
 
   const owned = new Set<string>();
   const startable = startablePositions(profile.rosterPositions);
@@ -121,7 +138,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // start. Read from his own list, and through normalizeTeam on both sides:
   // he writes JAC where Sleeper says JAX, and comparing them raw is what put
   // two Jacksonville players on a phantom bye on 2026-09-09.
-  const playing = new Set<string>();
+  const playing = new Set<string>(fixtureMap(games).keys());
   if (weekly) {
     for (const e of [...Object.values(weekly.positional).flat(), ...weekly.flex]) {
       const t = normalizeTeam(e.team);
@@ -159,7 +176,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       adjustedFlexRank: null,
       opponent: m?.opponent ?? null,
       home: m?.home ?? null,
-      injuryStatus: raw?.injury_status ?? null,
+      injuryStatus: raw?.injury_status ?? projections[id]?.injuryStatus ?? null,
       onBye: isOnBye({
         ranked: pr !== null || fr !== null,
         team: normalizeTeam(raw?.team ?? null),
@@ -310,12 +327,12 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     const researchById = new Map(
       freeAgents.filter((p) => p.research).map((p) => [p.playerId, p.research!]),
     );
-    const candidateFor = (id: string, position: string, weekGain: number): ClaimCandidate => ({
+    const candidateFor = (id: string, position: string, gain: ClaimGain): ClaimCandidate => ({
       playerId: id,
       position,
       age: players[id]?.age ?? null,
       seasonPositionRank: lab.byId[id]?.positionRank ?? null,
-      weekGain,
+      ...gain,
       lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
       researchTier: (researchById.get(id)?.tier as ClaimTier | undefined) ?? null,
       researchPercent: researchById.get(id)?.faabPercent ?? null,
@@ -325,21 +342,19 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     // was worth to the buyer's lineup that week is not recoverable.
     const observed: ObservedClaim[] = bids.map((bid) => {
       const position = players[bid.playerId]?.position ?? "WR";
-      const tier = classifyClaim(candidateFor(bid.playerId, position, 0), { ...base, observed: [] });
+      const tier = classifyClaim(candidateFor(bid.playerId, position, claimGain(null, {})), { ...base, observed: [] });
       return { tier, amount: bid.amount };
     });
     const ctx: PricingContext = { ...base, observed };
 
+    // The gain is projected points from the feed, or unknown; never a rank
+    // gap. The solver's ranking still decides WHETHER he starts.
     for (const t of report.startable) {
-      const gain = Math.max(0, scoreOf(t.player) - (t.displaces ? scoreOf(t.displaces) : 0));
-      t.price = priceClaim(candidateFor(t.player.playerId, t.player.position, gain), ctx);
+      t.price = priceClaim(candidateFor(t.player.playerId, t.player.position, claimGain(t, projections)), ctx);
     }
     for (const t of report.seasonUpgrades) {
-      const starts = report.startable.find((s) => s.player.playerId === t.player.playerId);
-      const gain = starts
-        ? Math.max(0, scoreOf(starts.player) - (starts.displaces ? scoreOf(starts.displaces) : 0))
-        : 0;
-      t.price = priceClaim(candidateFor(t.player.playerId, t.player.position, gain), ctx);
+      const starts = report.startable.find((s) => s.player.playerId === t.player.playerId) ?? null;
+      t.price = priceClaim(candidateFor(t.player.playerId, t.player.position, claimGain(starts, projections)), ctx);
     }
     pacing = pacingFor(ctx);
   }

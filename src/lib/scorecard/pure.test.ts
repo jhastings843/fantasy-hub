@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { perfectLineup, scoreLineup, season, verdict } from "./pure";
+import { finalStarters, perfectLineup, scoreLineup, season, verdict } from "./pure";
 
 const SLOTS = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "BN", "BN"];
 
@@ -104,5 +104,36 @@ describe("season", () => {
     const s = season([]);
     expect(s.weeks).toBe(0);
     expect(s.vsStarted).toBe(0);
+  });
+});
+
+describe("finalStarters", () => {
+  const snapshot = ["qb1", "rb1", "rb2"];
+
+  it("reads what Sleeper says he actually started", () => {
+    const out = finalStarters(
+      [
+        { roster_id: 3, starters: ["qb2", "rb1", "rb3"] },
+        { roster_id: 7, starters: ["qb1", "rb1", "rb2"] },
+      ],
+      3,
+      snapshot,
+    );
+    expect(out).toEqual({ starters: ["qb2", "rb1", "rb3"], source: "sleeper" });
+  });
+
+  it("keeps the Sunday-morning snapshot when his roster is not in the matchups", () => {
+    const out = finalStarters([{ roster_id: 7, starters: ["qb1"] }], 3, snapshot);
+    expect(out).toEqual({ starters: snapshot, source: "snapshot" });
+  });
+
+  it("keeps the snapshot when the record predates roster ids", () => {
+    const out = finalStarters([{ roster_id: 3, starters: ["qb2"] }], null, snapshot);
+    expect(out.source).toBe("snapshot");
+  });
+
+  it("keeps the snapshot when Sleeper has no starters for the week", () => {
+    const out = finalStarters([{ roster_id: 3, starters: null }], 3, snapshot);
+    expect(out.source).toBe("snapshot");
   });
 });

@@ -19,6 +19,12 @@ export type AlarmKind = "no-pick" | "empty-slot" | "unavailable" | "line-move";
 export interface AlarmReason {
   kind: AlarmKind;
   text: string;
+  /**
+   * What the problem is about, stable across its wording. A receiver who is
+   * doubtful at 11:45 and out at 12:30 is one problem, not two; a second
+   * starter ruled out at 12:30 is a new one.
+   */
+  key: string;
 }
 
 export interface PoolAlarmInput {
@@ -68,6 +74,7 @@ export function lockAlarms(input: {
     if (!p.pick) {
       out.push({
         kind: "no-pick",
+        key: `no-pick:${p.pool}`,
         text: `No pick logged in the ${p.pool}. A pool with no pick is a strike.`,
       });
       continue;
@@ -80,6 +87,7 @@ export function lockAlarms(input: {
     if (fall > drop) {
       out.push({
         kind: "line-move",
+        key: `line-move:${p.pool}:${p.pick}`,
         text: `${p.pick} in the ${p.pool} is down ${(fall * 100).toFixed(1)} points since Thursday, now ${(p.winProb * 100).toFixed(1)}% to win.`,
       });
     }
@@ -89,6 +97,7 @@ export function lockAlarms(input: {
     if (!s.player) {
       out.push({
         kind: "empty-slot",
+        key: `empty-slot:${s.league}:${s.slot}`,
         text: `${s.league}: ${s.slot} is empty and will score nothing.`,
       });
       continue;
@@ -96,10 +105,22 @@ export function lockAlarms(input: {
     if (s.status && UNAVAILABLE.has(s.status)) {
       out.push({
         kind: "unavailable",
+        key: `unavailable:${s.league}:${s.player}`,
         text: `${s.league}: ${s.player} is ${s.status.toLowerCase()} and is starting at ${s.slot}.`,
       });
     }
   }
 
   return out.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
+}
+
+/**
+ * The problems this week's earlier alarms did not already raise. The alarm
+ * used to be one email per week, so a starter ruled out after the first send
+ * was swallowed; deduplicating by problem keeps the noise rule (the same empty
+ * slot is not news twice) without losing the news.
+ */
+export function unseenAlarms(reasons: AlarmReason[], sentKeys: string[]): AlarmReason[] {
+  const seen = new Set(sentKeys);
+  return reasons.filter((r) => !seen.has(r.key));
 }

@@ -24,6 +24,8 @@ export interface Snapshot {
   takenAt: string;
   rosterPositions: string[];
   roster: string[];
+  /** His Sleeper roster id, so settling can read back what he really started. Absent on older records. */
+  rosterId?: number | null;
   /** Player ids in slot order for each candidate lineup. */
   started: string[];
   advised: string[];
@@ -38,6 +40,9 @@ export interface Snapshot {
 export interface Settled extends Snapshot {
   settledAt: string;
   perfect: string[];
+  /** The lineup that actually scored, and where it was read from. */
+  startedFinal?: string[];
+  startedSource?: "sleeper" | "snapshot";
   verdict: WeekVerdict;
   points: Record<string, number>;
 }

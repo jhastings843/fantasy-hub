@@ -22,6 +22,7 @@ import { runMidweekEmail } from "@/lib/midweek/run";
 import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
+import { partialFailure } from "./outcome";
 
 // The heartbeat.
 //
@@ -253,9 +254,19 @@ async function refreshLineups(force = false): Promise<string> {
     dropped = await revalidateProjections().catch(() => 0);
   }
   const lineups = await buildWeeklyLineups();
+  // A league the builder could not advise is a failed refresh for that
+  // league, not a quiet one. Blocked (no weekly list at all) is the state of
+  // the world rather than a fault, and is said rather than thrown.
+  const problem = partialFailure(
+    "leagues advised",
+    lineups.leagues.length,
+    lineups.leagues.filter((l) => l.error).map((l) => `${l.leagueName}: ${l.error}`),
+  );
+  if (problem) throw new Error(problem);
   const changes = lineups.leagues.reduce((n, l) => n + l.advice.changes.length, 0);
   const statuses = force ? `, ${dropped} projection cache${dropped === 1 ? "" : "s"} dropped` : "";
-  return `${lineups.leagues.length} leagues, ${changes} change${changes === 1 ? "" : "s"}${statuses}`;
+  const blocked = lineups.blocked ? ` (blocked: ${lineups.blocked})` : "";
+  return `${lineups.leagues.length} leagues, ${changes} change${changes === 1 ? "" : "s"}${statuses}${blocked}`;
 }
 
 async function refreshWaivers(): Promise<string> {
@@ -263,8 +274,16 @@ async function refreshWaivers(): Promise<string> {
     (l) => l.source !== "manual" && l.type !== "guillotine",
   );
   const results = await Promise.allSettled(leagues.map((l) => buildWaivers(l.id)));
-  const ok = results.filter((r) => r.status === "fulfilled").length;
-  return `${ok} of ${leagues.length} leagues rebuilt`;
+  const failed = results.flatMap((r, i) => {
+    const name = leagues[i].name;
+    if (r.status === "rejected") {
+      return [`${name}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`];
+    }
+    return r.value.blocked ? [`${name}: ${r.value.blocked}`] : [];
+  });
+  const problem = partialFailure("leagues rebuilt", leagues.length, failed);
+  if (problem) throw new Error(problem);
+  return `${leagues.length} leagues rebuilt`;
 }
 
 /**
@@ -371,6 +390,9 @@ async function attemptSend(id: SendId, budgetMs: number): Promise<SendOutcome> {
  */
 async function alreadyWentOut(id: SendId): Promise<boolean> {
   if (id === "faab") return false;
+  // The alarm is one email per problem, not per week, and only it knows
+  // which problems this week's earlier alarms covered. It checks itself.
+  if (id === "alarm") return false;
   try {
     const state = await getNflState();
     const week = state.display_week ?? state.week;
@@ -438,7 +460,11 @@ export async function runPulse(
     }
   }
 
-  if (claimed) await recordTierRun(tier);
+  // A tier is done when its jobs are, and not before. Recording a run whose
+  // job failed would put the retry an hour out, which for the hourly tier is
+  // the difference between advice that is stale for fifteen minutes and
+  // advice that is stale until lunch.
+  if (claimed && jobs.every((j) => j.ok)) await recordTierRun(tier);
 
   const receipt: PulseReceipt = {
     at: new Date().toISOString(),

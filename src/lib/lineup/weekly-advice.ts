@@ -183,6 +183,10 @@ export function isOnBye(input: {
 }): boolean {
   if (input.ranked) return false;
   if (!input.team) return false;
+  // No list of who is playing is no information, not a league-wide bye. The
+  // waiver page read an empty set as "everyone is off" for a week in which
+  // his weekly list was stale, and offered nobody.
+  if (input.teamsPlaying.size === 0) return false;
   return !input.teamsPlaying.has(input.team);
 }
 

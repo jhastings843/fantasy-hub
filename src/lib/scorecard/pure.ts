@@ -150,3 +150,23 @@ export function season(verdicts: WeekVerdict[]): {
     weeksBehind: verdicts.filter((v) => v.vsStarted < 0).length,
   };
 }
+
+/**
+ * What he actually started, read back from Sleeper once the week is over.
+ *
+ * The snapshot's `started` is Sleeper's starters array on Sunday morning,
+ * which is not the lineup that scored if he touched it after the snapshot
+ * ran. The matchups endpoint carries the final one. The snapshot stays the
+ * fallback for records taken before roster ids were stored, and for a week
+ * Sleeper cannot answer.
+ */
+export function finalStarters(
+  matchups: { roster_id: number; starters?: string[] | null }[],
+  rosterId: number | null,
+  snapshot: string[],
+): { starters: string[]; source: "sleeper" | "snapshot" } {
+  if (rosterId === null) return { starters: snapshot, source: "snapshot" };
+  const mine = matchups.find((m) => m.roster_id === rosterId);
+  if (!mine?.starters || mine.starters.length === 0) return { starters: snapshot, source: "snapshot" };
+  return { starters: mine.starters, source: "sleeper" };
+}

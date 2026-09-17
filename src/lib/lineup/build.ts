@@ -27,6 +27,8 @@ export interface LeagueLineup {
   scoringLabel: string;
   /** The whole roster, so a caller can re-solve without fetching again. */
   roster: AdvicePlayer[];
+  /** His Sleeper roster id in this league. Null when the league could not be read. */
+  rosterId: number | null;
   /** Sleeper's own starters array at the moment this was built. */
   currentStarters: string[];
   /** Teams whose game has already kicked off, so their slots cannot move. */
@@ -196,6 +198,7 @@ export async function buildWeeklyLineups(
         skewNotes: [],
         scoringLabel: scoringLabel(profile),
         roster: [],
+        rosterId: null,
         currentStarters: [],
         lockedTeams: [],
         advice: { slots: [], changes: [], problems: [], superflexFellThrough: false, adjustmentDecided: [] },
@@ -346,6 +349,7 @@ async function lineupForLeague(
     skewNotes: scoringSkewNotes(leagueScoring, weekly.scoring),
     scoringLabel: scoringLabel(profile),
     roster,
+    rosterId: mine.roster_id,
     currentStarters: mine.starters ?? [],
     lockedTeams: [...locked].sort(),
     advice,

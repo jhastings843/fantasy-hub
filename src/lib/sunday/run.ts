@@ -5,7 +5,7 @@ import { buildWeeklyLineups, type WeeklyLineups } from "@/lib/lineup/build";
 import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
 import { readBaseline } from "@/lib/survivor/baseline";
-import { lockAlarms, type PoolAlarmInput, type SlotAlarmInput } from "./alarm";
+import { lockAlarms, unseenAlarms, type PoolAlarmInput, type SlotAlarmInput } from "./alarm";
 import { alarmSubject, renderLockAlarm, renderSundayBrief, sundaySubject } from "./email";
 
 // The two Sunday jobs.
@@ -15,6 +15,13 @@ import { alarmSubject, renderLockAlarm, renderSundayBrief, sundaySubject } from 
 // no-op rather than a second copy.
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app";
+
+/** A short stable tag for a set of alarm keys. Not cryptographic; it only has to differ when the set does. */
+function digest(keys: string[]): string {
+  let h = 5381;
+  for (const ch of keys.slice().sort().join("|")) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0;
+  return h.toString(36);
+}
 
 export interface RunOptions {
   /** Render and return the HTML instead of sending. */
@@ -152,9 +159,9 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
           })),
   );
 
-  const reasons = lockAlarms({ pools, slots });
+  const found = lockAlarms({ pools, slots });
 
-  if (reasons.length === 0) {
+  if (found.length === 0) {
     return Response.json({
       ok: true,
       skipped: true,
@@ -162,6 +169,23 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
       checked: { pools: pools.length, slots: slots.length },
     });
   }
+
+  // One email per PROBLEM, not one per week. A record without keys is from
+  // before problems were keyed; it is read as covering everything it saw,
+  // which is what it used to mean.
+  const previous = dry ? null : await alreadySent("alarm", season, week);
+  const sentKeys = resend ? [] : (previous?.keys ?? (previous ? found.map((r) => r.key) : []));
+  const fresh = unseenAlarms(found, sentKeys);
+  if (previous && !resend && fresh.length === 0) {
+    return Response.json({
+      ok: true,
+      skipped: true,
+      reason: `An alarm already went out at ${previous.sentAt} about everything that is wrong: ${previous.note ?? ""}`.trim(),
+    });
+  }
+  // The new problem leads; anything still unfixed from the earlier alarm
+  // follows, so the email is complete on its own.
+  const reasons = [...fresh, ...found.filter((r) => !fresh.includes(r))];
 
   const input = { reasons, week, generatedAt: new Date().toISOString(), appUrl: APP_URL() };
   const subject = `${test ? "[Test] " : ""}${alarmSubject(input)}`;
@@ -171,17 +195,9 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
     return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
   }
 
-  const previous = await alreadySent("alarm", season, week);
-  if (previous && !resend) {
-    return Response.json({
-      ok: true,
-      skipped: true,
-      reason: `An alarm already went out at ${previous.sentAt}: ${previous.note ?? ""}`.trim(),
-    });
-  }
-  if (previous && resend) await clearSent("alarm", season, week);
-
-  const result = await sendEmail(subject, html, `alarm:${season}:w${week}`);
+  // The idempotency key names the problems, so a retry of this send is a
+  // no-op and a later send about a new problem is not.
+  const result = await sendEmail(subject, html, `alarm:${season}:w${week}:${digest(fresh.map((r) => r.key))}`);
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }
@@ -191,6 +207,7 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
     subject,
     messageId: result.id,
     note: reasons.map((r) => r.kind).join(", "),
+    keys: [...new Set([...sentKeys, ...reasons.map((r) => r.key)])],
   });
 
   return Response.json({ ok: true, sent: true, subject, week, reasons });

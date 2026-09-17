@@ -93,6 +93,13 @@ describe("isOnBye", () => {
   it("does not guess when the team is unknown", () => {
     expect(isOnBye({ ranked: false, team: null, teamsPlaying: playing })).toBe(false);
   });
+
+  it("treats an empty playing set as unknown, not as a league-wide bye", () => {
+    // When his weekly list is stale there is no list to read matchups from,
+    // and for a week that left every unranked free agent "on bye" and off the
+    // waiver page. No information is not the same as no game.
+    expect(isOnBye({ ranked: false, team: "PIT", teamsPlaying: new Set() })).toBe(false);
+  });
 });
 
 describe("cannotPlay", () => {

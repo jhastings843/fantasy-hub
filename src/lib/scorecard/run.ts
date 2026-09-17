@@ -2,9 +2,9 @@ import "server-only";
 import { buildWeeklyLineups } from "@/lib/lineup/build";
 import { adviseLineup } from "@/lib/lineup/weekly-advice";
 import { scoreStatLine, type ScoringSettings } from "@/lib/guillotine/scoring";
-import { getLeague, getNflState } from "@/lib/sleeper/client";
+import { getLeague, getLeagueMatchups, getNflState } from "@/lib/sleeper/client";
 import { getWeekStats } from "@/lib/sleeper/stats";
-import { perfectLineup, scoreLineup, verdict, type ActualPoints } from "./pure";
+import { finalStarters, perfectLineup, scoreLineup, verdict, type ActualPoints } from "./pure";
 import { isSettled, readWeek, writeWeek, type Settled, type Snapshot } from "./store";
 
 // The two moments.
@@ -67,17 +67,16 @@ export async function snapshotWeek(options: { force?: boolean } = {}): Promise<{
     if (existing && !options.force) continue;
 
     const advised = league.advice.slots.map((s) => s.recommended?.playerId ?? "");
-    // His ranking with the adjustment taken away, solved by the SAME function,
-    // so the two lineups cannot differ because of anything but the adjustment.
-    // `locked` is stripped along with the adjustment, and for the same reason:
-    // this lineup is the counterfactual "his rankings, nothing else", and a
-    // clock constraint is something else. The advised lineup above keeps its
-    // locks, which is what finally retires the impurity noted at the top of
-    // this file: what it grades is now what Jack could actually have set.
+    // His ranking with the adjustment taken away, solved by the SAME function
+    // under the SAME locks and the same starters, so the two lineups cannot
+    // differ because of anything but the adjustment. An earlier version
+    // stripped the locks here too, which made "advised minus raw" measure two
+    // things at once: the scoring adjustment, and whether a Thursday slot
+    // could still be moved. Only the first is what this record is for.
     const raw = adviseLineup({
       rosterPositions: league.rosterPositions,
-      roster: league.roster.map((p) => ({ ...p, adjustedFlexRank: null, locked: false })),
-      currentStarters: [],
+      roster: league.roster.map((p) => ({ ...p, adjustedFlexRank: null })),
+      currentStarters: league.currentStarters,
     }).slots.map((s) => s.recommended?.playerId ?? "");
 
     const snapshot: Snapshot = {
@@ -88,6 +87,7 @@ export async function snapshotWeek(options: { force?: boolean } = {}): Promise<{
       takenAt: new Date().toISOString(),
       rosterPositions: league.rosterPositions,
       roster: league.roster.map((p) => p.playerId),
+      rosterId: league.rosterId,
       started: league.currentStarters,
       advised,
       raw,
@@ -187,14 +187,25 @@ export async function settleWeek(options: {
       actual,
     );
 
+    // Graded against the lineup that actually scored, not the one Sleeper
+    // showed on Sunday morning: a change he made at noon is his decision and
+    // belongs on his side of the ledger.
+    const matchups =
+      record.rosterId != null
+        ? await getLeagueMatchups(leagueId, options.week).catch(() => [])
+        : [];
+    const started = finalStarters(matchups, record.rosterId ?? null, record.started);
+
     const out: Settled = {
       ...record,
       settledAt: new Date().toISOString(),
       perfect,
+      startedFinal: started.starters,
+      startedSource: started.source,
       points: Object.fromEntries(record.roster.map((id) => [id, actual[id] ?? 0])),
       verdict: verdict({
         advised: scoreLineup(record.advised, actual).points,
-        started: scoreLineup(record.started, actual).points,
+        started: scoreLineup(started.starters, actual).points,
         raw: scoreLineup(record.raw, actual).points,
         perfect: scoreLineup(perfect, actual).points,
       }),
