@@ -14,7 +14,7 @@ import { getNflState } from "@/lib/sleeper/client";
 import { alreadySent as sharedAlreadySent } from "@/lib/email/sent-log";
 import { alreadySent as thursdayAlreadySent } from "@/lib/thursday/sent-log";
 import { fcFormatFromProfile, revalidateFCValues } from "@/lib/fantasycalc/client";
-import { revalidateMovers, revalidatePicks } from "@/lib/rosteraudit/client";
+import { revalidatePicks } from "@/lib/rosteraudit/client";
 import { revalidateAllPlayers } from "@/lib/sleeper/client";
 import { runFaabEmail, configuredSendDay } from "@/lib/guillotine/run";
 import { runThursdayEmail, configuredSendDay as thursdaySendDay } from "@/lib/thursday/run";
@@ -281,10 +281,9 @@ async function refreshValues(): Promise<string> {
   await Promise.allSettled([
     ...formats.map((f) => revalidateFCValues(f)),
     revalidatePicks(),
-    revalidateMovers(),
     revalidateAllPlayers(),
   ]);
-  return `${formats.length} value format${formats.length === 1 ? "" : "s"}, picks, movers, players`;
+  return `${formats.length} value format${formats.length === 1 ? "" : "s"}, picks, players`;
 }
 
 function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }[] {

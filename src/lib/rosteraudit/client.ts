@@ -8,8 +8,6 @@ import type {
   RAManagerHistory,
   RAManagerSeasonRow,
   RAManagerSummary,
-  RAMover,
-  RAMovers,
   RAPick,
   RAPlayerProfile,
   RAPlayerStats,
@@ -285,65 +283,6 @@ export async function getPicks(): Promise<RAPick[]> {
 
 export async function revalidatePicks(): Promise<void> {
   await invalidate(ALL_PICKS_KEY, PICKS_KEY);
-}
-
-// --- Movers ---
-
-const MOVERS_KEY = (limit: number) => `rosteraudit:v1:movers:${limit}`;
-const MOVERS_TTL = 60 * 60;
-
-type RawMover = {
-  sleeper_id?: string;
-  name?: string;
-  position?: string;
-  team?: string | null;
-  age?: string | number | null;
-  tier?: string | number | null;
-  val_sf?: string | number | null;
-  trend_7d?: string | number | null;
-  trend_30d?: string | number | null;
-  buy_low?: string | number | null;
-  sell_high?: string | number | null;
-  breakout?: string | number | null;
-};
-
-type MoversResponse = { risers?: RawMover[]; fallers?: RawMover[] };
-
-function slimMover(r: RawMover): RAMover | null {
-  if (!r.sleeper_id || !r.name || !r.position) return null;
-  return {
-    sleeperId: r.sleeper_id,
-    name: r.name,
-    position: r.position,
-    team: typeof r.team === "string" ? r.team : null,
-    age: r.age != null ? num(r.age) : null,
-    tier: r.tier != null ? num(r.tier) : null,
-    valueSf: num(r.val_sf),
-    trend7Day: trendNum(r.trend_7d),
-    trend30Day: trendNum(r.trend_30d),
-    buyLow: flag(r.buy_low),
-    sellHigh: flag(r.sell_high),
-    breakout: flag(r.breakout),
-  };
-}
-
-export function getMovers(limit = 30): Promise<RAMovers> {
-  return cached(MOVERS_KEY(limit), MOVERS_TTL, async () => {
-    const res = await raFetch<MoversResponse>(
-      `/movers?position=all&limit=${limit}`,
-    );
-    const risers = (res.risers ?? [])
-      .map(slimMover)
-      .filter((x): x is RAMover => x !== null);
-    const fallers = (res.fallers ?? [])
-      .map(slimMover)
-      .filter((x): x is RAMover => x !== null);
-    return { risers, fallers };
-  });
-}
-
-export async function revalidateMovers(limits: number[] = [30]): Promise<void> {
-  await invalidate(...limits.map((l) => MOVERS_KEY(l)));
 }
 
 export async function revalidateGrades(
@@ -690,8 +629,6 @@ export type {
   RAValuesBySleeperId,
   RAFormatKey,
   RAPick,
-  RAMover,
-  RAMovers,
   RATeamGrade,
   RAGradesByRosterId,
   RAPlayerProfile,

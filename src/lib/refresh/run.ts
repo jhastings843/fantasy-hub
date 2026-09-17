@@ -14,7 +14,6 @@ import {
 import {
   formatKeyFromLeague,
   revalidateGrades,
-  revalidateMovers,
   revalidatePicks,
   revalidateValues,
 } from "@/lib/rosteraudit/client";
@@ -91,7 +90,6 @@ export async function dropShared(): Promise<void> {
   await Promise.all([
     revalidateAllPlayers(),
     revalidatePicks(),
-    revalidateMovers(),
   ]);
 }
 
