@@ -196,36 +196,63 @@ function SeasonPlan({ report }: { report: WeeklyFaabReport }) {
 
       {report.wallets.length > 0 ? (
         <div className="mt-5 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-            Who can outbid you
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              Who can outbid you
+            </div>
+            <div className="text-[11px] text-zinc-500">
+              {report.wallets.length} alive &middot; {money(budget)} each to start
+            </div>
           </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {report.wallets.slice(0, 8).map((w) => (
-              <li key={w.rosterId} className="flex items-center gap-3">
-                <span
-                  className={`w-32 shrink-0 truncate text-xs ${
-                    w.isMine
-                      ? "font-semibold text-zinc-900 dark:text-zinc-100"
-                      : "text-zinc-600 dark:text-zinc-400"
-                  }`}
-                >
-                  {w.name}
-                  {w.isMine ? " (you)" : ""}
-                </span>
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+          <div className="mt-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+            <span className="w-28 shrink-0 sm:w-32">Team</span>
+            <span className="flex-1" aria-hidden />
+            <span className="w-14 shrink-0 text-right">Spent</span>
+            <span className="w-14 shrink-0 text-right">Left</span>
+          </div>
+          <ul className="mt-1.5 flex flex-col gap-2">
+            {report.wallets.map((w) => {
+              const spent = Math.max(0, budget - w.remaining);
+              return (
+                <li key={w.rosterId} className="flex items-center gap-3">
                   <span
-                    className={`block h-full rounded-full ${
-                      w.isMine ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                    className={`w-28 shrink-0 truncate text-xs sm:w-32 ${
+                      w.isMine
+                        ? "font-semibold text-zinc-900 dark:text-zinc-100"
+                        : "text-zinc-600 dark:text-zinc-400"
                     }`}
-                    style={{ width: `${Math.max(2, (w.remaining / budget) * 100)}%` }}
-                  />
-                </span>
-                <span className="w-14 shrink-0 text-right text-xs font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
-                  {money(w.remaining)}
-                </span>
-              </li>
-            ))}
+                  >
+                    {w.name}
+                    {w.isMine ? " (you)" : ""}
+                  </span>
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <span
+                      className={`block h-full rounded-full ${
+                        w.isMine ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600"
+                      }`}
+                      style={{ width: `${Math.max(2, (w.remaining / budget) * 100)}%` }}
+                    />
+                  </span>
+                  <span
+                    className={`w-14 shrink-0 text-right text-xs tabular-nums ${
+                      spent > 0
+                        ? "text-zinc-600 dark:text-zinc-400"
+                        : "text-zinc-400 dark:text-zinc-600"
+                    }`}
+                  >
+                    {money(spent)}
+                  </span>
+                  <span className="w-14 shrink-0 text-right text-xs font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {money(w.remaining)}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
+          <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+            Every team still alive, richest first. Spent is what the season has
+            already taken from the {money(budget)} they began with.
+          </p>
         </div>
       ) : null}
     </Card>
