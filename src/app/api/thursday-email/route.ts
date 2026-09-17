@@ -1,4 +1,10 @@
-import { configuredSendDay, DAYS, dayInNewYork, runThursdayEmail } from "@/lib/thursday/run";
+import {
+  configuredSendDay,
+  DAYS,
+  dayInNewYork,
+  runThursdayEmail,
+  sentThisWeek,
+} from "@/lib/thursday/run";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +19,7 @@ export const dynamic = "force-dynamic";
 // Running daily also means a missed Thursday is not a missed week: ?force=1
 // sends on demand.
 //
-//   ?check=1   readiness, no auth, no send
+//   ?check=1   readiness and whether this week went out, no auth, no send
 //   ?dry=1     render and return the HTML without sending
 //   ?force=1   ignore the day gate
 //   ?resend=1  send again even though this week already went out
@@ -48,6 +54,9 @@ export async function GET(request: Request) {
         sendDay: DAYS[configuredSendDay()],
         today: DAYS[dayInNewYork(new Date())],
       },
+      // The answer to "did it go", which willSend cannot give. Read from the
+      // send log by the current Sleeper week; the message id is Resend's.
+      thisWeek: await sentThisWeek(),
     });
   }
 

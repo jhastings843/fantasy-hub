@@ -4,9 +4,10 @@ import type { SurvivorReport } from "@/lib/survivor/types";
 import { buildWeeklyLineups } from "@/lib/lineup/build";
 import { sendEmail } from "@/lib/guillotine/send";
 import { renderThursdayEmail, thursdaySubject, totalChanges } from "./email";
-import { alreadySent, clearSent, recordSent } from "./sent-log";
+import { alreadySent, clearSent, recordSent, type ThursdaySendRecord } from "./sent-log";
 import { recordBaseline, type Baselines } from "@/lib/survivor/baseline";
 import { withSendLock } from "@/lib/email/sent-log";
+import { getNflState } from "@/lib/sleeper/client";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -34,6 +35,30 @@ export function dayInNewYork(now: Date): number {
     weekday: "long",
   }).format(now);
   return DAYS.indexOf(weekday);
+}
+
+export type ThursdaySentThisWeek =
+  | { week: number; season: string; sent: ThursdaySendRecord | null }
+  | { error: string };
+
+/**
+ * Whether this week's email has gone out, for ?check=1.
+ *
+ * Readiness said "willSend true" all morning on the first unattended
+ * Thursday and could not say whether it had, which is the only question
+ * worth asking after 8am. The send log knows; this reads it by the current
+ * Sleeper week. An error is reported as one rather than as "not sent",
+ * because those call for different next steps.
+ */
+export async function sentThisWeek(): Promise<ThursdaySentThisWeek> {
+  try {
+    const state = await getNflState();
+    const week = state.display_week ?? state.week;
+    if (!week || !state.season) return { error: "Sleeper did not say which week it is." };
+    return { week, season: state.season, sent: await alreadySent(state.season, week) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 /**
