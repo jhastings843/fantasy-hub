@@ -137,7 +137,7 @@ function MoverRow({
               {" · "}
               <span className={`font-medium tabular-nums ${trendCls}`}>
                 {primaryLabel} {primaryTrend > 0 ? "+" : ""}
-                {primaryTrend}
+                {primaryTrend.toLocaleString()}
               </span>
             </>
           )}
@@ -174,13 +174,14 @@ export default async function PlayersPage({
   const leagueType = profileFromSleeper(league).type;
   const startable = startablePositions(profileFromSleeper(league).rosterPositions);
 
-  const [rosters, users, allPlayers, raValues] = await Promise.all([
+  const [rosters, users, allPlayers, leagueValues] = await Promise.all([
     getLeagueRosters(leagueId),
     getLeagueUsers(leagueId),
     getAllPlayers(),
-    getValuesForProfile(profileFromSleeper(league), league).then((r) => r.values),
+    getValuesForProfile(profileFromSleeper(league), league),
   ]);
-  const movers = moversFromValues(raValues, 30);
+  const raValues = leagueValues.values;
+  const movers = moversFromValues(raValues, leagueValues.source.key, 30);
 
   const usersById = new Map(users.map((u: SleeperUser) => [u.user_id, u]));
   const myRoster = rosters.find((r) => r.owner_id === me.user_id);

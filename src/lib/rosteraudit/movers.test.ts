@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 import { moversFromValues } from "./movers";
 import type { RAValue, RAValuesBySleeperId } from "./types";
 
-function player(
-  id: string,
-  over: Partial<RAValue> & { position?: string },
-): RAValue {
+function player(id: string, over: Partial<RAValue>): RAValue {
   return {
     sleeperId: id,
     name: `Player ${id}`,
@@ -31,33 +28,53 @@ function byId(...players: RAValue[]): RAValuesBySleeperId {
 }
 
 describe("moversFromValues", () => {
-  it("splits players into risers and fallers by 7-day trend, biggest move first", () => {
+  it("splits FantasyCalc players into risers and fallers by 30-day points, biggest move first", () => {
     const values = byId(
-      player("a", { trend7Day: 300 }),
-      player("b", { trend7Day: -450 }),
-      player("c", { trend7Day: 900 }),
-      player("d", { trend7Day: -120 }),
-      player("e", { trend7Day: 0 }),
+      player("a", { trend30Day: 300 }),
+      player("b", { trend30Day: -450 }),
+      player("c", { trend30Day: 900 }),
+      player("d", { trend30Day: -120 }),
+      player("e", { trend30Day: 0 }),
     );
-    const { risers, fallers } = moversFromValues(values, 30);
+    const { risers, fallers } = moversFromValues(values, "fantasycalc", 30);
     expect(risers.map((m) => m.sleeperId)).toEqual(["c", "a"]);
     expect(fallers.map((m) => m.sleeperId)).toEqual(["b", "d"]);
+    expect(risers[0].trend30Day).toBe(900);
+  });
+
+  it("ranks RosterAudit players by implied point change, not by raw percentage", () => {
+    // Live data from 2026-09-16: a 37-point receiver who climbed from 10
+    // carries a bigger basis-point trend than Bijan Robinson's week.
+    const values = byId(
+      player("barion", { value: 37, trend7Day: 27000 }),
+      player("bijan", { value: 9985, trend7Day: 584 }),
+      player("jones", { value: 1767, trend7Day: 8487 }),
+    );
+    const { risers } = moversFromValues(values, "rosteraudit", 30);
+    expect(risers.map((m) => m.sleeperId)).toEqual(["jones", "bijan", "barion"]);
+    expect(risers.map((m) => m.trend7Day)).toEqual([811, 551, 27]);
+  });
+
+  it("converts RosterAudit fallers the same way", () => {
+    // Down 20% from 5,000 means 6,250 before.
+    const values = byId(player("a", { value: 5000, trend7Day: -2000 }));
+    const { fallers } = moversFromValues(values, "rosteraudit", 30);
+    expect(fallers[0].trend7Day).toBe(-1250);
   });
 
   it("falls back to the 30-day trend when the source has no 7-day trend", () => {
-    // FantasyCalc (redraft) values carry only a 30-day trend.
     const values = byId(
       player("a", { trend7Day: 0, trend30Day: 200 }),
       player("b", { trend7Day: 0, trend30Day: -80 }),
     );
-    const { risers, fallers } = moversFromValues(values, 30);
+    const { risers, fallers } = moversFromValues(values, "fantasycalc", 30);
     expect(risers.map((m) => m.sleeperId)).toEqual(["a"]);
     expect(fallers.map((m) => m.sleeperId)).toEqual(["b"]);
   });
 
   it("prefers the 7-day trend over the 30-day trend when both exist", () => {
     const values = byId(player("a", { trend7Day: -50, trend30Day: 400 }));
-    const { risers, fallers } = moversFromValues(values, 30);
+    const { risers, fallers } = moversFromValues(values, "rosteraudit", 30);
     expect(risers).toEqual([]);
     expect(fallers.map((m) => m.sleeperId)).toEqual(["a"]);
   });
@@ -65,13 +82,13 @@ describe("moversFromValues", () => {
   it("caps each list at the limit", () => {
     const values = byId(
       ...Array.from({ length: 12 }, (_, i) =>
-        player(`r${i}`, { trend7Day: 100 + i }),
+        player(`r${i}`, { trend30Day: 100 + i }),
       ),
       ...Array.from({ length: 12 }, (_, i) =>
-        player(`f${i}`, { trend7Day: -(100 + i) }),
+        player(`f${i}`, { trend30Day: -(100 + i) }),
       ),
     );
-    const { risers, fallers } = moversFromValues(values, 5);
+    const { risers, fallers } = moversFromValues(values, "fantasycalc", 5);
     expect(risers).toHaveLength(5);
     expect(fallers).toHaveLength(5);
     expect(risers[0].sleeperId).toBe("r11");
@@ -80,11 +97,11 @@ describe("moversFromValues", () => {
 
   it("only tracks the positions the page shows", () => {
     const values = byId(
-      player("k", { position: "K", trend7Day: 500 }),
-      player("def", { position: "DEF", trend7Day: 500 }),
-      player("qb", { position: "QB", trend7Day: 100 }),
+      player("k", { position: "K", trend30Day: 500 }),
+      player("def", { position: "DEF", trend30Day: 500 }),
+      player("qb", { position: "QB", trend30Day: 100 }),
     );
-    const { risers } = moversFromValues(values, 30);
+    const { risers } = moversFromValues(values, "fantasycalc", 30);
     expect(risers.map((m) => m.sleeperId)).toEqual(["qb"]);
   });
 
@@ -96,14 +113,14 @@ describe("moversFromValues", () => {
         team: "ATL",
         age: 24.6,
         tier: 1,
-        value: 9800,
+        value: 9985,
         trend7Day: 584,
         trend30Day: 556,
         buyLow: true,
         breakout: true,
       }),
     );
-    const { risers } = moversFromValues(values, 30);
+    const { risers } = moversFromValues(values, "rosteraudit", 30);
     expect(risers[0]).toEqual({
       sleeperId: "a",
       name: "Bijan Robinson",
@@ -111,9 +128,9 @@ describe("moversFromValues", () => {
       team: "ATL",
       age: 24.6,
       tier: 1,
-      valueSf: 9800,
-      trend7Day: 584,
-      trend30Day: 556,
+      valueSf: 9985,
+      trend7Day: 551,
+      trend30Day: 526,
       buyLow: true,
       sellHigh: false,
       breakout: true,
