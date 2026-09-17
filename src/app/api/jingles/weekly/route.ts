@@ -1,4 +1,9 @@
-import { latestWeekly, readWeekly, type StoredWeeklyEntry } from "@/lib/jingles/ingest";
+import {
+  latestWeeklyFor,
+  readWeeklyFor,
+  type StoredWeeklyEntry,
+} from "@/lib/jingles/ingest";
+import type { Scoring } from "@/lib/jingles/parse";
 import { normalizeTeam } from "@/lib/jingles/resolve";
 import { fixtureMap, type Fixture } from "@/lib/nfl/week";
 import { getSeasonGames } from "@/lib/survivor/odds";
@@ -47,26 +52,43 @@ interface Row {
   matchup: string;
   /** Rank within his list for that position. */
   positionRank: number | null;
-  /** Rank in the Top 150 FLEX list. Null means outside it, not unranked. */
+  /** Rank in his FLEX list. Null means outside it, not unranked. */
   flexRank: number | null;
+  /** Rank in his superflex list, where quarterbacks are ranked against the rest. */
+  superflexRank: number | null;
+  /** Expert consensus rank, where FantasyPros publishes one. */
+  ecrRank: number | null;
+  /** Consensus minus his. POSITIVE means he is higher on the player than the field. */
+  vsEcr: number | null;
   sleeperId: string | null;
+}
+
+/** "full_ppr", "ppr", "full", "1" and friends all mean the same list. */
+function askedScoring(raw: string | null): Scoring {
+  const s = (raw ?? "").trim().toLowerCase().replace(/[\s-]/g, "_");
+  if (!s) return "half_ppr";
+  if (/^(full_?ppr|ppr|full|1|1_?0)$/.test(s)) return "full_ppr";
+  if (/^(standard|std|non_?ppr|none|0|0_?0)$/.test(s)) return "standard";
+  return "half_ppr";
 }
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
 
+  const scoring = askedScoring(params.get("scoring"));
   const askedWeek = Number(params.get("week"));
-  const latest = await latestWeekly();
+  const latest = await latestWeeklyFor(scoring);
   const weekly =
     Number.isFinite(askedWeek) && askedWeek > 0 && latest
-      ? await readWeekly(latest.season, askedWeek)
+      ? await readWeeklyFor(scoring, latest.season, askedWeek)
       : latest;
 
   if (!weekly) {
     return Response.json({
       ok: false,
       error:
-        "No weekly rankings have been ingested. Nothing here is a start/sit answer until his weekly post is in.",
+        "No weekly rankings have been ingested for that scoring. Nothing here is a start/sit answer until his board is in.",
+      scoring,
       players: [],
     });
   }
@@ -111,8 +133,11 @@ export async function GET(request: Request) {
         opponent,
         home,
         matchup: `${home ? "vs" : "@"} ${opponent}`,
-        positionRank: e.rank,
+        positionRank: e.positionRank ?? e.rank,
         flexRank: null,
+        superflexRank: null,
+        ecrRank: e.ecrRank ?? null,
+        vsEcr: e.vsEcr ?? null,
         sleeperId: e.sleeperId,
       });
     }
@@ -130,11 +155,41 @@ export async function GET(request: Request) {
         opponent,
         home,
         matchup: `${home ? "vs" : "@"} ${opponent}`,
-        positionRank: null,
+        positionRank: e.positionRank ?? null,
         flexRank: e.rank,
+        superflexRank: null,
+        ecrRank: e.ecrRank ?? null,
+        vsEcr: e.vsEcr ?? null,
         sleeperId: e.sleeperId,
       });
     }
+  }
+
+  // His superflex ordering, folded onto whatever is already here. New from week
+  // 2: he never published one on Substack, so a week read from an old post
+  // simply has none and every superflexRank stays null.
+  for (const e of weekly.superflex ?? []) {
+    const key = keyOf(e);
+    const existing = rows.get(key);
+    if (existing) {
+      existing.superflexRank = e.rank;
+      continue;
+    }
+    const { opponent, home } = matchupOf(e);
+    rows.set(key, {
+      name: e.name,
+      position: e.position,
+      team: teamOf(e),
+      opponent,
+      home,
+      matchup: `${home ? "vs" : "@"} ${opponent}`,
+      positionRank: e.positionRank ?? null,
+      flexRank: null,
+      superflexRank: e.rank,
+      ecrRank: e.ecrRank ?? null,
+      vsEcr: e.vsEcr ?? null,
+      sleeperId: e.sleeperId,
+    });
   }
 
   const all = [...rows.values()];
@@ -194,18 +249,23 @@ export async function GET(request: Request) {
     // the league the question is about.
     howToUse: [
       `These are ${scoringLabel} rankings for week ${weekly.week} only. They are a start/sit opinion, not a season-long or dynasty one.`,
-      "For a FLEX decision compare flexRank, which is the only list where he ranks running backs, receivers and tight ends against each other. Comparing two positionRanks across different positions is meaningless.",
-      "For a dedicated slot (QB, RB, WR, TE, DEF) compare positionRank.",
-      "flexRank null means he left that player out of his Top 150 FLEX list, which is a real signal in a flex decision, not missing data.",
+      "For a FLEX decision compare flexRank, which is the list where he ranks running backs, receivers and tight ends against each other. Comparing two positionRanks across different positions is meaningless.",
+      "For a SUPERFLEX or two-quarterback slot compare superflexRank, which is the only list where he ranks quarterbacks against everyone else.",
+      "For a dedicated slot (QB, RB, WR, TE, DEF, K) compare positionRank.",
+      "flexRank null means he left that player out of his flex list, which is a real signal in a flex decision, not missing data.",
       "A player absent entirely is one he did not rank this week. Say so rather than guessing at a rank.",
-      `If the league is not ${scoringLabel}, say so: full PPR lifts pass-catching backs and slot receivers above where this list puts them, standard pushes them down, and a tight end premium lifts tight ends further still.`,
+      "vsEcr is his rank against the expert consensus, and POSITIVE MEANS HE IS HIGHER on that player than the field. It is where his stance differs from everyone else, which is the reason to quote him rather than a consensus list. ecrRank null means FantasyPros published no consensus for that player.",
+      `Ask for another scoring with ?scoring=full_ppr or ?scoring=standard. He now publishes all three as genuinely different lists, so quote the one that matches the league rather than adjusting ${scoringLabel} in your head.`,
     ],
     counts: {
       returned: players.length,
       matching: matching.length,
       ranked: all.length,
       inFlexList: all.filter((r) => r.flexRank !== null).length,
+      inSuperflexList: all.filter((r) => r.superflexRank !== null).length,
     },
+    /** The scorings he publishes, so a caller does not have to guess at the parameter. */
+    scoringOptions: ["half_ppr", "full_ppr", "standard"],
     // Named rather than returned empty, so a spelling difference does not read
     // as "he is not ranked this week".
     notFound: names.length

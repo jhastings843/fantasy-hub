@@ -1,5 +1,12 @@
 import "server-only";
-import { latestWeekly, readWeekly, type StoredWeekly } from "@/lib/jingles/ingest";
+import {
+  latestWeekly,
+  readWeekly,
+  readWeeklyFor,
+  type StoredWeekly,
+} from "@/lib/jingles/ingest";
+import { scoringForLeague } from "@/lib/jingles/active";
+import type { Scoring } from "@/lib/jingles/parse";
 import { getMyLeagues } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
 import { getAllPlayers, getLeague, getLeagueRosters, getUser } from "@/lib/sleeper/client";
@@ -174,13 +181,33 @@ export async function buildWeeklyLineups(
     ? leagues.filter((l) => l.id === options.leagueId)
     : leagues;
 
+  // One stored list per scoring, read once and shared.
+  //
+  // THIS IS THE POINT OF THE MOVE. Until week 2 he published a single half-PPR
+  // list and Dah Chopped, a full-PPR league, was advised off it with a footnote
+  // apologising. He now publishes three genuinely different orderings, so each
+  // league reads its own and the footnote disappears on its own: scoringSkewNotes
+  // compares the league against the list it was actually quoted.
+  //
+  // Falls back to the spine list when a scoring was never stored, which is what
+  // happens for any week ingested from his old Substack posts. A fallback is a
+  // real half-PPR list being read by a full-PPR league, and the skew note comes
+  // back to say so rather than the page going quiet.
+  const boards = new Map<Scoring, StoredWeekly | null>();
+  const boardFor = async (scoring: Scoring): Promise<StoredWeekly> => {
+    if (!boards.has(scoring)) {
+      boards.set(scoring, await readWeeklyFor(scoring, weekly.season, weekly.week));
+    }
+    return boards.get(scoring) ?? weekly;
+  };
+
   const out: LeagueLineup[] = [];
   for (const profile of wanted) {
     try {
       out.push(
         await lineupForLeague(
           profile,
-          weekly,
+          await boardFor(scoringForLeague(profile)),
           players,
           me.user_id,
           playing,

@@ -1,9 +1,10 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { getAllPlayers } from "@/lib/sleeper/client";
+import { getAllPlayers, getNflState } from "@/lib/sleeper/client";
 import { fetchPosts, type JinglesPost } from "./feed";
 import { inboxConfigured } from "./inbox";
 import { parseMentions, parsePlays, parseRankings, type Scoring } from "./parse";
+import { fetchAllWeeklyBoards, type FpRow } from "./fantasypros";
 import { parseWeekly } from "./weekly";
 import { resolveNames, toCandidates } from "./resolve";
 
@@ -26,6 +27,13 @@ const KEY = {
   // the draft board, scout, trade and plan tabs, which all read that key.
   weekly: (season: string, week: number) => `jingles:v1:weekly:${season}:w${week}`,
   weeklyLatest: () => `jingles:v1:weekly:latest`,
+  // Per scoring, because from week 2 on there are three genuinely different
+  // weekly lists rather than one list and a paragraph telling you how to adjust
+  // it. The v1 keys above are the single half-PPR store his Substack posts
+  // filled, and they are still read as a fallback so week 1 does not vanish.
+  weeklyFor: (season: string, week: number, scoring: Scoring) =>
+    `jingles:v2:weekly:${season}:w${week}:${scoring}`,
+  weeklyLatestFor: (scoring: Scoring) => `jingles:v2:weekly:latest:${scoring}`,
   previous: (scoring: Scoring) => `jingles:v1:rankings:${scoring}:previous`,
   notes: () => `jingles:v1:notes`,
   seen: () => `jingles:v1:seen`,
@@ -34,6 +42,9 @@ const KEY = {
 
 /** Rankings are stable research, not live data. A month is generous. */
 const TTL = 60 * 60 * 24 * 30;
+
+/** Where he publishes them now, for anything that links back to the source. */
+const RANKINGS_URL = process.env.JINGLES_RANKINGS_URL ?? "https://rankings.jingleslabs.com";
 
 export interface StoredEntry {
   rank: number;
@@ -67,6 +78,21 @@ export interface StoredWeeklyEntry {
   team: string;
   opponent: string;
   home: boolean;
+  /**
+   * Everything below arrives only from the FantasyPros board, so all of it is
+   * optional: a week stored from one of his old Substack posts carries none of
+   * it, and a reader has to treat absence as "not known" rather than as zero.
+   */
+  positionRank?: number;
+  /** Expert consensus rank for the same player, where FantasyPros has one. */
+  ecrRank?: number | null;
+  /** Consensus rank minus his. POSITIVE means he is higher than the field. */
+  vsEcr?: number | null;
+  bye?: number | null;
+  fantasyProsId?: string;
+  /** The only id Jack's Yahoo league could ever be joined on. */
+  yahooId?: string | null;
+  note?: string | null;
 }
 
 export interface StoredWeekly {
@@ -79,11 +105,18 @@ export interface StoredWeekly {
   /** His own "Last Updated" line. The field that decides whether a re-read is new. */
   updatedLabel: string | null;
   ingestedAt: string;
-  source: "feed" | "inbox";
+  source: "feed" | "inbox" | "fantasypros";
   /** QB, RB, WR, TE, DEF, K. */
   positional: Record<string, StoredWeeklyEntry[]>;
   /** RB, WR and TE only. He publishes no quarterbacks in this list. */
   flex: StoredWeeklyEntry[];
+  /**
+   * His superflex ordering: quarterbacks ranked against everyone else. Absent
+   * on any week stored from a Substack post, because he never published one.
+   */
+  superflex?: StoredWeeklyEntry[];
+  /** His publish stamp from the platform, e.g. "2026-09-17 07:19:57". */
+  publishedAt?: string | null;
   unresolved: { name: string; position: string; team: string | null; reason: string }[];
 }
 
@@ -147,13 +180,40 @@ export async function readRankings(scoring: Scoring): Promise<StoredRankings | n
   }
 }
 
-/** His weekly list for one week, or null if that week was never read. */
-export async function readWeekly(season: string, week: number): Promise<StoredWeekly | null> {
+/**
+ * His weekly list for one week in one scoring.
+ *
+ * Falls back to the single half-PPR store his Substack posts wrote. Week 1 of
+ * 2026 only ever existed there, so without the fallback the first week of the
+ * season would disappear the moment the new source took over. The fallback is
+ * offered ONLY to a half-PPR caller: handing that list to a full-PPR league
+ * would resurrect exactly the mislabelling this per-scoring split exists to end.
+ */
+export async function readWeeklyFor(
+  scoring: Scoring,
+  season: string,
+  week: number,
+): Promise<StoredWeekly | null> {
   try {
-    return (await redis.get<StoredWeekly>(KEY.weekly(season, week))) ?? null;
+    const stored = await redis.get<StoredWeekly>(KEY.weeklyFor(season, week, scoring));
+    if (stored) return stored;
+  } catch {
+    // Fall through to the legacy store rather than going quiet.
+  }
+
+  if (scoring !== "half_ppr") return null;
+
+  try {
+    const legacy = await redis.get<StoredWeekly>(KEY.weekly(season, week));
+    return legacy ?? null;
   } catch {
     return null;
   }
+}
+
+/** His weekly list for one week, or null if that week was never read. */
+export async function readWeekly(season: string, week: number): Promise<StoredWeekly | null> {
+  return readWeeklyFor("half_ppr", season, week);
 }
 
 /**
@@ -164,14 +224,32 @@ export async function readWeekly(season: string, week: number): Promise<StoredWe
  * Tuesday-to-Thursday publication window wrong. What was stored last is what he
  * published last.
  */
-export async function latestWeekly(): Promise<StoredWeekly | null> {
+export async function latestWeeklyFor(scoring: Scoring): Promise<StoredWeekly | null> {
+  try {
+    const at = await redis.get<{ season: string; week: number }>(
+      KEY.weeklyLatestFor(scoring),
+    );
+    if (at) {
+      const stored = await readWeeklyFor(scoring, at.season, at.week);
+      if (stored) return stored;
+    }
+  } catch {
+    // Fall through.
+  }
+
+  if (scoring !== "half_ppr") return null;
+
   try {
     const at = await redis.get<{ season: string; week: number }>(KEY.weeklyLatest());
     if (!at) return null;
-    return await readWeekly(at.season, at.week);
+    return await readWeeklyFor("half_ppr", at.season, at.week);
   } catch {
     return null;
   }
+}
+
+export async function latestWeekly(): Promise<StoredWeekly | null> {
+  return latestWeeklyFor("half_ppr");
 }
 
 export async function readNotes(): Promise<StoredNote[]> {
@@ -431,6 +509,160 @@ async function ingestWeekly(post: JinglesPost, report: IngestReport): Promise<vo
   });
 }
 
+/**
+ * Fold his FantasyPros board into the store, one stored list per scoring.
+ *
+ * This is the weekly path from week 2 of 2026 onward. It does not read a post
+ * and is not triggered by one: on 2026-09-17 he moved the rankings to
+ * rankings.jingleslabs.com and the Substack post that announced it contains a
+ * link and no rows. Waiting for a post that will never come again is how this
+ * would have gone quiet for the rest of the season while still looking healthy.
+ *
+ * Stored only when his publish stamp has moved, the same contract the post
+ * parser held with his "Last Updated" line. He edits these lists through the
+ * week, so a re-read that finds the same stamp is a no-op rather than a rewrite.
+ */
+async function ingestWeeklyBoards(
+  season: string,
+  week: number,
+  report: IngestReport,
+  options: { force?: boolean } = {},
+): Promise<void> {
+  const boards = await fetchAllWeeklyBoards(season, week);
+
+  if (boards.length === 0) {
+    report.skipped.push({
+      title: `Weekly rankings, ${season} week ${week}`,
+      reason:
+        "his rankings board returned no players for this week, which is normal before he publishes it",
+    });
+    return;
+  }
+
+  const players = await getAllPlayers();
+  const candidates = toCandidates(players);
+
+  for (const board of boards) {
+    const existing = await readWeeklyFor(board.scoring, board.season, board.week);
+    const changed =
+      options.force ||
+      !existing ||
+      (existing.publishedAt ?? existing.updatedLabel) !== board.publishedAt;
+
+    if (!changed) {
+      report.weeklyIngested.push({
+        season: board.season,
+        week: board.week,
+        scoring: board.scoring,
+        rows: Object.values(existing.positional).flat().length + existing.flex.length,
+        unresolved: existing.unresolved.length,
+        updatedLabel: existing.updatedLabel,
+        changed: false,
+      });
+      continue;
+    }
+
+    // Every row he published this week, resolved ONCE. A player sits in his
+    // positional list, his flex list and his superflex list, and resolving them
+    // separately is how one player ends up with two Sleeper ids.
+    const everyRow = [
+      ...Object.values(board.positional).flat(),
+      ...board.flex,
+      ...board.superflex,
+    ];
+    const keyOf = (r: FpRow) => `${r.name}|${r.position}|${r.team}`;
+    const unique = new Map<string, FpRow>();
+    for (const row of everyRow) unique.set(keyOf(row), row);
+
+    const { resolved, unresolved, ambiguous } = resolveNames([...unique.values()], candidates);
+    const idFor = new Map<string, string>();
+    for (const { input, playerId } of resolved) idFor.set(keyOf(input), playerId);
+
+    const store = (r: FpRow): StoredWeeklyEntry => ({
+      rank: r.rank,
+      sleeperId: idFor.get(keyOf(r)) ?? null,
+      name: r.name,
+      position: r.position,
+      team: r.team,
+      opponent: r.opponent,
+      home: r.home,
+      positionRank: r.positionRank,
+      ecrRank: r.ecrRank,
+      vsEcr: r.vsEcr,
+      bye: r.bye,
+      fantasyProsId: r.fantasyProsId,
+      yahooId: r.yahooId,
+      note: r.note,
+    });
+
+    const scoringLabel =
+      board.scoring === "full_ppr" ? "PPR" : board.scoring === "standard" ? "Standard" : "Half PPR";
+
+    const stored: StoredWeekly = {
+      season: board.season,
+      week: board.week,
+      scoring: board.scoring,
+      title: `Jingles Labs Week ${board.week} Rankings (${scoringLabel})`,
+      url: RANKINGS_URL,
+      postedAt: board.publishedAt
+        ? new Date(`${board.publishedAt.replace(" ", "T")}Z`).toISOString()
+        : new Date().toISOString(),
+      // His publish stamp IS the updated label now. Kept in the same field so
+      // every reader that already shows "updated when" keeps working unchanged.
+      updatedLabel: board.publishedAt,
+      publishedAt: board.publishedAt,
+      ingestedAt: new Date().toISOString(),
+      source: "fantasypros",
+      positional: Object.fromEntries(
+        Object.entries(board.positional).map(([pos, list]) => [pos, list.map(store)]),
+      ),
+      flex: board.flex.map(store),
+      superflex: board.superflex.map(store),
+      unresolved: [
+        ...unresolved.map((u) => ({
+          name: u.name,
+          position: u.position,
+          team: u.team,
+          reason: "no Sleeper player matched",
+        })),
+        ...ambiguous.map((a) => ({
+          name: a.input.name,
+          position: a.input.position,
+          team: a.input.team,
+          reason: `matched ${a.candidates.length} players: ${a.candidates.join(", ")}`,
+        })),
+      ],
+    };
+
+    try {
+      await redis.set(KEY.weeklyFor(board.season, board.week, board.scoring), stored, {
+        ex: TTL,
+      });
+      await redis.set(
+        KEY.weeklyLatestFor(board.scoring),
+        { season: board.season, week: board.week },
+        { ex: TTL },
+      );
+    } catch (e) {
+      report.skipped.push({
+        title: stored.title,
+        reason: `read fine but could not be stored: ${e instanceof Error ? e.message : e}`,
+      });
+      continue;
+    }
+
+    report.weeklyIngested.push({
+      season: board.season,
+      week: board.week,
+      scoring: board.scoring,
+      rows: Object.values(stored.positional).flat().length + stored.flex.length,
+      unresolved: stored.unresolved.length,
+      updatedLabel: stored.updatedLabel,
+      changed: true,
+    });
+  }
+}
+
 async function ingestNotes(post: JinglesPost, report: IngestReport): Promise<void> {
   const players = await getAllPlayers();
   const candidates = toCandidates(players);
@@ -503,6 +735,28 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
     bettingPostsSeen: 0,
     skipped: [],
   };
+
+  // His rankings board FIRST, and not conditional on anything he posted.
+  //
+  // Until 2026-09-17 the weekly list only ever arrived inside a post, so the
+  // ingest looked for a post and parsed it. The list now lives on a platform he
+  // updates through the week without writing anything, which means a
+  // post-driven ingest would sit there reporting healthy runs and quietly serve
+  // week 1 rankings until January.
+  try {
+    const state = await getNflState();
+    const week = state.display_week ?? state.week;
+    if (state.season && week >= 1) {
+      await ingestWeeklyBoards(state.season, week, report, { force: options.force });
+    }
+  } catch (e) {
+    report.skipped.push({
+      title: "Weekly rankings board",
+      reason: `could not tell which week it is, so his board was not read: ${
+        e instanceof Error ? e.message : e
+      }`,
+    });
+  }
 
   const posts = await fetchPosts();
   report.postsSeen = posts.length;

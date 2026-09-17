@@ -1,6 +1,6 @@
 import "server-only";
 import { labForScoring, scoringForLeague, type LabIndex } from "@/lib/jingles/active";
-import { latestWeekly, type StoredWeekly } from "@/lib/jingles/ingest";
+import { latestWeekly, latestWeeklyFor, type StoredWeekly } from "@/lib/jingles/ingest";
 import { normalizeTeam } from "@/lib/jingles/resolve";
 import { resolveLeague } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
@@ -91,7 +91,11 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   }
 
   const [latest, lab, players, rosters, league, me, nflState] = await Promise.all([
-    latestWeekly(),
+    // This league's own scoring, falling back to the half-PPR list he used to
+    // be the only publisher of. A slightly skewed list still ranks a waiver
+    // claim usefully; no list at all empties the whole this-week half of the
+    // page, so the fallback is deliberate and is the weaker of two evils.
+    weeklyForLeague(scoringForLeague(profile)),
     labForScoring(scoringForLeague(profile)),
     getAllPlayers(),
     getLeagueRosters(profile.id),
@@ -379,6 +383,11 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
         ? `His latest weekly list is for week ${latest.week} and this is week ${nflWeek}, so the this-week half of this page waits for his new post. The claims below still stand.`
         : "No weekly rankings ingested yet, so the this-week half of this page is empty. The season-long claims below still stand.",
   };
+}
+
+/** His list in a league's own scoring, or the half-PPR one if that is all there is. */
+async function weeklyForLeague(scoring: ReturnType<typeof scoringForLeague>) {
+  return (await latestWeeklyFor(scoring)) ?? (await latestWeekly());
 }
 
 function weeklyIndex(weekly: StoredWeekly | null) {
