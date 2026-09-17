@@ -62,6 +62,19 @@ describe("moversFromValues", () => {
     expect(fallers[0].trend7Day).toBe(-1250);
   });
 
+  it("treats RosterAudit's -100% floor as losing what is left, not as infinity", () => {
+    // Live data from 2026-09-16: ten players floored at -10000 with values
+    // under 80. A division by zero here rendered "-∞" at the top of fallers.
+    const values = byId(
+      player("rudolph", { value: 70, trend7Day: -10000 }),
+      player("kittle", { value: 330, trend7Day: -5245 }),
+    );
+    const { fallers } = moversFromValues(values, "rosteraudit", 30);
+    expect(fallers.map((m) => m.sleeperId)).toEqual(["kittle", "rudolph"]);
+    expect(fallers.map((m) => m.trend7Day)).toEqual([-364, -70]);
+    expect(fallers.every((m) => Number.isFinite(m.trend7Day))).toBe(true);
+  });
+
   it("falls back to the 30-day trend when the source has no 7-day trend", () => {
     const values = byId(
       player("a", { trend7Day: 0, trend30Day: 200 }),

@@ -26,6 +26,10 @@ const TRACKED_POSITIONS = new Set(["QB", "RB", "WR", "TE"]);
 /** Points gained or lost over the window, from a basis-point share of value. */
 function pointsFromBasisPoints(value: number, bp: number): number {
   if (bp === 0 || value <= 0) return 0;
+  // RosterAudit floors a collapsed player at -100%, which says nothing about
+  // where he fell from. Count the whole of what is left as the loss; at the
+  // values involved (single and double digits) that keeps him off the top.
+  if (bp <= -10_000) return -Math.round(value);
   const before = value / (1 + bp / 10_000);
   return Math.round(value - before);
 }
