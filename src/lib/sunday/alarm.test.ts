@@ -118,12 +118,14 @@ describe("alarm keys and what counts as new", () => {
     expect(doubtful.key).toContain("Rome Odunze");
   });
 
-  it("keeps two empty slots in the same league apart", () => {
+  it("keeps two empty slots in the same league apart, even with the same label", () => {
+    // A lineup has two WR slots and often two FLEX, and both are labelled
+    // by position alone. The second FLEX going empty at 12:30 is news.
     const out = lockAlarms({
       pools: [],
       slots: [
-        { ...slot, slot: "WR2", player: null },
-        { ...slot, slot: "TE", player: null },
+        { ...slot, slot: "FLEX", index: 6, player: null },
+        { ...slot, slot: "FLEX", index: 7, player: null },
       ],
     });
     expect(new Set(out.map((r) => r.key)).size).toBe(2);

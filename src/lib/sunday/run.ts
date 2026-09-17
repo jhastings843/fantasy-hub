@@ -154,6 +154,7 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
           .map((slot) => ({
             league: league.leagueName,
             slot: slot.slot,
+            index: slot.index,
             player: slot.current?.name ?? null,
             status: slot.current?.onBye ? "Bye" : (slot.current?.injuryStatus ?? null),
           })),

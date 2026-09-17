@@ -41,6 +41,12 @@ export interface PoolAlarmInput {
 export interface SlotAlarmInput {
   league: string;
   slot: string;
+  /**
+   * Position in the roster_positions array. Slot labels repeat (a lineup has
+   * two WR and often two FLEX), so the label alone cannot tell one empty
+   * flex from another, and the second one going empty would be "seen".
+   */
+  index?: number;
   /** Null means the slot is empty, which scores zero. */
   player: string | null;
   /** Sleeper's status string, or "Bye". */
@@ -97,7 +103,7 @@ export function lockAlarms(input: {
     if (!s.player) {
       out.push({
         kind: "empty-slot",
-        key: `empty-slot:${s.league}:${s.slot}`,
+        key: `empty-slot:${s.league}:${s.slot}#${s.index ?? s.slot}`,
         text: `${s.league}: ${s.slot} is empty and will score nothing.`,
       });
       continue;

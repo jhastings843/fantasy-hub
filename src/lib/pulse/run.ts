@@ -274,16 +274,19 @@ async function refreshWaivers(): Promise<string> {
     (l) => l.source !== "manual" && l.type !== "guillotine",
   );
   const results = await Promise.allSettled(leagues.map((l) => buildWaivers(l.id)));
-  const failed = results.flatMap((r, i) => {
-    const name = leagues[i].name;
-    if (r.status === "rejected") {
-      return [`${name}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`];
-    }
-    return r.value.blocked ? [`${name}: ${r.value.blocked}`] : [];
-  });
+  // Only a build that threw is a failure. `blocked` is also set when his
+  // weekly list is stale, and the season claims still rebuild in that state;
+  // counting it would rerun the hourly tier every fifteen minutes for as
+  // long as he has not posted, which can be most of a week.
+  const failed = results.flatMap((r, i) =>
+    r.status === "rejected"
+      ? [`${leagues[i].name}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`]
+      : [],
+  );
   const problem = partialFailure("leagues rebuilt", leagues.length, failed);
   if (problem) throw new Error(problem);
-  return `${leagues.length} leagues rebuilt`;
+  const waiting = results.filter((r) => r.status === "fulfilled" && r.value.blocked).length;
+  return `${leagues.length} leagues rebuilt${waiting ? `, ${waiting} waiting on this week's list` : ""}`;
 }
 
 /**

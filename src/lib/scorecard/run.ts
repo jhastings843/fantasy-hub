@@ -190,10 +190,17 @@ export async function settleWeek(options: {
     // Graded against the lineup that actually scored, not the one Sleeper
     // showed on Sunday morning: a change he made at noon is his decision and
     // belongs on his side of the ledger.
+    // A week is settled once, so a Sleeper outage here must defer the week
+    // rather than freeze the Sunday-morning fallback into the record. An
+    // answer that lacks his roster is still an answer, and falls back.
     const matchups =
       record.rosterId != null
-        ? await getLeagueMatchups(leagueId, options.week).catch(() => [])
+        ? await getLeagueMatchups(leagueId, options.week).catch(() => null)
         : [];
+    if (matchups === null) {
+      skipped.push({ leagueId, why: "Sleeper's matchups could not be read; the week will settle on a later run" });
+      continue;
+    }
     const started = finalStarters(matchups, record.rosterId ?? null, record.started);
 
     const out: Settled = {
