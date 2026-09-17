@@ -88,7 +88,9 @@ async function create() {
     for (const s of existing) console.log(describe(s));
     return;
   }
-  const res = await api('POST', `/v2/schedules/${encodeURIComponent(DESTINATION)}`, {
+  // The destination goes in the path as written. QStash reads the scheme off
+  // it and rejects a percent-encoded one as having no scheme.
+  const res = await api('POST', `/v2/schedules/${DESTINATION}`, {
     'Upstash-Cron': CRON,
     'Upstash-Method': 'GET',
     // One retry, a minute later. The app answers 200 even when a job inside
