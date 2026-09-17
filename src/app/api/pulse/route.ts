@@ -9,9 +9,10 @@ export const maxDuration = 60;
 
 // GET /api/pulse - the heartbeat.
 //
-// Called every fifteen minutes by .github/workflows/pulse.yml. What it does
-// depends on the Eastern clock, which is decided in lib/pulse/tempo.ts and
-// tested there rather than being expressed in cron.
+// Called every fifteen minutes by a QStash schedule (scripts/qstash-pulse.mjs),
+// with .github/workflows/pulse.yml as a backstop that GitHub fires a few times
+// a day. What it does depends on the Eastern clock, which is decided in
+// lib/pulse/tempo.ts and tested there rather than being expressed in cron.
 //
 //   (no args)   do whatever is due now
 //   ?peek=1     say what would happen, do nothing. No auth: it reads a clock

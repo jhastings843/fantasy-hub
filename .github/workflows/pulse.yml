@@ -10,10 +10,14 @@
 # wrong for four months of the year. src/lib/pulse/tempo.ts decides, and it has
 # tests.
 #
-# Two things worth knowing about GitHub's scheduler: it can run several minutes
-# late under load, which is why nothing here is timed to the minute, and it
-# disables scheduled workflows on a repository with no activity for 60 days,
-# which a season of commits comfortably avoids.
+# THIS IS THE BACKSTOP, NOT THE HEARTBEAT. GitHub's scheduler delivered about
+# seven runs a day against the fifteen-minute ask (measured 2026-09-14 to
+# 09-17: median gap 197 minutes, longest 330), every one of them green, so
+# nothing flagged it. QStash fires the same endpoint on the minute; see
+# scripts/qstash-pulse.mjs. This workflow stays so a QStash outage costs hours
+# rather than everything, and the app's tier leases make a doubled call
+# harmless. GitHub also disables scheduled workflows on a repository with no
+# activity for 60 days, which a season of commits comfortably avoids.
 #
 # Secrets and variables this needs:
 #   secrets.CRON_SECRET  the same value as the Vercel environment variable
