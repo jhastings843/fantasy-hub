@@ -102,6 +102,7 @@ function PlayerRowItem({
               Break
             </span>
           )}
+          <JinglesRankChip p={p} />
         </div>
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
           {[p.team ?? "FA", p.position].filter(Boolean).join(" · ")}
@@ -110,10 +111,58 @@ function PlayerRowItem({
             : ""}
         </span>
       </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums">
-        {p.value > 0 ? p.value.toLocaleString() : "-"}
+      <span className="flex shrink-0 flex-col items-end">
+        <span className="text-sm font-semibold tabular-nums">
+          {p.value > 0 ? p.value.toLocaleString() : "-"}
+        </span>
+        <MarketDelta p={p} />
       </span>
     </label>
+  );
+}
+
+/**
+ * Where he has the player, when a league reads his list. "Off list" only
+ * shows for a player the market rates inside his range, because that absence
+ * is a call; a deep bench player he never got to is not.
+ */
+function JinglesRankChip({ p }: { p: PlayerRow }) {
+  if (p.marketValue === undefined) return null;
+  if (p.jinglesRank === null || p.jinglesRank === undefined) {
+    return (
+      <span
+        title="Not on Jingles' season list, though the market rates him inside it"
+        className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+      >
+        Off list
+      </span>
+    );
+  }
+  return (
+    <span
+      title={`Jingles has him ${p.position}${p.jinglesPositionRank ?? "?"}, #${p.jinglesRank} overall`}
+      className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+    >
+      J {p.position}{p.jinglesPositionRank ?? p.jinglesRank}
+    </span>
+  );
+}
+
+/** Signed distance from the market's number, so the blend is never hidden. */
+function MarketDelta({ p }: { p: PlayerRow }) {
+  if (p.marketValue === undefined) return null;
+  const d = p.value - p.marketValue;
+  if (d === 0) return null;
+  return (
+    <span
+      title={`Market ${p.marketValue.toLocaleString()}`}
+      className={`text-[10px] font-medium tabular-nums ${
+        d > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+      }`}
+    >
+      {d > 0 ? "+" : ""}
+      {d.toLocaleString()} vs mkt
+    </span>
   );
 }
 
@@ -295,6 +344,18 @@ function partnerSummary(partner: { verdict: TradeVerdict; positionalImpact: Posi
   return `For them: ${verdictLabel(partner.verdict)}${holes.length ? ` · ${holes.join(" · ")}` : ""}`;
 }
 
+/** What the trade values were blended with, for the line that says so. */
+export interface JinglesBlendInfo {
+  title: string;
+  url: string;
+  postedAt: string;
+  matchesLeagueScoring: boolean;
+  /** Players on his list. */
+  ranked: number;
+  /** Players whose value the blend changed. */
+  moved: number;
+}
+
 export default function TradeBuilder({
   teams,
   myRosterId,
@@ -303,6 +364,7 @@ export default function TradeBuilder({
   leagueType,
   faabBudget,
   faabByRosterId,
+  jingles = null,
 }: {
   teams: TeamSummary[];
   myRosterId: number;
@@ -314,6 +376,8 @@ export default function TradeBuilder({
   faabBudget: number | null;
   /** What each roster has left to spend. */
   faabByRosterId: Record<number, number>;
+  /** Null in dynasty, where his redraft list has no say. */
+  jingles?: JinglesBlendInfo | null;
 }) {
   // Only a dynasty league has future rookie picks. Offering them anywhere else
   // was the bug: a redraft trade screen let you build an offer around assets
@@ -712,6 +776,28 @@ export default function TradeBuilder({
 
   return (
     <div className="flex flex-col gap-6">
+      {jingles && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+            Jingles in the price
+          </span>
+          <span>
+            Every value here is half the market, half where he ranks the player on{" "}
+            <a
+              href={jingles.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
+            >
+              {jingles.title}
+            </a>{" "}
+            (posted {jingles.postedAt.slice(0, 10)}). {jingles.moved.toLocaleString()} of{" "}
+            {jingles.ranked.toLocaleString()} ranked players moved.
+            {!jingles.matchesLeagueScoring &&
+              " His list is half PPR, this league is not, so the lean is directional."}
+          </span>
+        </p>
+      )}
       {bestTrades.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">

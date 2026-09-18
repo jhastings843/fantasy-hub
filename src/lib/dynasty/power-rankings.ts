@@ -18,6 +18,13 @@ export interface PlayerValueLike {
   buyLow?: boolean;
   sellHigh?: boolean;
   breakout?: boolean;
+  // Present only where a league blends his season list into the market value
+  // (see lib/redraft/jingles-values.ts). marketValue is what the source said
+  // before the blend; jinglesRank is null when he left the player off.
+  marketValue?: number;
+  marketPositionRank?: number;
+  jinglesRank?: number | null;
+  jinglesPositionRank?: number | null;
 }
 export type PlayerValuesBySleeperId = Record<string, PlayerValueLike>;
 
@@ -37,6 +44,10 @@ export type PlayerRow = {
   buyLow?: boolean;
   sellHigh?: boolean;
   breakout?: boolean;
+  marketValue?: number;
+  marketPositionRank?: number;
+  jinglesRank?: number | null;
+  jinglesPositionRank?: number | null;
 };
 
 export type TeamSummary = {
@@ -93,6 +104,10 @@ export function computeTeamSummaries(
           buyLow: v?.buyLow ?? false,
           sellHigh: v?.sellHigh ?? false,
           breakout: v?.breakout ?? false,
+          marketValue: v?.marketValue,
+          marketPositionRank: v?.marketPositionRank,
+          jinglesRank: v?.jinglesRank,
+          jinglesPositionRank: v?.jinglesPositionRank,
         };
       })
       .filter((x): x is PlayerRow => x !== null)

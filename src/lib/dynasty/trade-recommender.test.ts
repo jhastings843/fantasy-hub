@@ -129,3 +129,70 @@ describe("bilateral trade recommendations", () => {
     expect(ideas.every((i) => i.mutual)).toBe(true);
   });
 });
+
+describe("jingles lean in the verdict", () => {
+  function blended(id: string, position: string, value: number, marketValue: number, marketPositionRank: number, jinglesRank: number | null, jinglesPositionRank: number | null): PlayerRow {
+    return { ...player(id, position, value), marketValue, marketPositionRank, jinglesRank, jinglesPositionRank };
+  }
+  const picks = new Map();
+
+  it("says nothing about Jingles when no player carries his rank", () => {
+    const teams = fixture();
+    const result = evaluateTrade(
+      { myPlayers: [teams[0].players[0]], myPicks: [], theirPlayers: [teams[1].players[0]], theirPicks: [] },
+      teams[0], teams[1], teams, 4, false, picks,
+    );
+    expect(result?.reasoning.some((r) => r.includes("Jingles"))).toBe(false);
+    expect(result?.jinglesSwing).toBeNull();
+  });
+
+  it("names the player he is higher on when his list tilts the deal your way", () => {
+    const mine = blended("give", "WR", 1000, 1000, 4, 10, 4);
+    const theirs = blended("get", "RB", 1200, 800, 5, 6, 2); // market RB5, he says RB2
+    const teams = league([[mine], [theirs], [player("x", "WR", 500)], [player("y", "RB", 500)]]);
+    const result = evaluateTrade(
+      { myPlayers: [mine], myPicks: [], theirPlayers: [theirs], theirPicks: [] },
+      teams[0], teams[1], teams, 4, false, picks,
+    );
+    expect(result?.jinglesSwing).toBe(400);
+    const line = result?.reasoning.find((r) => r.includes("Jingles"));
+    expect(line).toBe("Jingles tilts this your way (+400): he has get RB2, the market has him RB5");
+  });
+
+  it("warns when his list tilts the deal against you", () => {
+    const mine = blended("give", "WR", 1300, 900, 4, 3, 1); // market WR4, he says WR1
+    const theirs = blended("get", "RB", 1000, 1000, 3, 8, 3);
+    const teams = league([[mine], [theirs], [player("x", "WR", 500)], [player("y", "RB", 500)]]);
+    const result = evaluateTrade(
+      { myPlayers: [mine], myPicks: [], theirPlayers: [theirs], theirPicks: [] },
+      teams[0], teams[1], teams, 4, false, picks,
+    );
+    expect(result?.jinglesSwing).toBe(-400);
+    expect(result?.reasoning.find((r) => r.includes("Jingles")))
+      .toBe("Jingles tilts this against you (-400): he has give WR1, the market has him WR4");
+  });
+
+  it("says he agrees with the market when the swing is small", () => {
+    const mine = blended("give", "WR", 1010, 1000, 2, 5, 2);
+    const theirs = blended("get", "RB", 1000, 1000, 2, 6, 2);
+    const teams = league([[mine], [theirs], [player("x", "WR", 500)], [player("y", "RB", 500)]]);
+    const result = evaluateTrade(
+      { myPlayers: [mine], myPicks: [], theirPlayers: [theirs], theirPicks: [] },
+      teams[0], teams[1], teams, 4, false, picks,
+    );
+    expect(result?.jinglesSwing).toBe(-10);
+    expect(result?.reasoning).toContain("Jingles and the market agree on this one");
+  });
+
+  it("names a player he left off his list as unranked", () => {
+    const mine = blended("give", "WR", 1000, 1000, 4, 10, 4);
+    const theirs = blended("get", "RB", 500, 900, 5, null, null);
+    const teams = league([[mine], [theirs], [player("x", "WR", 500)], [player("y", "RB", 500)]]);
+    const result = evaluateTrade(
+      { myPlayers: [mine], myPicks: [], theirPlayers: [theirs], theirPicks: [] },
+      teams[0], teams[1], teams, 4, false, picks,
+    );
+    expect(result?.reasoning.find((r) => r.includes("Jingles")))
+      .toBe("Jingles tilts this against you (-400): he left get off his list, the market has him RB5");
+  });
+});

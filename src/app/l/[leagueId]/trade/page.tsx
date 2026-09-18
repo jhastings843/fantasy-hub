@@ -15,6 +15,11 @@ import TradeBuilder from "./TradeBuilder";
 import { RefreshButton } from "@/components/RefreshButton";
 import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
+import { jinglesAppliesTo } from "@/lib/jingles/data";
+import { activeLab } from "@/lib/jingles/active";
+import { blendWithJingles } from "@/lib/redraft/jingles-values";
+import type { JinglesBlendInfo } from "./TradeBuilder";
+import type { PlayerValuesBySleeperId } from "@/lib/dynasty/power-rankings";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +61,11 @@ export default async function TradePage({
 
   const profile = profileFromSleeper(league);
 
-  const [me, rosters, users, players, fcValues, picks] = await Promise.all([
+  // His season list is redraft research, so it prices redraft trades and
+  // stays out of dynasty ones (the same rule the badges and draft board use).
+  const readsJingles = jinglesAppliesTo(profile.type);
+
+  const [me, rosters, users, players, marketValues, picks, lab] = await Promise.all([
     getUser(username),
     getLeagueRosters(leagueId),
     getLeagueUsers(leagueId),
@@ -65,7 +74,27 @@ export default async function TradePage({
     // Rookie picks exist in dynasty and nowhere else. Fetching them for a
     // redraft league was not just wasted work, it fed a UI that offered them.
     profile.type === "dynasty" ? getPicks() : Promise.resolve([]),
+    readsJingles ? activeLab(profile) : Promise.resolve(null),
   ]);
+
+  // Half the market, half his list. See lib/redraft/jingles-values.ts.
+  let fcValues: PlayerValuesBySleeperId = marketValues;
+  let jingles: JinglesBlendInfo | null = null;
+  if (lab && lab.list.length > 0) {
+    const blend = blendWithJingles(marketValues, {
+      entries: lab.list,
+      byId: lab.byId,
+    });
+    fcValues = blend.values;
+    jingles = {
+      title: lab.title,
+      url: lab.url,
+      postedAt: lab.postedAt,
+      matchesLeagueScoring: lab.matchesLeagueScoring,
+      ranked: lab.list.length,
+      moved: blend.moved,
+    };
+  }
 
   // What each roster has left to spend, which is the budget minus what they have
   // already used. Sleeper reports the spend, not the remainder.
@@ -116,6 +145,7 @@ export default async function TradePage({
           leagueType={profile.type}
           faabBudget={profile.faab}
           faabByRosterId={faabByRosterId}
+          jingles={jingles}
         />
 
       </div>

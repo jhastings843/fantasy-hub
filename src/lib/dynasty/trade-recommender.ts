@@ -685,6 +685,12 @@ export interface TradeAssessment extends BilateralScore {
   reasoning: string[];
   positionalImpact: PositionalImpact[];
   counters: CounterSuggestion[];
+  /**
+   * How much of the value gap is his opinion rather than the market's, in
+   * value points; positive favours you. Null when no player in the deal
+   * carries his rank, which is every dynasty league.
+   */
+  jinglesSwing: number | null;
 }
 
 const VERDICT_LABEL: Record<TradeVerdict, string> = {
@@ -766,6 +772,66 @@ export function scoreSideFor(
   const overallScore = pctDelta * 100 + positionalScore * 5;
 
   return { positionalScore, positionalImpact, overallScore, pctDelta };
+}
+
+// ---------------------------------------------------------------
+// His list versus the market
+// ---------------------------------------------------------------
+
+/** Value the blend added to (or took from) a player. Zero when unblended. */
+function jinglesLift(p: PlayerRow): number {
+  return p.marketValue === undefined ? 0 : p.value - p.marketValue;
+}
+
+function hisLabel(p: PlayerRow): string {
+  if (p.jinglesRank === null || p.jinglesRank === undefined) {
+    return `he left ${p.name} off his list`;
+  }
+  return `he has ${p.name} ${p.position}${p.jinglesPositionRank ?? p.jinglesRank}`;
+}
+
+function marketLabel(p: PlayerRow): string {
+  return `the market has him ${p.position}${p.marketPositionRank ?? p.positionRank}`;
+}
+
+/**
+ * One line on where his list stands on the deal.
+ *
+ * The blended values already carry his opinion into the verdict; this makes
+ * that visible. Without it a trade the market calls even could read as a
+ * clear win, and Jack would have no way to tell whether that was the market
+ * or Jingles talking. The line names the single biggest mover, which is the
+ * player worth asking about.
+ */
+export function jinglesLean(
+  giving: PlayerRow[],
+  receiving: PlayerRow[],
+): { swing: number; line: string } | null {
+  const blended = [...giving, ...receiving].filter((p) => p.marketValue !== undefined);
+  if (blended.length === 0) return null;
+
+  const swing =
+    receiving.reduce((s, p) => s + jinglesLift(p), 0) -
+    giving.reduce((s, p) => s + jinglesLift(p), 0);
+
+  const baseline = Math.max(bundleValue(giving), bundleValue(receiving));
+  if (Math.abs(swing) < 100 && Math.abs(swing) < baseline * 0.05) {
+    return { swing, line: "Jingles and the market agree on this one" };
+  }
+
+  // The player whose lift moved the gap furthest in the swing's direction.
+  const movers = [
+    ...receiving.map((p) => ({ p, toward: jinglesLift(p) })),
+    ...giving.map((p) => ({ p, toward: -jinglesLift(p) })),
+  ].filter((m) => Math.sign(m.toward) === Math.sign(swing));
+  movers.sort((a, b) => Math.abs(b.toward) - Math.abs(a.toward));
+  const mover = movers[0]?.p;
+  const signed = `${swing > 0 ? "+" : ""}${swing.toLocaleString()}`;
+  const head = swing > 0
+    ? `Jingles tilts this your way (${signed})`
+    : `Jingles tilts this against you (${signed})`;
+  if (!mover) return { swing, line: head };
+  return { swing, line: `${head}: ${hisLabel(mover)}, ${marketLabel(mover)}` };
 }
 
 function verdictFor(score: number): TradeVerdict {
@@ -865,6 +931,9 @@ export function evaluateTrade(
   } else {
     reasoning.push("Value is essentially even");
   }
+
+  const lean = jinglesLean(proposal.myPlayers, proposal.theirPlayers);
+  if (lean) reasoning.push(lean.line);
 
   // Lead with hole transitions, then improvements, then non-hole
   // weakening. Holes get explicit language because opening one is
@@ -988,6 +1057,7 @@ export function evaluateTrade(
     reasoning,
     positionalImpact,
     counters: counters.slice(0, 3),
+    jinglesSwing: lean?.swing ?? null,
     partner: partnerAssessment,
     mutual,
     mutualScore,
