@@ -486,8 +486,8 @@ export default function TradeBuilder({
 
   const bestTrades = useMemo(() => {
     if (!myTeam) return [];
-    return findBestTrades(myTeam, teams, teams.length, 6);
-  }, [myTeam, teams]);
+    return findBestTrades(myTeam, teams, teams.length, 6, { youth: tradesPicks });
+  }, [myTeam, teams, tradesPicks]);
 
   const assessment = useMemo(() => {
     if (!myTeam) return null;
@@ -796,6 +796,14 @@ export default function TradeBuilder({
             {!jingles.matchesLeagueScoring &&
               " His list is half PPR, this league is not, so the lean is directional."}
           </span>
+        </p>
+      )}
+      {bestTrades.length === 0 && myTeam && (
+        <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+          No trade ideas across the league right now. Your rooms rank{" "}
+          {POSITIONS_DISPLAY.map((pos) => `${pos} #${myTeam.positionRanks[pos] ?? "?"}`).join(", ")} of{" "}
+          {teams.length}, and nothing on another roster both lifts one of them and works for the other side.
+          Pick a partner or a player below to price a deal by hand.
         </p>
       )}
       {bestTrades.length > 0 && (

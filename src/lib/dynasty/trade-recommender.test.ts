@@ -196,3 +196,56 @@ describe("jingles lean in the verdict", () => {
       .toBe("Jingles tilts this against you (-400): he left get off his list, the market has him RB5");
   });
 });
+
+describe("best trades for a balanced roster", () => {
+  // Four teams, so the median rank is 2. My rooms: QB 1st, TE 1st, RB 2nd,
+  // WR 2nd. Nothing is below the median, but RB and WR are still my weakest
+  // rooms and team 2 has an RB who would lift mine to 1st.
+  function balanced() {
+    return league([
+      [player("my-qb", "QB", 3000), player("my-te", "TE", 2000), player("my-rb", "RB", 1400), player("my-wr", "WR", 1500), player("my-qb2", "QB", 1400)],
+      [player("their-rb", "RB", 1500), player("their-rb2", "RB", 900), player("their-qb", "QB", 400), player("their-wr", "WR", 1000), player("their-te", "TE", 500)],
+      [player("c-rb", "RB", 800), player("c-wr", "WR", 2000), player("c-qb", "QB", 1000), player("c-te", "TE", 900)],
+      [player("d-rb", "RB", 500), player("d-wr", "WR", 500), player("d-qb", "QB", 500), player("d-te", "TE", 300)],
+    ]);
+  }
+
+  it("still targets the weakest rooms when no room is below the median", () => {
+    const teams = balanced();
+    expect(teams[0].positionRanks).toEqual({ QB: 1, RB: 2, WR: 2, TE: 1 });
+    const ideas = findBestTrades(teams[0], teams, 4, 6);
+    expect(ideas.length).toBeGreaterThan(0);
+    expect(ideas.every((i) => ["RB", "WR"].includes(i.positionalGain.position))).toBe(true);
+  });
+
+  it("never targets a room that is already top four", () => {
+    const teams = balanced();
+    const ideas = findBestTrades(teams[0], teams, 12, 6);
+    expect(ideas.some((i) => i.positionalGain.position === "QB" || i.positionalGain.position === "TE")).toBe(false);
+  });
+});
+
+describe("youth arbitrage is a dynasty idea", () => {
+  function agingFixture() {
+    return league([
+      // My WR room is the league's worst even with the aging star, which is
+      // the condition an age swap needs; the swap itself is near value parity.
+      [player("old-star", "WR", 3000, 30), player("my-rb", "RB", 500), player("my-qb", "QB", 500), player("my-te", "TE", 500)],
+      [player("young", "WR", 2950, 22), player("b-wr2", "WR", 500), player("b-rb", "RB", 2000), player("b-qb", "QB", 2000), player("b-te", "TE", 2000)],
+      [player("c-wr", "WR", 4000), player("c-rb", "RB", 1000), player("c-qb", "QB", 1000), player("c-te", "TE", 1000)],
+      [player("d-wr", "WR", 3500), player("d-rb", "RB", 800), player("d-qb", "QB", 800), player("d-te", "TE", 800)],
+    ]);
+  }
+
+  it("offers age swaps in dynasty", () => {
+    const teams = agingFixture();
+    const ideas = findBestTrades(teams[0], teams, 4, 6, { youth: true });
+    expect(ideas.some((i) => i.kind === "youth_arbitrage")).toBe(true);
+  });
+
+  it("never offers age swaps in redraft, where next year does not exist", () => {
+    const teams = agingFixture();
+    const ideas = findBestTrades(teams[0], teams, 4, 6, { youth: false });
+    expect(ideas.some((i) => i.kind === "youth_arbitrage")).toBe(false);
+  });
+});

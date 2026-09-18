@@ -109,12 +109,23 @@ function projectedRank(
   return rank;
 }
 
+export interface BestTradeOptions {
+  /**
+   * Whether to offer "sell the aging star for young upside" ideas. Those
+   * price a player's next three seasons, which only exist in dynasty; a
+   * redraft league was being told Justin Jefferson had a short runway.
+   */
+  youth?: boolean;
+}
+
 export function findBestTrades(
   myTeam: TeamSummary,
   allTeams: TeamSummary[],
   totalTeams: number,
   limit = 6,
+  options: BestTradeOptions = {},
 ): BestTradeIdea[] {
+  const youth = options.youth ?? true;
   const ideas: BestTradeIdea[] = [];
 
   const myRanksByPos = TRADE_POSITIONS.map((p) => ({
@@ -122,14 +133,24 @@ export function findBestTrades(
     rank: myTeam.positionRanks[p] ?? 99,
   })).sort((a, b) => b.rank - a.rank);
 
-  // Anything below median is "needs help"; the bottom two are top priority.
+  // Anything below median needs help. A balanced roster has nothing below
+  // the median and used to get no ideas at all, which read as the tool being
+  // broken: Jack's Half PPR team sat QB3, RB6, WR6, TE3 in a 12-team league
+  // and the section simply vanished. Now the two weakest rooms are always in
+  // play unless they are already near the top, so a mid-pack room can still
+  // be improved. The fit checks below (partner better than me, projected
+  // improvement, works for both sides) keep the ideas honest.
   const median = Math.ceil(totalTeams / 2);
-  const myWeakPositions = myRanksByPos
-    .filter((x) => x.rank > median)
+  const belowMedian = myRanksByPos.filter((x) => x.rank > median).map((x) => x.pos);
+  const nearTop = Math.max(2, Math.ceil(totalTeams / 4));
+  const weakest = myRanksByPos
+    .filter((x) => x.rank >= nearTop)
+    .slice(0, 2)
     .map((x) => x.pos);
+  const myWeakPositions = [...new Set([...belowMedian, ...weakest])];
 
   if (myWeakPositions.length === 0) {
-    // Already balanced; no clear trade priorities. Return empty.
+    // Every room is near the top of the league. Nothing to fix by trade.
     return [];
   }
 
@@ -181,7 +202,7 @@ export function findBestTrades(
   // positional fit. For each of my aging stars, find a younger player
   // on a partner's roster within 70-110% of my player's value.
   const myAgingStars = myTeam.players
-    .filter((p) => isAging(p) && p.value >= 1500)
+    .filter((p) => youth && isAging(p) && p.value >= 1500)
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
