@@ -4,6 +4,7 @@ import {
   researchWaiverTargets,
   type ResearchFormat,
 } from "@/lib/waivers/research";
+import { friendlyAiError } from "@/lib/ai-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,13 @@ export async function POST(request: Request) {
         top: research.targets.slice(0, 5).map((t) => `${t.name} ${t.faabPercent ?? "?"}%`),
       };
     } catch (e) {
-      results[format] = { ok: false, error: e instanceof Error ? e.message : String(e) };
+      // Out of credit reads as a plain sentence rather than a raw 400, so the
+      // failure names its own fix.
+      const friendly = friendlyAiError(e);
+      results[format] = {
+        ok: false,
+        error: friendly ?? (e instanceof Error ? e.message : String(e)),
+      };
     }
   }
   const ok = Object.values(results).every((r) => (r as { ok: boolean }).ok);
