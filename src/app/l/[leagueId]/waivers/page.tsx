@@ -65,6 +65,23 @@ function ResearchLine({ p }: { p: WaiverPlayer }) {
   );
 }
 
+function JinglesLine({ p }: { p: WaiverPlayer }) {
+  if (!p.jingles) return null;
+  const { rank, faab, faabPercent, budget, note } = p.jingles;
+  // His dollars and the percent they represent. The dollars are what he wrote
+  // and the percent is what carries into a league with a different budget, and
+  // showing only one of them makes a reader do the conversion he already did.
+  const bid = `$${faab} of $${budget}`;
+  return (
+    <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+      <Chip tone="amber">
+        Jingles{rank !== null ? ` #${rank}` : ""} {bid} ({Math.round(faabPercent)}%)
+      </Chip>{" "}
+      {note}
+    </p>
+  );
+}
+
 function UsageLine({ p }: { p: WaiverPlayer }) {
   if (!p.lastWeek) return null;
   const quiet = p.lastWeek.snaps < 10 && !p.onBye;
@@ -123,6 +140,7 @@ function StartRow({ t }: { t: StartableTarget }) {
         {t.displaces ? `, ahead of ${t.displaces.name}` : ""}.
       </p>
       <ResearchLine p={t.player} />
+      <JinglesLine p={t.player} />
       <UsageLine p={t.player} />
       <BidLine price={t.price} />
       {t.price ? (
@@ -155,6 +173,7 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
           )}
         </p>
         <ResearchLine p={t.player} />
+        <JinglesLine p={t.player} />
         <UsageLine p={t.player} />
         <BidLine price={t.price} />
         {t.price ? (

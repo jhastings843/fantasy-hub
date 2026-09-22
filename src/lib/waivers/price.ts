@@ -110,6 +110,8 @@ export interface ClaimCandidate {
   /** The web consensus tier and bid percent, when this week's research named him. */
   researchTier?: ClaimTier | null;
   researchPercent?: number | null;
+  /** His waiver post's bid on this player, as a percent of the budget. */
+  jinglesPercent?: number | null;
 }
 
 export interface ObservedClaim {
@@ -286,8 +288,15 @@ function marketFor(tier: ClaimTier, c: ClaimCandidate, ctx: PricingContext): num
   const modelled = blended * heat;
   // Published consensus bids run high against what leagues actually pay, so
   // the research is one voice in the market number, not the whole of it.
-  if (c.researchPercent != null && c.researchPercent > 0) {
-    return (modelled + (ctx.budget * c.researchPercent) / 100) / 2;
+  // Averaged where both exist, because they are two waiver columns rather than
+  // two independent markets: counting them separately would let the published
+  // opinion outvote what leagues actually pay.
+  const published = [c.researchPercent, c.jinglesPercent].filter(
+    (p): p is number => p != null && p > 0,
+  );
+  if (published.length > 0) {
+    const consensus = published.reduce((a, b) => a + b, 0) / published.length;
+    return (modelled + (ctx.budget * consensus) / 100) / 2;
   }
   return modelled;
 }
@@ -337,6 +346,11 @@ export function priceClaim(c: ClaimCandidate, ctx: PricingContext): ClaimPrice {
   }
   if (c.researchPercent != null) {
     why.push(`This week's waiver columns put him at about ${c.researchPercent}% of budget.`);
+  }
+  if (c.jinglesPercent != null) {
+    // Named, because a number with an author behind it is worth more than an
+    // average, and Jack reads his post anyway.
+    why.push(`Jingles bids ${Math.round(c.jinglesPercent)}% of budget on him this week.`);
   }
   if (broke) {
     why.push("No FAAB left to spend, so this is a $0 claim: it lands only if nobody else bids.");

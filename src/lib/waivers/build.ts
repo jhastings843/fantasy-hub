@@ -1,6 +1,6 @@
 import "server-only";
 import { labForScoring, scoringForLeague, type LabIndex } from "@/lib/jingles/active";
-import { latestWeekly, latestWeeklyFor, type StoredWeekly } from "@/lib/jingles/ingest";
+import { latestWeekly, latestWeeklyFor, readWaivers, type StoredWeekly } from "@/lib/jingles/ingest";
 import { normalizeTeam } from "@/lib/jingles/resolve";
 import { resolveLeague } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
@@ -269,6 +269,43 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     };
   }
 
+  // His waiver post, folded onto whichever board was built above.
+  //
+  // Done here rather than inside either branch because it applies to both: his
+  // bids are as useful against a fresh season list as they are against a wire
+  // of trending adds. It is also the only source in this function that prints a
+  // dollar figure, which is the thing the page had been missing.
+  const jingles = await readWaivers(season, nflWeek);
+  if (jingles) {
+    const priced = (row: (typeof jingles.rows)[number]) => ({
+      rank: row.rank,
+      faab: row.faab,
+      faabPercent: row.faabPercent,
+      budget: jingles.budget,
+      note: row.note,
+    });
+    const rowById = new Map(
+      jingles.rows.filter((r) => r.sleeperId).map((r) => [r.sleeperId!, r]),
+    );
+    freeAgents = freeAgents.map((p) => {
+      const row = rowById.get(p.playerId);
+      return row ? { ...p, jingles: priced(row) } : p;
+    });
+
+    // Anyone he named who is not on the board yet. He publishes thirty players
+    // he would actually claim, and a board that shows his bid on the four it
+    // already had is a worse version of his post.
+    const have = new Set(freeAgents.map((p) => p.playerId));
+    const his = jingles.rows
+      .filter((r) => r.sleeperId && !have.has(r.sleeperId) && !owned.has(r.sleeperId))
+      .map((r) => ({ ...toPlayer(r.sleeperId!), jingles: priced(r) }))
+      .filter((p) => isStartableIn(p.position, startable));
+    freeAgents = mergeWire(freeAgents, his);
+
+    const budgetNote = ` His week ${jingles.week} waiver post prices ${jingles.rows.length} players against a $${jingles.budget} budget, shown here as a percent of yours.`;
+    source = { ...source, note: (source.note ?? "") + budgetNote };
+  }
+
   const roster = (mine.players ?? []).map(toPlayer);
 
   const budgetTotal = profile.faab;
@@ -328,6 +365,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       emptySlots,
     };
 
+    const jinglesById = new Map(
+      freeAgents.filter((p) => p.jingles).map((p) => [p.playerId, p.jingles!]),
+    );
     const researchById = new Map(
       freeAgents.filter((p) => p.research).map((p) => [p.playerId, p.research!]),
     );
@@ -340,6 +380,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
       researchTier: (researchById.get(id)?.tier as ClaimTier | undefined) ?? null,
       researchPercent: researchById.get(id)?.faabPercent ?? null,
+      jinglesPercent: jinglesById.get(id)?.faabPercent ?? null,
     });
 
     // Historical bids are tiered by the player's season rank alone; what he

@@ -6,6 +6,7 @@ import { inboxConfigured } from "./inbox";
 import { parseMentions, parsePlays, parseRankings, type Scoring } from "./parse";
 import { fetchAllWeeklyBoards, type FpRow } from "./fantasypros";
 import { parseWeekly } from "./weekly";
+import { parseWaivers } from "./waivers";
 import { resolveNames, toCandidates } from "./resolve";
 
 // Turning his posts into something the app can use.
@@ -34,6 +35,10 @@ const KEY = {
   weeklyFor: (season: string, week: number, scoring: Scoring) =>
     `jingles:v2:weekly:${season}:w${week}:${scoring}`,
   weeklyLatestFor: (scoring: Scoring) => `jingles:v2:weekly:latest:${scoring}`,
+  // His waiver post, which is a third document again: thirty players, a bid
+  // and a rostered percent each, alive for exactly one week.
+  waivers: (season: string, week: number) => `jingles:v1:waivers:${season}:w${week}`,
+  waiversLatest: () => `jingles:v1:waivers:latest`,
   previous: (scoring: Scoring) => `jingles:v1:rankings:${scoring}:previous`,
   notes: () => `jingles:v1:notes`,
   seen: () => `jingles:v1:seen`,
@@ -120,6 +125,34 @@ export interface StoredWeekly {
   unresolved: { name: string; position: string; team: string | null; reason: string }[];
 }
 
+export interface StoredWaiverRow {
+  /** His rank in the week's ranked list, or null for a player named only in the prose. */
+  rank: number | null;
+  sleeperId: string | null;
+  name: string;
+  position: string;
+  /** The dollars he wrote, against the budget his post is priced for. */
+  faab: number;
+  /** The bid as a percent of that budget, which is the form the app prices in. */
+  faabPercent: number;
+  rostered: number | null;
+  /** His case for the player, quoted. Only the players he wrote about have one. */
+  note: string | null;
+}
+
+export interface StoredWaivers {
+  season: string;
+  week: number;
+  /** The budget his dollars are priced against, usually $100. */
+  budget: number;
+  title: string;
+  url: string;
+  postedAt: string;
+  ingestedAt: string;
+  rows: StoredWaiverRow[];
+  unresolved: { name: string; position: string; team: string | null; reason: string }[];
+}
+
 export interface StoredNote {
   sleeperId: string;
   name: string;
@@ -148,9 +181,24 @@ export interface IngestReport {
     updatedLabel: string | null;
     changed: boolean;
   }[];
+  waiversIngested: {
+    season: string;
+    week: number;
+    rows: number;
+    unresolved: number;
+    budget: number;
+    changed: boolean;
+  }[];
   notesIngested: number;
   bettingPostsSeen: number;
   skipped: { title: string; reason: string }[];
+  /** The week this run was working on, as the schedule understands it. */
+  week?: number | null;
+  /**
+   * True when his rankings and his waiver post for that week were both already
+   * in the store, so a run asked to work only if needed did nothing.
+   */
+  weekComplete?: boolean;
 }
 
 async function readSeen(): Promise<Set<string>> {
@@ -250,6 +298,32 @@ export async function latestWeeklyFor(scoring: Scoring): Promise<StoredWeekly | 
 
 export async function latestWeekly(): Promise<StoredWeekly | null> {
   return latestWeeklyFor("half_ppr");
+}
+
+/** His waiver post for one week, or null if that week was never read. */
+export async function readWaivers(season: string, week: number): Promise<StoredWaivers | null> {
+  try {
+    return (await redis.get<StoredWaivers>(KEY.waivers(season, week))) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The most recent waiver post, whichever week that is.
+ *
+ * A pointer rather than a scan, for the same reason the weekly list keeps one:
+ * there is no key listing on this client, and guessing the week from the
+ * calendar gets the Tuesday-to-Wednesday window wrong in both directions.
+ */
+export async function latestWaivers(): Promise<StoredWaivers | null> {
+  try {
+    const at = await redis.get<{ season: string; week: number }>(KEY.waiversLatest());
+    if (!at) return null;
+    return await readWaivers(at.season, at.week);
+  } catch {
+    return null;
+  }
 }
 
 export async function readNotes(): Promise<StoredNote[]> {
@@ -663,6 +737,119 @@ async function ingestWeeklyBoards(
   }
 }
 
+/**
+ * Fold his waiver post into the store.
+ *
+ * Stored only when the bids have actually moved. He edits this post through
+ * Tuesday evening as injury news lands, and a re-read that finds the same
+ * thirty players at the same prices is a no-op rather than a rewrite, which is
+ * what lets the Tuesday-to-Thursday schedule run repeatedly without churn.
+ *
+ * A short list is refused rather than stored. Thirty rows is what he publishes;
+ * four rows means the shape of his post changed and the parser caught the
+ * wreckage, and half a waiver board is worse than yesterday's whole one.
+ */
+async function ingestWaivers(
+  post: JinglesPost,
+  season: string,
+  report: IngestReport,
+): Promise<void> {
+  const parsed = parseWaivers(post.html, post.title);
+  const week = parsed.week;
+
+  if (!week) {
+    report.skipped.push({
+      title: post.title,
+      reason: "read as a waiver post but its title names no week, so it could not be filed",
+    });
+    return;
+  }
+
+  if (parsed.rows.length < 10) {
+    report.skipped.push({
+      title: post.title,
+      reason: `read as a waiver post but only ${parsed.rows.length} players came out of it, so the post shape has changed`,
+    });
+    return;
+  }
+
+  const existing = await readWaivers(parsed.season ?? season, week);
+  const signature = (rows: { name: string; faab: number }[]) =>
+    rows.map((r) => `${r.name}:${r.faab}`).join("|");
+  if (existing && signature(existing.rows) === signature(parsed.rows)) {
+    report.waiversIngested.push({
+      season: existing.season,
+      week: existing.week,
+      rows: existing.rows.length,
+      unresolved: existing.unresolved.length,
+      budget: existing.budget,
+      changed: false,
+    });
+    return;
+  }
+
+  const players = await getAllPlayers();
+  const { resolved, unresolved, ambiguous } = resolveNames(
+    parsed.rows.map((r) => ({ name: r.name, position: r.position, team: null })),
+    toCandidates(players),
+  );
+  const idByName = new Map(resolved.map((r) => [r.input.name, r.playerId]));
+
+  const stored: StoredWaivers = {
+    season: parsed.season ?? season,
+    week,
+    budget: parsed.budget,
+    title: post.title,
+    url: post.url,
+    postedAt: post.postedAt,
+    ingestedAt: new Date().toISOString(),
+    rows: parsed.rows.map((r) => ({
+      rank: r.rank,
+      sleeperId: idByName.get(r.name) ?? null,
+      name: r.name,
+      position: r.position,
+      faab: r.faab,
+      faabPercent: r.faabPercent,
+      rostered: r.rostered,
+      note: r.note,
+    })),
+    unresolved: [
+      ...unresolved.map((u) => ({
+        name: u.name,
+        position: u.position,
+        team: u.team,
+        reason: "no Sleeper player matched",
+      })),
+      ...ambiguous.map((a) => ({
+        name: a.input.name,
+        position: a.input.position,
+        team: a.input.team,
+        reason: `matched ${a.candidates.length} players: ${a.candidates.join(", ")}`,
+      })),
+    ],
+  };
+
+  try {
+    await redis.set(KEY.waivers(stored.season, week), stored, { ex: TTL });
+    await redis.set(KEY.waiversLatest(), { season: stored.season, week }, { ex: TTL });
+  } catch (e) {
+    report.skipped.push({
+      title: post.title,
+      reason: `read fine but could not be stored: ${e instanceof Error ? e.message : e}`,
+    });
+    return;
+  }
+
+  report.waiversIngested.push({
+    season: stored.season,
+    week,
+    rows: stored.rows.length,
+    unresolved: stored.unresolved.length,
+    budget: stored.budget,
+    changed: true,
+  });
+}
+
 async function ingestNotes(post: JinglesPost, report: IngestReport): Promise<void> {
   const players = await getAllPlayers();
   const candidates = toCandidates(players);
@@ -718,23 +905,105 @@ async function ingestNotes(post: JinglesPost, report: IngestReport): Promise<voi
 }
 
 /**
+ * What this week already has in the store.
+ *
+ * "Rankings" means all three scorings, because a week where only half PPR
+ * landed is a week his full-PPR and standard readers are still waiting on, and
+ * calling that done would stop the later runs from ever fetching it.
+ */
+async function weekCaptured(
+  season: string,
+  week: number,
+): Promise<{ rankings: boolean; waivers: boolean }> {
+  const scorings: Scoring[] = ["half_ppr", "full_ppr", "standard"];
+  const stored = await Promise.all(scorings.map((s) => readWeeklyFor(s, season, week)));
+  const waivers = await readWaivers(season, week);
+  return {
+    rankings: stored.every((w) => w !== null && w.week === week),
+    waivers: waivers !== null && waivers.week === week,
+  };
+}
+
+/**
  * Read the publication and fold anything new into the store.
  *
  * Idempotent: a post already seen is skipped, and re-running is safe. Called
  * from the daily snapshot cron rather than a cron of its own, because Vercel
  * Hobby allows two and both are spoken for.
  */
-export async function ingestJingles(options: { force?: boolean } = {}): Promise<IngestReport> {
+export async function ingestJingles(
+  options: { force?: boolean; ifNeeded?: boolean } = {},
+): Promise<IngestReport> {
   const report: IngestReport = {
     ranAt: new Date().toISOString(),
     postsSeen: 0,
     postsNew: 0,
     rankingsIngested: [],
     weeklyIngested: [],
+    waiversIngested: [],
     notesIngested: 0,
     bettingPostsSeen: 0,
     skipped: [],
+    week: null,
+    weekComplete: false,
   };
+
+  // Which week the app is working on, and which weeks his board is read for.
+  //
+  // Sleeper keeps two numbers and they disagree for three days. On a Tuesday
+  // after week 2 is played, `week` is already 3 while `display_week` is still
+  // 2, because display_week follows the scoreboard and only rolls once waivers
+  // process on Wednesday. This ingest asked for display_week, which meant that
+  // every Tuesday and every Wednesday morning, the three days when the whole
+  // point is preparing for the week ahead, it fetched the week just finished
+  // and reported a healthy run. Both weeks are read now, oldest first, so the
+  // "latest" pointer ends on the week that is coming.
+  let season: string | null = null;
+  let upcoming: number | null = null;
+  let weeks: number[] = [];
+  try {
+    const state = await getNflState();
+    season = state.season ?? null;
+    upcoming = state.week ?? state.display_week ?? null;
+    const displayed = state.display_week ?? state.week ?? null;
+    weeks = [...new Set([displayed, upcoming].filter((w): w is number => !!w && w >= 1))].sort(
+      (a, b) => a - b,
+    );
+    report.week = upcoming;
+  } catch (e) {
+    report.skipped.push({
+      title: "Weekly rankings board",
+      reason: `could not tell which week it is, so his board was not read: ${
+        e instanceof Error ? e.message : e
+      }`,
+    });
+  }
+
+  // Asked to work only if there is work: this run is one of several across
+  // Tuesday, Wednesday and Thursday, and once his rankings and his waiver post
+  // for the week are both in, the later ones have nothing to do. Checked before
+  // anything is fetched, so a no-op run costs two reads rather than a crawl of
+  // the publication.
+  //
+  // The daily snapshot ingest does NOT pass this. It keeps re-reading all week,
+  // which is what picks up the Thursday practice-report edits he makes to lists
+  // already stored.
+  if (options.ifNeeded && !options.force && season && upcoming) {
+    const captured = await weekCaptured(season, upcoming);
+    if (captured.rankings && captured.waivers) {
+      report.weekComplete = true;
+      report.skipped.push({
+        title: `Week ${upcoming}`,
+        reason: "his rankings and his waiver post for this week are both already in",
+      });
+      try {
+        await redis.set(KEY.lastRun(), report, { ex: TTL });
+      } catch {
+        // The report is a convenience, not the work.
+      }
+      return report;
+    }
+  }
 
   // His rankings board FIRST, and not conditional on anything he posted.
   //
@@ -743,19 +1012,10 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
   // updates through the week without writing anything, which means a
   // post-driven ingest would sit there reporting healthy runs and quietly serve
   // week 1 rankings until January.
-  try {
-    const state = await getNflState();
-    const week = state.display_week ?? state.week;
-    if (state.season && week >= 1) {
-      await ingestWeeklyBoards(state.season, week, report, { force: options.force });
+  if (season) {
+    for (const week of weeks) {
+      await ingestWeeklyBoards(season, week, report, { force: options.force });
     }
-  } catch (e) {
-    report.skipped.push({
-      title: "Weekly rankings board",
-      reason: `could not tell which week it is, so his board was not read: ${
-        e instanceof Error ? e.message : e
-      }`,
-    });
   }
 
   const posts = await fetchPosts();
@@ -770,7 +1030,11 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
     // advising off Monday's ranks on Sunday morning, which is the failure this
     // whole feature exists to avoid. It is cheap to re-read: the store is only
     // written when his Last Updated line has actually moved.
-    const rereadAlways = post.kind === "weekly_rankings";
+    // Same reasoning for the waiver post: he edits it through Tuesday evening
+    // as injury news lands, and a bid that moved from $5 to $25 is exactly the
+    // edit worth catching. The store is only written when the prices actually
+    // changed, so re-reading is cheap.
+    const rereadAlways = post.kind === "weekly_rankings" || post.kind === "waivers";
     if (!options.force && !rereadAlways && seen.has(post.id)) continue;
     report.postsNew++;
 
@@ -797,6 +1061,9 @@ export async function ingestJingles(options: { force?: boolean } = {}): Promise<
         break;
       case "weekly_rankings":
         await ingestWeekly(post, report);
+        break;
+      case "waivers":
+        await ingestWaivers(post, season ?? post.postedAt.slice(0, 4), report);
         break;
       case "targets_fades":
       case "deep_dive":

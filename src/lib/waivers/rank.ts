@@ -29,6 +29,24 @@ export interface WaiverPlayer extends AdvicePlayer {
   lastWeek?: LastWeekUsage | null;
   /** The web consensus on him this week, when the research named him. */
   research?: { tier: string; faabPercent: number | null; note: string } | null;
+  /**
+   * His waiver post on him this week.
+   *
+   * Kept apart from `research` on purpose. The web consensus is a dozen
+   * columns averaged into one number, and this is one analyst with a name, a
+   * rank and a dollar figure he committed to. Folding his bid into the
+   * consensus would launder the second into the first, and his is the one Jack
+   * actually wants to see.
+   */
+  jingles?: {
+    rank: number | null;
+    /** The dollars he wrote, against the budget his post prices for. */
+    faab: number;
+    /** That bid as a percent of the budget, which is what travels between leagues. */
+    faabPercent: number;
+    budget: number;
+    note: string | null;
+  } | null;
 }
 
 export interface StartableTarget {

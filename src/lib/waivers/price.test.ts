@@ -134,6 +134,25 @@ describe("classifyClaim", () => {
     expect(loud.reason).toContain("40% of budget");
   });
 
+  it("folds his waiver post bid into the market number and says whose it is", () => {
+    const quiet = priceClaim(cand({ seasonPositionRank: 60, weekGain: 3 }), ctx());
+    const his = priceClaim(cand({ seasonPositionRank: 60, weekGain: 3, jinglesPercent: 25 }), ctx());
+    expect(his.marketExpected).toBeGreaterThan(quiet.marketExpected);
+    expect(his.reason).toContain("Jingles bids 25% of budget");
+  });
+
+  it("averages the two published bids rather than counting them twice", () => {
+    // Both are waiver columns read off the same week of news. A player they
+    // agree on at 40% should price where one source at 40% prices him, not
+    // higher for having been said twice.
+    const both = priceClaim(
+      cand({ seasonPositionRank: 60, weekGain: 3, researchPercent: 40, jinglesPercent: 40 }),
+      ctx(),
+    );
+    const one = priceClaim(cand({ seasonPositionRank: 60, weekGain: 3, researchPercent: 40 }), ctx());
+    expect(both.marketExpected).toBe(one.marketExpected);
+  });
+
   it("treats K, DEF and a one-QB league's QB as streamers", () => {
     expect(classifyClaim(cand({ position: "DEF", weekGain: 2 }), ctx())).toBe("streamer");
     expect(classifyClaim(cand({ position: "QB", weekGain: 4, seasonPositionRank: 5 }), ctx())).toBe("streamer");

@@ -1,4 +1,4 @@
-import { ingestJingles, lastRun, readRankings } from "@/lib/jingles/ingest";
+import { ingestJingles, lastRun, latestWaivers, readRankings } from "@/lib/jingles/ingest";
 import type { Scoring } from "@/lib/jingles/parse";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +12,16 @@ export const dynamic = "force-dynamic";
 //
 // GET without arguments reports the last run instead of triggering one, so
 // checking on it is free.
+//
+// ?ifNeeded=1 is what the Tuesday-to-Thursday schedule sends: work only if his
+// rankings or his waiver post for the coming week are still missing. Several
+// runs a day catch him whenever he publishes, and the ones after that cost two
+// reads and stop.
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const run = params.get("run") === "1" || params.get("force") === "1";
   const force = params.get("force") === "1";
+  const ifNeeded = params.get("ifNeeded") === "1";
 
   if (!run) {
     const previous = await lastRun();
@@ -36,9 +42,24 @@ export async function GET(request: Request) {
           : null;
       }),
     );
+    const waivers = await latestWaivers();
     return Response.json({
       ok: true,
       rankings: stored.filter(Boolean),
+      // His bids for the week, summarised. The rows themselves are large and
+      // the point of showing them here is answering "did tonight's run get
+      // them" without reading Redis by hand.
+      waivers: waivers
+        ? {
+            season: waivers.season,
+            week: waivers.week,
+            budget: waivers.budget,
+            players: waivers.rows.length,
+            unresolved: waivers.unresolved,
+            ingestedAt: waivers.ingestedAt,
+            top: waivers.rows.slice(0, 5).map((r) => `${r.name} $${r.faab}`),
+          }
+        : null,
       lastRun: previous,
       hint: previous
         ? "Add ?run=1 to pull again, or ?force=1 to reprocess posts already seen."
@@ -53,7 +74,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const report = await ingestJingles({ force });
+    const report = await ingestJingles({ force, ifNeeded });
     return Response.json({ ok: true, report });
   } catch (e) {
     return Response.json(

@@ -1,0 +1,75 @@
+name: Jingles week
+
+# His week, pulled in while it is still useful.
+#
+# Two documents matter here and they arrive on his schedule, not ours: the
+# weekly rankings board, which he starts publishing Tuesday and edits through
+# Thursday, and the Tuesday waiver post, which is the only place he prints an
+# actual FAB bid. Waivers run Wednesday night, so a post found on Friday is a
+# post found too late.
+#
+# The daily snapshot cron still runs its own full ingest and keeps catching his
+# later edits. This workflow exists for the front of the week, where the gap
+# between him publishing and the app knowing about it is the whole cost.
+#
+# Every run sends ifNeeded=1: once the rankings and the waiver post for the
+# coming week are both stored, the remaining runs cost two Redis reads and stop.
+# GitHub cron is UTC. During EDT, 13:00 UTC is 9am, 00:00 UTC is 8pm the day
+# before, and 19:00 UTC is 3pm.
+
+on:
+  schedule:
+    # Tuesday and Wednesday, 9am ET.
+    - cron: "0 13 * * 2,3"
+    # Tuesday and Wednesday, 8pm ET. Written as the following day in UTC.
+    - cron: "0 0 * * 3,4"
+    # Thursday, 3pm ET. One look for whatever he moved after Wednesday.
+    - cron: "0 19 * * 4"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Re-read and re-store even if this week is already in (1 to force)"
+        default: ""
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Pull his rankings and waiver post
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          url="$APP_URL/api/jingles-ingest?run=1"
+          if [ -n "$FORCE" ]; then url="$url&force=1"; else url="$url&ifNeeded=1"; fi
+
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            --max-time 300 \
+            "$url")
+          echo "HTTP $status"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::jingles ingest returned HTTP $status"
+            head -c 1000 response.json; echo
+            exit 1
+          fi
+
+          # A skipped run is a success and has to read like one, so the summary
+          # says what it found rather than only what it wrote.
+          jq -r '
+            .report as $r
+            | "week: \($r.week // "unknown")"
+            , (if $r.weekComplete then "nothing to do: rankings and waivers for this week are already in" else empty end)
+            , ($r.weeklyIngested[]? | "rankings w\(.week) \(.scoring): \(.rows) rows" + (if .changed then " (updated)" else " (unchanged)" end))
+            , ($r.waiversIngested[]? | "waivers w\(.week): \(.rows) players, $\(.budget) budget" + (if .changed then " (updated)" else " (unchanged)" end))
+            , (if ($r.waiversIngested | length) == 0 and ($r.weekComplete | not) then "waivers: not published yet" else empty end)
+            , ($r.skipped[]? | "skipped \(.title): \(.reason)")
+          ' response.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # The ingest failing to find his post is not a failed run. He posts
+          # when he posts, and a red X every Tuesday morning trains you to
+          # ignore the one that means something.
+          jq -e '.ok == true' response.json > /dev/null

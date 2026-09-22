@@ -17,6 +17,8 @@ export type PostKind =
   | "rankings"
   /** His weekly list: one section per position plus a FLEX 150. */
   | "weekly_rankings"
+  /** His Tuesday waiver post: thirty players, a bid and a rostered percent each. */
+  | "waivers"
   | "targets_fades"
   | "deep_dive"
   | "betting"
@@ -129,6 +131,12 @@ export function detectScoring(title: string, body = ""): Scoring {
 
 export function classifyPost(title: string, body = ""): PostKind {
   const t = title.toLowerCase();
+  // Checked FIRST, and before the two rankings branches. His waiver post is
+  // titled with a week number like the weekly list is, and its own body ends
+  // with a section called "30 Waiver Adds Ranked", so either of the branches
+  // below would happily swallow it and write thirty rows over five hundred.
+  // See waivers.ts.
+  if (/\bwaiver/.test(t)) return "waivers";
   // Checked BEFORE the generic rankings branch, which would otherwise swallow
   // it: "2026 Week 1 Fantasy Football Rankings" contains "rankings". They are
   // different documents with different row shapes and different lifetimes, and
