@@ -14,13 +14,13 @@ name: Jingles week
 #
 # Every run sends ifNeeded=1: once the rankings and the waiver post for the
 # coming week are both stored, the remaining runs cost two Redis reads and stop.
-# GitHub cron is UTC. During EDT, 13:00 UTC is 9am, 00:00 UTC is 8pm the day
+# GitHub cron is UTC. During EDT, 17:00 UTC is 1pm, 00:00 UTC is 8pm the day
 # before, and 19:00 UTC is 3pm.
 
 on:
   schedule:
-    # Tuesday and Wednesday, 9am ET.
-    - cron: "0 13 * * 2,3"
+    # Tuesday and Wednesday, 1pm ET.
+    - cron: "0 17 * * 2,3"
     # Tuesday and Wednesday, 8pm ET. Written as the following day in UTC.
     - cron: "0 0 * * 3,4"
     # Thursday, 3pm ET. One look for whatever he moved after Wednesday.
