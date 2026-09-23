@@ -201,6 +201,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // Otherwise the wire itself is the ranking: who all of Sleeper is adding,
   // minus anyone who did not actually play last week.
   const labFresh = isFreshForRun(lab.postedAt);
+  const jingles = await readWaivers(season, nflWeek);
   let freeAgents: WaiverPlayer[];
   let source: WaiverContext["source"];
   if (labFresh) {
@@ -259,9 +260,12 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     }));
     freeAgents = mergeWire(researchPlayers, trendingPlayers);
 
+    const lead = jingles ? "His waiver post leads the list" : null;
     const researched = research
-      ? ` This week's ${borrowed ? "redraft " : ""}waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and lead the list; Sleeper's most-added players fill in behind them.`
-      : " No web research has run for this week yet, so the list is Sleeper's most-added players, filtered by who actually played.";
+      ? ` ${lead ? `${lead}; this` : "This"} week's ${borrowed ? "redraft " : ""}waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and ${lead ? "follow it" : "lead the list"}; Sleeper's most-added players fill in behind them.`
+      : lead
+        ? ` ${lead}; no web research has run for this week, so Sleeper's most-added players, filtered by who actually played, fill in behind it.`
+        : " No web research has run for this week yet, so the list is Sleeper's most-added players, filtered by who actually played.";
     source = {
       label: research ? "Web consensus and Sleeper trending adds" : "Sleeper trending adds",
       fresh: false,
@@ -275,7 +279,6 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // bids are as useful against a fresh season list as they are against a wire
   // of trending adds. It is also the only source in this function that prints a
   // dollar figure, which is the thing the page had been missing.
-  const jingles = await readWaivers(season, nflWeek);
   if (jingles) {
     const priced = (row: (typeof jingles.rows)[number]) => ({
       rank: row.rank,
@@ -287,20 +290,25 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     const rowById = new Map(
       jingles.rows.filter((r) => r.sleeperId).map((r) => [r.sleeperId!, r]),
     );
-    freeAgents = freeAgents.map((p) => {
+    const board = freeAgents.map((p) => {
       const row = rowById.get(p.playerId);
       return row ? { ...p, jingles: priced(row) } : p;
     });
 
-    // Anyone he named who is not on the board yet. He publishes thirty players
-    // he would actually claim, and a board that shows his bid on the four it
-    // already had is a worse version of his post.
-    const have = new Set(freeAgents.map((p) => p.playerId));
+    // His thirty lead, in his order. He publishes players he would actually
+    // claim, and when his season list is stale the board's order IS the
+    // season ranking ("given" mode keeps the first eight), so leaving his post
+    // behind a hundred most-added names cut his top tight end, Oronde Gadsden
+    // (#5, week 3), before he was ever compared to the roster. With a fresh
+    // season list the order does not matter: season claims sort by that list.
+    const onBoard = new Map(board.map((p) => [p.playerId, p]));
     const his = jingles.rows
-      .filter((r) => r.sleeperId && !have.has(r.sleeperId) && !owned.has(r.sleeperId))
-      .map((r) => ({ ...toPlayer(r.sleeperId!), jingles: priced(r) }))
+      .filter((r) => r.sleeperId && !owned.has(r.sleeperId))
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => (a.r.rank ?? Infinity) - (b.r.rank ?? Infinity) || a.i - b.i)
+      .map(({ r }) => onBoard.get(r.sleeperId!) ?? { ...toPlayer(r.sleeperId!), jingles: priced(r) })
       .filter((p) => isStartableIn(p.position, startable));
-    freeAgents = mergeWire(freeAgents, his);
+    freeAgents = mergeWire(his, board);
 
     const budgetNote = ` His week ${jingles.week} waiver post prices ${jingles.rows.length} players against a $${jingles.budget} budget, shown here as a percent of yours.`;
     source = { ...source, note: (source.note ?? "") + budgetNote };
