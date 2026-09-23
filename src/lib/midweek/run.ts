@@ -7,10 +7,14 @@ import { midweekSubject, renderMidweekEmail } from "./email";
 
 // The Wednesday job.
 //
-// Waivers run today in the three Sleeper leagues that have them, and the
-// guillotine league's bids process today too, so this is the one morning where
-// a claim is the whole decision. The guillotine league is pointed at rather
-// than re-explained: its own guide went out yesterday with the pacing in it.
+// Tuesday evening, ahead of the 3am run.
+//
+// Every league here processes its claims at 3am Wednesday, and this email used
+// to go out at 8am Wednesday, five hours after the thing it was advising on.
+// Evening also means it lands after the day's practice reports and after
+// Jingles publishes his waiver article, which are the two things most likely
+// to change the answer. The guillotine league is pointed at rather than
+// re-explained: its own guide went out this morning with the pacing in it.
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app";
 

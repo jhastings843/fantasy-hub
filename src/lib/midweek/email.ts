@@ -61,12 +61,19 @@ export function midweekSubject(input: MidweekInput): string {
 function usageNote(p: {
   lastWeek?: { week: number; points: number; snaps: number; targets: number; carries: number } | null;
   research?: { faabPercent: number | null; note: string } | null;
+  jingles?: { rank: number | null; faab: number; faabPercent: number; budget: number; note: string | null } | null;
 }): string {
   const usage = p.lastWeek ? ` ${usageText(p.lastWeek)}.` : "";
   const research = p.research
     ? ` Consensus${p.research.faabPercent != null ? ` ${p.research.faabPercent}% of budget` : " pick"}: ${p.research.note}`
     : "";
-  return `${usage}${research}`;
+  // His bid, kept separate from the consensus and attributed. It is the only
+  // number in this email with a name behind it, and on most weeks it is the
+  // only one with an actual price in it.
+  const jingles = p.jingles
+    ? ` Jingles${p.jingles.rank != null ? ` #${p.jingles.rank}` : ""}: $${p.jingles.faab} of $${p.jingles.budget} (${Math.round(p.jingles.faabPercent)}%).${p.jingles.note ? ` ${p.jingles.note}` : ""}`
+    : "";
+  return `${usage}${research}${jingles}`;
 }
 
 function bidText(
@@ -156,12 +163,12 @@ export function renderMidweekEmail(input: MidweekInput): string {
 
   const body = input.leagues.length
     ? input.leagues.map(leagueCard).join("")
-    : card(`${label("Waivers")}${paragraph("No league could be read this morning.")}`, WARN);
+    : card(`${label("Waivers")}${paragraph("No league could be read tonight.")}`, WARN);
 
   const guillotine = input.guillotine
     ? card(
         `${label("Guillotine")}
-<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};">Bids in ${escapeHtml(input.guillotine.name)} process today. Tuesday's guide has the pacing; the page has the live numbers.</div>
+<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};">Bids in ${escapeHtml(input.guillotine.name)} process at 3am, the same run as these claims. Tuesday's guide has the pacing; the page has the live numbers.</div>
 <div style="padding-top:8px;"><a href="${escapeHtml(input.appUrl)}/l/${escapeHtml(input.guillotine.leagueId)}/faab" style="font:600 13px/1.4 -apple-system,sans-serif;color:${PALETTE.accent};text-decoration:none;">Open the FAAB guide &rarr;</a></div>`,
       )
     : "";
@@ -173,7 +180,7 @@ export function renderMidweekEmail(input: MidweekInput): string {
   return emailPage({
     title: midweekSubject(input),
     kicker: `Wednesday · Week ${input.week ?? ""}`,
-    heading: n === 0 ? "Nothing to claim" : "Worth a claim today",
+    heading: n === 0 ? "Nothing to claim" : "Worth a claim before 3am",
     preheader:
       n === 0
         ? "No league has anything on the wire worth taking."

@@ -905,6 +905,21 @@ async function ingestNotes(post: JinglesPost, report: IngestReport): Promise<voi
 }
 
 /**
+ * Are his rankings for this week published and stored.
+ *
+ * The lineup email will not go out without them: its whole job is to say who
+ * starts, and the ranking it would use otherwise is last week's, which is the
+ * quiet way to advise a bench player into a lineup. All three scorings,
+ * because the board publishes them together and a week with one of them is a
+ * week that is still landing.
+ */
+export async function weeklyRankingsReady(season: string, week: number): Promise<boolean> {
+  const scorings: Scoring[] = ["half_ppr", "full_ppr", "standard"];
+  const stored = await Promise.all(scorings.map((s) => readWeeklyFor(s, season, week)));
+  return stored.every((w) => w !== null && w.week === week);
+}
+
+/**
  * What this week already has in the store.
  *
  * "Rankings" means all three scorings, because a week where only half PPR

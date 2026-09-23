@@ -11,6 +11,7 @@ import { getNflState } from "@/lib/sleeper/client";
 import { getMyLeagues } from "@/lib/league/discover";
 import { getWeekTransactions } from "@/lib/guillotine/league-state";
 import { waiversAreSettled } from "@/lib/waivers/settled";
+import { weeklyRankingsReady } from "@/lib/jingles/ingest";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -21,7 +22,10 @@ import { waiversAreSettled } from "@/lib/waivers/settled";
 export const DAYS = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 ];
-const DEFAULT_SEND_DAY = 4; // Thursday, in America/New_York.
+// Wednesday. The lineup email follows the 3am waiver run rather than waiting
+// a day behind it, and it holds itself until waivers have processed and his
+// rankings are up. Thursday is the fallback slot, in tempo.ts.
+const DEFAULT_SEND_DAY = 3;
 
 export function configuredSendDay(): number {
   const raw = (process.env.THURSDAY_EMAIL_DAY ?? "").trim();
@@ -165,6 +169,21 @@ async function runThursdayEmailLocked(options: {
   // SEND is what waits. A skip is not a failure, it is the job saying not yet,
   // and the pulse will try again later the same day.
   if (!force) {
+    // His rankings, on the day this email prefers to go. The same rule the
+    // waiver gate follows: ingest as early as it likes, send only when the
+    // thing being sent is true. On the fallback day the rankings stop being a
+    // blocker, because a lineup email built on last week's ranks still beats
+    // no lineup email at all, and waivers alone decide.
+    const onPreferredDay = today === sendDay;
+    if (onPreferredDay && !(await weeklyRankingsReady(season, week))) {
+      return Response.json({
+        ok: true,
+        skipped: true,
+        waitingOnRankings: true,
+        reason: `His week ${week} rankings are not published yet, so the lineup this email would print is last week's. Waiting for them.`,
+      });
+    }
+
     const leagues = (await getMyLeagues()).filter((l) => l.source !== "manual");
     const feeds = await Promise.all(
       leagues.map(async (l) => ({

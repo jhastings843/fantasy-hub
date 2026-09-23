@@ -127,8 +127,18 @@ export function etClock(now: Date): EtClock {
 function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until?: number }[] {
   return [
     { id: "faab", day: days.faabDay ?? 2, at: 8 * 60 },
-    { id: "midweek", day: 3, at: 8 * 60 },
-    { id: "thursday", day: days.thursdayDay ?? THU, at: 8 * 60 },
+    // Tuesday evening, not Wednesday morning. Every league except the
+    // guillotine one processes its claims at 3am Wednesday, so a Wednesday 8am
+    // email about what to claim arrived five hours after the claims ran. 7pm
+    // is after the day's practice reports and after Jingles posts his waiver
+    // article, and still eight hours clear of the run.
+    { id: "midweek", day: 2, at: 19 * 60 },
+    // Twice, deliberately. The lineup email waits for waivers to process and
+    // for his rankings to be published, and on a week where either is late
+    // there has to be a second chance at it rather than no email at all. The
+    // send log makes the Thursday slot a no-op when Wednesday went out.
+    { id: "thursday", day: days.thursdayDay ?? WED, at: 8 * 60 },
+    { id: "thursday", day: THU, at: 8 * 60 },
     { id: "sunday", day: SUN, at: 9 * 60 },
     // After the 11:30 inactive reports and well before the 13:00 lock. This one
     // is allowed to send nothing at all, which is its normal outcome.

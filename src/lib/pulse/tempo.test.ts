@@ -112,11 +112,20 @@ describe("tempoFor, the season", () => {
 });
 
 describe("tempoFor, sends", () => {
-  it("puts each send on its own morning", () => {
+  it("puts each send in its own window", () => {
+    // FAAB Tuesday morning, the other leagues' waivers Tuesday evening, the
+    // lineup email Wednesday morning with Thursday as its fallback.
     expect(tempoFor(at("2026-09-15T12:00:00Z")).dueSends).toContain("faab");
-    expect(tempoFor(at("2026-09-16T12:00:00Z")).dueSends).toContain("midweek");
+    expect(tempoFor(at("2026-09-15T23:30:00Z")).dueSends).toContain("midweek");
+    expect(tempoFor(at("2026-09-16T12:00:00Z")).dueSends).toContain("thursday");
     expect(tempoFor(at("2026-09-17T12:00:00Z")).dueSends).toContain("thursday");
     expect(tempoFor(at("2026-09-13T13:00:00Z")).dueSends).toContain("sunday");
+  });
+
+  it("keeps the waiver email clear of the 3am run it is advising on", () => {
+    // Every league but the guillotine one processes claims at 3am Wednesday,
+    // so Wednesday morning is too late to be telling anyone what to claim.
+    expect(tempoFor(at("2026-09-16T12:00:00Z")).dueSends).not.toContain("midweek");
   });
 
   it("does not send before its time", () => {
@@ -131,10 +140,11 @@ describe("tempoFor, sends", () => {
   });
 
   it("stops being due the next day", () => {
-    // Wednesday 8:00am ET is the midweek send's morning, not FAAB's.
+    // Wednesday 8:00am ET belongs to the lineup email, not to Tuesday's two.
     const due = tempoFor(at("2026-09-16T12:00:00Z")).dueSends;
-    expect(due).toContain("midweek");
+    expect(due).toContain("thursday");
     expect(due).not.toContain("faab");
+    expect(due).not.toContain("midweek");
   });
 
   it("holds the Sunday alarm until inactives have landed", () => {
@@ -156,5 +166,27 @@ describe("tempoFor, sends", () => {
     // The commissioner drops the chopped roster on Wednesday one week.
     const due = tempoFor(at("2026-09-16T12:00:00Z"), { faabDay: 3 }).dueSends;
     expect(due).toContain("faab");
+  });
+});
+
+describe("the week's shape, after the 3am waiver run was accounted for", () => {
+  const due = (iso: string) => tempoFor(at(iso)).dueSends;
+
+  it("gives the lineup email a second chance on Thursday", () => {
+    // It refuses to send until waivers have processed and his rankings are
+    // published. A week where either is late needs somewhere else to land.
+    expect(due("2026-09-17T12:00:00Z")).toContain("thursday");
+  });
+
+  it("sends the waiver email after the evening's injury reports", () => {
+    // 6:45pm ET Tuesday is too early; 7:30pm is the window.
+    expect(due("2026-09-15T22:45:00Z")).not.toContain("midweek");
+    expect(due("2026-09-15T23:30:00Z")).toContain("midweek");
+  });
+
+  it("keeps both Tuesday emails out of each other's way", () => {
+    const morning = due("2026-09-15T12:00:00Z");
+    expect(morning).toContain("faab");
+    expect(morning).not.toContain("midweek");
   });
 });
