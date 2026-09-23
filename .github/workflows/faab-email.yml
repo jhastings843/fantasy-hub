@@ -57,10 +57,17 @@ jobs:
             exit 1
           fi
 
-          # The dry run returns the rendered HTML, which is not something to
-          # print into a public log.
-          jq -r 'if .html then (. | del(.html)) + {html: "rendered, \(.html | length) bytes"} else . end
-                 | to_entries[] | "\(.key): \(.value | tostring | .[0:200])"' response.json \
+          # A dry run answers with the rendered email itself rather than JSON,
+          # and the email is not something to print into a public log. Report
+          # that it rendered and how big it was.
+          if [ -n "$DRY" ]; then
+            bytes=$(wc -c < response.json | tr -d ' ')
+            echo "dry run: email rendered, $bytes bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+            grep -o 'Joe Burrow\|Rashee Rice\|chains' response.json | sort -u | head -5
+            exit 0
+          fi
+
+          jq -r 'to_entries[] | "\(.key): \(.value | tostring | .[0:200])"' response.json \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
           jq -e '.ok == true' response.json > /dev/null
