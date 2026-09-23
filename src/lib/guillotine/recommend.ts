@@ -40,6 +40,74 @@ const BYE_HORIZON = 3;
 /** A bid under this share of the market number is price enforcement, not a plan to win. */
 const PRICE_ENFORCEMENT_RATIO = 0.5;
 
+/**
+ * Statuses that mean he does not play this week.
+ *
+ * Sleeper's feed carries these on the projection row, and the projection it
+ * ships alongside them is often NOT zeroed: Puka Nacua came through week 3
+ * listed Out with 14.4 points still attached. Reading the number and ignoring
+ * the word is how a card ends up leading with a player who scores nothing.
+ */
+const CANNOT_PLAY = /^(out|ir|pup|nfi|susp|doubtful|dnp|na)/i;
+
+/**
+ * What a hurt player's bid is multiplied by, once his weekly value is gone.
+ *
+ * The guillotine research is direct about this: hold when the player has an
+ * imminent bye, an injury, or one unsustainable spike week. But it is a hold,
+ * not a ban, because an elite player bought hurt is still an elite player in
+ * the endgame, and the same research says the ideal end state is owning eight
+ * of the best players left. So the discount is keyed to how much this week
+ * matters. In red you are buying Sunday and a player who cannot play it is
+ * nearly worthless; in green you can afford to buy December.
+ */
+const INJURED_DISCOUNT: Record<Posture, number> = {
+  red: 0.3,
+  yellow: 0.45,
+  green: 0.7,
+};
+
+/**
+ * The floor under a player's quality, as a share of his position's bar.
+ *
+ * Nobody on the card is worthless, and a season projection of zero usually
+ * means the feed never projected him rather than that he cannot play.
+ */
+const MIN_QUALITY = 0.35;
+
+/**
+ * What competition for a player does to his price.
+ *
+ * The research says to estimate the rival bid and add an edge, and that the
+ * spend triggers include teams around the line upgrading while you are not.
+ * Both need to know who else wants him. Deliberately gentle: this counts which
+ * rivals could start him, which is demand, not their willingness to pay for it.
+ */
+const DEMAND_FACTOR = { uncontested: 0.85, normal: 1, contested: 1.15 };
+
+/**
+ * The researched hold rule, as a price cap.
+ *
+ * Both strategy docs say the same thing in the same words: hold when the gain
+ * is two to three projected points for ten to twenty percent of the budget.
+ * The model had no way to express that, so a player who cleared the endgame
+ * bar could be priced at a fifth of the budget for three points this week,
+ * which is the exact trade the rule exists to refuse.
+ *
+ * It is a cap and not a ban, and it lifts for a genuine endgame buy made from
+ * a safe week, because the other half of the research is that the ideal end
+ * state is owning eight of the best players left. A week you might be chopped
+ * in is not the week to buy December.
+ */
+const THIN_GAIN = 3;
+const THIN_GAIN_CAP_SHARE = 0.1;
+
+/** Rivals who would start him before the market counts as busy. */
+const CONTESTED_AT = 3;
+
+/** Points a rival's lineup has to gain before he is a real bidder for a player. */
+const RIVAL_NEED_GAIN = 2;
+
 /** Never show more than this many chains; a longer card is not a plan. */
 const MAX_CHAINS = 3;
 
@@ -56,6 +124,16 @@ export interface RecommendInput {
   week: number;
   /** Every player rostered anywhere in the league, for the positional bars. */
   leaguePlayers: { position: string; rosPoints: number }[];
+  /**
+   * One entry per surviving rival: the weakest starter they currently field at
+   * each position, in projected points. A player who beats that number is
+   * somebody they would start, which makes him somebody they may bid on.
+   *
+   * Optional because a caller that cannot see the other rosters should get a
+   * card priced on the market alone rather than one priced as if nobody else
+   * wanted anybody.
+   */
+  rivalStarterBars?: Record<string, number>[];
 }
 
 const asLineup = (p: PoolPlayer, useRos = false): LineupPlayer => ({
@@ -63,6 +141,45 @@ const asLineup = (p: PoolPlayer, useRos = false): LineupPlayer => ({
   position: p.position,
   points: useRos ? p.rosPoints : p.weekPoints,
 });
+
+/** He is ruled out of this week, whatever his projection still says. */
+export function cannotPlay(player: { injuryStatus: string | null }): boolean {
+  return player.injuryStatus != null && CANNOT_PLAY.test(player.injuryStatus.trim());
+}
+
+/**
+ * How good he is for his position, as a share of what a final-four starter is.
+ *
+ * This is what stops four quarterbacks who all replace an injured starter from
+ * being priced identically. Every one of them adds fifteen points to a lineup
+ * with a hole in it, so the lineup gain cannot tell them apart, and the tier
+ * ladder puts all of them on the same rung unless they are outright elite. The
+ * season projection can tell them apart, and it is already in hand.
+ */
+export function qualityFactor(player: PoolPlayer, bars: Record<string, number>): number {
+  const bar = bars[player.position];
+  if (!bar || !Number.isFinite(bar) || bar <= 0) return 1;
+  return Math.min(1, Math.max(MIN_QUALITY, player.rosPoints / bar));
+}
+
+/** How many surviving rivals would put this player straight into their lineup. */
+export function contestedBy(
+  player: PoolPlayer,
+  rivalStarterBars: Record<string, number>[],
+): number {
+  return rivalStarterBars.filter((bars) => {
+    const theirs = bars[player.position];
+    if (theirs == null) return false;
+    return player.weekPoints - theirs >= RIVAL_NEED_GAIN;
+  }).length;
+}
+
+function demandFactor(contested: number, rivals: number): number {
+  // No rosters to read means no opinion, rather than a discount for silence.
+  if (rivals === 0) return DEMAND_FACTOR.normal;
+  if (contested === 0) return DEMAND_FACTOR.uncontested;
+  return contested >= CONTESTED_AT ? DEMAND_FACTOR.contested : DEMAND_FACTOR.normal;
+}
 
 /**
  * How many players at each position a four-team field would be starting.
@@ -148,6 +265,7 @@ function reasonFor(
   tier: Tier,
   weekGain: number,
   displacesName: string | null,
+  demand: { contested: number; rivals: number } = { contested: 0, rivals: 0 },
 ): string {
   const parts: string[] = [];
 
@@ -169,8 +287,22 @@ function reasonFor(
     );
   }
 
-  if (player.injuryStatus) parts.push(`listed ${player.injuryStatus}`);
+  if (player.injuryStatus) {
+    parts.push(
+      cannotPlay(player)
+        ? `listed ${player.injuryStatus}, so he is priced for what he is worth after this week, not for Sunday`
+        : `listed ${player.injuryStatus}`,
+    );
+  }
   if (player.byeWeek != null) parts.push(`bye week ${player.byeWeek}`);
+
+  if (demand.rivals > 0) {
+    if (demand.contested === 0) {
+      parts.push("no surviving rival would start him, so expect to be alone on this one");
+    } else if (demand.contested >= CONTESTED_AT) {
+      parts.push(`${demand.contested} surviving rivals would start him, so expect company`);
+    }
+  }
 
   return parts.join(". ") + ".";
 }
@@ -189,13 +321,38 @@ export function priceTarget(
   market: MarketModel,
   budget: BudgetPlan,
   posture: Posture,
+  modifiers: { quality?: number; injured?: boolean; demand?: number } = {},
 ): { bid: number; walkAway: number; marketExpected: number } {
   const marketExpected = market.estimates[tier].expected;
   const valueFactor = Math.min(1.5, Math.max(0.5, weekGain / REFERENCE_GAIN));
-  const raw = marketExpected * URGENCY[posture] * valueFactor;
+  const quality = modifiers.quality ?? 1;
+  const demand = modifiers.demand ?? 1;
 
-  const walkAway = Math.min(budget.maxSingleBid, Math.max(marketExpected, raw));
-  const bid = unroundBid(Math.min(raw, budget.maxSingleBid), budget.maxSingleBid);
+  // Urgency is a statement about needing help THIS Sunday, so a player who
+  // cannot play on Sunday does not get it. Leaving it in place made a red week
+  // outbid a green one for a player who was ruled out, which is exactly
+  // backwards: the desperate team is the one that cannot afford him.
+  const confidence = modifiers.injured ? INJURED_DISCOUNT[posture] : 1;
+  const urgency = modifiers.injured ? 1 : URGENCY[posture];
+  const raw = marketExpected * urgency * valueFactor * quality * confidence * demand;
+
+  // The hold rule: thin weekly gain cannot justify a heavy bid, unless this is
+  // an endgame piece bought in a week that is not about survival.
+  //
+  // Written as a rate rather than a threshold, because a threshold puts a cliff
+  // in the middle of the decision: a player at 3.0 points of gain would have
+  // been capped at a tenth of the budget and one at 3.1 would have been free to
+  // take a fifth of it. Ten percent per three points, with a floor so a pure
+  // speculation can still be bought at a speculative price.
+  const endgameBuy = tier === "championship" && posture === "green";
+  const valueCeiling =
+    budget.originalBudget * THIN_GAIN_CAP_SHARE * Math.max(weekGain / THIN_GAIN, 0.2);
+  const ceiling = endgameBuy
+    ? budget.maxSingleBid
+    : Math.min(budget.maxSingleBid, valueCeiling);
+
+  const walkAway = Math.min(ceiling, Math.max(marketExpected, raw));
+  const bid = unroundBid(Math.min(raw, ceiling), ceiling);
 
   return {
     bid: Math.max(1, bid),
@@ -220,18 +377,32 @@ export function buildBidCard(input: RecommendInput): BidCard {
   const rosterLineup = myPlayers.map((p) => asLineup(p));
 
   // Score every candidate on what he would actually add.
+  const rivalBars = input.rivalStarterBars ?? [];
+
   const scored = candidates
     .map((player) => {
-      const { gain, displaces, slot } = marginalValue(
+      const out = cannotPlay(player);
+      const { gain: rawGain, displaces, slot } = marginalValue(
         rosterLineup,
         asLineup(player),
         rosterPositions,
       );
+      // A player who is ruled out adds nothing to this week's lineup, whatever
+      // the feed projects for him. Zeroing it here rather than discounting the
+      // price at the end is deliberate: the gain is what tiers him, what orders
+      // the chain and what sizes the bid, so a number that is not going to
+      // happen has to leave through the same door it came in.
+      const gain = out ? 0 : rawGain;
       const displacedPlayer = displaces
         ? (myPlayers.find((p) => p.playerId === displaces.playerId) ?? null)
         : null;
       const tier = classify(player, gain, bars, week);
-      const price = priceTarget(tier, gain, market, budget, posture);
+      const contested = contestedBy(player, rivalBars);
+      const price = priceTarget(tier, gain, market, budget, posture, {
+        quality: qualityFactor(player, bars),
+        injured: out,
+        demand: demandFactor(contested, rivalBars.length),
+      });
 
       const target: BidTarget = {
         player,
@@ -246,7 +417,10 @@ export function buildBidCard(input: RecommendInput): BidCard {
           : null,
         slot,
         ...price,
-        reason: reasonFor(player, tier, gain, displacedPlayer?.name ?? null),
+        reason: reasonFor(player, tier, gain, displacedPlayer?.name ?? null, {
+          contested,
+          rivals: rivalBars.length,
+        }),
       };
       return target;
     })
@@ -324,10 +498,18 @@ export function buildBidCard(input: RecommendInput): BidCard {
     }
   }
 
-  // Sleeper processes claims by bid amount, highest first, and offers no
-  // other way to order your own claims. So a fallback that outbids the target
-  // ahead of it is processed first and wins first. Bids must not rise down a
-  // chain, or the order on the card is not the order Sleeper runs.
+  // Sleeper processes claims by bid amount, highest first, and offers no other
+  // way to order your own claims, so the card has to be sorted by bid to mean
+  // anything. It used to be sorted by this week's gain alone, which held while
+  // every target was priced off that gain. Now that a hurt player keeps his
+  // price through the endgame tier while losing his Sunday, the two orders can
+  // disagree, and the one that matters is the money.
+  for (const chain of chains) {
+    chain.targets.sort(
+      (a, b) => b.bid - a.bid || b.weekGain - a.weekGain || b.player.rosPoints - a.player.rosPoints,
+    );
+  }
+
   for (const chain of chains) {
     for (let i = 1; i < chain.targets.length; i++) {
       const prev = chain.targets[i - 1];

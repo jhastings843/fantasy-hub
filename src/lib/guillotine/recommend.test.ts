@@ -382,3 +382,166 @@ describe("chain order matches Sleeper's processing order", () => {
     }
   });
 });
+
+// The three things a week-3 card got wrong against the live league, kept as
+// tests because each one was a defensible-looking rule that produced a bid Jack
+// would not have made.
+// The shared fixture above plans a $20 weekly cap, which clamps every bid to
+// the same number and hides exactly what these tests are about. This is the
+// same league in a week where there is money to spend.
+const roomToSpend = planBudget({
+  budget: 1000,
+  remaining: 900,
+  teamsAlive: 12,
+  totalTeams: 16,
+  posture: "red",
+  rivalRemaining: Array(11).fill(800),
+});
+
+describe("telling apart players who fill the same hole", () => {
+  // A quarterback hole, and four quarterbacks who would fill it. Every one of
+  // them replaces a zero, so the lineup gain cannot separate them: that is the
+  // whole point. Their season projections can.
+  const hurtStarter = [
+    player("qb", "QB", 0, { injuryStatus: "Out", rosPoints: 300 }),
+    ...myPlayers.filter((p) => p.playerId !== "qb"),
+  ];
+  // The league bar for a starting quarterback in this fixture is 28.5 season
+  // points, so these three are a fringe starter, a slightly worse one, and a
+  // player the feed never projected at all.
+  const qbs = [
+    player("elite", "QB", 19, { rosPoints: 28 }),
+    player("good", "QB", 18.1, { rosPoints: 26 }),
+    player("streamer", "QB", 16.7, { rosPoints: 0 }),
+  ];
+  const card = buildBidCard(
+    input({ myPlayers: hurtStarter, candidates: qbs, posture: "red", budget: roomToSpend }),
+  );
+  const bidFor = (id: string) =>
+    card.chains.flatMap((c) => c.targets).find((t) => t.player.playerId === id)?.bid ?? 0;
+
+  it("does not price the streamer like the starter", () => {
+    expect(bidFor("elite")).toBeGreaterThan(bidFor("streamer") * 2);
+  });
+
+  it("still keeps the two real starters close, because they are close", () => {
+    expect(bidFor("good")).toBeGreaterThan(bidFor("elite") * 0.8);
+  });
+});
+
+describe("a player who cannot play this week", () => {
+  const out = player("hurt", "TE", 14, { injuryStatus: "Out", rosPoints: 20 });
+  const healthy = player("fit", "TE", 11, { rosPoints: 20 });
+  // Good enough that he is worth owning for the endgame even while hurt.
+  const elite = player("star", "WR", 16, { injuryStatus: "Out", rosPoints: 300 });
+
+  it("is not priced on a lineup gain he cannot deliver", () => {
+    // Sleeper ships an injury status and a full projection on the same row, so
+    // the feed will happily say a player who is out scores fourteen points.
+    const red = buildBidCard(
+      input({ candidates: [out, healthy], posture: "red", budget: roomToSpend }),
+    );
+    const targets = red.chains.flatMap((c) => c.targets);
+    const hurtBid = targets.find((t) => t.player.playerId === "hurt")?.bid ?? 0;
+    const healthyBid = targets.find((t) => t.player.playerId === "fit")?.bid ?? 0;
+    expect(hurtBid).toBeLessThan(healthyBid);
+  });
+
+  it("costs less when this week is the week that decides you", () => {
+    // One budget, two postures, so the only thing that moves is the price of a
+    // player who is not playing.
+    const green = buildBidCard(input({ candidates: [elite], posture: "green", budget: roomToSpend }));
+    const red = buildBidCard(input({ candidates: [elite], posture: "red", budget: roomToSpend }));
+    const bid = (card: ReturnType<typeof buildBidCard>) =>
+      card.chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
+    // Red urgency is 1.3x and green is 0.35x, so a red card outbidding a green
+    // one is the normal case. The injury discount has to be strong enough to
+    // invert that, because a player who does not play cannot save a week.
+    expect(bid(red)).toBeLessThan(bid(green));
+  });
+
+  it("keeps a player who cannot play off the card unless he is worth owning anyway", () => {
+    // A mid tier player who is out this week is not a waiver claim, he is a
+    // roster spot spent on nothing.
+    const card = buildBidCard(input({ candidates: [out], posture: "red", budget: roomToSpend }));
+    expect(card.chains.flatMap((c) => c.targets)).toHaveLength(0);
+  });
+
+  it("says why the price is what it is", () => {
+    const card = buildBidCard(input({ candidates: [elite], posture: "red", budget: roomToSpend }));
+    const reason = card.chains.flatMap((c) => c.targets)[0]?.reason ?? "";
+    expect(reason).toContain("not for Sunday");
+  });
+});
+
+describe("what the rest of the league needs", () => {
+  const target = player("wanted", "WR", 16);
+  const bars = (worstWr: number) => Array(11).fill({ QB: 20, RB: 12, WR: worstWr, TE: 8 });
+
+  it("pays more for a player several rivals would start", () => {
+    const contested = buildBidCard(
+      input({ candidates: [target], rivalStarterBars: bars(8), budget: roomToSpend }),
+    );
+    const alone = buildBidCard(
+      input({ candidates: [target], rivalStarterBars: bars(20), budget: roomToSpend }),
+    );
+    const bid = (card: ReturnType<typeof buildBidCard>) =>
+      card.chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
+    expect(bid(contested)).toBeGreaterThan(bid(alone));
+  });
+
+  it("has no opinion when it cannot see the other rosters", () => {
+    const blind = buildBidCard(input({ candidates: [target], budget: roomToSpend }));
+    const neutral = buildBidCard(
+      input({ candidates: [target], rivalStarterBars: [{ WR: 10 }], budget: roomToSpend }),
+    );
+    const bid = (card: ReturnType<typeof buildBidCard>) =>
+      card.chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
+    expect(bid(blind)).toBe(bid(neutral));
+  });
+});
+
+describe("the hold rule on thin upgrades", () => {
+  // Both strategy docs: hold when the gain is 2-3 projected points for 10-20%
+  // of the budget. This is the rule the week 3 card broke by pricing a 3.1
+  // point upgrade at $208 of $1000.
+  // An elite player by season projection who barely beats my worst starter
+  // this week: the exact shape the rule is written for.
+  const thin = player("thin", "WR", 6, { rosPoints: 300 });
+  const budget = planBudget({
+    budget: 1000,
+    remaining: 900,
+    teamsAlive: 12,
+    totalTeams: 16,
+    posture: "red",
+    rivalRemaining: Array(11).fill(800),
+  });
+
+  it("caps a small weekly upgrade at a tenth of the budget per three points", () => {
+    const card = buildBidCard(input({ candidates: [thin], posture: "red", budget }));
+    const target = card.chains.flatMap((c) => c.targets)[0];
+    // He beats my worst starter by about a point, so the ceiling is well under
+    // the $250 single-bid limit that would otherwise apply.
+    expect(target.bid).toBeLessThanOrEqual(100);
+  });
+
+  it("lifts the cap for an endgame buy made from a safe week", () => {
+    const red = buildBidCard(input({ candidates: [thin], posture: "red", budget }));
+    const green = buildBidCard(input({ candidates: [thin], posture: "green", budget }));
+    const bid = (card: ReturnType<typeof buildBidCard>) =>
+      card.chains.flatMap((c) => c.targets)[0]?.walkAway ?? 0;
+    // Green urgency is 0.35 against red's 1.3, so green losing this comparison
+    // would prove nothing. The walk-away number is where the ceiling shows.
+    expect(bid(green)).toBeGreaterThan(bid(red));
+  });
+
+  it("leaves a real lineup upgrade alone", () => {
+    const real = player("real", "TE", 18, { rosPoints: 20 });
+    const card = buildBidCard(input({ candidates: [real], posture: "red", budget }));
+    const target = card.chains.flatMap((c) => c.targets)[0];
+    // Thirteen points of gain, so the rate ceiling lands near $430 and never
+    // touches a bid the market put at a fraction of that.
+    expect(target.weekGain).toBeGreaterThan(10);
+    expect(target.bid).toBeGreaterThan(50);
+  });
+});

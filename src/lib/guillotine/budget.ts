@@ -79,6 +79,8 @@ export interface BudgetPlan {
   weeklyCap: number;
   /** The most you should put on any single player. */
   maxSingleBid: number;
+  /** The budget this league started with, which is what every rule of thumb is a share of. */
+  originalBudget: number;
   /** Your share of all FAAB still held by living teams. */
   purchasingPowerShare: number;
   /** The largest bid any one rival could make. */
@@ -170,6 +172,7 @@ export function planBudget(input: BudgetInput): BudgetPlan {
     holdFloor,
     weeklyCap,
     maxSingleBid,
+    originalBudget: budget,
     purchasingPowerShare: pool > 0 ? remaining / pool : 0,
     maxRivalBid: rivalRemaining.length > 0 ? Math.max(...rivalRemaining) : 0,
     notes,

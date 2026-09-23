@@ -16,6 +16,7 @@ import { assessFragility, submittedLineupNote, type Fragility } from "./fragilit
 import { buildMarket, type ObservedBid, type Tier } from "./market";
 import { getByeWeeks, getSeasonRates, getWeekProjections } from "./projections";
 import { buildBidCard, finalFourBars } from "./recommend";
+import { bestLineup, slotAccepts } from "./lineup";
 import { snapshotFrom } from "./roster-diff";
 import { scoringSkewNotes } from "./scoring";
 import type { LeagueProfile } from "@/lib/league/types";
@@ -117,6 +118,7 @@ function fallbackReport(
       holdFloor: 0,
       weeklyCap: 0,
       maxSingleBid: 0,
+      originalBudget: 0,
       purchasingPowerShare: 0,
       maxRivalBid: 0,
       notes: [],
@@ -365,6 +367,39 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
       .slice(0, POOL_PER_POSITION),
   );
 
+  // What every surviving rival is starting, at its weakest point per position.
+  //
+  // This is the demand side of the market, and until now the model had none of
+  // it: it knew what rivals could afford and nothing about whether they wanted
+  // anybody. A quarterback who would walk into four other lineups is a
+  // different purchase from one nobody else can use, at the same price.
+  const rivalStarterBars: Record<string, number>[] = state.aliveRosterIds
+    .filter((id) => id !== myRoster.roster_id)
+    .map((id) => {
+      const roster = rosters.find((r) => r.roster_id === id);
+      const theirs = poolFor(roster?.players ?? []);
+      const lineup = bestLineup(
+        theirs.map((p) => ({ playerId: p.playerId, position: p.position, points: p.weekPoints })),
+        profile.rosterPositions,
+      );
+      const byPosition: Record<string, number> = {};
+      for (const slot of lineup.slots) {
+        if (!slot.player) {
+          // An unfilled slot is the strongest demand there is, and a bar of
+          // zero says so without needing a special case downstream.
+          for (const position of ["QB", "RB", "WR", "TE"]) {
+            if (slotAccepts(slot.slot, position)) byPosition[position] = 0;
+          }
+          continue;
+        }
+        const player = theirs.find((t) => t.playerId === slot.player!.playerId);
+        const position = player?.position ?? slot.player.position;
+        const points = slot.player.points;
+        byPosition[position] = Math.min(byPosition[position] ?? Infinity, points);
+      }
+      return byPosition;
+    });
+
   const card = buildBidCard({
     myPlayers,
     candidates: available,
@@ -374,6 +409,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     posture: posture.posture,
     week,
     leaguePlayers,
+    rivalStarterBars,
   });
 
   // --- My lineup, for the report's own section ---
