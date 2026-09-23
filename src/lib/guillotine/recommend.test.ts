@@ -5,6 +5,7 @@ import {
   finalFourBars,
   priceTarget,
   startersByPosition,
+  strictlyDescending,
 } from "./recommend";
 import type { RecommendInput } from "./recommend";
 import { buildMarket } from "./market";
@@ -633,5 +634,76 @@ describe("pricing against the rivals who actually exist", () => {
     const oneNeedyRival = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
     const target = cardWith(oneNeedyRival).chains.flatMap((c) => c.targets)[0];
     expect(target.walkAway).toBeGreaterThan(target.bid);
+  });
+});
+
+// Week 3, 2026, Dah Chopped League. Jayden Daniels was out, and four
+// quarterbacks within 1.4 points of each other were on the wire. The card bid
+// $59, $58, $58 and $38 on them. Nobody else bid on Nix or Lock, Nix won at
+// $58, and Lock went unclaimed and was a free pickup the next morning.
+describe("a glut at one position", () => {
+  const qbs = [
+    player("burrow", "QB", 18.2),
+    player("kyler", "QB", 17.6),
+    player("nix", "QB", 17.1),
+    player("lock", "QB", 16.8),
+  ];
+  const withQbOut = myPlayers.map((p) => (p.playerId === "qb" ? { ...p, weekPoints: 0 } : p));
+  const rivalsNeedingQb = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `rival${i}`,
+      faabLeft: 1000,
+      bars: { QB: 10, RB: 30, WR: 30, TE: 30 },
+    }));
+  const card = (rivals: number) =>
+    buildBidCard({
+      ...input({ budget: roomToSpend, posture: "red" }),
+      myPlayers: withQbOut,
+      candidates: qbs,
+      rivals: rivalsNeedingQb(rivals),
+    });
+  const qbChain = (c: ReturnType<typeof card>) =>
+    c.chains.find((ch) => ch.targets.some((t) => t.player.position === "QB"))!;
+
+  it("bids the minimum on the fallback that will be left over", () => {
+    const chain = qbChain(card(3));
+    expect(chain.targets.at(-1)!.player.playerId).toBe("lock");
+    expect(chain.targets.at(-1)!.bid).toBe(1);
+  });
+
+  it("prices each step up by the points it adds over the next one", () => {
+    const chain = qbChain(card(3));
+    const nix = chain.targets.find((t) => t.player.playerId === "nix")!;
+    // 0.3 points over a free Drew Lock is not worth $58.
+    expect(nix.bid).toBeLessThan(10);
+  });
+
+  it("puts no two claims at the same price", () => {
+    const chain = qbChain(card(3));
+    const bids = chain.targets.map((t) => t.bid);
+    expect(new Set(bids).size).toBe(bids.length);
+    for (let i = 1; i < bids.length; i++) expect(bids[i]).toBeLessThan(bids[i - 1]);
+  });
+
+  it("pays full price when every quarterback has a bidder", () => {
+    // Five rivals for four players: nobody is left over, so no free fallback.
+    const chain = qbChain(card(5));
+    expect(chain.targets.at(-1)!.bid).toBeGreaterThan(10);
+  });
+});
+
+describe("strictlyDescending", () => {
+  const t = (bid: number, walkAway = bid) => ({ bid, walkAway }) as never;
+
+  it("breaks a tie so Sleeper runs the claims in the card's order", () => {
+    const targets = [t(59), t(58), t(58), t(38)];
+    strictlyDescending(targets);
+    expect(targets.map((x: { bid: number }) => x.bid)).toEqual([59, 58, 57, 38]);
+  });
+
+  it("lifts from the bottom when the floor leaves no room", () => {
+    const targets = [t(1), t(1), t(1)];
+    strictlyDescending(targets);
+    expect(targets.map((x: { bid: number }) => x.bid)).toEqual([3, 2, 1]);
   });
 });

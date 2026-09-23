@@ -123,6 +123,9 @@ const MAX_CHAINS = 3;
 /** Fallbacks per chain, so a lost claim still lands something. */
 const MAX_TARGETS_PER_CHAIN = 4;
 
+/** Sleeper's smallest legal bid in every league Jack plays. */
+const MIN_BID = 1;
+
 export interface RecommendInput {
   myPlayers: PoolPlayer[];
   candidates: PoolPlayer[];
@@ -472,6 +475,9 @@ export function buildBidCard(input: RecommendInput): BidCard {
   // Score every candidate on what he would actually add.
   const rivals = input.rivals ?? [];
 
+  // Competition per target, kept for the chain ladder below.
+  const competition = new Map<string, { contested: number; supply: number }>();
+
   const scored = candidates
     .map((player) => {
       const plays = playsProbability(player);
@@ -496,6 +502,7 @@ export function buildBidCard(input: RecommendInput): BidCard {
       // Only rivals who could actually pay the going rate count as bidders.
       const contested = contestedBy(player, rivals, market.estimates[tier].expected);
       const supply = comparableSupply(player, candidates);
+      competition.set(player.playerId, { contested: contested.length, supply });
       const price = priceTarget(tier, gain, market, budget, posture, {
         quality: qualityFactor(player, bars),
         plays,
@@ -610,13 +617,8 @@ export function buildBidCard(input: RecommendInput): BidCard {
   }
 
   for (const chain of chains) {
-    for (let i = 1; i < chain.targets.length; i++) {
-      const prev = chain.targets[i - 1];
-      const cur = chain.targets[i];
-      if (cur.bid > prev.bid) cur.bid = prev.bid;
-      if (cur.walkAway > prev.walkAway) cur.walkAway = prev.walkAway;
-      if (cur.walkAway < cur.bid) cur.walkAway = cur.bid;
-    }
+    ladderChain(chain.targets, competition, rivals.length > 0);
+    strictlyDescending(chain.targets);
   }
   maxPossibleSpend = worstCase(chains);
 
@@ -640,6 +642,76 @@ export function buildBidCard(input: RecommendInput): BidCard {
     summary: summarize(chains, sitOut, maxPossibleSpend, posture),
     sharedDisplacement: [...new Set(doubleCounted)],
   };
+}
+
+/**
+ * Price each fallback in a chain against the next one down, not the field.
+ *
+ * Week 3 put four quarterbacks on the card within 1.4 points of each other and
+ * priced every one of them near $58, as if each had to be won against every
+ * rival. But the third choice is only ever reached after losing the first two,
+ * and what it buys over the fourth is the gap between them: Bo Nix won at $58
+ * for 0.3 points over Drew Lock, and Lock went unclaimed and was a free pickup
+ * the next morning.
+ *
+ * So when the bottom of a chain is in surplus (more comparable players than
+ * rivals who would start one), someone is left over and the floor is the
+ * minimum bid. Each claim above it pays for its gain over the one below, at the
+ * rate its own price implies, and never more than it was priced at alone.
+ *
+ * Championship targets are left alone. Their price is about the endgame, and a
+ * weekly gap says nothing about that.
+ */
+export function ladderChain(
+  targets: BidTarget[],
+  competition: Map<string, { contested: number; supply: number }>,
+  rivalsKnown: boolean,
+): void {
+  if (!rivalsKnown || targets.length === 0) return;
+  // The ladder runs over the weekly tail of the chain only.
+  let start = targets.length;
+  while (start > 0 && targets[start - 1].tier !== "championship") start--;
+  const tail = targets.slice(start);
+  if (tail.length === 0) return;
+
+  const bottom = tail[tail.length - 1];
+  const c = competition.get(bottom.player.playerId);
+  if (!c || c.supply <= c.contested) return;
+
+  bottom.bid = MIN_BID;
+  for (let i = tail.length - 2; i >= 0; i--) {
+    const cur = tail[i];
+    const next = tail[i + 1];
+    const gap = Math.max(0, cur.weekGain - next.weekGain);
+    const premium = cur.weekGain > 0 ? (cur.bid * gap) / cur.weekGain : 0;
+    cur.bid = Math.min(cur.bid, next.bid + Math.max(1, Math.round(premium)));
+  }
+}
+
+/**
+ * No two claims in a chain at the same price.
+ *
+ * Sleeper runs your claims highest bid first and breaks a tie its own way. In
+ * week 3 Kyler Murray and Bo Nix were both $58, Sleeper ran Nix first, Nix took
+ * the drop, and Kyler failed with nothing left to drop. The card's order only
+ * means something if the money says it.
+ */
+export function strictlyDescending(targets: BidTarget[]): void {
+  for (let i = 1; i < targets.length; i++) {
+    const prev = targets[i - 1];
+    const cur = targets[i];
+    if (cur.bid >= prev.bid) cur.bid = prev.bid - 1;
+  }
+  // A $1 floor can leave no room below; lift from the bottom instead.
+  for (let i = targets.length - 1; i >= 0; i--) {
+    const floor = i === targets.length - 1 ? MIN_BID : targets[i + 1].bid + 1;
+    if (targets[i].bid < floor) targets[i].bid = floor;
+  }
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
+    if (i > 0 && t.walkAway > targets[i - 1].walkAway) t.walkAway = targets[i - 1].walkAway;
+    if (t.walkAway < t.bid) t.walkAway = t.bid;
+  }
 }
 
 function needLabel(targets: BidTarget[], emptySlots: Set<string>): string {
