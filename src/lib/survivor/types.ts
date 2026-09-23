@@ -105,6 +105,16 @@ export interface PoolConfig {
   poolSize: number;
   /** Entries still alive. Falls back to poolSize before week 1. */
   entriesAlive: number | null;
+  /**
+   * The week `entriesAlive` was counted in.
+   *
+   * A number read off the pool's own board beats anything derived from the
+   * pick distribution, which cannot see entries that left before the snapshot.
+   * But it beats it for that week only: an old count left in place would
+   * silently outrank the derivation for the rest of the season, which is the
+   * failure the derivation was built to end.
+   */
+  entriesAliveWeek: number | null;
   /** Losses allowed before elimination. 1 = one strike. */
   strikes: number;
   canRebuy: boolean;
@@ -141,6 +151,7 @@ export const DEFAULT_POOL: PoolConfig = {
   name: "Survivor pool",
   poolSize: 500,
   entriesAlive: null,
+  entriesAliveWeek: null,
   strikes: 1,
   canRebuy: false,
   tieAdvances: false,

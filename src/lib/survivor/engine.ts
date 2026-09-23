@@ -246,10 +246,19 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   const coverage = ownershipCoverage(rawPicks, teamsPlaying);
   const ownership = normalizeOwnership(rawPicks, teamsPlaying);
 
+  // A count you typed beats a count we worked out.
+  //
+  // The derived number comes from the pick distribution, which only ever sees
+  // entries that were still in the pool when the distribution was captured.
+  // Anyone who withdrew, never paid, or was removed between the snapshot and
+  // now is invisible to it, and that gap is real: the 500 pool derived 174 and
+  // the board said 172. Until this, a hand-set count was accepted, stored, and
+  // then silently ignored the moment a single week was logged.
+  const countedByHand =
+    pool.entriesAlive != null && pool.entriesAliveWeek === week ? pool.entriesAlive : null;
   const entriesAlive =
-    field.weeksLogged > 0
-      ? field.entriesAlive
-      : (pool.entriesAlive ?? pool.poolSize);
+    countedByHand ??
+    (field.weeksLogged > 0 ? field.entriesAlive : (pool.entriesAlive ?? pool.poolSize));
   // What the pool is playing FOR, which is not the same question as which pick
   // is best this week. See posture.ts: pool size barely touches the weekly
   // equity number, and decides instead whether surviving wins outright or ends
@@ -507,9 +516,14 @@ export function assembleReport(input: EngineInput): SurvivorReport {
 
   if (field.weeksLogged > 0) {
     const last = field.attrition[field.attrition.length - 1];
+    const derived = `${field.weeksLogged} week(s) logged. The pool is down to ${field.entriesAlive} entries from ${pool.poolSize}${last ? `, ${last.entering - last.survived} of them in Week ${last.week}` : ""}`;
     notes.push(
-      `${field.weeksLogged} week(s) logged. The pool is down to ${field.entriesAlive} entries from ${pool.poolSize}${last ? `, ${last.entering - last.survived} of them in Week ${last.week}` : ""}. That count is derived from the picks you logged, so it does not need maintaining by hand.`,
+      countedByHand != null && countedByHand !== field.entriesAlive
+        ? `${derived} by the logged picks, but you counted ${countedByHand} on the board and that is the number being used. The picks can only see entries that were still in the pool when the distribution was captured, so anyone who left before that is missing from the derivation. Clear the count to go back to deriving it.`
+        : `${derived}. That count is derived from the picks you logged, so it does not need maintaining by hand.`,
     );
+  } else if (countedByHand != null) {
+    notes.push(`${countedByHand} entries alive, counted by hand.`);
   }
   if (calibration.weeks > 0) notes.push(calibration.summary);
   if (unloggedWeeks.length > 0) {

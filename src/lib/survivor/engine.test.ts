@@ -341,6 +341,41 @@ describe("assembleReport", () => {
       expect(r.field.weeksLogged).toBe(1);
     });
 
+    // The derivation reads the pick distribution, which only contains entries
+    // that were still in the pool when it was captured. Jack counted 172 alive
+    // in the 500 pool on a week the picks derived 174, and he was right: two
+    // entries had left before the snapshot. The typed number was being stored
+    // and then quietly ignored.
+    it("lets a count taken this week beat the derivation", () => {
+      const r = wk2({
+        weeklyPicks: { "1": { KC: 70, NYG: 30 } },
+        entriesAlive: 348,
+        entriesAliveWeek: 2,
+      });
+      expect(r.entriesAlive).toBe(348);
+      // The derived number is still reported, because the gap is information.
+      expect(r.field.entriesAlive).toBe(350);
+      expect(r.notes.some((n) => n.includes("you counted 348"))).toBe(true);
+    });
+
+    it("expires that count rather than letting it outrank the derivation forever", () => {
+      const r = wk2({
+        weeklyPicks: { "1": { KC: 70, NYG: 30 } },
+        entriesAlive: 348,
+        entriesAliveWeek: 1,
+      });
+      expect(r.entriesAlive).toBe(350);
+    });
+
+    it("says nothing when the hand count agrees with the derivation", () => {
+      const r = wk2({
+        weeklyPicks: { "1": { KC: 70, NYG: 30 } },
+        entriesAlive: 350,
+        entriesAliveWeek: 2,
+      });
+      expect(r.notes.some((n) => n.includes("you counted"))).toBe(false);
+    });
+
     it("falls back to the typed number when nothing is logged", () => {
       expect(wk2({ entriesAlive: 420 }).entriesAlive).toBe(420);
     });

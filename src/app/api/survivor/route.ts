@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { buildReport, buildReports, SEASON } from "@/lib/survivor/report";
+import { buildReport, buildReports, currentWeek, SEASON } from "@/lib/survivor/report";
+import { getSeasonGames } from "@/lib/survivor/odds";
 import { getPool, savePool } from "@/lib/survivor/state";
+import type { PoolConfig } from "@/lib/survivor/types";
 import { DEFAULT_POOL_ID, isPoolId } from "@/lib/survivor/pools";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +53,8 @@ const patchSchema = z.object({
   name: z.string().min(1).max(60).optional(),
   poolSize: z.number().int().min(1).max(1_000_000).optional(),
   entriesAlive: z.number().int().min(1).max(1_000_000).nullable().optional(),
+  // Not accepted from the caller. A count is an observation about the week it
+  // was taken in, so the week is stamped here rather than typed in.
   strikes: z.number().int().min(1).max(5).optional(),
   canRebuy: z.boolean().optional(),
   tieAdvances: z.boolean().optional(),
@@ -85,7 +89,18 @@ export async function POST(req: Request) {
   }
 
   try {
-    await savePool(SEASON, target.id, parsed.data);
+    // A count of who is left is only true for the week it was counted in, so
+    // it is stored with that week attached and expires on its own. Sending
+    // null clears both.
+    const patch: Partial<PoolConfig> = { ...parsed.data };
+    if (patch.entriesAlive !== undefined) {
+      patch.entriesAliveWeek =
+        patch.entriesAlive === null
+          ? null
+          : currentWeek((await getSeasonGames(SEASON)).games);
+    }
+
+    await savePool(SEASON, target.id, patch);
     const report = await buildReport(target.id);
     return NextResponse.json(report);
   } catch (e) {
