@@ -397,6 +397,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       position,
       age: players[id]?.age ?? null,
       seasonPositionRank: lab.byId[id]?.positionRank ?? null,
+      seasonRankStale: !labFresh,
       ...gain,
       lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
       researchTier: (researchById.get(id)?.tier as ClaimTier | undefined) ?? null,

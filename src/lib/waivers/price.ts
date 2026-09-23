@@ -52,6 +52,14 @@ const YOUNG_AGE = 25;
 /** Below this many points of lineup gain a player is a filler, not a starter. */
 const STARTER_GAIN = 2;
 
+/**
+ * A start worth less than this over who already starts is a coin flip, and a
+ * coin flip is streamer money whatever tier the player's name earns. Projections
+ * carry about a point of noise per player, so under one point the "upgrade" is
+ * inside the error.
+ */
+const NEAR_TIE_GAIN = 1;
+
 /** A gain this size or more is a full-need target. */
 const BIG_GAIN = 5;
 
@@ -95,6 +103,13 @@ export interface ClaimCandidate {
   age: number | null;
   /** "WR54" parsed to 54, when he is on the season list. */
   seasonPositionRank: number | null;
+  /**
+   * True when that season rank comes from a list he has not touched this week.
+   * A stale rank still says who he rated at all, but not that the player is an
+   * every-week starter today: week 3, a Sep 5 TE10 made Dalton Schultz a $16
+   * "starter" claim for a 0.3-point upgrade.
+   */
+  seasonRankStale?: boolean;
   /**
    * Projected points he adds to this week's best lineup, from the weekly
    * projection feed. Null when the feed has no number for him or for the man
@@ -190,7 +205,14 @@ export function classifyClaim(c: ClaimCandidate, ctx: PricingContext): ClaimTier
   // Otherwise the research is this week's opinion and the season list may
   // not be; when the consensus rates a player higher than the rank does,
   // the consensus wins. It never lowers a tier the lineup math earned.
-  return strongerTier(own, c.researchTier);
+  const tier = strongerTier(own, c.researchTier);
+  // Except for a near tie. Paying starter money to replace a starter by a
+  // fraction of a point buys nothing this week, and the season case for him
+  // is priced separately when he is offered as a season claim.
+  if (starts(c) && c.weekGain != null && c.weekGain < NEAR_TIE_GAIN) {
+    return TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf("streamer") ? "streamer" : tier;
+  }
+  return tier;
 }
 
 /** He enters this week's lineup, by measured points or by the solver's rank. */
@@ -202,8 +224,9 @@ function classifyOwn(c: ClaimCandidate, ctx: PricingContext): ClaimTier {
   if (isStreamerPosition(c, ctx)) return starts(c) ? "streamer" : "stash";
 
   const bar = starterBar(c.position, ctx);
-  if (c.seasonPositionRank != null && c.seasonPositionRank <= bar * 0.4) return "winner";
-  if (c.seasonPositionRank != null && c.seasonPositionRank <= bar) return "starter";
+  const current = c.seasonRankStale ? null : c.seasonPositionRank;
+  if (current != null && current <= bar * 0.4) return "winner";
+  if (current != null && current <= bar) return "starter";
   // Multiweek money needs a measured gain. A start the feed cannot size is
   // a start, and a start alone is filler money.
   if (c.weekGain != null && c.weekGain >= STARTER_GAIN) return "multiweek";

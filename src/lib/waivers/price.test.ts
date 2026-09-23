@@ -264,3 +264,29 @@ describe("pacing", () => {
     expect(q.note).toContain("Ahead of pace");
   });
 });
+
+describe("near ties and a stale season list", () => {
+  // Week 3, 2026 Half PPR: Dalton Schultz, TE10 on a Sep 5 season list, +0.3
+  // projected points over Colston Loveland, was priced $16 of $100.
+  const schultz = cand({ position: "TE", seasonPositionRank: 10, weekGain: 0.3, startsThisWeek: true, lastWeekSnaps: 54 });
+
+  it("prices a start that barely beats the starter as a streamer", () => {
+    expect(classifyClaim(schultz, ctx())).toBe("streamer");
+    expect(priceClaim(schultz, ctx({ remaining: 84 })).bid).toBeLessThanOrEqual(6);
+  });
+
+  it("keeps full price for a start that is a real upgrade", () => {
+    expect(classifyClaim({ ...schultz, weekGain: 6 }, ctx())).toBe("starter");
+  });
+
+  it("scales the same claim to the league's budget", () => {
+    const small = priceClaim({ ...schultz, weekGain: 6 }, ctx());
+    const big = priceClaim({ ...schultz, weekGain: 6 }, ctx({ budget: 1000, remaining: 1000 }));
+    expect(big.bid).toBeGreaterThan(small.bid * 8);
+  });
+
+  it("does not call a player an every-week starter off a stale season rank", () => {
+    const stale = { ...schultz, weekGain: 2.5, seasonRankStale: true };
+    expect(classifyClaim(stale, ctx())).toBe("multiweek");
+  });
+});
