@@ -1,6 +1,6 @@
 import "server-only";
 import { labForScoring, scoringForLeague, type LabIndex } from "@/lib/jingles/active";
-import { latestWeekly, latestWeeklyFor, readWaivers, type StoredWeekly } from "@/lib/jingles/ingest";
+import { latestWeekly, latestWeeklyFor, positionRankOf, readWaivers, type StoredWeekly } from "@/lib/jingles/ingest";
 import { normalizeTeam } from "@/lib/jingles/resolve";
 import { resolveLeague } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
@@ -440,7 +440,11 @@ function weeklyIndex(weekly: StoredWeekly | null) {
   for (const list of Object.values(weekly.positional)) {
     for (const e of list) {
       if (!e.sleeperId) continue;
-      positional.set(e.sleeperId, e.rank);
+      // A week read off the FantasyPros board builds each position list out of
+      // his SUPERFLEX list, so `rank` there is the superflex spot (Bateman
+      // WR43 stored as 118). positionRank is the position rank whenever the
+      // board supplied one; `rank` is only right for weeks read off Substack.
+      positional.set(e.sleeperId, positionRankOf(e));
       meta.set(e.sleeperId, { opponent: e.opponent, home: e.home });
     }
   }

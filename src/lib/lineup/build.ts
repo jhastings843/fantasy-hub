@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  positionRankOf,
   latestWeekly,
   readWeekly,
   readWeeklyFor,
@@ -288,7 +289,11 @@ async function lineupForLeague(
   for (const list of Object.values(weekly.positional)) {
     for (const e of list) {
       if (!e.sleeperId) continue;
-      positionalRank.set(e.sleeperId, e.rank);
+      // A week read off the FantasyPros board builds each position list out of
+      // his SUPERFLEX list, so `rank` there is the superflex spot (Bateman
+      // WR43 stored as 118). positionRank is the position rank whenever the
+      // board supplied one; `rank` is only right for weeks read off Substack.
+      positionalRank.set(e.sleeperId, positionRankOf(e));
       meta.set(e.sleeperId, { opponent: e.opponent, home: e.home });
     }
   }

@@ -100,6 +100,11 @@ export interface StoredWeeklyEntry {
   note?: string | null;
 }
 
+/** An entry's rank within its position, whichever source stored the week. */
+export function positionRankOf(e: Pick<StoredWeeklyEntry, "rank" | "positionRank">): number {
+  return e.positionRank ?? e.rank;
+}
+
 export interface StoredWeekly {
   season: string;
   week: number;
