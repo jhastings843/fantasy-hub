@@ -421,7 +421,11 @@ describe("telling apart players who fill the same hole", () => {
     card.chains.flatMap((c) => c.targets).find((t) => t.player.playerId === id)?.bid ?? 0;
 
   it("does not price the streamer like the starter", () => {
-    expect(bidFor("elite")).toBeGreaterThan(bidFor("streamer") * 2);
+    // The gap is narrower than it used to be, on purpose: both are priced off
+    // what it takes to win a multiweek starter in this room, and the streamer
+    // is cheaper because his own value runs out first, not because the market
+    // for quarterbacks is three different markets.
+    expect(bidFor("elite")).toBeGreaterThan(bidFor("streamer") * 1.3);
   });
 
   it("still keeps the two real starters close, because they are close", () => {
@@ -476,14 +480,19 @@ describe("a player who cannot play this week", () => {
 
 describe("what the rest of the league needs", () => {
   const target = player("wanted", "WR", 16);
-  const bars = (worstWr: number) => Array(11).fill({ QB: 20, RB: 12, WR: worstWr, TE: 8 });
+  const bars = (worstWr: number) =>
+    Array.from({ length: 11 }, (_, i) => ({
+      name: `Rival ${i + 1}`,
+      faabLeft: 800,
+      bars: { QB: 20, RB: 12, WR: worstWr, TE: 8 },
+    }));
 
   it("pays more for a player several rivals would start", () => {
     const contested = buildBidCard(
-      input({ candidates: [target], rivalStarterBars: bars(8), budget: roomToSpend }),
+      input({ candidates: [target], rivals: bars(8), budget: roomToSpend }),
     );
     const alone = buildBidCard(
-      input({ candidates: [target], rivalStarterBars: bars(20), budget: roomToSpend }),
+      input({ candidates: [target], rivals: bars(20), budget: roomToSpend }),
     );
     const bid = (card: ReturnType<typeof buildBidCard>) =>
       card.chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
@@ -493,7 +502,7 @@ describe("what the rest of the league needs", () => {
   it("has no opinion when it cannot see the other rosters", () => {
     const blind = buildBidCard(input({ candidates: [target], budget: roomToSpend }));
     const neutral = buildBidCard(
-      input({ candidates: [target], rivalStarterBars: [{ WR: 10 }], budget: roomToSpend }),
+      input({ candidates: [target], rivals: [{ name: "One rival", faabLeft: 800, bars: { WR: 10 } }], budget: roomToSpend }),
     );
     const bid = (card: ReturnType<typeof buildBidCard>) =>
       card.chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
@@ -542,6 +551,87 @@ describe("the hold rule on thin upgrades", () => {
     // Thirteen points of gain, so the rate ceiling lands near $430 and never
     // touches a bid the market put at a fraction of that.
     expect(target.weekGain).toBeGreaterThan(10);
-    expect(target.bid).toBeGreaterThan(50);
+    // Priced off the market rather than off the ceiling, so what matters is
+    // that the hold rule is nowhere near it.
+    expect(target.bid).toBeGreaterThan(40);
+    expect(target.walkAway).toBeGreaterThan(target.bid);
+  });
+});
+
+describe("pricing against the rivals who actually exist", () => {
+  const budget = planBudget({
+    budget: 1000,
+    remaining: 900,
+    teamsAlive: 14,
+    totalTeams: 16,
+    posture: "red",
+    rivalRemaining: Array(13).fill(900),
+  });
+
+  // Week 3 put four startable quarterbacks in front of two teams that needed
+  // one, and the model bid $106 on the best of them in a room that had never
+  // paid more than $56 for a multiweek starter.
+  const qbs = [
+    player("best", "QB", 18.3, { rosPoints: 28 }),
+    player("second", "QB", 17.6, { rosPoints: 27 }),
+    player("third", "QB", 17.2, { rosPoints: 26 }),
+    player("fourth", "QB", 16.7, { rosPoints: 25 }),
+  ];
+  const needsAQb = { name: "DonovanQ", faabLeft: 948, bars: { QB: 0, RB: 14, WR: 14, TE: 10 } };
+  const happy = (i: number) => ({
+    name: `Rival ${i}`,
+    faabLeft: 900,
+    bars: { QB: 18, RB: 14, WR: 14, TE: 10 },
+  });
+  const hurtStarter = [
+    player("qb", "QB", 0, { injuryStatus: "Out", rosPoints: 28 }),
+    ...myPlayers.filter((p) => p.playerId !== "qb"),
+  ];
+
+  const cardWith = (rivals: RecommendInput["rivals"]) =>
+    buildBidCard(
+      input({ myPlayers: hurtStarter, candidates: qbs, posture: "red", budget, rivals }),
+    );
+
+  const topBid = (rivals: RecommendInput["rivals"]) =>
+    cardWith(rivals).chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
+
+  it("does not pay a scarcity price when the position is not scarce", () => {
+    const oneNeedyRival = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
+    // One bidder, four interchangeable quarterbacks. The market estimate for a
+    // multiweek starter in this fixture is the number to stay near.
+    expect(topBid(oneNeedyRival)).toBeLessThan(80);
+  });
+
+  it("pays up when the same rivals have nowhere else to go", () => {
+    const scarce = input({
+      myPlayers: hurtStarter,
+      candidates: [qbs[0]],
+      posture: "red",
+      budget,
+      rivals: [needsAQb, { ...needsAQb, name: "Second needy" }, { ...needsAQb, name: "Third needy" }],
+    });
+    const contested = buildBidCard(scarce).chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
+    const oneNeedyRival = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
+    expect(contested).toBeGreaterThan(topBid(oneNeedyRival));
+  });
+
+  it("ignores a rival who wants him and cannot pay", () => {
+    const broke = [{ ...needsAQb, faabLeft: 3 }, ...Array.from({ length: 12 }, (_, i) => happy(i))];
+    const solvent = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
+    expect(topBid(broke)).toBeLessThan(topBid(solvent));
+  });
+
+  it("names the rival and says what else he could buy", () => {
+    const oneNeedyRival = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
+    const reason = cardWith(oneNeedyRival).chains.flatMap((c) => c.targets)[0]?.reason ?? "";
+    expect(reason).toContain("DonovanQ would start him");
+    expect(reason).toContain("comparable");
+  });
+
+  it("keeps the walk-away above the bid, because they answer different questions", () => {
+    const oneNeedyRival = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
+    const target = cardWith(oneNeedyRival).chains.flatMap((c) => c.targets)[0];
+    expect(target.walkAway).toBeGreaterThan(target.bid);
   });
 });

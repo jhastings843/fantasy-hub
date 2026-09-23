@@ -390,7 +390,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
   // it: it knew what rivals could afford and nothing about whether they wanted
   // anybody. A quarterback who would walk into four other lineups is a
   // different purchase from one nobody else can use, at the same price.
-  const rivalStarterBars: Record<string, number>[] = state.aliveRosterIds
+  const rivals = state.aliveRosterIds
     .filter((id) => id !== myRoster.roster_id)
     .map((id) => {
       const roster = rosters.find((r) => r.roster_id === id);
@@ -414,7 +414,11 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
         const points = slot.player.points;
         byPosition[position] = Math.min(byPosition[position] ?? Infinity, points);
       }
-      return byPosition;
+      return {
+        name: teamName(id),
+        faabLeft: state.faabRemaining[id] ?? 0,
+        bars: byPosition,
+      };
     });
 
   const card = buildBidCard({
@@ -426,7 +430,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     posture: posture.posture,
     week,
     leaguePlayers,
-    rivalStarterBars,
+    rivals,
   });
 
   // --- My lineup, for the report's own section ---

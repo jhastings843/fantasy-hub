@@ -102,8 +102,17 @@ const DEMAND_FACTOR = { uncontested: 0.85, normal: 1, contested: 1.15 };
 const THIN_GAIN = 3;
 const THIN_GAIN_CAP_SHARE = 0.1;
 
-/** Rivals who would start him before the market counts as busy. */
-const CONTESTED_AT = 3;
+/** Two players this close do the same job for the same bidder. */
+const COMPARABLE_WITHIN = 2;
+
+/**
+ * What a bid adds on top of the market price to actually win it.
+ *
+ * The research is blunt about this: the ideal win is a dollar over second
+ * place, not a hundred over. The premium is for being sure in a week that
+ * could end you, not for the pleasure of paying more.
+ */
+const EDGE: Record<Posture, number> = { red: 1.15, yellow: 1.08, green: 1 };
 
 /** Points a rival's lineup has to gain before he is a real bidder for a player. */
 const RIVAL_NEED_GAIN = 2;
@@ -125,15 +134,16 @@ export interface RecommendInput {
   /** Every player rostered anywhere in the league, for the positional bars. */
   leaguePlayers: { position: string; rosPoints: number }[];
   /**
-   * One entry per surviving rival: the weakest starter they currently field at
-   * each position, in projected points. A player who beats that number is
-   * somebody they would start, which makes him somebody they may bid on.
+   * One entry per surviving rival: what they are starting at each position and
+   * what they have left to spend. A player who beats their weakest starter is
+   * somebody they would start, and a rival with no money is not a bidder
+   * whatever he needs.
    *
    * Optional because a caller that cannot see the other rosters should get a
    * card priced on the market alone rather than one priced as if nobody else
    * wanted anybody.
    */
-  rivalStarterBars?: Record<string, number>[];
+  rivals?: { name: string; faabLeft: number; bars: Record<string, number> }[];
 }
 
 const asLineup = (p: PoolPlayer, useRos = false): LineupPlayer => ({
@@ -177,23 +187,54 @@ export function qualityFactor(player: PoolPlayer, bars: Record<string, number>):
   return Math.min(1, Math.max(MIN_QUALITY, player.rosPoints / bar));
 }
 
-/** How many surviving rivals would put this player straight into their lineup. */
+/** Surviving rivals who would start this player AND can afford to chase him. */
 export function contestedBy(
   player: PoolPlayer,
-  rivalStarterBars: Record<string, number>[],
-): number {
-  return rivalStarterBars.filter((bars) => {
-    const theirs = bars[player.position];
-    if (theirs == null) return false;
-    return player.weekPoints - theirs >= RIVAL_NEED_GAIN;
-  }).length;
+  rivals: { name: string; faabLeft: number; bars: Record<string, number> }[],
+  minimumBid = 0,
+): string[] {
+  return rivals
+    .filter((r) => {
+      const theirs = r.bars[player.position];
+      if (theirs == null) return false;
+      if (r.faabLeft < minimumBid) return false;
+      return player.weekPoints - theirs >= RIVAL_NEED_GAIN;
+    })
+    .map((r) => r.name);
 }
 
-function demandFactor(contested: number, rivals: number): number {
-  // No rosters to read means no opinion, rather than a discount for silence.
-  if (rivals === 0) return DEMAND_FACTOR.normal;
+/**
+ * How many other players would do the same job for the same bidders.
+ *
+ * This is the piece that was missing, and it is most of the answer. Week 3 put
+ * four startable quarterbacks on the board within 1.6 points of each other,
+ * against two teams that needed one, and the model priced the best of them at
+ * twice what this room has ever paid for a multiweek starter. Demand without
+ * supply is not a market.
+ */
+export function comparableSupply(player: PoolPlayer, candidates: PoolPlayer[]): number {
+  return candidates.filter(
+    (c) =>
+      c.position === player.position &&
+      Math.abs(c.weekPoints - player.weekPoints) <= COMPARABLE_WITHIN,
+  ).length;
+}
+
+/**
+ * What competition does to the price, as bidders per comparable player.
+ *
+ * Nobody wanting him is cheap. Three teams chasing the only player who fixes
+ * their week is expensive. Two teams and four interchangeable players is the
+ * ordinary case and prices near what the room usually pays.
+ */
+export function demandPressure(contested: number, supply: number, rivalsKnown: boolean): number {
+  if (!rivalsKnown) return DEMAND_FACTOR.normal;
   if (contested === 0) return DEMAND_FACTOR.uncontested;
-  return contested >= CONTESTED_AT ? DEMAND_FACTOR.contested : DEMAND_FACTOR.normal;
+  const perPlayer = contested / Math.max(1, supply);
+  return Math.min(
+    DEMAND_FACTOR.contested,
+    Math.max(DEMAND_FACTOR.uncontested, 0.8 + 0.5 * perPlayer),
+  );
 }
 
 /**
@@ -280,7 +321,11 @@ function reasonFor(
   tier: Tier,
   weekGain: number,
   displacesName: string | null,
-  demand: { contested: number; rivals: number } = { contested: 0, rivals: 0 },
+  demand: { contested: string[]; supply: number; rivalsKnown: boolean } = {
+    contested: [],
+    supply: 0,
+    rivalsKnown: false,
+  },
 ): string {
   const parts: string[] = [];
 
@@ -311,11 +356,23 @@ function reasonFor(
   }
   if (player.byeWeek != null) parts.push(`bye week ${player.byeWeek}`);
 
-  if (demand.rivals > 0) {
-    if (demand.contested === 0) {
+  // Who else is bidding, and what else they could buy instead. Both halves
+  // matter: one rival chasing the only player who fixes his week is a different
+  // auction from one rival looking at four interchangeable ones.
+  if (demand.rivalsKnown) {
+    const others = Math.max(0, demand.supply - 1);
+    if (demand.contested.length === 0) {
       parts.push("no surviving rival would start him, so expect to be alone on this one");
-    } else if (demand.contested >= CONTESTED_AT) {
-      parts.push(`${demand.contested} surviving rivals would start him, so expect company`);
+    } else {
+      const who =
+        demand.contested.length <= 2
+          ? demand.contested.join(" and ")
+          : `${demand.contested.length} rivals`;
+      parts.push(
+        others > 0
+          ? `${who} would start him, with ${others} comparable ${others === 1 ? "player" : "players"} also available`
+          : `${who} would start him, and there is nobody comparable left`,
+      );
     }
   }
 
@@ -341,7 +398,7 @@ export function priceTarget(
   const marketExpected = market.estimates[tier].expected;
   const valueFactor = Math.min(1.5, Math.max(0.5, weekGain / REFERENCE_GAIN));
   const quality = modifiers.quality ?? 1;
-  const demand = modifiers.demand ?? 1;
+  const pressure = modifiers.demand ?? 1;
   const plays = modifiers.plays ?? 1;
 
   // Urgency is a statement about needing help THIS Sunday, so it arrives in
@@ -353,7 +410,20 @@ export function priceTarget(
   const injuredFloor = INJURED_DISCOUNT[posture];
   const confidence = injuredFloor + (1 - injuredFloor) * plays;
   const urgency = 1 + (URGENCY[posture] - 1) * plays;
-  const raw = marketExpected * urgency * valueFactor * quality * confidence * demand;
+
+  // Two different numbers, and bidding the wrong one is what made a $56 room
+  // pay $106 for a quarterback.
+  //
+  // What he is WORTH to this roster is the market price bent by urgency, by
+  // what he adds, by how good he is and by whether he will play. That is a
+  // ceiling: the point past which winning is a loss.
+  //
+  // What it TAKES to win him is the market price bent by how many rivals want
+  // him and how many other players would do the same job, plus an edge. That
+  // is the bid. The model used to bid its ceiling on everything, which wins
+  // every auction and overpays in all of them.
+  const worthToMe = marketExpected * urgency * valueFactor * quality * confidence;
+  const takesToWin = marketExpected * pressure * EDGE[posture];
 
   // The hold rule: thin weekly gain cannot justify a heavy bid, unless this is
   // an endgame piece bought in a week that is not about survival.
@@ -364,14 +434,18 @@ export function priceTarget(
   // take a fifth of it. Ten percent per three points, with a floor so a pure
   // speculation can still be bought at a speculative price.
   const endgameBuy = tier === "championship" && posture === "green";
-  const valueCeiling =
+  const holdRuleCeiling =
     budget.originalBudget * THIN_GAIN_CAP_SHARE * Math.max(weekGain / THIN_GAIN, 0.2);
   const ceiling = endgameBuy
     ? budget.maxSingleBid
-    : Math.min(budget.maxSingleBid, valueCeiling);
+    : Math.min(budget.maxSingleBid, holdRuleCeiling);
 
-  const walkAway = Math.min(ceiling, Math.max(marketExpected, raw));
-  const bid = unroundBid(Math.min(raw, ceiling), ceiling);
+  // Never bid past what he is worth, even when the market says it would take
+  // more. That is the sit-out rule: if the price to win exceeds the value, the
+  // right play is losing the auction.
+  const maxWilling = Math.max(1, Math.min(ceiling, worthToMe));
+  const walkAway = Math.min(ceiling, Math.max(marketExpected, worthToMe));
+  const bid = unroundBid(Math.min(takesToWin, maxWilling), maxWilling);
 
   return {
     bid: Math.max(1, bid),
@@ -396,12 +470,11 @@ export function buildBidCard(input: RecommendInput): BidCard {
   const rosterLineup = myPlayers.map((p) => asLineup(p));
 
   // Score every candidate on what he would actually add.
-  const rivalBars = input.rivalStarterBars ?? [];
+  const rivals = input.rivals ?? [];
 
   const scored = candidates
     .map((player) => {
       const plays = playsProbability(player);
-      const out = plays === 0;
       const { gain: rawGain, displaces, slot } = marginalValue(
         rosterLineup,
         asLineup(player),
@@ -420,11 +493,13 @@ export function buildBidCard(input: RecommendInput): BidCard {
         ? (myPlayers.find((p) => p.playerId === displaces.playerId) ?? null)
         : null;
       const tier = classify(player, gain, bars, week);
-      const contested = contestedBy(player, rivalBars);
+      // Only rivals who could actually pay the going rate count as bidders.
+      const contested = contestedBy(player, rivals, market.estimates[tier].expected);
+      const supply = comparableSupply(player, candidates);
       const price = priceTarget(tier, gain, market, budget, posture, {
         quality: qualityFactor(player, bars),
         plays,
-        demand: demandFactor(contested, rivalBars.length),
+        demand: demandPressure(contested.length, supply, rivals.length > 0),
       });
 
       const target: BidTarget = {
@@ -442,7 +517,8 @@ export function buildBidCard(input: RecommendInput): BidCard {
         ...price,
         reason: reasonFor(player, tier, gain, displacedPlayer?.name ?? null, {
           contested,
-          rivals: rivalBars.length,
+          supply,
+          rivalsKnown: rivals.length > 0,
         }),
       };
       return target;
