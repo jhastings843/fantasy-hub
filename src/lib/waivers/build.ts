@@ -409,7 +409,15 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     // was worth to the buyer's lineup that week is not recoverable.
     const observed: ObservedClaim[] = bids.map((bid) => {
       const position = players[bid.playerId]?.position ?? "WR";
-      const tier = classifyClaim(candidateFor(bid.playerId, position, claimGain(null, {})), { ...base, observed: [] });
+      // Past bids were placed while his season list was the current one, so
+      // they are tiered by it even when it is stale for today's decisions.
+      // Tiering them as stale emptied the league's own evidence out of the
+      // starter tier and sent its price back to the prior (Mariota, $88 to
+      // $98 with a $129 market, week 3 dynasty).
+      const tier = classifyClaim(
+        { ...candidateFor(bid.playerId, position, claimGain(null, {})), seasonRankStale: false },
+        { ...base, observed: [] },
+      );
       return { tier, amount: bid.amount };
     });
     const ctx: PricingContext = { ...base, observed };
