@@ -87,7 +87,7 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
   }
   if (previous && resend) await clearSent("midweek", season, week);
 
-  const result = await sendEmail(subject, html, `midweek:${season}:w${week}`);
+  const result = await sendEmail(subject, html, `midweek:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }

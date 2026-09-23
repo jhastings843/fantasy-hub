@@ -214,7 +214,7 @@ async function runThursdayEmailLocked(options: {
   }
   if (previous && resend) await clearSent(season, week);
 
-  const result = await sendEmail(subject, html, `thursday:${season}:w${week}`);
+  const result = await sendEmail(subject, html, `thursday:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }

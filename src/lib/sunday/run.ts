@@ -89,7 +89,7 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
   }
   if (previous && resend) await clearSent("sunday", season, week);
 
-  const result = await sendEmail(subject, html, `sunday:${season}:w${week}`);
+  const result = await sendEmail(subject, html, `sunday:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }
@@ -198,7 +198,7 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
 
   // The idempotency key names the problems, so a retry of this send is a
   // no-op and a later send about a new problem is not.
-  const result = await sendEmail(subject, html, `alarm:${season}:w${week}:${digest(fresh.map((r) => r.key))}`);
+  const result = await sendEmail(subject, html, `alarm:${season}:w${week}:${digest(fresh.map((r) => r.key))}${resend ? `:again-${Date.now()}` : ""}`);
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }
