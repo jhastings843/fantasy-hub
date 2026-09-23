@@ -7,6 +7,7 @@ import {
 } from "@/lib/thursday/run";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // GET /api/thursday-email - the survivor pick and the lineups, before kickoff.
 //

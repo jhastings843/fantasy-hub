@@ -12,6 +12,7 @@ import { getMyLeagues } from "@/lib/league/discover";
 import { getWeekTransactions } from "@/lib/guillotine/league-state";
 import { waiversAreSettled } from "@/lib/waivers/settled";
 import { weeklyRankingsReady } from "@/lib/jingles/ingest";
+import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -117,6 +118,11 @@ async function runThursdayEmailLocked(options: {
       reason: `This goes out on ${DAYS[sendDay]} and today is ${DAYS[today]}. Add ?force=1 to send anyway.`,
     });
   }
+
+  // His latest weekly list before the rankings gate and the lineups read it.
+  // He revises it through the week, so this is not skipped when a list for
+  // the week is already stored. Skipped for a dry run.
+  const refreshed = dry ? null : await refreshJinglesBeforeSend();
 
   // The survivor half and the lineup half fail independently, and one being
   // down is not a reason to withhold the other. A Thursday with a pick and no
@@ -240,6 +246,7 @@ async function runThursdayEmailLocked(options: {
   return Response.json({
     ok: true,
     sent: true,
+    refreshed,
     subject,
     week,
     season,

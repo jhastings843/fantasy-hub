@@ -4,6 +4,7 @@ import { buildWaivers, type WaiverContext } from "@/lib/waivers/build";
 import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
 import { midweekSubject, renderMidweekEmail } from "./email";
+import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
 
 // The Wednesday job.
 //
@@ -33,7 +34,9 @@ export function runMidweekEmail(options: MidweekOptions = {}): Promise<Response>
 
 async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Response> {
   const { dry = false, resend = false, test = false } = options;
-
+  // His waiver post and weekly list, read now rather than trusted from the
+  // last scheduled ingest. Skipped for a dry run, which anyone can request.
+  const refreshed = dry ? null : await refreshJinglesBeforeSend();
   const all = await getMyLeagues();
   const sleeper = all.filter((l) => l.source !== "manual");
   const guillotineLeague = sleeper.find((l) => l.type === "guillotine") ?? null;
@@ -101,6 +104,7 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
   return Response.json({
     ok: true,
     sent: true,
+    refreshed,
     subject,
     week,
     leagues: leagues.length,
