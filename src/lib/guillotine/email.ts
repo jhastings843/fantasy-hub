@@ -105,7 +105,19 @@ function chainBlock(
                 </div>
                 <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">
                   ${escapeHtml(TIER_LABEL[target.tier])}${target.weekGain > 0 ? `. Adds ${target.weekGain.toFixed(1)} to your lineup` : ""}${target.displaces ? ` over ${escapeHtml(target.displaces.name)}` : ""}.
-                </div>
+                </div>${
+                  // A player carrying a tag the beat has already cleared, or
+                  // one the two sources disagree about, is the case where the
+                  // bid needs its reasoning attached. Everything else is left
+                  // alone: this email is short on purpose.
+                  target.player.statusDisputed
+                    ? `<div style="font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:4px;border-left:2px solid ${PALETTE.amberInk};padding-left:8px;margin-top:5px;">${escapeHtml(target.player.statusDisputed)}.${
+                        target.player.statusNote
+                          ? ` <span style="color:${PALETTE.muted};">${escapeHtml(target.player.statusNote.slice(0, 180))}</span>`
+                          : ""
+                      }</div>`
+                    : ""
+                }
               </td>
               <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
                 <div style="font:600 18px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${PALETTE.amberInk};">${money(target.bid)}</div>
@@ -129,7 +141,13 @@ function chainBlock(
               &nbsp;${escapeHtml(chain.need)}
             </td>
             <td style="text-align:right;font:400 11px/1.4 -apple-system,sans-serif;color:${PALETTE.body};">
-              ${chain.drop ? `all drop ${escapeHtml(chain.drop.name)}` : "no free roster spot"}
+              ${
+                chain.drop
+                  ? // The drop is the half of a claim that is easy to skim past
+                    // and impossible to undo, so it carries the weight here.
+                    `all drop <strong style="color:${PALETTE.ink};font-weight:700;">${escapeHtml(chain.drop.name)}</strong>`
+                  : "no free roster spot"
+              }
             </td>
           </tr>
         </table>
@@ -137,7 +155,7 @@ function chainBlock(
     </tr>
     ${claims}${
         chain.targets.length > 1
-          ? `<tr><td style="padding:8px 14px 10px;border-top:1px solid ${PALETTE.hairline};font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};">Submit all ${chain.targets.length}. Only one can win: once a claim lands, ${escapeHtml(chain.drop?.name ?? "the drop")} is gone and Sleeper voids the rest. The most this chain costs is <strong style="color:${PALETTE.ink};">${money(Math.max(...chain.targets.map((t) => t.bid)))}</strong>, not the bids added together.</td></tr>`
+          ? `<tr><td style="padding:8px 14px 10px;border-top:1px solid ${PALETTE.hairline};font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};">Submit all ${chain.targets.length}. Only one can win: once a claim lands, <strong style="color:${PALETTE.ink};font-weight:700;">${escapeHtml(chain.drop?.name ?? "the drop")}</strong> is gone and Sleeper voids the rest. The most this chain costs is <strong style="color:${PALETTE.ink};">${money(Math.max(...chain.targets.map((t) => t.bid)))}</strong>, not the bids added together.</td></tr>`
           : ""
       }
   </table>`;

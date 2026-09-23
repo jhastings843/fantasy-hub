@@ -17,6 +17,8 @@ import { buildMarket, type ObservedBid, type Tier } from "./market";
 import { getByeWeeks, getSeasonRates, getWeekProjections } from "./projections";
 import { buildBidCard, finalFourBars } from "./recommend";
 import { bestLineup, slotAccepts } from "./lineup";
+import { availability, injuryFor } from "./availability";
+import { getInjuryReport } from "@/lib/survivor/intel";
 import { snapshotFrom } from "./roster-diff";
 import { scoringSkewNotes } from "./scoring";
 import type { LeagueProfile } from "@/lib/league/types";
@@ -216,6 +218,11 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     );
   }
 
+  // ESPN's injury report, which is the only source here written by people who
+  // watched practice. A failed fetch is not fatal: the crossing falls back to
+  // Sleeper's tag and its own projection, which is what it had before.
+  const injuryReport = await getInjuryReport().catch(() => []);
+
   const choppedIds = new Set(state.choppedPlayerIds);
 
   const toPool = (playerId: string): PoolPlayer | null => {
@@ -224,7 +231,17 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     if (!weekly && !rate) return null;
     const base = weekly ?? rate;
     const team = base.team;
+    // Sleeper's tag, ESPN's report and Sleeper's own projection, crossed. See
+    // availability.ts: any one of the three on its own gets week 3 wrong.
+    const status = availability(
+      base.injuryStatus,
+      injuryFor(base.name, injuryReport),
+      weekly ? weekly.points : null,
+    );
     return {
+      plays: status.plays,
+      statusDisputed: status.disputed,
+      statusNote: status.note,
       playerId,
       name: base.name,
       position: base.position,

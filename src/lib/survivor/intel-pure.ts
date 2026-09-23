@@ -62,14 +62,22 @@ export interface EspnInjuryFeed {
 }
 
 /** ESPN's league-wide injury feed into our notes. Skips anyone listed Active. */
-export function parseInjuries(data: EspnInjuryFeed): InjuryNote[] {
+/**
+ * `includeActive` keeps the entries ESPN files on players who are fine again.
+ *
+ * The survivor picks do not want them: a flag reading "QB is Active" is noise
+ * on a card about win probabilities. The bid card wants them badly, because an
+ * ESPN entry reading Active on a player Sleeper still has tagged Out is the
+ * clearing, and dropping it here is what made Kyler Murray invisible.
+ */
+export function parseInjuries(data: EspnInjuryFeed, includeActive = false): InjuryNote[] {
   const out: InjuryNote[] = [];
   for (const block of data.injuries ?? []) {
     const abbr = abbrForDisplayName(block.displayName ?? "");
     if (!abbr) continue;
     for (const inj of block.injuries ?? []) {
       const status = (inj.status ?? "").trim();
-      if (!status || status.toLowerCase() === "active") continue;
+      if (!status || (!includeActive && status.toLowerCase() === "active")) continue;
       const player = inj.athlete?.displayName ?? "";
       if (!player) continue;
       const position = inj.athlete?.position?.abbreviation ?? "";

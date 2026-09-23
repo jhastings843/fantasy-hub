@@ -103,7 +103,7 @@ export async function readLeagueState(
   };
 }
 
-interface RawTransaction {
+export interface RawTransaction {
   type?: string;
   status?: string;
   leg?: number;

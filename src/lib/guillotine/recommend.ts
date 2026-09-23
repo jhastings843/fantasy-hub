@@ -142,9 +142,24 @@ const asLineup = (p: PoolPlayer, useRos = false): LineupPlayer => ({
   points: useRos ? p.rosPoints : p.weekPoints,
 });
 
-/** He is ruled out of this week, whatever his projection still says. */
-export function cannotPlay(player: { injuryStatus: string | null }): boolean {
-  return player.injuryStatus != null && CANNOT_PLAY.test(player.injuryStatus.trim());
+/**
+ * The chance he plays, 0 to 1.
+ *
+ * Prefers the crossed number the report works out from Sleeper, ESPN and
+ * whether Sleeper still projects him, and falls back to reading the raw tag
+ * for any caller that did not do that work.
+ */
+export function playsProbability(player: {
+  injuryStatus: string | null;
+  plays?: number;
+}): number {
+  if (typeof player.plays === "number") return Math.min(1, Math.max(0, player.plays));
+  return player.injuryStatus != null && CANNOT_PLAY.test(player.injuryStatus.trim()) ? 0 : 1;
+}
+
+/** He is not expected to be in the lineup at all. */
+export function cannotPlay(player: { injuryStatus: string | null; plays?: number }): boolean {
+  return playsProbability(player) === 0;
 }
 
 /**
@@ -321,19 +336,23 @@ export function priceTarget(
   market: MarketModel,
   budget: BudgetPlan,
   posture: Posture,
-  modifiers: { quality?: number; injured?: boolean; demand?: number } = {},
+  modifiers: { quality?: number; plays?: number; demand?: number } = {},
 ): { bid: number; walkAway: number; marketExpected: number } {
   const marketExpected = market.estimates[tier].expected;
   const valueFactor = Math.min(1.5, Math.max(0.5, weekGain / REFERENCE_GAIN));
   const quality = modifiers.quality ?? 1;
   const demand = modifiers.demand ?? 1;
+  const plays = modifiers.plays ?? 1;
 
-  // Urgency is a statement about needing help THIS Sunday, so a player who
-  // cannot play on Sunday does not get it. Leaving it in place made a red week
-  // outbid a green one for a player who was ruled out, which is exactly
-  // backwards: the desperate team is the one that cannot afford him.
-  const confidence = modifiers.injured ? INJURED_DISCOUNT[posture] : 1;
-  const urgency = modifiers.injured ? 1 : URGENCY[posture];
+  // Urgency is a statement about needing help THIS Sunday, so it arrives in
+  // proportion to the chance he is available on Sunday. Leaving it at full
+  // strength made a red week outbid a green one for a player who was ruled
+  // out, which is exactly backwards: the desperate team is the one that
+  // cannot afford him. Switching it off entirely on a tag was the opposite
+  // mistake, and cost a questionable starter his whole price.
+  const injuredFloor = INJURED_DISCOUNT[posture];
+  const confidence = injuredFloor + (1 - injuredFloor) * plays;
+  const urgency = 1 + (URGENCY[posture] - 1) * plays;
   const raw = marketExpected * urgency * valueFactor * quality * confidence * demand;
 
   // The hold rule: thin weekly gain cannot justify a heavy bid, unless this is
@@ -381,18 +400,22 @@ export function buildBidCard(input: RecommendInput): BidCard {
 
   const scored = candidates
     .map((player) => {
-      const out = cannotPlay(player);
+      const plays = playsProbability(player);
+      const out = plays === 0;
       const { gain: rawGain, displaces, slot } = marginalValue(
         rosterLineup,
         asLineup(player),
         rosterPositions,
       );
-      // A player who is ruled out adds nothing to this week's lineup, whatever
-      // the feed projects for him. Zeroing it here rather than discounting the
-      // price at the end is deliberate: the gain is what tiers him, what orders
-      // the chain and what sizes the bid, so a number that is not going to
-      // happen has to leave through the same door it came in.
-      const gain = out ? 0 : rawGain;
+      // What he adds, times the chance he is there to add it.
+      //
+      // This used to be a switch: ruled out meant zero. That was right about
+      // the players who are actually out and wrong about everyone carrying a
+      // tag nobody has cleared yet, and the wrongness was invisible, because a
+      // zeroed gain drops a player off the card entirely rather than pricing
+      // him low. A questionable starter is worth three quarters of a starter,
+      // which is a number, not a disappearance.
+      const gain = rawGain * plays;
       const displacedPlayer = displaces
         ? (myPlayers.find((p) => p.playerId === displaces.playerId) ?? null)
         : null;
@@ -400,7 +423,7 @@ export function buildBidCard(input: RecommendInput): BidCard {
       const contested = contestedBy(player, rivalBars);
       const price = priceTarget(tier, gain, market, budget, posture, {
         quality: qualityFactor(player, bars),
-        injured: out,
+        plays,
         demand: demandFactor(contested, rivalBars.length),
       });
 

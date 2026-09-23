@@ -8,6 +8,9 @@ import { alreadySent, clearSent, recordSent, type ThursdaySendRecord } from "./s
 import { recordBaseline, type Baselines } from "@/lib/survivor/baseline";
 import { withSendLock } from "@/lib/email/sent-log";
 import { getNflState } from "@/lib/sleeper/client";
+import { getMyLeagues } from "@/lib/league/discover";
+import { getWeekTransactions } from "@/lib/guillotine/league-state";
+import { waiversAreSettled } from "@/lib/waivers/settled";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -150,6 +153,35 @@ async function runThursdayEmailLocked(options: {
     return new Response(html, {
       headers: { "content-type": "text/html; charset=utf-8" },
     });
+  }
+
+  // Nothing goes out until waivers have run.
+  //
+  // This email's job is to say who starts, and before waivers process that
+  // answer is provisional in both directions: a player it tells you to start
+  // may be about to be claimed by somebody else, and the player who should
+  // start may still be a bid you have not won. The rankings behind it are
+  // ingested on their own schedule and can be as early as they like; the
+  // SEND is what waits. A skip is not a failure, it is the job saying not yet,
+  // and the pulse will try again later the same day.
+  if (!force) {
+    const leagues = (await getMyLeagues()).filter((l) => l.source !== "manual");
+    const feeds = await Promise.all(
+      leagues.map(async (l) => ({
+        leagueId: l.id,
+        name: l.name,
+        transactions: await getWeekTransactions(l.id, week).catch(() => []),
+      })),
+    );
+    const settlement = waiversAreSettled(feeds, new Date());
+    if (!settlement.settled) {
+      return Response.json({
+        ok: true,
+        skipped: true,
+        waitingOnWaivers: settlement.waitingOn,
+        reason: settlement.reason,
+      });
+    }
   }
 
   const previous = await alreadySent(season, week);

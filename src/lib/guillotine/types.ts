@@ -19,6 +19,16 @@ export interface PoolPlayer {
   rosPoints: number;
   /** Sleeper's status string when it is anything other than active. */
   injuryStatus: string | null;
+  /**
+   * The chance he is in the lineup on Sunday, 0 to 1, crossed from Sleeper's
+   * tag, ESPN's report and whether Sleeper still projects him. Absent means
+   * nobody looked, which reads as available.
+   */
+  plays?: number;
+  /** Set when the sources disagreed, so the card can say which way. */
+  statusDisputed?: string | null;
+  /** The beat note behind the status, where there is one. */
+  statusNote?: string | null;
   /** The player's next bye, when it falls inside the horizon we care about. */
   byeWeek: number | null;
   /** True when this player came off the roster chopped this week. */
