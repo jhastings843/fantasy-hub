@@ -107,6 +107,8 @@ export interface RawTransaction {
   type?: string;
   status?: string;
   leg?: number;
+  /** Milliseconds since epoch when the claim resolved. */
+  status_updated?: number;
   adds?: Record<string, number> | null;
   settings?: { waiver_bid?: number } | null;
 }

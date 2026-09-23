@@ -10,7 +10,7 @@ import { withSendLock } from "@/lib/email/sent-log";
 import { getNflState } from "@/lib/sleeper/client";
 import { getMyLeagues } from "@/lib/league/discover";
 import { getWeekTransactions } from "@/lib/guillotine/league-state";
-import { waiversAreSettled } from "@/lib/waivers/settled";
+import { thisWeeksClaims, waiversAreSettled } from "@/lib/waivers/settled";
 import { weeklyRankingsReady } from "@/lib/jingles/ingest";
 import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
 
@@ -195,7 +195,13 @@ async function runThursdayEmailLocked(options: {
       leagues.map(async (l) => ({
         leagueId: l.id,
         name: l.name,
-        transactions: await getWeekTransactions(l.id, week).catch(() => []),
+        // Sleeper files Wednesday's run under the week just played.
+        transactions: thisWeeksClaims(
+          await Promise.all(
+            [week - 1, week].map((w) => getWeekTransactions(l.id, w).catch(() => [])),
+          ),
+          new Date(),
+        ),
       })),
     );
     const settlement = waiversAreSettled(feeds, new Date());

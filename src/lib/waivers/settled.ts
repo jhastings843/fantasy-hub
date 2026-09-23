@@ -18,7 +18,7 @@ const WEDNESDAY = 3;
 /**
  * When Wednesday stops waiting for evidence.
  *
- * Every one of Jack's leagues processes between midnight and 2am ET on
+ * Every one of Jack's leagues processes between 3am and 5am ET on
  * Wednesday, so noon is many hours past the last of them. A week where nobody
  * in any league put in a claim still has to produce an email.
  */
@@ -63,6 +63,34 @@ function newYorkParts(now: Date): { day: number; hour: number } {
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return { day: Math.max(0, days.indexOf(weekday)), hour: hour % 24 };
+}
+
+/** Tuesday, in America/New_York. */
+const TUESDAY = 2;
+
+/**
+ * The earliest moment a claim can belong to this week's run: the most recent
+ * Tuesday noon in New York.
+ *
+ * Sleeper files a Wednesday run under the week just played, not the week
+ * about to start, so the run that sets week 3's lineups lives in week 2's
+ * feed. That same feed also carries the rolling claims from the previous
+ * Thursday onward, which would read as "already processed" at 1am on
+ * Wednesday. The timestamp is what tells them apart.
+ */
+export function thisWeeksRunStartsAt(now: Date): number {
+  const { day, hour } = newYorkParts(now);
+  const daysBack = (day - TUESDAY + 7) % 7;
+  const hoursBack = daysBack * 24 + (hour - 12);
+  // Tuesday before noon means last Tuesday's run is still the current one.
+  const back = hoursBack < 0 ? hoursBack + 7 * 24 : hoursBack;
+  return now.getTime() - back * 60 * 60 * 1000 - now.getMinutes() * 60 * 1000;
+}
+
+/** Claims from this week's run only, across the feeds it might be filed in. */
+export function thisWeeksClaims(feeds: RawTransaction[][], now: Date): RawTransaction[] {
+  const since = thisWeeksRunStartsAt(now);
+  return feeds.flat().filter((t) => (t.status_updated ?? 0) >= since);
 }
 
 export function waiversAreSettled(

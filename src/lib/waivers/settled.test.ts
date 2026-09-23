@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leagueHasProcessed, waiversAreSettled } from "./settled";
+import { leagueHasProcessed, thisWeeksClaims, waiversAreSettled } from "./settled";
 
 const tx = (type: string, status: string) => ({ type, status }) as never;
 
@@ -58,5 +58,28 @@ describe("waiversAreSettled", () => {
 
   it("does not block when there are no Sleeper leagues to wait on", () => {
     expect(waiversAreSettled([], TUESDAY_NIGHT).settled).toBe(true);
+  });
+});
+
+describe("thisWeeksClaims", () => {
+  // Real stamps from week 3, 2026: last Thursday's rolling claim and the
+  // Wednesday run, both filed by Sleeper under week 2.
+  const lastThursday = { type: "waiver", status: "complete", status_updated: Date.parse("2026-09-17T07:03:00Z") };
+  const wednesdayRun = { type: "waiver", status: "failed", status_updated: Date.parse("2026-09-23T07:13:00Z") };
+
+  it("finds the Wednesday run in the previous week's feed", () => {
+    const claims = thisWeeksClaims([[lastThursday, wednesdayRun], []], WEDNESDAY_MORNING);
+    expect(claims).toEqual([wednesdayRun]);
+    expect(leagueHasProcessed(claims)).toBe(true);
+  });
+
+  it("does not read last Thursday's claims as this week's run", () => {
+    const claims = thisWeeksClaims([[lastThursday], []], TUESDAY_NIGHT);
+    expect(leagueHasProcessed(claims)).toBe(false);
+  });
+
+  it("still counts the run on the Thursday fallback day", () => {
+    const thursday = new Date("2026-09-24T14:00:00Z");
+    expect(thisWeeksClaims([[wednesdayRun]], thursday)).toEqual([wednesdayRun]);
   });
 });
