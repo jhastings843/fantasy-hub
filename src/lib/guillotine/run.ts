@@ -161,7 +161,17 @@ async function runFaabEmailLocked(options: FaabRunOptions = {}): Promise<Respons
     }
   }
 
-  const result = await sendEmail(subject, html, `faab:${leagueId}:${season}:w${report.week}`);
+  // The idempotency key is what makes two attempts at the same email one
+  // email, and asking for a resend is saying that this one is not the same.
+  // Resend holds a key for 24 hours and answers a repeat with 409, so without
+  // the suffix the only send that resend=1 can ever produce is a refusal, which
+  // is exactly what happened the first time the card changed after a Tuesday.
+  const attempt = resend ? `:again-${Date.now()}` : "";
+  const result = await sendEmail(
+    subject,
+    html,
+    `faab:${leagueId}:${season}:w${report.week}${attempt}`,
+  );
 
   if (result.sent) {
     await recordSent(leagueId, season, report.week, {
