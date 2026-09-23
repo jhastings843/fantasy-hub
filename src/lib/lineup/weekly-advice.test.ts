@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adjustedFlexRanks,
   adviseLineup,
+  needsFlexAdjustment,
   cannotPlay,
   isOnBye,
   scoreOf,
@@ -182,6 +183,82 @@ describe("adviseLineup", () => {
     expect(a.changes).toHaveLength(1);
     expect(a.changes[0].recommended?.playerId).toBe("rb4");
     expect(a.changes[0].reason).toContain("over rb3");
+  });
+
+  it("names a leaver the slot could actually hold", () => {
+    // Dah Dynasty, week 3, 2026-09-23. Two men were leaving the lineup, an
+    // unranked quarterback and an unranked back, and the report handed each
+    // one to the wrong slot: the FLEX row read "Start Tre Tucker over Jaxson
+    // Dart", who is a quarterback sitting in the QB slot, and the superflex
+    // row read "Start Jacoby Brissett over Rico Dowdle", who is a back sitting
+    // in a flex slot. Both names were legal in the other row and nowhere else.
+    const superflexRoster = [
+      player({ playerId: "qbOut", position: "QB", unranked: true, injuryStatus: "Doubtful" }),
+      player({ playerId: "qbStay", position: "QB", positionalRank: 18 }),
+      player({ playerId: "qbIn", position: "QB", positionalRank: 20 }),
+      player({ playerId: "rb1", position: "RB", positionalRank: 1, flexRank: 1 }),
+      player({ playerId: "rb2", position: "RB", positionalRank: 19, flexRank: 41 }),
+      player({ playerId: "rbOut", position: "RB", unranked: true }),
+      player({ playerId: "wr1", position: "WR", positionalRank: 20, flexRank: 39 }),
+      player({ playerId: "wr2", position: "WR", positionalRank: 34, flexRank: 71 }),
+      player({ playerId: "te1", position: "TE", positionalRank: 4, flexRank: 49 }),
+      player({ playerId: "fx1", position: "WR", positionalRank: 46, flexRank: 90 }),
+      player({ playerId: "fxIn", position: "WR", positionalRank: 52, flexRank: 99 }),
+      player({ playerId: "fx3", position: "TE", positionalRank: 17, flexRank: 102 }),
+    ];
+    const a = adviseLineup({
+      rosterPositions: SLOTS.dynasty,
+      roster: superflexRoster,
+      // QB, RB, RB, WR, WR, TE, then three flexes, then the superflex.
+      currentStarters: [
+        "qbOut", "rb1", "rb2", "wr1", "wr2", "te1", "fx1", "fx3", "rbOut", "qbStay",
+      ],
+    });
+
+    const flex = a.changes.find((c) => c.slot === "FLEX");
+    const superflex = a.changes.find((c) => c.slot === "SUPER_FLEX");
+    expect(flex?.recommended?.playerId).toBe("fxIn");
+    expect(superflex?.recommended?.playerId).toBe("qbIn");
+    // Each row names the man it is actually replacing, and nobody else's.
+    expect(flex?.reason).toContain("rbOut");
+    expect(flex?.reason).not.toContain("qbOut");
+    expect(superflex?.reason).toContain("qbOut");
+    expect(superflex?.reason).not.toContain("rbOut");
+  });
+
+  it("says which slot a leaver is coming out of when it is not this one", () => {
+    // Dah Chopped, week 3. A receiver entering the WR slot really was replacing
+    // a tight end, because the tight end was the only man leaving, but the row
+    // read "Start Denzel Boston (WR 26) over Colston Loveland, at TE 13" and
+    // Loveland was sitting in the TE slot. The pairing is right; stating it as
+    // though he were at receiver is not.
+    const shuffled = [
+      player({ playerId: "qb1", position: "QB", positionalRank: 3 }),
+      player({ playerId: "rb1", position: "RB", positionalRank: 8, flexRank: 20 }),
+      player({ playerId: "rb2", position: "RB", positionalRank: 38, flexRank: 55 }),
+      player({ playerId: "wrA", position: "WR", positionalRank: 16, flexRank: 30 }),
+      player({ playerId: "wrB", position: "WR", positionalRank: 30, flexRank: 67 }),
+      player({ playerId: "wrD", position: "WR", positionalRank: 31, flexRank: 68 }),
+      player({ playerId: "wrIn", position: "WR", positionalRank: 26, flexRank: 60 }),
+      player({ playerId: "teA", position: "TE", positionalRank: 4, flexRank: 49 }),
+      player({ playerId: "teB", position: "TE", positionalRank: 13, flexRank: 83 }),
+    ];
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster: shuffled,
+      currentStarters: ["qb1", "rb1", "rb2", "wrA", "wrB", "teB", "teA", "wrD"],
+    });
+
+    expect(a.changes).toHaveLength(1);
+    const wr = a.changes[0];
+    expect(wr.slot).toBe("WR");
+    expect(wr.recommended?.playerId).toBe("wrIn");
+    // The man leaving is named, with his own slot, and the slot he vacates is
+    // accounted for rather than left for Jack to work out.
+    expect(wr.reason).toContain("teB");
+    expect(wr.reason).toContain("comes out of TE");
+    expect(wr.reason).toContain("teA");
+    expect(wr.reason).not.toContain("over teB");
   });
 
   it("says nothing when the lineup is already right", () => {
@@ -615,5 +692,24 @@ describe("adviseLineup with games already played", () => {
     expect(after.slots.map((s) => s.recommended?.playerId)).toEqual(
       before.slots.map((s) => s.recommended?.playerId),
     );
+  });
+});
+
+describe("needsFlexAdjustment", () => {
+  it("leaves a league alone when it scores receiving exactly like the list", () => {
+    expect(needsFlexAdjustment({ rec: 0.5 }, 0.5)).toBe(false);
+    expect(needsFlexAdjustment({ rec: 1 }, 1)).toBe(false);
+  });
+
+  it("re-ranks when the reception value differs", () => {
+    expect(needsFlexAdjustment({ rec: 1 }, 0.5)).toBe(true);
+    expect(needsFlexAdjustment({ rec: 0 }, 0.5)).toBe(true);
+  });
+
+  it("re-ranks for a tight end premium even when the PPR matches", () => {
+    // Dah Dynasty, 2026-09-23. Full PPR reading a full-PPR list, so the old
+    // name check called them identical and the 0.25 premium never reached the
+    // flex order: Kyle Pitts sat at FLEX 102 behind Tre Tucker at 99.
+    expect(needsFlexAdjustment({ rec: 1, bonus_rec_te: 0.25 }, 1)).toBe(true);
   });
 });

@@ -55,6 +55,15 @@ export function startingSlots(rosterPositions: string[]): string[] {
   return rosterPositions.filter((p) => !BENCH_SLOTS.has(p));
 }
 
+/**
+ * How many positions a slot will take, so callers can work the narrow slots
+ * first. An unknown slot sorts last rather than throwing, which is what keeps
+ * a format nobody has seen yet from taking the page down.
+ */
+export function slotWidth(slot: string): number {
+  return SLOT_ELIGIBILITY[slot]?.length ?? 99;
+}
+
 export function slotAccepts(slot: string, position: string): boolean {
   const eligible = SLOT_ELIGIBILITY[slot];
   if (!eligible) return false;
@@ -73,7 +82,7 @@ export function slotAccepts(slot: string, position: string): boolean {
 export function bestLineup(players: LineupPlayer[], rosterPositions: string[]): Lineup {
   const slots = startingSlots(rosterPositions);
   const order = slots
-    .map((slot, index) => ({ slot, index, width: SLOT_ELIGIBILITY[slot]?.length ?? 99 }))
+    .map((slot, index) => ({ slot, index, width: slotWidth(slot) }))
     .sort((a, b) => a.width - b.width || a.index - b.index);
 
   const available = [...players].sort((a, b) => b.points - a.points);

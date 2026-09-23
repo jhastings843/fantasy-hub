@@ -1,4 +1,5 @@
-import { bestLineup, slotAccepts, startingSlots, type LineupPlayer } from "./solve";
+import { bestLineup, slotAccepts, slotWidth, startingSlots, type LineupPlayer } from "./solve";
+import type { ScoringSettings } from "@/lib/guillotine/scoring";
 
 // Who to start this week, from his weekly rankings and the league's own slots.
 //
@@ -314,6 +315,77 @@ export function adviseLineup(input: {
     .sort((a, b) => scoreOf(a) - scoreOf(b));
   const leavingQueue = [...leaving];
 
+  // Who each change is actually replacing, decided before any row is written.
+  //
+  // A change needs a name for the man coming out, and the queue on its own
+  // gives the wrong one. On 2026-09-23 Dah Dynasty had two unranked players
+  // leaving, a quarterback and a running back, and the report handed each to
+  // the wrong row: the FLEX read "Start Tre Tucker over Jaxson Dart", a
+  // quarterback sitting in the QB slot, and the superflex read "Start Jacoby
+  // Brissett over Rico Dowdle", a back sitting in a flex slot. The two names
+  // were simply swapped, because the queue is sorted by rank and knows nothing
+  // about slots.
+  //
+  // So a slot takes a leaver it could legally hold, narrowest slot first. That
+  // ordering is what makes taking the cheapest eligible leaver safe rather than
+  // merely convenient: slot eligibility is a nested family, so a wide slot can
+  // always use what a narrow one leaves behind, and the reverse is not true.
+  // It is the same argument bestLineup rests on.
+  //
+  // The queue is still the fallback, because a change can genuinely have no
+  // eligible leaver and it would be worse to say nothing. In Dah Chopped a
+  // receiver entering the WR slot really is replacing the tight end coming out
+  // of the TE slot: he is the only man leaving.
+  const changedIndexes = slots
+    .map((slot, index) => ({ slot, index }))
+    .filter(({ index }) => {
+      const rec = assigned.get(index);
+      return rec !== undefined && !startingNow.has(rec.playerId);
+    });
+  const displacedBy = new Map<number, AdvicePlayer>();
+
+  const claim = (index: number, p: AdvicePlayer) => {
+    displacedBy.set(index, p);
+    const at = leavingQueue.findIndex((q) => q.playerId === p.playerId);
+    if (at >= 0) leavingQueue.splice(at, 1);
+  };
+
+  // The slot's own occupant first, when he is the one leaving. Nothing to
+  // search for there, and claiming him early stops another slot taking him.
+  for (const { index } of changedIndexes) {
+    const id = currentStarters[index];
+    const sitting = id && id !== "0" ? (byId.get(id) ?? null) : null;
+    if (sitting && !startingAfter.has(sitting.playerId)) claim(index, sitting);
+  }
+
+  for (const { slot, index } of changedIndexes
+    .filter(({ index }) => !displacedBy.has(index))
+    .sort((a, b) => slotWidth(a.slot) - slotWidth(b.slot) || a.index - b.index)) {
+    const pick =
+      leavingQueue.find((p) => slotAccepts(slot, p.position)) ?? leavingQueue[0] ?? null;
+    if (pick) claim(index, pick);
+  }
+
+  /**
+   * The slot a leaver is actually sitting in, when it is not the one being
+   * reported, plus whoever takes it over.
+   *
+   * "Start Denzel Boston (WR 26) over Colston Loveland, at TE 13" was true
+   * about who comes out and wrong about where he was: Loveland was in the TE
+   * slot. Jack read it as an illegal move, which is the correct reading of the
+   * sentence. A change whose leaver sits elsewhere is a shuffle, so it is
+   * reported as one.
+   */
+  const vacated = (
+    displaced: AdvicePlayer | null,
+    index: number,
+  ): { slot: string; takenBy: AdvicePlayer | null } | null => {
+    if (!displaced) return null;
+    const at = currentStarters.indexOf(displaced.playerId);
+    if (at < 0 || at >= slots.length || at === index) return null;
+    return { slot: slots[at], takenBy: assigned.get(at) ?? null };
+  };
+
   const advice: SlotAdvice[] = slots.map((slot, index) => {
     const recommended = assigned.get(index) ?? null;
     const currentId = currentStarters[index];
@@ -332,22 +404,10 @@ export function adviseLineup(input: {
           .filter((p) => !taken.has(p.playerId) && slotAccepts(slot, p.position))
           .sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? null);
 
-    // Who this player is actually replacing. When the slot's current occupant
-    // is staying in the lineup elsewhere, the person being dropped is somebody
-    // else, and naming the wrong one reads as nonsense.
-    const displaced =
-      changed && recommended
-        ? current && !startingAfter.has(current.playerId)
-          ? current
-          : (leavingQueue[0] ?? null)
-        : current;
-    // Claimed, so a second change cannot name the same person again. Without
-    // this, a lineup with two players coming out reported both slots as
-    // replacing the first of them.
-    if (changed && displaced) {
-      const at = leavingQueue.findIndex((p) => p.playerId === displaced.playerId);
-      if (at >= 0) leavingQueue.splice(at, 1);
-    }
+    // Who this player is actually replacing, paired above. When the slot's
+    // current occupant is staying in the lineup elsewhere, the person being
+    // dropped is somebody else, and naming the wrong one reads as nonsense.
+    const displaced = changed ? (displacedBy.get(index) ?? null) : current;
 
     return {
       slot,
@@ -356,7 +416,7 @@ export function adviseLineup(input: {
       recommended,
       changed,
       alternative,
-      reason: reasonFor(slot, displaced, recommended, alternative, changed),
+      reason: reasonFor(slot, displaced, recommended, alternative, changed, vacated(displaced, index)),
     };
   });
 
@@ -434,6 +494,8 @@ function reasonFor(
   recommended: AdvicePlayer | null,
   alternative: AdvicePlayer | null,
   changed: boolean,
+  /** Set when the man coming out is sitting in a different slot from this one. */
+  vacated: { slot: string; takenBy: AdvicePlayer | null } | null = null,
 ): string {
   if (!recommended) return "No eligible player for this slot.";
 
@@ -464,15 +526,25 @@ function reasonFor(
 
   // "he has him at" cannot front a number that is partly ours. The label now
   // carries its own attribution, so the sentence just points at it.
+  //
+  // Quoted for the slot he is IN, not the slot being reported. A tight end
+  // coming out of TE is a TE 13, and calling him a FLEX 83 in the same sentence
+  // that names his slot reads as two different players.
+  const quotedIn = vacated?.slot ?? slot;
   const why = current.onBye
     ? "on bye"
     : cannotPlay(current)
       ? `listed ${current.injuryStatus}`
       : current.unranked
         ? "not in his list this week"
-        : `at ${rankLabel(current, slot)}`;
+        : `at ${rankLabel(current, quotedIn)}`;
 
-  return `Start ${rec} over ${current.name}, ${why}.`;
+  if (!vacated) return `Start ${rec} over ${current.name}, ${why}.`;
+
+  // He is not in this slot, so he is not what this slot is "over". Naming his
+  // slot, and who inherits it, is the whole move rather than half of it.
+  const inherits = vacated.takenBy ? `, with ${vacated.takenBy.name} moving in` : "";
+  return `Start ${rec}. ${current.name}, ${why}, comes out of ${vacated.slot}${inherits}.`;
 }
 
 /**
@@ -517,6 +589,30 @@ function reasonFor(
  * human ranker who watches the tape is the better tiebreak than a projection
  * that does not.
  */
+/**
+ * Whether this league's flex order has to be re-ranked at all.
+ *
+ * True whenever the league pays receiving differently from the list being
+ * quoted, in either of the two places that separate them: the reception value
+ * and the tight end premium.
+ *
+ * Both halves matter, and leaving the second one out is the bug Jack caught on
+ * 2026-09-23. Dah Dynasty is full PPR, so it reads his full-PPR list, and a
+ * check on the scoring NAME said the two matched and skipped the adjustment
+ * entirely. That took the league's 0.25 tight end premium out of the flex
+ * order with it, and Kyle Pitts sat at FLEX 102 behind Tre Tucker at 99 in a
+ * league that pays Pitts a quarter point for every catch and Tucker nothing
+ * extra. A premium his list cannot know about is exactly what the adjustment
+ * exists to price.
+ */
+export function needsFlexAdjustment(
+  leagueScoring: ScoringSettings,
+  /** Points per reception in the list being quoted. */
+  listPpr: number,
+): boolean {
+  return (leagueScoring.rec ?? 0) !== listPpr || (leagueScoring.bonus_rec_te ?? 0) !== 0;
+}
+
 export const ADJUSTMENT_MARGIN = 1.0;
 
 export function adjustedFlexRanks(

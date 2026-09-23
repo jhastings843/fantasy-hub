@@ -17,7 +17,7 @@ import { scoringSkewNotes, type ScoringSettings } from "@/lib/guillotine/scoring
 import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
 import { getSeasonGames } from "@/lib/survivor/odds";
 import { fixtureMap, lockedTeams, teamsWithStats, type Fixture } from "@/lib/nfl/week";
-import { adjustedFlexRanks, adviseLineup, isOnBye, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
+import { adjustedFlexRanks, adviseLineup, isOnBye, needsFlexAdjustment, type AdvicePlayer, type LineupAdvice } from "./weekly-advice";
 
 // Everything the lineup advice needs, fetched and joined.
 //
@@ -273,7 +273,8 @@ async function lineupForLeague(
   if (!mine) throw new Error("No roster on this league belongs to you.");
 
   const leagueScoring = (league.scoring_settings ?? {}) as ScoringSettings;
-  const listScoring = listScoringFor(leagueScoring, PPR_FOR[weekly.scoring] ?? 0.5);
+  const listPpr = PPR_FOR[weekly.scoring] ?? 0.5;
+  const listScoring = listScoringFor(leagueScoring, listPpr);
 
   // Two calls, two cache entries. getWeekProjections uses its first argument
   // only as a cache namespace, so a suffix is what keeps the league-scored and
@@ -304,14 +305,15 @@ async function lineupForLeague(
     if (!meta.has(e.sleeperId)) meta.set(e.sleeperId, { opponent: e.opponent, home: e.home });
   }
 
-  const adjusted =
-    weekly.scoring === scoringNameFor(profile)
-      ? new Map<string, number>()
-      : adjustedFlexRanks(
-          weekly.flex.map((e) => ({ playerId: e.sleeperId, rank: e.rank })),
-          toPointsMap(listPoints),
-          toPointsMap(leaguePoints),
-        );
+  // Asked of the settings, not of the scoring's name: a full-PPR league reading
+  // a full-PPR list still pays a tight end premium his list cannot know about.
+  const adjusted = !needsFlexAdjustment(leagueScoring, listPpr)
+    ? new Map<string, number>()
+    : adjustedFlexRanks(
+        weekly.flex.map((e) => ({ playerId: e.sleeperId, rank: e.rank })),
+        toPointsMap(listPoints),
+        toPointsMap(leaguePoints),
+      );
 
   const actual = scoreRows(stats, leagueScoring);
 
@@ -392,12 +394,6 @@ async function lineupForLeague(
 /** A player with no team cannot be locked, because nothing tells us he played. */
 function isLocked(team: string | null, locked: Set<string>): boolean {
   return team !== null && locked.has(team);
-}
-
-function scoringNameFor(profile: LeagueProfile): string {
-  if (profile.ppr >= 1) return "full_ppr";
-  if (profile.ppr === 0) return "standard";
-  return "half_ppr";
 }
 
 function toPointsMap(
