@@ -117,6 +117,12 @@ export function waiverTargets(input: {
   seasonOrder?: "rank" | "given";
   /** In "given" mode, never propose dropping a player ranked this high. */
   protectRankedWithin?: number;
+  /**
+   * Free agents found only on his weekly list. Checked against this week's
+   * lineup like any other free agent, but never offered as a season claim:
+   * a week-3 matchup rank says nothing about who to hold for the season.
+   */
+  weeklyOnly?: WaiverPlayer[];
 }): WaiverReport {
   const { rosterPositions, roster, freeAgents } = input;
   const limit = input.limit ?? 8;
@@ -135,7 +141,7 @@ export function waiverTargets(input: {
   );
 
   const startable: StartableTarget[] = [];
-  for (const fa of freeAgents) {
+  for (const fa of [...freeAgents, ...(input.weeklyOnly ?? [])]) {
     if (cannotPlay(fa)) continue;
     const { gain, displaces, slot } = marginalValue(
       available.map(toLineupPlayer),

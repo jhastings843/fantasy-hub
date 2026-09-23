@@ -313,10 +313,23 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   const budgetLeft =
     budgetTotal !== null && typeof used === "number" ? budgetTotal - used : budgetTotal;
 
+  // Everyone free on his weekly list who is not already on the board. The
+  // board above is built from research, Sleeper's most-added and his waiver
+  // post, and a player in none of them never got compared to the lineup, even
+  // when his own list for this week ranked him ahead of the starter: week 3,
+  // half PPR, Dalton Schultz was TE10 and free, the board recommended
+  // Freiermuth (TE11) over Loveland (TE13), and Schultz was never considered.
+  const onBoard = new Set(freeAgents.map((p) => p.playerId));
+  const weeklyOnly = [...new Set([...index.positional.keys(), ...index.flex.keys()])]
+    .filter((id) => !owned.has(id) && !onBoard.has(id))
+    .map(toPlayer)
+    .filter((p) => isStartableIn(p.position, startable));
+
   const report = waiverTargets({
     rosterPositions: profile.rosterPositions,
     roster,
     freeAgents,
+    weeklyOnly,
     seasonOrder: labFresh ? "rank" : "given",
   });
 

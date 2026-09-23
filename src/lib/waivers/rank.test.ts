@@ -56,6 +56,22 @@ describe("waiverTargets", () => {
       expect(r.startable[0].displaces?.playerId).toBe("wr3");
     });
 
+    it("starts a free agent found only on his weekly list, ahead of a worse one on the board", () => {
+      // Week 3 half PPR: Schultz (TE10, flex 76) was free and on nobody's
+      // board, and the email recommended Freiermuth (TE11, flex 78) instead.
+      const tes = [
+        ...roster.filter((x) => x.position !== "TE"),
+        p({ playerId: "loveland", position: "TE", positionalRank: 13, flexRank: 91, seasonRank: 120 }),
+      ];
+      const board = [p({ playerId: "freiermuth", position: "TE", positionalRank: 11, flexRank: 78 })];
+      const weeklyOnly = [p({ playerId: "schultz", position: "TE", positionalRank: 10, flexRank: 76 })];
+      const r = waiverTargets({ rosterPositions: SLOTS, roster: tes, freeAgents: board, weeklyOnly, seasonOrder: "given" });
+      expect(r.startable[0].player.playerId).toBe("schultz");
+      expect(r.startable.map((t) => t.player.playerId)).toContain("freiermuth");
+      // A matchup rank is not a reason to hold him all season.
+      expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("schultz");
+    });
+
     it("never suggests a free agent who cannot play", () => {
       const free = [
         p({ playerId: "faHurt", position: "WR", flexRank: 1, injuryStatus: "Out" }),
