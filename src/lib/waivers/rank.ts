@@ -195,7 +195,11 @@ export function waiverTargets(input: {
 
   const seasonUpgrades: SeasonTarget[] = givenOrder
     ? seasonByWeek({
-        pool: [...freeAgents, ...(input.weeklyOnly ?? [])],
+        // A player already offered as a start is already a claim; naming him
+        // twice in one email is noise, not emphasis.
+        pool: [...freeAgents, ...(input.weeklyOnly ?? [])].filter(
+          (p) => !startable.slice(0, limit).some((t) => t.player.playerId === p.playerId),
+        ),
         droppable,
         openSpots,
         limit,
@@ -279,14 +283,14 @@ function seasonByWeek(input: {
   const drops = [...input.droppable].sort((a, b) => scoreOf(a) - scoreOf(b));
   for (const d of drops) {
     if (out.length >= input.limit) break;
+    // A drop with no rank this week (a stash, a bye, a player he left off)
+    // gives the weekly list nothing to compare, and sorting everyone by it
+    // anyway puts every receiver ahead of every quarterback, which is how a
+    // superflex league's injury-replacement QBs vanished. So only a ranked
+    // drop is decided by the weekly list; an unranked one falls to the board.
     const comparable = rankedThisWeek(d);
-    let pick =
-      byWeek.find((p) => !used.has(p.playerId) && (comparable ? beatsThisWeek(p, d) : !protectedAsset(d))) ?? null;
-    let why: string | null = pick
-      ? comparable
-        ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}`
-        : `${weekLabel(pick)} this week, ${d.name} has no game or rank this week`
-      : null;
+    let pick = comparable ? (byWeek.find((p) => !used.has(p.playerId) && beatsThisWeek(p, d)) ?? null) : null;
+    let why: string | null = pick ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}` : null;
     // Nobody his weekly list has ahead of this drop. The board's own order
     // (his post, then the research, then Sleeper's most-added) still fills it,
     // but only when the drop is not a player his season list rates.

@@ -262,6 +262,16 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades[0].alternative?.playerId).toBe("gadsden");
   });
 
+  it("does not repeat a start as a season claim", () => {
+    const star = wk("star", "WR", 20, 10);
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [], weeklyOnly: [star, worthy], seasonOrder: "given",
+    });
+    expect(r.startable.map((t) => t.player.playerId)).toContain("star");
+    expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("star");
+    expect(r.seasonUpgrades[0].player.playerId).toBe("worthy");
+  });
+
   it("never offers a weekly pick that his list has behind the drop", () => {
     const r = waiverTargets({
       rosterPositions: slots, roster, freeAgents: [], weeklyOnly: [wk("deep", "WR", 140, 70)], seasonOrder: "given",
