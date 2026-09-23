@@ -74,6 +74,10 @@ export interface SeasonTarget {
   placesBetter: number | null;
   /** What to bid, once the league's budget and market are known. */
   price?: ClaimPrice;
+  /** Why this one, when the pick came off his weekly list: "WR38 this week, Wicks is WR45". */
+  why?: string | null;
+  /** His own waiver-post pick for the same drop, when it is somebody else. */
+  alternative?: WaiverPlayer | null;
 }
 
 export interface WaiverReport {
@@ -101,6 +105,28 @@ const toLineupPlayer = (p: AdvicePlayer): LineupPlayer => ({
  */
 const bySeasonRank = (a: WaiverPlayer, b: WaiverPlayer) =>
   (a.seasonRank ?? Number.MAX_SAFE_INTEGER) - (b.seasonRank ?? Number.MAX_SAFE_INTEGER);
+
+/**
+ * Whether his weekly list has `a` ahead of `b`.
+ *
+ * Only where the list actually compares them: the FLEX list ranks running
+ * backs, receivers and tight ends against each other, and a position list
+ * only ranks within its position. Anything else is "cannot say", not "no".
+ */
+export function beatsThisWeek(a: WaiverPlayer, b: WaiverPlayer): boolean {
+  const fa = a.adjustedFlexRank ?? a.flexRank;
+  const fb = b.adjustedFlexRank ?? b.flexRank;
+  if (fa !== null && fb !== null) return fa < fb;
+  if (a.position === b.position && a.positionalRank !== null && b.positionalRank !== null) {
+    return a.positionalRank < b.positionalRank;
+  }
+  return false;
+}
+
+const weekLabel = (p: WaiverPlayer) =>
+  p.positionalRank !== null ? `${p.position}${p.positionalRank}` : p.flexRank !== null ? `FLEX ${p.flexRank}` : "unranked";
+
+const rankedThisWeek = (p: WaiverPlayer) => !p.unranked && !p.onBye;
 
 export function waiverTargets(input: {
   rosterPositions: string[];
@@ -167,11 +193,129 @@ export function waiverTargets(input: {
   // those, every claim is a swap and has to name its price.
   const openSpots = Math.max(0, rosterPositions.length - roster.length);
 
-  const seasonPool = givenOrder
-    ? freeAgents
-    : freeAgents.filter((p) => p.seasonRank !== null).sort(bySeasonRank);
+  const seasonUpgrades: SeasonTarget[] = givenOrder
+    ? seasonByWeek({
+        pool: [...freeAgents, ...(input.weeklyOnly ?? [])],
+        droppable,
+        openSpots,
+        limit,
+        protectWithin,
+      })
+    : seasonByRank(freeAgents, droppable, openSpots, limit);
 
-  const seasonUpgrades: SeasonTarget[] = seasonPool
+  return {
+    startable: startable.slice(0, limit),
+    seasonUpgrades,
+    dropCandidates: droppable.slice(0, limit),
+    untouchable: [...untouchable],
+  };
+}
+
+/**
+ * Season claims when his season list is stale, decided by his weekly list.
+ *
+ * Built around the drops rather than the adds. For each bench player, worst
+ * this week first, offer the best free agent his latest weekly list has ahead
+ * of him, from anywhere: his waiver post, the research, Sleeper's most-added,
+ * or simply his weekly list. That last source is the point. He leaves widely
+ * rostered players out of his waiver post (Xavier Worthy, 67.6% rostered,
+ * week 3), and a player who is free in THIS league and ranks WR38 against a
+ * bench WR45 is a claim whatever the rest of Sleeper has done.
+ *
+ * His waiver-post pick for the same drop rides along as the alternative when
+ * it is somebody else, with his bid, because his post is a season-long read
+ * and a one-week rank is not. When nobody on his weekly list beats a drop, the
+ * board's order fills it, but only for a drop that is not a real asset.
+ */
+function seasonByWeek(input: {
+  pool: WaiverPlayer[];
+  droppable: WaiverPlayer[];
+  openSpots: number;
+  limit: number;
+  protectWithin: number;
+}): SeasonTarget[] {
+  const seen = new Set<string>();
+  const pool = input.pool.filter((p) => {
+    if (seen.has(p.playerId) || cannotPlay(p)) return false;
+    seen.add(p.playerId);
+    return true;
+  });
+  const byWeek = pool.filter(rankedThisWeek).sort((a, b) => scoreOf(b) - scoreOf(a));
+  const his = pool
+    .filter((p) => p.jingles)
+    .sort((a, b) => (a.jingles!.rank ?? Infinity) - (b.jingles!.rank ?? Infinity));
+  const protectedAsset = (d: WaiverPlayer) => d.seasonRank !== null && d.seasonRank <= input.protectWithin;
+
+  const used = new Set<string>();
+  const alternativesShown = new Set<string>();
+  const alternativeFor = (pick: WaiverPlayer, d: WaiverPlayer | null) => {
+    const alt = his.find(
+      (p) =>
+        p.playerId !== pick.playerId &&
+        !used.has(p.playerId) &&
+        !alternativesShown.has(p.playerId) &&
+        (d === null || !protectedAsset(d) || beatsThisWeek(p, d)),
+    );
+    if (alt) alternativesShown.add(alt.playerId);
+    return alt ?? null;
+  };
+  const out: SeasonTarget[] = [];
+
+  for (let k = 0; k < input.openSpots && out.length < input.limit; k++) {
+    const pick = byWeek.find((p) => !used.has(p.playerId)) ?? his.find((p) => !used.has(p.playerId));
+    if (!pick) break;
+    used.add(pick.playerId);
+    out.push({
+      player: pick,
+      dropFor: null,
+      placesBetter: null,
+      why: rankedThisWeek(pick) ? `${weekLabel(pick)} this week` : null,
+      alternative: alternativeFor(pick, null),
+    });
+  }
+
+  // Worst this week first. A bench player on bye or off his list this week
+  // has no rank to beat, so he is only droppable if he is not a real asset.
+  const drops = [...input.droppable].sort((a, b) => scoreOf(a) - scoreOf(b));
+  for (const d of drops) {
+    if (out.length >= input.limit) break;
+    const comparable = rankedThisWeek(d);
+    let pick =
+      byWeek.find((p) => !used.has(p.playerId) && (comparable ? beatsThisWeek(p, d) : !protectedAsset(d))) ?? null;
+    let why: string | null = pick
+      ? comparable
+        ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}`
+        : `${weekLabel(pick)} this week, ${d.name} has no game or rank this week`
+      : null;
+    // Nobody his weekly list has ahead of this drop. The board's own order
+    // (his post, then the research, then Sleeper's most-added) still fills it,
+    // but only when the drop is not a player his season list rates.
+    // Never a player his weekly list has BEHIND the drop: that is a list
+    // saying no, not a list with nothing to say.
+    if (!pick && !protectedAsset(d)) {
+      pick =
+        pool.find(
+          (p) => !used.has(p.playerId) && !(comparable && rankedThisWeek(p) && !beatsThisWeek(p, d)),
+        ) ?? null;
+      why = null;
+    }
+    if (!pick) continue;
+    used.add(pick.playerId);
+    out.push({ player: pick, dropFor: d, placesBetter: null, why, alternative: alternativeFor(pick, d) });
+  }
+  return out;
+}
+
+/** Season claims off a fresh season list: by his rank, each beating its drop. */
+function seasonByRank(
+  freeAgents: WaiverPlayer[],
+  droppable: WaiverPlayer[],
+  openSpots: number,
+  limit: number,
+): SeasonTarget[] {
+  const seasonPool = freeAgents.filter((p) => p.seasonRank !== null).sort(bySeasonRank);
+
+  return seasonPool
     .slice(0, limit)
     .map((player, i) => {
       if (i < openSpots) return { player, dropFor: null, placesBetter: null };
@@ -180,7 +324,7 @@ export function waiverTargets(input: {
       // times over.
       const dropFor = droppable[i - openSpots] ?? null;
       const placesBetter =
-        !givenOrder && dropFor && dropFor.seasonRank !== null && player.seasonRank !== null
+        dropFor && dropFor.seasonRank !== null && player.seasonRank !== null
           ? dropFor.seasonRank - player.seasonRank
           : null;
       return { player, dropFor, placesBetter };
@@ -191,20 +335,8 @@ export function waiverTargets(input: {
       // No free spot and nobody droppable: the roster is all starters, and a
       // claim with no stated cost is not advice.
       if (t.dropFor === null) return false;
-      // The wire is doing the ranking: a most-added player is worth a look,
-      // but not at the price of a player his list still rates.
-      if (givenOrder) {
-        return t.dropFor.seasonRank === null || t.dropFor.seasonRank > protectWithin;
-      }
       // An unranked player is beaten by anybody he ranked.
       if (t.dropFor.seasonRank === null) return true;
       return t.player.seasonRank !== null && t.player.seasonRank < t.dropFor.seasonRank;
     });
-
-  return {
-    startable: startable.slice(0, limit),
-    seasonUpgrades,
-    dropCandidates: droppable.slice(0, limit),
-    untouchable: [...untouchable],
-  };
 }

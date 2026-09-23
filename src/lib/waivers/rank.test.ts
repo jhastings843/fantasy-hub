@@ -68,8 +68,6 @@ describe("waiverTargets", () => {
       const r = waiverTargets({ rosterPositions: SLOTS, roster: tes, freeAgents: board, weeklyOnly, seasonOrder: "given" });
       expect(r.startable[0].player.playerId).toBe("schultz");
       expect(r.startable.map((t) => t.player.playerId)).toContain("freiermuth");
-      // A matchup rank is not a reason to hold him all season.
-      expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("schultz");
     });
 
     it("never suggests a free agent who cannot play", () => {
@@ -225,5 +223,59 @@ describe("waiverTargets in given order (the wire is ranking)", () => {
     const tight = roster.map((p) => (p.playerId === "body" ? wp("asset2", "WR", 130) : p));
     const report = waiverTargets({ rosterPositions: slots, roster: tight, freeAgents: wire, seasonOrder: "given" });
     expect(report.seasonUpgrades).toEqual([]);
+  });
+});
+
+describe("season claims off his weekly list (season list stale)", () => {
+  const slots = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "BN", "BN"];
+  const wk = (
+    id: string,
+    position: string,
+    flexRank: number | null,
+    positionalRank: number | null,
+    extra: Partial<WaiverPlayer> = {},
+  ): WaiverPlayer => ({
+    playerId: id, name: id, position, team: "NE", positionalRank, flexRank, adjustedFlexRank: null,
+    opponent: "BUF", home: true, injuryStatus: null, onBye: false,
+    unranked: flexRank === null && positionalRank === null,
+    seasonRank: null, seasonPositionRank: null, tier: null, ...extra,
+  });
+  // Week 3, 2026 Half PPR, the shape that mattered: starters all well ahead,
+  // Wicks the worst of the bench at WR45 / FLEX 92.
+  const roster = [
+    wk("qb", "QB", null, 8), wk("walker", "RB", 2, 2), wk("love", "RB", 41, 24), wk("lamb", "WR", 14, 6),
+    wk("washington", "WR", 28, 12), wk("loveland", "TE", 91, 13), wk("diggs", "WR", 72, 32), wk("godwin", "WR", 75, 35),
+    wk("downs", "WR", 77, 36, { seasonRank: 90 }), wk("wicks", "WR", 92, 45, { seasonRank: 160 }),
+  ];
+  const gadsden = wk("gadsden", "TE", 105, 16, {
+    jingles: { rank: 5, faab: 6, faabPercent: 6, budget: 100, note: null },
+  });
+  const worthy = wk("worthy", "WR", 82, 38);
+
+  it("takes the free agent his weekly list has ahead of the drop, and names his post pick as the alternative", () => {
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [gadsden], weeklyOnly: [worthy], seasonOrder: "given",
+    });
+    expect(r.seasonUpgrades[0].player.playerId).toBe("worthy");
+    expect(r.seasonUpgrades[0].dropFor?.playerId).toBe("wicks");
+    expect(r.seasonUpgrades[0].why).toBe("WR38 this week, wicks is WR45");
+    expect(r.seasonUpgrades[0].alternative?.playerId).toBe("gadsden");
+  });
+
+  it("never offers a weekly pick that his list has behind the drop", () => {
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [], weeklyOnly: [wk("deep", "WR", 140, 70)], seasonOrder: "given",
+    });
+    expect(r.seasonUpgrades).toEqual([]);
+  });
+
+  it("does not drop a player on bye who his season list rates", () => {
+    const onBye = roster.map((p) =>
+      p.playerId === "wicks" ? wk("star", "WR", null, null, { onBye: true, seasonRank: 30 }) : p,
+    );
+    const r = waiverTargets({
+      rosterPositions: slots, roster: onBye, freeAgents: [], weeklyOnly: [worthy], seasonOrder: "given",
+    });
+    expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("star");
   });
 });

@@ -58,6 +58,17 @@ export function midweekSubject(input: MidweekInput): string {
   return `${head}: ${n} claim${n === 1 ? "" : "s"} worth making`;
 }
 
+
+/** His own waiver pick for the same drop, when the weekly list chose somebody else. */
+function alternativeText(t: { alternative?: { name: string; jingles?: { rank: number | null; faab: number; budget: number } | null } | null }): string {
+  const a = t.alternative;
+  if (!a) return "";
+  const his = a.jingles
+    ? `, his waiver pick${a.jingles.rank != null ? ` #${a.jingles.rank}` : ""} at $${a.jingles.faab} of $${a.jingles.budget}`
+    : "";
+  return ` Or ${a.name}${his}.`;
+}
+
 function usageNote(p: {
   lastWeek?: { week: number; points: number; snaps: number; targets: number; carries: number } | null;
   research?: { faabPercent: number | null; note: string } | null;
@@ -140,9 +151,13 @@ function leagueCard(league: WaiverContext): string {
     .map((t) =>
       playerLine(
         t.player.name,
-        `${t.player.seasonPositionRank ?? "Ranked"} on the season list${
-          t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
-        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${usageNote(t.player)}${bidText(t.price)}`,
+        `${
+          t.why
+            ? `His weekly list: ${t.why}`
+            : `${t.player.seasonPositionRank ?? "Ranked"} on the season list${
+                t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
+              }`
+        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${usageNote(t.player)}${bidText(t.price)}${alternativeText(t)}`,
         "season",
       ),
     )

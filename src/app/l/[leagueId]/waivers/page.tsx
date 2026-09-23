@@ -172,6 +172,11 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
             "You have a free roster spot, so this one costs nothing."
           )}
         </p>
+        {t.why ? (
+          <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            His weekly list: {t.why}.
+          </p>
+        ) : null}
         <ResearchLine p={t.player} />
         <JinglesLine p={t.player} />
         <UsageLine p={t.player} />
@@ -179,6 +184,15 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
         {t.price ? (
           <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
             {t.price.reason}
+          </p>
+        ) : null}
+        {t.alternative ? (
+          <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            Or <span className="font-medium text-zinc-700 dark:text-zinc-300">{t.alternative.name}</span>
+            {t.alternative.jingles
+              ? `, his waiver pick${t.alternative.jingles.rank != null ? ` #${t.alternative.jingles.rank}` : ""} at $${t.alternative.jingles.faab} of $${t.alternative.jingles.budget}`
+              : ""}
+            .
           </p>
         ) : null}
       </div>
