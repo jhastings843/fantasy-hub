@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBidCard,
+  isFillIn,
   classify,
   finalFourBars,
   priceTarget,
@@ -620,7 +621,14 @@ describe("pricing against the rivals who actually exist", () => {
   it("ignores a rival who wants him and cannot pay", () => {
     const broke = [{ ...needsAQb, faabLeft: 3 }, ...Array.from({ length: 12 }, (_, i) => happy(i))];
     const solvent = [needsAQb, ...Array.from({ length: 12 }, (_, i) => happy(i))];
-    expect(topBid(broke)).toBeLessThan(topBid(solvent));
+    // One quarterback, so the only difference is whether the rival can pay.
+    // With four on the board the chain ladder prices both cases near the
+    // minimum, which is right but says nothing about the rival.
+    const onlyOne = (rivals: RecommendInput["rivals"]) =>
+      buildBidCard(
+        input({ myPlayers: hurtStarter, candidates: [qbs[0]], posture: "red", budget, rivals }),
+      ).chains.flatMap((c) => c.targets)[0]?.bid ?? 0;
+    expect(onlyOne(broke)).toBeLessThan(onlyOne(solvent));
   });
 
   it("names the rival and says what else he could buy", () => {
@@ -708,6 +716,36 @@ describe("a glut at one position", () => {
     for (let i = 1; i < bids.length; i++) expect(bids[i]).toBeLessThan(bids[i - 1]);
   });
 
+  it("puts a season starter on the card ahead of a one-week fill-in", () => {
+    // Week 3 as it really was: five quarterbacks, room for four. Lock edged
+    // Willis on the week and projected nothing after it.
+    const real = buildBidCard({
+      ...input({ budget: roomToSpend, posture: "red" }),
+      myPlayers: withQbOut,
+      candidates: [
+        player("burrow", "QB", 18.2, { rosPoints: 17.0 }),
+        player("kyler", "QB", 17.6, { rosPoints: 15.7 }),
+        player("nix", "QB", 17.1, { rosPoints: 16.4 }),
+        player("lock", "QB", 16.8, { rosPoints: 0 }),
+        player("willis", "QB", 16.1, { rosPoints: 15.0 }),
+      ],
+      rivals: rivalsNeedingQb(3),
+    });
+    const ids = qbChain(real).targets.map((t) => t.player.playerId);
+    expect(ids).toContain("willis");
+    expect(ids).not.toContain("lock");
+  });
+
+  it("still uses a fill-in when there is nobody better", () => {
+    const thin = buildBidCard({
+      ...input({ budget: roomToSpend, posture: "red" }),
+      myPlayers: withQbOut,
+      candidates: [player("lock", "QB", 16.8, { rosPoints: 0 })],
+      rivals: rivalsNeedingQb(3),
+    });
+    expect(qbChain(thin).targets.map((t) => t.player.playerId)).toEqual(["lock"]);
+  });
+
   it("pays full price when every quarterback has a bidder", () => {
     // Five rivals for four players: nobody is left over, so no free fallback.
     const chain = qbChain(card(5));
@@ -728,5 +766,15 @@ describe("strictlyDescending", () => {
     const targets = [t(1), t(1), t(1)];
     strictlyDescending(targets);
     expect(targets.map((x: { bid: number }) => x.bid)).toEqual([3, 2, 1]);
+  });
+});
+
+describe("isFillIn", () => {
+  it("marks a backup starting one game", () => {
+    expect(isFillIn(player("lock", "QB", 16.8, { rosPoints: 0 }))).toBe(true);
+  });
+
+  it("does not mark a starter with a good matchup", () => {
+    expect(isFillIn(player("wr", "WR", 15, { rosPoints: 12 }))).toBe(false);
   });
 });

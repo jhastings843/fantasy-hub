@@ -126,6 +126,9 @@ const MAX_TARGETS_PER_CHAIN = 4;
 /** Sleeper's smallest legal bid in every league Jack plays. */
 const MIN_BID = 1;
 
+/** Rest-of-season rate below this share of the week marks a one-week fill-in. */
+const FILL_IN_SHARE = 0.5;
+
 export interface RecommendInput {
   myPlayers: PoolPlayer[];
   candidates: PoolPlayer[];
@@ -540,8 +543,18 @@ export function buildBidCard(input: RecommendInput): BidCard {
   // first version grouped by slot instead, and an RB and a WR who both
   // replaced the same weak flex became two chains that split the weekly cap
   // between them, so the top target got half the money it deserved.
+  //
+  // One-week fill-ins queue behind everyone who will still be starting after
+  // Sunday. Week 3 filled the last quarterback spot with Drew Lock, 16.8 that
+  // week and nothing after, and left Malik Willis off the card: QB15 on his
+  // list, 15.0 a game for the season, and unclaimed. A fill-in still makes a
+  // chain when there are not four real options for the hole.
   const byNeed = new Map<string, BidTarget[]>();
-  for (const target of scored) {
+  const queue = [
+    ...scored.filter((t) => !isFillIn(t.player)),
+    ...scored.filter((t) => isFillIn(t.player)),
+  ];
+  for (const target of queue) {
     const key = target.displaces?.playerId ?? target.slot ?? target.player.position;
     const list = byNeed.get(key) ?? [];
     if (list.length < MAX_TARGETS_PER_CHAIN) list.push(target);
@@ -645,6 +658,16 @@ export function buildBidCard(input: RecommendInput): BidCard {
 }
 
 /**
+ * A player projected for this week and not much after it: a backup starting
+ * one game, a return man covering one injury. Half is deliberately loose, so a
+ * starter with a good matchup (15 this week, 12 a game for the season) is not
+ * one.
+ */
+export function isFillIn(player: PoolPlayer): boolean {
+  return player.weekPoints > 0 && player.rosPoints < player.weekPoints * FILL_IN_SHARE;
+}
+
+/**
  * Price each fallback in a chain against the next one down, not the field.
  *
  * Week 3 put four quarterbacks on the card within 1.4 points of each other and
@@ -689,7 +712,13 @@ export function ladderChain(
     // season, so the step from Lock up to Nix is buying a starter, not a
     // third of a point. Everything from here up keeps its own price.
     if (Math.abs(cur.player.rosPoints - next.player.rosPoints) > COMPARABLE_WITHIN) break;
-    const gap = Math.max(0, cur.weekGain - next.weekGain);
+    // A starter bought for several weeks is worth his edge over the fallback
+    // in every one of them, so the step counts whichever gap is larger.
+    const gap = Math.max(
+      0,
+      cur.weekGain - next.weekGain,
+      cur.player.rosPoints - next.player.rosPoints,
+    );
     const premium = cur.weekGain > 0 ? (cur.bid * gap) / cur.weekGain : 0;
     cur.bid = Math.min(cur.bid, next.bid + Math.max(1, Math.round(premium)));
   }
