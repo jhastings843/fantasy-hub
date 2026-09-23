@@ -685,6 +685,29 @@ describe("a glut at one position", () => {
     for (let i = 1; i < bids.length; i++) expect(bids[i]).toBeLessThan(bids[i - 1]);
   });
 
+  it("does not ladder down to a one-week fill-in", () => {
+    // The real week 3 numbers: Lock was 0.3 behind Nix for the week and
+    // projected nothing after it. Nix is a season starter; Lock is not his
+    // fallback for anything past Sunday.
+    const real = buildBidCard({
+      ...input({ budget: roomToSpend, posture: "red" }),
+      myPlayers: withQbOut,
+      candidates: [
+        player("burrow", "QB", 18.2, { rosPoints: 17.0 }),
+        player("kyler", "QB", 17.6, { rosPoints: 15.7 }),
+        player("nix", "QB", 17.1, { rosPoints: 16.4 }),
+        player("lock", "QB", 16.8, { rosPoints: 0 }),
+      ],
+      rivals: rivalsNeedingQb(3),
+    });
+    const chain = qbChain(real);
+    const bid = (id: string) => chain.targets.find((t) => t.player.playerId === id)!.bid;
+    expect(bid("lock")).toBe(1);
+    expect(bid("nix")).toBeGreaterThan(30);
+    const bids = chain.targets.map((t) => t.bid);
+    for (let i = 1; i < bids.length; i++) expect(bids[i]).toBeLessThan(bids[i - 1]);
+  });
+
   it("pays full price when every quarterback has a bidder", () => {
     // Five rivals for four players: nobody is left over, so no free fallback.
     const chain = qbChain(card(5));

@@ -657,7 +657,9 @@ export function buildBidCard(input: RecommendInput): BidCard {
  * So when the bottom of a chain is in surplus (more comparable players than
  * rivals who would start one), someone is left over and the floor is the
  * minimum bid. Each claim above it pays for its gain over the one below, at the
- * rate its own price implies, and never more than it was priced at alone.
+ * rate its own price implies, and never more than it was priced at alone. The
+ * ladder only climbs between players who are comparable for the rest of the
+ * season too; the first real step up in rest-of-season value ends it.
  *
  * Championship targets are left alone. Their price is about the endgame, and a
  * weekly gap says nothing about that.
@@ -682,6 +684,11 @@ export function ladderChain(
   for (let i = tail.length - 2; i >= 0; i--) {
     const cur = tail[i];
     const next = tail[i + 1];
+    // A one-week fill-in is not a fallback for a season-long starter. Drew
+    // Lock projected 0.3 behind Nix for week 3 and zero for the rest of the
+    // season, so the step from Lock up to Nix is buying a starter, not a
+    // third of a point. Everything from here up keeps its own price.
+    if (Math.abs(cur.player.rosPoints - next.player.rosPoints) > COMPARABLE_WITHIN) break;
     const gap = Math.max(0, cur.weekGain - next.weekGain);
     const premium = cur.weekGain > 0 ? (cur.bid * gap) / cur.weekGain : 0;
     cur.bid = Math.min(cur.bid, next.bid + Math.max(1, Math.round(premium)));
