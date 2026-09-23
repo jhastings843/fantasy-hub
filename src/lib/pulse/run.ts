@@ -351,7 +351,9 @@ async function runSend(id: SendId): Promise<Response> {
     case "midweek":
       return runMidweekEmail();
     case "thursday":
-      return runThursdayEmail({ force: true });
+      // Day only. The waiver and rankings gates are the reason this send
+      // waits, and the pulse is the caller that most needs them.
+      return runThursdayEmail({ ignoreDayGate: true });
     case "sunday":
       return runSundayBrief();
     case "alarm":

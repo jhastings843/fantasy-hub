@@ -76,6 +76,15 @@ export async function sentThisWeek(): Promise<ThursdaySentThisWeek> {
 /** The job, behind its lock. See withSendLock: two callers, one send. */
 export function runThursdayEmail(options: {
   force?: boolean;
+  /**
+   * Skip only the day check, because the caller already decided the day.
+   *
+   * The pulse used to pass force, which also skipped the waiver and rankings
+   * gates, so the scheduled send never checked either. It went out at 8am on
+   * week 3's Wednesday and was right only because every league had processed
+   * by 5am.
+   */
+  ignoreDayGate?: boolean;
   dry?: boolean;
   resend?: boolean;
   /**
@@ -95,6 +104,15 @@ export function runThursdayEmail(options: {
 
 async function runThursdayEmailLocked(options: {
   force?: boolean;
+  /**
+   * Skip only the day check, because the caller already decided the day.
+   *
+   * The pulse used to pass force, which also skipped the waiver and rankings
+   * gates, so the scheduled send never checked either. It went out at 8am on
+   * week 3's Wednesday and was right only because every league had processed
+   * by 5am.
+   */
+  ignoreDayGate?: boolean;
   dry?: boolean;
   resend?: boolean;
   /**
@@ -107,11 +125,12 @@ async function runThursdayEmailLocked(options: {
    */
   test?: boolean;
 } = {}): Promise<Response> {
-  const { force = false, dry = false, resend = false, test = false } = options;
+  const { force = false, ignoreDayGate = false, dry = false, resend = false, test = false } =
+    options;
 
   const sendDay = configuredSendDay();
   const today = dayInNewYork(new Date());
-  if (!force && !dry && today !== sendDay) {
+  if (!force && !ignoreDayGate && !dry && today !== sendDay) {
     return Response.json({
       ok: true,
       skipped: true,
