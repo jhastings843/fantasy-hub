@@ -1,0 +1,66 @@
+name: FAAB email
+
+# Send the guillotine guide by hand.
+#
+# The Tuesday send is automatic: the pulse fires it when its window opens and
+# the daily Vercel cron is the backstop. This is the third way in, for the week
+# the card changes after the email has already gone out, or the week the send
+# window is missed. It exists as a workflow rather than a curl because
+# CRON_SECRET lives in this repo's secrets and in Vercel, and nowhere a person
+# should be pasting it.
+#
+# Nothing here runs on a schedule. It only runs when you press the button.
+
+on:
+  workflow_dispatch:
+    inputs:
+      resend:
+        description: "Send again even though this week already went out (1 to resend)"
+        default: "1"
+      dry:
+        description: "Render it and print the size without sending (1 for a dry run)"
+        default: ""
+      league:
+        description: "League id, if you do not want the guillotine league it finds"
+        default: ""
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          RESEND: ${{ inputs.resend }}
+          DRY: ${{ inputs.dry }}
+          LEAGUE: ${{ inputs.league }}
+        run: |
+          # force=1 always: pressing the button IS the decision that today is
+          # the day, and a run that quietly did nothing because it is Thursday
+          # would be the least useful possible answer.
+          url="$APP_URL/api/faab-email?force=1"
+          if [ -n "$RESEND" ]; then url="$url&resend=1"; fi
+          if [ -n "$DRY" ]; then url="$url&dry=1"; fi
+          if [ -n "$LEAGUE" ]; then url="$url&league=$LEAGUE"; fi
+
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            --max-time 90 \
+            "$url")
+          echo "HTTP $status"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::faab email returned HTTP $status"
+            head -c 500 response.json; echo
+            exit 1
+          fi
+
+          # The dry run returns the rendered HTML, which is not something to
+          # print into a public log.
+          jq -r 'if .html then (. | del(.html)) + {html: "rendered, \(.html | length) bytes"} else . end
+                 | to_entries[] | "\(.key): \(.value | tostring | .[0:200])"' response.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          jq -e '.ok == true' response.json > /dev/null
