@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   getLegPicks,
   getPoolById,
+  inProgressPools,
   listPools,
+  picksInit,
   sleeperTokenConfigured,
 } from "@/lib/survivor/sleeper-pool";
 
@@ -52,7 +54,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, pool: pool.data });
   }
 
+  if (params.get("init") === "1") {
+    const init = await picksInit();
+    if (!init.ok) return NextResponse.json({ ok: false, error: init.error }, { status: 502 });
+    return NextResponse.json({ ok: true, init: init.data });
+  }
+
+  const running = await inProgressPools();
   const pools = await listPools();
   if (!pools.ok) return NextResponse.json({ ok: false, error: pools.error }, { status: 502 });
-  return NextResponse.json({ ok: true, count: pools.data?.length ?? 0, pools: pools.data });
+  return NextResponse.json({
+    ok: true,
+    inProgress: running.data ?? [],
+    inProgressError: running.ok ? undefined : running.error,
+    count: pools.data?.length ?? 0,
+    pools: pools.data,
+  });
 }

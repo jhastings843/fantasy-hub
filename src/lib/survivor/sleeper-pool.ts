@@ -77,10 +77,36 @@ export interface UserPool {
   metadata: Record<string, unknown> | null;
 }
 
+/**
+ * Everything the app's own picks screen loads at startup.
+ *
+ * Untyped in their schema and undocumented, but it is what the client asks for
+ * first, so it is the query most likely to name the pools in whatever shape
+ * they actually have. Used to find the survivor pool rather than guessing at
+ * filters on get_user_pools, which returns nothing without a status list.
+ */
+export async function picksInit(): Promise<GraphQlResult<unknown>> {
+  const res = await sleeperGraphQl<{ my_picks_init: unknown }>(`{ my_picks_init }`);
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, data: res.data?.my_picks_init ?? null };
+}
+
+/** Pools with something still running in them. */
+export async function inProgressPools(limit = 25): Promise<GraphQlResult<UserPool[]>> {
+  const res = await sleeperGraphQl<{ get_in_progress_user_pools: UserPool[] }>(
+    `{ get_in_progress_user_pools(limit: ${limit}, offset: 0) {
+        pool_id pool_type sport status created metadata
+      } }`,
+  );
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, data: res.data?.get_in_progress_user_pools ?? [] };
+}
+
 /** Every pool this account is in, newest first. */
 export async function listPools(limit = 25): Promise<GraphQlResult<UserPool[]>> {
+  // status is a LIST in their schema and the query returns nothing without it.
   const res = await sleeperGraphQl<{ get_user_pools: UserPool[] }>(
-    `{ get_user_pools(sport: "nfl", limit: ${limit}, offset: 0) {
+    `{ get_user_pools(sport: "nfl", limit: ${limit}, offset: 0, status: ["in_season", "pre_season", "complete", "in_progress"]) {
         pool_id pool_type sport status created metadata
       } }`,
   );
