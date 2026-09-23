@@ -746,7 +746,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                     : "Every finished week is in, so the ownership numbers are projected for your pool rather than taken from Yahoo alone."}
               </p>
             </div>
-            {!nothingToLogYet && (
+            {!nothingToLogYet && !report.board && (
               <button
                 type="button"
                 onClick={() => (pasteOpen ? setPasteOpen(false) : openWeek(logWeek))}
@@ -765,7 +765,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             )}
           </div>
 
-          {pasteOpen && (
+          {pasteOpen && !report.board && (
             <div className="flex flex-col gap-2 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
               {finishedWeeks.length > 1 && (
                 <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Week to log">
@@ -841,6 +841,22 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             </div>
           )}
 
+          {report.board?.source === "sleeper" ? (
+            <div className="flex flex-col gap-1 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
+              <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Read live from Sleeper
+              </p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                All {report.board.entries.toLocaleString()} entries and their whole pick history,
+                straight off the league. {report.board.alive} alive,{" "}
+                {report.board.untouched.length} teams nobody surviving has used. Nothing to paste
+                and nothing to keep in step.
+              </p>
+            </div>
+          ) : null}
+
+          {report.board?.source !== "sleeper" && (
+          <>
           {/* The board itself, read from a screenshot.
               Percentages answer this week. Rows answer the season: which
               entries are carrying which burned teams, which is the thing the
@@ -894,7 +910,10 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             )}
           </div>
 
-          {report.field.weeksLogged > 0 && (
+          </>
+          )}
+
+          {report.field.weeksLogged > 0 && !report.board && (
             <div className="grid gap-4 border-t border-zinc-200/70 pt-3 sm:grid-cols-3 dark:border-zinc-800">
               <Stat
                 label="Entries left"

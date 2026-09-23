@@ -551,8 +551,12 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     notes.push(`${countedByHand} entries alive, counted by hand.`);
   }
   if (board) {
+    const where =
+      pool.entriesSource === "sleeper"
+        ? "read live from Sleeper"
+        : "read row by row off the board";
     notes.push(
-      `The ${board.alive}-entry board has been read row by row, so the burned teams and the count of who is left are exact rather than modelled. ${board.untouched.length} teams nobody surviving has used yet.`,
+      `Every entry ${where}, so the burned teams and the count of who is left are exact rather than modelled. ${board.alive} alive, and ${board.untouched.length} teams nobody surviving has used yet.`,
     );
   }
   if (calibration.weeks > 0 && !board) notes.push(calibration.summary);
@@ -667,6 +671,14 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     },
     injuries,
     notes,
+    board: board
+      ? {
+          source: pool.entriesSource === "sleeper" ? ("sleeper" as const) : ("screenshot" as const),
+          alive: board.alive,
+          entries: pool.entries?.length ?? board.alive,
+          untouched: board.untouched,
+        }
+      : null,
     field,
     unloggedWeeks,
     calibration,

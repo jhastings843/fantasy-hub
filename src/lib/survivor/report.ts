@@ -5,6 +5,8 @@ import { getInjuries } from "./intel";
 import { getPool } from "./state";
 import { assembleReport } from "./engine";
 import { DEFAULT_POOL_ID, POOLS, poolMeta } from "./pools";
+import { fetchPickemBoard } from "./sleeper-pickem";
+import { currentWeek as weekOf } from "./engine";
 import type { Game, InjuryNote, Ownership, PoolConfig, SurvivorReport } from "./types";
 
 export const SEASON = 2026;
@@ -84,9 +86,38 @@ export async function buildReports(
     ...ids.map((id) => getPool(SEASON, id)),
   ]);
 
+  const week = weekOf(inputs.games, inputs.now);
+
+  // A pool that can be read is read, every time, rather than kept in step by
+  // hand. The rows are not stored: they are the pool's own state and Sleeper
+  // is where it lives, so copying them into our config would only create a
+  // second version to go stale.
+  const boards = await Promise.all(
+    ids.map(async (id, i) => {
+      const leagueId = { ...pools[i], ...overrides }.sleeperLeagueId;
+      if (!leagueId) return null;
+      return fetchPickemBoard(leagueId);
+    }),
+  );
+
   return reportsFrom(
     inputs,
-    ids.map((id, i) => ({ id, pool: { ...pools[i], ...overrides } })),
+    ids.map((id, i) => {
+      const pool = { ...pools[i], ...overrides };
+      const board = boards[i];
+      if (!board) return { id, pool };
+      return {
+        id,
+        pool: {
+          ...pool,
+          entries: board.entries,
+          entriesWeek: week,
+          entriesSource: "sleeper" as const,
+          entriesAlive: board.alive,
+          entriesAliveWeek: week,
+        },
+      };
+    }),
   );
 }
 

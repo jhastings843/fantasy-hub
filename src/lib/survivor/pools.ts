@@ -24,7 +24,9 @@ export const POOLS: PoolMeta[] = [
     id: "main",
     name: "500-entry pool",
     short: "500",
-    defaults: {},
+    // SURVIVING DIDDY YR 2!!!, read live. Nothing about this pool needs
+    // maintaining by hand any more.
+    defaults: { sleeperLeagueId: "1360442305483390976" },
   },
   {
     id: "thirty",

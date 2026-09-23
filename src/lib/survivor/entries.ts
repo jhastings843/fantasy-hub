@@ -20,6 +20,15 @@ export interface PoolEntry {
   name: string;
   /** Week number as a string, to the team abbreviation picked. */
   picks: Record<string, string>;
+  /**
+   * Out, where the source says so outright.
+   *
+   * A board read from a screenshot has no such column and leaves this unset,
+   * so alive is inferred from having a pick in every week. Sleeper states it,
+   * and has to be believed: an entry that LOST still holds a pick for every
+   * week it played, so inference alone would read the whole graveyard as alive.
+   */
+  eliminated?: boolean;
 }
 
 export type EntryParse =
@@ -139,6 +148,8 @@ export function deriveFromEntries(
   week: number,
 ): EntryDerived {
   const survived = entries.filter((e) => {
+    if (e.eliminated) return false;
+    if (e.eliminated === false) return true;
     for (let w = 1; w <= completedThrough; w++) {
       if (!e.picks[String(w)]) return false;
     }

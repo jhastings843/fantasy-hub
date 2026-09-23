@@ -126,6 +126,16 @@ export interface PoolConfig {
   entries?: { name: string; picks: Record<string, string> }[];
   /** The week the rows were read, so a stale board can be spotted. */
   entriesWeek?: number | null;
+  /** Where the rows came from, because it changes what the page should offer. */
+  entriesSource?: "sleeper" | "screenshot" | null;
+  /**
+   * The Sleeper league behind this pool, when it has one.
+   *
+   * Its sport is "pickem:nfl", which is why it never appeared in a leagues
+   * list or a pool query: every lookup filters on "nfl". Given the id, the
+   * public endpoints serve every entry's whole pick history without a token.
+   */
+  sleeperLeagueId?: string | null;
   /** Losses allowed before elimination. 1 = one strike. */
   strikes: number;
   canRebuy: boolean;
@@ -275,6 +285,20 @@ export interface SurvivorReport {
 
   /** Where the pool stands: entries left, and which teams it has burned. */
   field: FieldState;
+  /**
+   * Set when every entry's picks were read rather than modelled.
+   *
+   * The page uses it to stop asking for a weekly paste: a pool that reports
+   * itself does not need transcribing, and leaving the box there would invite
+   * somebody to overwrite good numbers with worse ones.
+   */
+  board?: {
+    source: "sleeper" | "screenshot";
+    alive: number;
+    entries: number;
+    /** Teams no surviving entry has used, which is what the field can follow you onto. */
+    untouched: string[];
+  } | null;
   /**
    * Completed weeks whose pool picks have not been logged yet. Logging these is
    * the one recurring input the tool asks for.
