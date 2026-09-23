@@ -5,6 +5,7 @@ import {
   inProgressPools,
   listPools,
   picksInit,
+  sleeperGraphQl,
   sleeperTokenConfigured,
 } from "@/lib/survivor/sleeper-pool";
 
@@ -52,6 +53,36 @@ export async function GET(request: Request) {
     const pool = await getPoolById(poolId);
     if (!pool.ok) return NextResponse.json({ ok: false, error: pool.error }, { status: 502 });
     return NextResponse.json({ ok: true, pool: pool.data });
+  }
+
+  // A matrix, because every pool query has come back empty and the cause could
+  // be the token, the argument shape, or pools not being pools at all. One
+  // deploy, every combination, and the counts say which.
+  if (params.get("matrix") === "1") {
+    const probes: Record<string, string> = {
+      me: `{ me { user_id display_name } }`,
+      pools_bare: `{ get_user_pools { pool_id pool_type status sport } }`,
+      pools_nfl: `{ get_user_pools(sport: "nfl") { pool_id pool_type status sport } }`,
+      pools_in_season: `{ get_user_pools(status: ["in_season"]) { pool_id pool_type status sport } }`,
+      pools_active: `{ get_user_pools(status: ["active"]) { pool_id pool_type status sport } }`,
+      pools_complete: `{ get_user_pools(status: ["complete"]) { pool_id pool_type status sport } }`,
+      pools_pending: `{ get_user_pools(status: ["pending"]) { pool_id pool_type status sport } }`,
+      pools_survivor: `{ get_user_pools(pool_type: "survivor") { pool_id pool_type status sport } }`,
+      pools_pickem: `{ get_user_pools(pool_type: "pickem") { pool_id pool_type status sport } }`,
+      in_progress: `{ get_in_progress_user_pools { pool_id pool_type status sport } }`,
+    };
+
+    const out: Record<string, unknown> = {};
+    for (const [name, query] of Object.entries(probes)) {
+      const r = await sleeperGraphQl<Record<string, unknown>>(query);
+      if (!r.ok) {
+        out[name] = { error: r.error };
+        continue;
+      }
+      const value = Object.values(r.data ?? {})[0];
+      out[name] = Array.isArray(value) ? { rows: value.length, sample: value.slice(0, 3) } : value;
+    }
+    return NextResponse.json({ ok: true, probes: out });
   }
 
   if (params.get("init") === "1") {
