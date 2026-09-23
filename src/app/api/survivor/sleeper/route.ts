@@ -59,8 +59,16 @@ export async function GET(request: Request) {
   // be the token, the argument shape, or pools not being pools at all. One
   // deploy, every combination, and the counts say which.
   if (params.get("matrix") === "1") {
+    const me = "733460435126353920";
     const probes: Record<string, string> = {
       me: `{ me { user_id display_name } }`,
+      // A survivor pool may not be a "pool" at all. Every pool query comes back
+      // empty while the token authenticates, so the next candidate is that it
+      // is a league of a kind the public leagues endpoint does not return.
+      rosters_regular: `{ rosters_by_user(user_id: "${me}", season: "2026", season_type: "regular", sport: "nfl") { league_id roster_id } }`,
+      rosters_pickem: `{ rosters_by_user(user_id: "${me}", season: "2026", season_type: "pickem", sport: "nfl") { league_id roster_id } }`,
+      rosters_survivor: `{ rosters_by_user(user_id: "${me}", season: "2026", season_type: "survivor", sport: "nfl") { league_id roster_id } }`,
+      owned_regular: `{ owned_leagues(user_id: "${me}", season: "2026", season_type: "regular", sport: "nfl") { league_id name } }`,
       pools_bare: `{ get_user_pools { pool_id pool_type status sport } }`,
       pools_nfl: `{ get_user_pools(sport: "nfl") { pool_id pool_type status sport } }`,
       pools_in_season: `{ get_user_pools(status: ["in_season"]) { pool_id pool_type status sport } }`,
