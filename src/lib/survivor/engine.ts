@@ -2,6 +2,7 @@ import { NFL_TEAMS, teamByAbbr } from "./teams";
 import { normalizeOwnership, ownershipCoverage } from "./yahoo";
 import { applyAvailability, deriveFieldState, type WeekPicks } from "./field";
 import { calibrate, projectOwnership, type Observation } from "./calibration";
+import { deriveFromEntries } from "./entries";
 import { notesForTeam } from "./intel-pure";
 import { orderTieByPosture, tieNote, tiedWithBest } from "./tie";
 import { equityMultiplier, fieldSurvival } from "./equity";
@@ -210,6 +211,23 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     pool.tieAdvances,
   );
 
+  // The pool's own board, when it has been read.
+  //
+  // Everything above is a model of the field: it thins each team's carriers at
+  // the overall survival rate, which quietly assumes the team an entry burned
+  // in week 1 says nothing about whether it survived week 4. Entries that took
+  // the chalk survived together, so the assumption is false in the direction
+  // that matters. Rows replace the model where they exist, and the model keeps
+  // running everywhere else.
+  const board =
+    pool.entries && pool.entries.length > 0 && pool.entriesWeek === week
+      ? deriveFromEntries(pool.entries, Math.max(0, week - 1), week)
+      : null;
+  if (board) {
+    field.burned = board.burned;
+    field.entriesAlive = board.alive;
+  }
+
   // How far the pool leans off the public, fitted week by week against Yahoo's
   // distribution for those same weeks.
   const observations: Observation[] = logged
@@ -226,10 +244,17 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // If the pool's own numbers for THIS week are somehow known, they beat any
   // projection. Otherwise project: take the public distribution, bend it by the
   // pool's chalk factor, then remove the teams the field can no longer pick.
+  // This week's picks, if the board already shows them, are not an estimate of
+  // anything: they are the distribution.
+  const fromBoard =
+    board && Object.keys(board.picksThisWeek).length > 0 ? board.picksThisWeek : null;
   const manual = pool.weeklyPicks[String(week)];
   let rawPicks: Ownership;
   let source: OwnershipSnapshot["source"];
-  if (manual) {
+  if (fromBoard) {
+    rawPicks = fromBoard;
+    source = "manual";
+  } else if (manual) {
     rawPicks = Object.fromEntries(
       Object.entries(manual).map(([k, v]) => [k, v / 100]),
     );
@@ -525,7 +550,12 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   } else if (countedByHand != null) {
     notes.push(`${countedByHand} entries alive, counted by hand.`);
   }
-  if (calibration.weeks > 0) notes.push(calibration.summary);
+  if (board) {
+    notes.push(
+      `The ${board.alive}-entry board has been read row by row, so the burned teams and the count of who is left are exact rather than modelled. ${board.untouched.length} teams nobody surviving has used yet.`,
+    );
+  }
+  if (calibration.weeks > 0 && !board) notes.push(calibration.summary);
   if (unloggedWeeks.length > 0) {
     notes.push(
       `Week(s) ${unloggedWeeks.join(", ")} finished but have not been logged. Paste what the pool picked and the projection, the burned teams and the entry count all update.`,

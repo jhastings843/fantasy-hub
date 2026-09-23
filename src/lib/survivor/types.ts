@@ -115,6 +115,17 @@ export interface PoolConfig {
    * failure the derivation was built to end.
    */
   entriesAliveWeek: number | null;
+
+  /**
+   * Who picked what, entry by entry, when the pool's board has been read.
+   *
+   * Optional and expected to be absent: it exists for the pools small enough
+   * that transcribing ten rows is a minute's work, and for the back half of a
+   * season in the big one. Everything still works without it, on fractions.
+   */
+  entries?: { name: string; picks: Record<string, string> }[];
+  /** The week the rows were read, so a stale board can be spotted. */
+  entriesWeek?: number | null;
   /** Losses allowed before elimination. 1 = one strike. */
   strikes: number;
   canRebuy: boolean;

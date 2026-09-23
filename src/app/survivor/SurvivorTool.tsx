@@ -205,6 +205,15 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // Reading the pool's own board from a screenshot. The small pool shows its
+  // picks as logos in a grid, so there is nothing to copy and a photo of it is
+  // the only export that exists.
+  const [boardBusy, setBoardBusy] = useState(false);
+  const [boardResult, setBoardResult] = useState<
+    { rows: number; alive: number; unreadable: number } | null
+  >(null);
+  const [boardError, setBoardError] = useState<string | null>(null);
+
   const [pasteOpen, setPasteOpen] = useState(false);
   const [paste, setPaste] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
@@ -223,6 +232,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   // gone. Reading pool.usedTeams here meant a pick that burned itself when the
   // week turned was missing from the board with nothing on the grid to say why.
   const usedSet = useMemo(() => new Set(report.burnedTeams), [report.burnedTeams]);
+  const boardRead = pool.entriesWeek === report.week ? (pool.entries?.length ?? 0) : 0;
   // SPENT, not burned. A team taken this week is still on this week's board,
   // because it is the answer, and it is still gone for the rest of the season.
   // Every count on the page reads this one: Jack had JAX taken in the 500 and
@@ -302,6 +312,48 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
     void patch({
       weeklyPicks: { ...pool.weeklyPicks, [String(logWeek)]: parsed.picks },
     });
+  }
+
+  /**
+   * Send a screenshot of the pool's board and store what comes back.
+   *
+   * The whole board every time, not a diff: it is one upload either way, and a
+   * board read fresh each week cannot drift from the site the way an
+   * accumulating record would.
+   */
+  async function uploadBoard(file: File) {
+    setBoardBusy(true);
+    setBoardError(null);
+    setBoardResult(null);
+    try {
+      const image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Could not read that file."));
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch(`/api/survivor/entries?pool=${report.poolId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        setBoardError(body.error ?? "The board could not be read.");
+        return;
+      }
+      setBoardResult({
+        rows: body.stored,
+        alive: body.alive,
+        unreadable: body.unreadable ?? 0,
+      });
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setBoardError(e instanceof Error ? e.message : "The upload failed.");
+    } finally {
+      setBoardBusy(false);
+    }
   }
 
   /** Point the box at a week and load what is saved for it, if anything. */
@@ -788,6 +840,59 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
               </div>
             </div>
           )}
+
+          {/* The board itself, read from a screenshot.
+              Percentages answer this week. Rows answer the season: which
+              entries are carrying which burned teams, which is the thing the
+              model can only estimate. */}
+          <div className="flex flex-col gap-2 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Read the board from a screenshot
+                </p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  {boardRead
+                    ? `${boardRead} rows stored, so burned teams and the count left are exact rather than modelled.`
+                    : "Screenshot the pool's grid of names and picks. Every entry, every week, read row by row."}
+                </p>
+              </div>
+              <label
+                className={`shrink-0 cursor-pointer rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                  boardBusy
+                    ? "bg-zinc-200 text-zinc-500 dark:bg-zinc-800"
+                    : "border border-zinc-200 text-zinc-600 hover:border-amber-400 hover:text-amber-700 dark:border-zinc-800 dark:text-zinc-400"
+                }`}
+              >
+                {boardBusy ? "Reading..." : boardRead ? "Upload a newer one" : "Upload screenshot"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  disabled={boardBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void uploadBoard(file);
+                  }}
+                />
+              </label>
+            </div>
+            {boardResult && (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                Read {boardResult.rows} entries, {boardResult.alive} still alive.
+                {boardResult.unreadable > 0
+                  ? ` ${boardResult.unreadable} pick${boardResult.unreadable === 1 ? "" : "s"} could not be identified, so check those rows.`
+                  : ""}
+              </p>
+            )}
+            {boardError && (
+              <p className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400">
+                <AlertTriangle size={12} aria-hidden />
+                {boardError}
+              </p>
+            )}
+          </div>
 
           {report.field.weeksLogged > 0 && (
             <div className="grid gap-4 border-t border-zinc-200/70 pt-3 sm:grid-cols-3 dark:border-zinc-800">
