@@ -243,6 +243,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
   // off, so the 500 board drew a TAKE THIS card for LAC while its own headline
   // said "you have JAX". The engine prices the pick; the page just draws it.
   const taken = report.myPickCandidate;
+  const out = !report.status.alive;
 
   async function patch(body: Record<string, unknown>) {
     setBusy(true);
@@ -434,10 +435,16 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                 {/* Each pool's own answer, so agreement or disagreement is
                     visible without switching tabs. */}
                 <span className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
-                  {r.myPick ?? r.bestTeam ?? "nothing left"}
-                  {r.myPick ? " taken" : ""}
-                  {" \u00b7 "}
-                  {r.spentTeams.length} spent
+                  {r.status.alive ? (
+                    <>
+                      {r.myPick ?? r.bestTeam ?? "nothing left"}
+                      {r.myPick ? " taken" : ""}
+                      {" \u00b7 "}
+                      {r.spentTeams.length} spent
+                    </>
+                  ) : (
+                    `Out in week ${r.status.endedBy?.week ?? "?"}`
+                  )}
                 </span>
               </button>
             );
@@ -451,7 +458,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
             Week {report.week}
           </span>
-          {locksIn && (
+          {locksIn && !out && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 text-[11px] font-semibold text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
               <Lock size={11} aria-hidden />
               Locks in {locksIn}
@@ -513,6 +520,11 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
         />
       )}
 
+      {/* Out of this pool: the page stops asking for anything. */}
+      {out && <OutCard report={report} />}
+
+      {!out && (
+      <>
       {/* Once a pick is in, it replaces the board. One way back, the button. */}
       {taken && (
         <TakenPick taken={taken} report={report} working={working} onChange={clearPick} />
@@ -1119,7 +1131,72 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
           })}
         </ul>
       </section>
+      </>
+      )}
     </div>
+  );
+}
+
+/**
+ * The pool is over for Jack. Says how, shows the season that got him there,
+ * and states plainly that nothing on this page or in the email needs him now.
+ */
+function OutCard({ report }: { report: SurvivorReport }) {
+  const { endedBy, record } = report.status;
+  const lasted = endedBy ? endedBy.week - 1 : record.length;
+  return (
+    <section className="flex flex-col gap-5 rounded-2xl border border-zinc-300 bg-zinc-50 p-5 dark:border-zinc-700 dark:bg-zinc-900/60 lg:p-6">
+      <div className="flex items-center gap-2">
+        <Shield size={14} className="text-zinc-500 dark:text-zinc-400" aria-hidden />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Out of the {report.pool.name}
+        </span>
+      </div>
+
+      {endedBy && (
+        <div className="flex flex-wrap items-center gap-4">
+          <Logo abbr={endedBy.team} size={48} />
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {endedBy.team} {endedBy.result === "T" ? "tied" : "lost"}{" "}
+              <span className="tabular-nums">
+                {endedBy.teamScore}&ndash;{endedBy.oppScore}
+              </span>
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {endedBy.home ? "vs" : "at"} {endedBy.opponent} &middot; week {endedBy.week}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <ol className="flex flex-wrap gap-2" aria-label="Your picks this season">
+        {record.map((p) => (
+          <li
+            key={p.week}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs tabular-nums ${
+              p.result === "W"
+                ? "border-emerald-200 bg-white text-emerald-800 dark:border-emerald-900/60 dark:bg-zinc-900 dark:text-emerald-300"
+                : "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
+            }`}
+          >
+            <span className="font-semibold">W{p.week}</span>
+            <Logo abbr={p.team} size={16} />
+            {p.team}
+            <span className="opacity-70">
+              {p.teamScore}&ndash;{p.oppScore}
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className="max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+        Survived {lasted} week{lasted === 1 ? "" : "s"}. {report.entriesAlive.toLocaleString()} of{" "}
+        {report.pool.poolSize.toLocaleString()} entries are still going. Nothing here needs you
+        until next season: the emails and the Sunday alarm have dropped this pool, and the board
+        resets on its own in August.
+      </p>
+    </section>
   );
 }
 

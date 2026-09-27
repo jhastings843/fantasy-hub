@@ -193,6 +193,7 @@ export interface FuturePlan {
 import type { FieldState } from "./field";
 import type { Posture } from "./posture";
 import type { Calibration } from "./calibration";
+import type { EntryStatus } from "./status";
 
 export interface SurvivorReport {
   season: number;
@@ -306,4 +307,10 @@ export interface SurvivorReport {
   unloggedWeeks: number[];
   /** How far the pool leans off the public, fitted from the logged weeks. */
   calibration: Calibration;
+  /**
+   * Whether Jack is still in this pool, from his picks and the final scores.
+   * Every consumer checks this before telling him what to pick: a dead entry
+   * gets no pick, no nag and no alarm.
+   */
+  status: EntryStatus;
 }

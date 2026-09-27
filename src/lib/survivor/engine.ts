@@ -1,3 +1,4 @@
+import { endedSentence, entryStatus } from "./status";
 import { NFL_TEAMS, teamByAbbr } from "./teams";
 import { normalizeOwnership, ownershipCoverage } from "./yahoo";
 import { applyAvailability, deriveFieldState, type WeekPicks } from "./field";
@@ -610,6 +611,7 @@ export function assembleReport(input: EngineInput): SurvivorReport {
   // engine's own, and silent when the two are inside the tie band, because
   // "you picked the other coin" is not information.
   const tiedTeams = new Set(tied.map((c) => c.team));
+  const status = entryStatus(pool, input.games);
   const myPickNote =
     taken && best && taken.team !== best.team && !tiedTeams.has(taken.team)
       ? `You took ${taken.team} over ${best.team}. That is ${pct(
@@ -637,7 +639,9 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     // Once a pick is taken it IS the headline. The Thursday email reads this
     // field, and telling Jack what to pick on a week he has already picked is
     // the same bug the page had, arriving by mail.
-    headline: taken
+    headline: status.endedBy
+      ? `Out: ${endedSentence(status.endedBy)}`
+      : taken
       ? `Week ${week}: you have ${taken.team} over ${taken.opponent}`
       : best
         ? // A tie is a caveat on the pick, not a substitute for naming one. The
@@ -682,5 +686,6 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     field,
     unloggedWeeks,
     calibration,
+    status,
   };
 }

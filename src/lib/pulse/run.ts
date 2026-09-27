@@ -219,16 +219,30 @@ async function job(
  * cached value and the report is rebuilt from that.
  */
 async function refreshSurvivor(force: boolean): Promise<string> {
+  // Games and injuries feed lineups and the guillotine board too, so they
+  // refresh on the live windows whatever happens in survivor. Only Yahoo's
+  // pick percentages are survivor's alone, and once Jack is out of every pool
+  // nothing reads them, so that pull stops.
+  const before = force ? await buildReports() : null;
+  const out = (rs: Awaited<ReturnType<typeof buildReports>>) =>
+    rs.length > 0 && rs.every((r) => !r.status.alive);
   if (force) {
     await Promise.allSettled([
       revalidateGames(SEASON),
-      revalidatePublicPicks(SEASON),
+      out(before!) ? Promise.resolve() : revalidatePublicPicks(SEASON),
       revalidateInjuries(),
     ]);
   }
   const reports = await buildReports();
+  if (out(reports)) {
+    return `out of every pool (${reports.map((r) => `${r.pool.name.replace(/-entry pool$/, "")}: wk ${r.status.endedBy?.week ?? "?"}`).join(", ")}), pick percentages not refreshed`;
+  }
+  return summarise(reports);
+}
+
+function summarise(reports: Awaited<ReturnType<typeof buildReports>>): string {
   const week = reports[0]?.week ?? "?";
-  const picks = reports.map((r) => `${r.pool.name.replace(/-entry pool$/, "")}: ${r.myPick ?? "none"}`);
+  const picks = reports.map((r) => `${r.pool.name.replace(/-entry pool$/, "")}: ${r.status.alive ? (r.myPick ?? "none") : "out"}`);
   return `week ${week}, ${picks.join(", ")}`;
 }
 

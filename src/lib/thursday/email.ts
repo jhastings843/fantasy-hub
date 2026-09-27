@@ -53,7 +53,8 @@ export function thursdaySubject(input: ThursdayInput): string {
     changes === 0
       ? "lineups all set"
       : `${changes} lineup change${changes === 1 ? "" : "s"}`;
-  return `Week ${week}: ${subjectPick(survivors)}, ${tail}`;
+  const pick = subjectPick(survivors);
+  return pick ? `Week ${week}: ${pick}, ${tail}` : `Week ${week}: ${tail}`;
 }
 
 /**
@@ -64,8 +65,10 @@ export function thursdaySubject(input: ThursdayInput): string {
  * teams with the pool sizes attached, because which pool is which is the whole
  * question at that point.
  */
-function subjectPick(survivors: SurvivorReport[]): string {
-  if (survivors.length === 0) return "no survivor pick";
+function subjectPick(all: SurvivorReport[]): string {
+  if (all.length === 0) return "no survivor pick";
+  const survivors = all.filter((s) => s.status.alive);
+  if (survivors.length === 0) return "";
 
   const first = survivors[0];
   const allAgree = survivors.every((s) => s.bestTeam === first.bestTeam);
@@ -107,7 +110,10 @@ function survivorSection(input: ThursdayInput): string {
     );
   }
 
+  // A pool Jack is out of gets no card. He knows, and a weekly reminder of a
+  // lost season is not information.
   return survivors
+    .filter((s) => s.status.alive)
     .map((s) => survivorBlock(s, survivors.length > 1 ? s.pool.name : null))
     .join("");
 }
@@ -304,7 +310,9 @@ export function renderThursdayEmail(input: ThursdayInput): string {
         ? "Nothing to change in any league."
         : `${changes} slots to change before kickoff.`,
     body: `${survivorSection(input)}<div style="padding-top:6px;">${lineupSection}</div>`,
-    cta: { href: `${input.appUrl}/survivor`, text: "Open survivor" },
+    cta: input.survivors.length > 0 && input.survivors.every((s) => !s.status.alive)
+      ? { href: input.appUrl, text: "Open fantasy hub" }
+      : { href: `${input.appUrl}/survivor`, text: "Open survivor" },
     footnote: `${provenance}<div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
 }

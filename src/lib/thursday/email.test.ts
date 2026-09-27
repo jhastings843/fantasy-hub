@@ -15,8 +15,12 @@ function survivor(
     bestTeam: best,
     candidates: [{ team: best, opponent }],
     pool: { name },
+    status: { alive: true, losses: 0, strikes: 1, record: [], endedBy: null },
   } as unknown as SurvivorReport;
 }
+
+const out = (r: SurvivorReport): SurvivorReport =>
+  ({ ...r, status: { ...r.status, alive: false } }) as SurvivorReport;
 
 const NO_CHANGES = {
   week: 2,
@@ -61,6 +65,20 @@ describe("thursdaySubject", () => {
       ]),
     );
     expect(subject).toBe("Week 2: LAC (500) / JAX (30), lineups all set");
+  });
+
+  it("drops a pool Jack is out of and names only the live one", () => {
+    const subject = thursdaySubject(
+      input([out(survivor("main", "500-entry pool", "LAC", "ARI")), survivor("thirty", "30-entry pool", "JAX", "CAR")]),
+    );
+    expect(subject).toBe("Week 2: JAX over CAR, lineups all set");
+  });
+
+  it("is only about lineups once every pool is lost", () => {
+    const subject = thursdaySubject(
+      input([out(survivor("main", "500-entry pool", "LAC", "ARI")), out(survivor("thirty", "30-entry pool", "LAC", "ARI"))]),
+    );
+    expect(subject).toBe("Week 2: lineups all set");
   });
 
   it("still says which week it is when no pick could be built", () => {

@@ -132,7 +132,8 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
   const baseline = await readBaseline(season, week);
   const now = Date.now();
 
-  const pools: PoolAlarmInput[] = survivors.map((s) => {
+  // Out of a pool means nothing in it can go wrong any more.
+  const pools: PoolAlarmInput[] = survivors.filter((s) => s.status.alive).map((s) => {
     const kickoff = s.myPickCandidate?.kickoff;
     const recorded = baseline[s.poolId];
     // Only a baseline for THIS team is a baseline. Switching from an 85% pick

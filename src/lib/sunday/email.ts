@@ -58,7 +58,8 @@ function allClear(input: SundayInput): boolean {
   if (lineups.leagues.length === 0) return false;
   if (lineups.leagues.some((l) => l.error)) return false;
   if (survivors.length === 0) return false;
-  if (survivors.some((s) => !s.myPick)) return false;
+  // A pool Jack is out of has nothing to pick, so it cannot hold the all-clear back.
+  if (survivors.some((s) => s.status.alive && !s.myPick)) return false;
   return true;
 }
 
@@ -88,8 +89,12 @@ function pickPhrase(survivors: SurvivorReport[], thursdayCalls: Record<string, s
   return picked.map((s) => `${s.myPick} (${s.pool.name.replace(/-entry pool$/, "")})`).join(" / ");
 }
 
+/** Pools still worth a word. Out pools drop off the email entirely. */
+const livePools = (survivors: SurvivorReport[]) => survivors.filter((s) => s.status.alive);
+
 export function sundaySubject(input: SundayInput): string {
   const week = input.survivors[0]?.week ?? input.lineups.week;
+  const live = livePools(input.survivors);
   const left = outstanding(input.lineups);
   const tail =
     left > 0
@@ -97,7 +102,9 @@ export function sundaySubject(input: SundayInput): string {
       : allClear(input)
         ? "lineups set"
         : "needs a look";
-  return `Week ${week} Sunday: ${pickPhrase(input.survivors, input.thursdayCalls)}, ${tail}`;
+  // Out of every pool: the subject is about lineups and nothing else.
+  if (input.survivors.length > 0 && live.length === 0) return `Week ${week} Sunday: ${tail}`;
+  return `Week ${week} Sunday: ${pickPhrase(live, input.thursdayCalls)}, ${tail}`;
 }
 
 function poolCard(report: SurvivorReport, showName: boolean, thursdayCall: string | null): string {
@@ -171,10 +178,11 @@ export function renderSundayBrief(input: SundayInput): string {
   const left = outstanding(lineups);
   const clear = allClear(input);
 
+  const live = livePools(survivors);
   const survivorCards =
     survivors.length === 0
       ? card(`${label("Survivor")}${paragraph("The board could not be built this morning.")}`, WARN)
-      : survivors.map((s) => poolCard(s, survivors.length > 1, input.thursdayCalls?.[s.poolId] ?? null)).join("");
+      : live.map((s) => poolCard(s, survivors.length > 1, input.thursdayCalls?.[s.poolId] ?? null)).join("");
 
   const lineupCard = lineups.blocked
     ? card(`${label("Lineups")}${paragraph(lineups.blocked)}`, WARN)
@@ -189,12 +197,17 @@ ${lineups.leagues.map(leagueLine).join("")}`,
     kicker: `Sunday · Week ${week ?? ""}`,
     heading: clear ? "Nothing needs doing" : "Before the 1pm lock",
     preheader: clear
-      ? "Picks are in and every lineup is set."
+      ? live.length > 0
+        ? "Picks are in and every lineup is set."
+        : "Every lineup is set."
       : left > 0
         ? `${left} lineup change${left === 1 ? "" : "s"} before 1pm.`
         : "Something could not be checked. Worth opening.",
     body: `${survivorCards}${lineupCard}`,
-    cta: { href: `${input.appUrl}/survivor`, text: "Open survivor" },
+    cta:
+      survivors.length > 0 && live.length === 0
+        ? { href: input.appUrl, text: "Open fantasy hub" }
+        : { href: `${input.appUrl}/survivor`, text: "Open survivor" },
     footnote: `<div>Inactives land around 11:30. If anything breaks after that you will get one more email at 11:45, and silence means nothing did.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
