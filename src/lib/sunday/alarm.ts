@@ -36,6 +36,19 @@ export interface PoolAlarmInput {
   baselineWinProb: number | null;
   /** The pick's game has already kicked off, so nothing can be changed. */
   locked: boolean;
+  /** The engine's pick right now. */
+  recommended?: string | null;
+  /** The engine's pick in Thursday's email, if it was recorded. */
+  thursdayCall?: string | null;
+}
+
+/** "Take SEA (Thursday's email said KC)", or just "Take SEA". Empty when there is no board. */
+export function takeLine(recommended?: string | null, thursdayCall?: string | null): string {
+  if (!recommended) return "";
+  const switched = thursdayCall && thursdayCall !== recommended;
+  return switched
+    ? `Take ${recommended}, not ${thursdayCall}: the engine switched since Thursday's email.`
+    : `Take ${recommended}.`;
 }
 
 export interface SlotAlarmInput {
@@ -81,7 +94,7 @@ export function lockAlarms(input: {
       out.push({
         kind: "no-pick",
         key: `no-pick:${p.pool}`,
-        text: `No pick logged in the ${p.pool}. A pool with no pick is a strike.`,
+        text: `No pick logged in the ${p.pool}. ${takeLine(p.recommended, p.thursdayCall)} A pool with no pick is a strike.`.replace(/\s+/g, " "),
       });
       continue;
     }

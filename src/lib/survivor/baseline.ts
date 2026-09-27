@@ -17,6 +17,12 @@ const key = (season: number | string, week: number) =>
 export interface PickBaseline {
   pick: string | null;
   winProb: number | null;
+  /**
+   * The team the engine told him to take on Thursday. Separate from pick,
+   * because most Thursdays nothing is logged yet and the advice is what he
+   * is carrying around. Absent on baselines written before this existed.
+   */
+  recommended?: string | null;
 }
 
 export type Baselines = Record<string, PickBaseline>;

@@ -33,6 +33,8 @@ const pctText = (n: number) => `${(n * 100).toFixed(1)}%`;
 export interface SundayInput {
   survivors: SurvivorReport[];
   lineups: WeeklyLineups;
+  /** The engine's pick per pool in Thursday's email, keyed by poolId. */
+  thursdayCalls?: Record<string, string | null>;
   generatedAt: string;
   appUrl: string;
 }
@@ -61,9 +63,23 @@ function allClear(input: SundayInput): boolean {
 }
 
 /** "JAX in both pools", or each pool named when they differ. */
-function pickPhrase(survivors: SurvivorReport[]): string {
+function pickPhrase(survivors: SurvivorReport[], thursdayCalls: Record<string, string | null> = {}): string {
   const picked = survivors.filter((s) => s.myPick);
-  if (picked.length === 0) return "no pick logged";
+  if (picked.length === 0) {
+    // The subject is the one line he is sure to read, so it names the team.
+    const best = survivors.map((s) => s.bestTeam ?? null);
+    if (best.some((b) => !b)) return "no pick logged";
+    const switched = survivors.some((s) => {
+      const was = thursdayCalls[s.poolId];
+      return was && was !== s.bestTeam;
+    });
+    const verb = switched ? "switch to" : "take";
+    const where =
+      best.every((b) => b === best[0])
+        ? `${best[0]}${survivors.length > 1 ? " in both pools" : ""}`
+        : survivors.map((s) => `${s.bestTeam} (${s.pool.name.replace(/-entry pool$/, "")})`).join(" / ");
+    return `${verb} ${where}, no pick logged`;
+  }
 
   const first = picked[0].myPick;
   if (picked.length === survivors.length && picked.every((s) => s.myPick === first)) {
@@ -81,15 +97,22 @@ export function sundaySubject(input: SundayInput): string {
       : allClear(input)
         ? "lineups set"
         : "needs a look";
-  return `Week ${week} Sunday: ${pickPhrase(input.survivors)}, ${tail}`;
+  return `Week ${week} Sunday: ${pickPhrase(input.survivors, input.thursdayCalls)}, ${tail}`;
 }
 
-function poolCard(report: SurvivorReport, showName: boolean): string {
+function poolCard(report: SurvivorReport, showName: boolean, thursdayCall: string | null): string {
   if (!report.myPick) {
+    const best = report.candidates.find((c) => c.team === report.bestTeam);
+    const switched = !!thursdayCall && !!report.bestTeam && thursdayCall !== report.bestTeam;
     return card(
       `${label(showName ? report.pool.name : "Survivor")}
-${headline("No pick logged")}
-${paragraph(`The engine would take ${report.bestTeam ?? "nothing"}. A pool with no pick is a strike, so this is the one thing on this page worth doing now.`)}`,
+${headline(report.bestTeam ? `Take ${report.bestTeam}${best ? ` over ${best.opponent}` : ""}` : "No pick logged")}
+${best ? statRow([
+  { name: "Win", value: pctText(best.winProb) },
+  { name: "Field on it", value: pctText(best.ownership) },
+]) : ""}
+${switched ? paragraph(`Changed from Thursday's email, which said ${thursdayCall}. ${report.reasoning[1] ?? ""}`.trim()) : ""}
+${paragraph(`No pick is logged yet. A pool with no pick is a strike, so this is the one thing on this page worth doing now.`)}`,
       BAD,
     );
   }
@@ -151,7 +174,7 @@ export function renderSundayBrief(input: SundayInput): string {
   const survivorCards =
     survivors.length === 0
       ? card(`${label("Survivor")}${paragraph("The board could not be built this morning.")}`, WARN)
-      : survivors.map((s) => poolCard(s, survivors.length > 1)).join("");
+      : survivors.map((s) => poolCard(s, survivors.length > 1, input.thursdayCalls?.[s.poolId] ?? null)).join("");
 
   const lineupCard = lineups.blocked
     ? card(`${label("Lineups")}${paragraph(lineups.blocked)}`, WARN)

@@ -31,6 +31,23 @@ describe("lockAlarms", () => {
     expect(out[0].text).toContain("500-entry pool");
   });
 
+  it("names the team to take when no pick is logged", () => {
+    const out = lockAlarms({
+      pools: [{ ...pool, pick: null, winProb: null, recommended: "SEA", thursdayCall: "SEA" }],
+      slots: [],
+    });
+    expect(out[0].text).toContain("Take SEA.");
+    expect(out[0].text).not.toContain("switched");
+  });
+
+  it("says when the engine has switched since Thursday", () => {
+    const out = lockAlarms({
+      pools: [{ ...pool, pick: null, winProb: null, recommended: "SEA", thursdayCall: "KC" }],
+      slots: [],
+    });
+    expect(out[0].text).toContain("Take SEA, not KC");
+  });
+
   it("shouts about an empty starting slot", () => {
     const out = lockAlarms({ pools: [], slots: [{ ...slot, player: null }] });
     expect(out[0].kind).toBe("empty-slot");

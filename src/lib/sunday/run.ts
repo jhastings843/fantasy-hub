@@ -66,9 +66,15 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
     });
   }
 
+  const baseline = await readBaseline(season, week);
+  const thursdayCalls = Object.fromEntries(
+    Object.entries(baseline).map(([poolId, b]) => [poolId, b.recommended ?? null]),
+  );
+
   const input = {
     survivors,
     lineups,
+    thursdayCalls,
     generatedAt: new Date().toISOString(),
     appUrl: APP_URL(),
   };
@@ -140,6 +146,8 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
       winProb: s.myPickCandidate?.winProb ?? null,
       baselineWinProb: sameTeam ? (recorded?.winProb ?? null) : null,
       locked: kickoff ? Date.parse(kickoff) <= now : false,
+      recommended: s.bestTeam ?? null,
+      thursdayCall: recorded?.recommended ?? null,
     };
   });
 

@@ -258,6 +258,7 @@ async function runThursdayEmailLocked(options: {
     baselines[report.poolId] = {
       pick: report.myPick,
       winProb: report.myPickCandidate?.winProb ?? null,
+      recommended: report.bestTeam ?? null,
     };
   }
   await recordBaseline(season, week, baselines);
