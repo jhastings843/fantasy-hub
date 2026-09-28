@@ -3,7 +3,8 @@ import { getSeasonGames } from "./odds";
 import { getPublicPicks } from "./ownership";
 import { getInjuries } from "./intel";
 import { getPool } from "./state";
-import { assembleReport } from "./engine";
+import { assembleReport, type EngineInput } from "./engine";
+import { splitCost } from "./split";
 import { DEFAULT_POOL_ID, POOLS, poolMeta } from "./pools";
 import { fetchPickemBoard } from "./sleeper-pickem";
 import { currentWeek as weekOf } from "./engine";
@@ -50,15 +51,21 @@ export async function fetchInputs(): Promise<ReportInputs> {
 /**
  * One report per pool off one set of inputs. Pure, so pool isolation is
  * testable: a team burned in one pool has to stay on the other's board.
+ *
+ * Then a second pass so two live pools do not quietly ride on one game. Taken
+ * picks are fixed and claim their team first. Open pools follow, most
+ * expensive to move first, so the pool that loses least by moving is the one
+ * that moves. A pool whose team is already claimed is rebuilt knowing that,
+ * and either splits onto a close alternative or is told it is stacked.
  */
 export function reportsFrom(
   inputs: ReportInputs,
   pools: { id: string; pool: PoolConfig }[],
 ): SurvivorReport[] {
-  return pools.map(({ id, pool }) =>
+  const build = (i: number, otherPools?: EngineInput["otherPools"]) =>
     assembleReport({
       season: SEASON,
-      poolId: id,
+      poolId: pools[i].id,
       games: inputs.games,
       gamesStale: inputs.gamesStale,
       gamesAt: inputs.gamesAt,
@@ -66,10 +73,50 @@ export function reportsFrom(
       publicPulledAt: inputs.publicPulledAt,
       publicStale: inputs.publicStale,
       injuries: inputs.injuries,
-      pool,
+      pool: pools[i].pool,
       now: inputs.now,
-    }),
-  );
+      otherPools,
+    });
+
+  const reports = pools.map((_, i) => build(i));
+  const live = reports
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.status.alive && !r.status.endedBy && (r.myPick ?? r.bestTeam));
+  if (live.length < 2) return reports;
+
+  const order = [
+    ...live.filter(({ r }) => r.myPick),
+    ...live
+      .filter(({ r }) => !r.myPick)
+      .sort((a, b) => splitCost(b.r.candidates) - splitCost(a.r.candidates)),
+  ];
+
+  // team -> the pool names on it, in the order they claimed it
+  const onTeam = new Map<string, string[]>();
+  const teamOf = (r: SurvivorReport) => (r.myPick ?? r.bestTeam) as string;
+  for (const { r, i } of order) {
+    const team = teamOf(r);
+    const holders = onTeam.get(team);
+    if (holders?.length) {
+      const claimed: Record<string, string> = {};
+      for (const [t, names] of onTeam) claimed[t] = names[0];
+      reports[i] = build(i, { claimed, allowSplit: true });
+    }
+    const final = teamOf(reports[i]);
+    onTeam.set(final, [...(onTeam.get(final) ?? []), reports[i].pool.name]);
+  }
+
+  // The pool that claimed a stacked team first was built before anyone joined
+  // it, so it has not been warned. It keeps its pick and gets the same line.
+  for (const { i } of order) {
+    const r = reports[i];
+    const holders = onTeam.get(teamOf(r)) ?? [];
+    if (holders.length < 2 || r.crossPool) continue;
+    const other = holders.find((n) => n !== r.pool.name) ?? holders[1];
+    reports[i] = build(i, { claimed: { [teamOf(r)]: other }, allowSplit: false });
+  }
+
+  return reports;
 }
 
 /**

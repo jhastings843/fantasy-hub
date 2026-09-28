@@ -118,7 +118,7 @@ ${best ? statRow([
   { name: "Win", value: pctText(best.winProb) },
   { name: "Field on it", value: pctText(best.ownership) },
 ]) : ""}
-${switched ? paragraph(`Changed from Thursday's email, which said ${thursdayCall}. ${report.reasoning[1] ?? ""}`.trim()) : ""}
+${switched ? paragraph(`Changed from Thursday's email, which said ${thursdayCall}. ${report.crossPool?.kind === "split" ? report.reasoning[0] : (report.reasoning[1] ?? "")}`.trim()) : ""}
 ${paragraph(`No pick is logged yet. A pool with no pick is a strike, so this is the one thing on this page worth doing now.`)}`,
       BAD,
     );

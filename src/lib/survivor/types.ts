@@ -194,6 +194,7 @@ import type { FieldState } from "./field";
 import type { Posture } from "./posture";
 import type { Calibration } from "./calibration";
 import type { EntryStatus } from "./status";
+import type { CrossPool } from "./split";
 
 export interface SurvivorReport {
   season: number;
@@ -313,4 +314,10 @@ export interface SurvivorReport {
    * gets no pick, no nag and no alarm.
    */
   status: EntryStatus;
+  /**
+   * Whether this pool split off, or is stacked on, the team another pool is
+   * on this week. Null when the pools are on different teams or there is only
+   * one pool.
+   */
+  crossPool: CrossPool | null;
 }

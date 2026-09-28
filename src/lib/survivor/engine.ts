@@ -6,6 +6,7 @@ import { calibrate, projectOwnership, type Observation } from "./calibration";
 import { deriveFromEntries } from "./entries";
 import { notesForTeam } from "./intel-pure";
 import { orderTieByPosture, tieNote, tiedWithBest } from "./tie";
+import { crossPoolSentence, splitAlternative, type CrossPool } from "./split";
 import { equityMultiplier, fieldSurvival } from "./equity";
 import { futureCost, planFuture } from "./assignment";
 import { DEFAULT_POOL_ID } from "./pools";
@@ -180,6 +181,12 @@ export interface EngineInput {
   injuries: InjuryNote[];
   pool: PoolConfig;
   now?: Date;
+  /**
+   * The other pools' teams this week, abbr -> pool name. Set by reportsFrom on
+   * a second pass once it knows two pools would land on the same team.
+   * allowSplit false means this pool keeps its pick and only gets the warning.
+   */
+  otherPools?: { claimed: Record<string, string>; allowSplit: boolean };
 }
 
 /**
@@ -428,6 +435,28 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     ...orderTieByPosture(candidates, calibration.confidence, posture.tiebreak),
   );
 
+  // Another pool already on this team: move to a close alternative if there
+  // is one, otherwise say both ride on it. A taken pick is never moved.
+  let crossPool: CrossPool | null = null;
+  let splitFrom: Candidate | null = null;
+  const claimed = input.otherPools?.claimed ?? {};
+  const onTeam = myPick ?? candidates[0]?.team ?? null;
+  if (onTeam && onTeam in claimed) {
+    const alt =
+      !myPick && input.otherPools?.allowSplit ? splitAlternative(candidates, claimed) : null;
+    if (alt) {
+      splitFrom = candidates[0];
+      candidates.splice(candidates.indexOf(alt), 1);
+      candidates.unshift(alt);
+    }
+    crossPool = {
+      kind: alt ? "split" : "stacked",
+      team: onTeam,
+      otherPool: claimed[onTeam],
+      movedTo: alt?.team ?? null,
+    };
+  }
+
   const best = candidates[0] ?? null;
   const safest = [...candidates].sort((a, b) => b.winProb - a.winProb)[0] ?? null;
 
@@ -604,8 +633,16 @@ export function assembleReport(input: EngineInput): SurvivorReport {
 
   // A pick that cannot be separated from the next one is not a decision, and
   // reporting it as one is how a 0.06% gap gets read as a recommendation.
-  const tied = tiedWithBest(candidates, calibration.confidence);
+  // A team given up to split from another pool is not a live alternative here,
+  // so it cannot be "effectively tied" with the pick that replaced it.
+  const tied = tiedWithBest(
+    splitFrom ? candidates.filter((c) => c.team !== splitFrom.team) : candidates,
+    calibration.confidence,
+  );
   const tieSentence = tieNote(tied, calibration.confidence, posture.tiebreak);
+  const crossSentence = crossPool
+    ? crossPoolSentence(crossPool, splitFrom, best, !!myPick)
+    : null;
 
   // Said once, if it is worth saying at all. Silent when the pick is the
   // engine's own, and silent when the two are inside the tie band, because
@@ -657,7 +694,12 @@ export function assembleReport(input: EngineInput): SurvivorReport {
     // The tie goes FIRST when there is one. It changes how every sentence after
     // it should be read, and a reader who stops after one line has then read the
     // most important thing rather than the least.
-    reasoning: tieSentence ? [tieSentence, ...reasoning] : reasoning,
+    // The cross-pool line goes before even the tie: it is the reason this pick
+    // differs from the other pool's, or the warning that it does not.
+    reasoning: [crossSentence, tieSentence, ...reasoning].filter(
+      (r): r is string => !!r,
+    ),
+    crossPool,
     tied: tied.map((c) => c.team),
     myPick,
     myPickCandidate: taken,
