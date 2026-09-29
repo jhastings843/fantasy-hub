@@ -331,6 +331,19 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("wicks");
   });
 
+  it("in dynasty, orders season claims by trade value, not this week's rank", () => {
+    const worth: Record<string, number> = { wicks: 400, te33: 450, youngwr: 1500 };
+    const te33 = wk("te33", "TE", 105, 33);
+    const youngwr = wk("youngwr", "WR", null, null);
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [te33, youngwr], seasonOrder: "value",
+      marketValue: (id) => worth[id] ?? null,
+    });
+    expect(r.seasonUpgrades[0]?.player.playerId).toBe("youngwr");
+    // 450 is not clearly more than a 400 drop, so the tight end is no claim at all.
+    expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("te33");
+  });
+
   it("does not drop a player on bye who his season list rates", () => {
     const onBye = roster.map((p) =>
       p.playerId === "wicks" ? wk("star", "WR", null, null, { onBye: true, seasonRank: 30 }) : p,

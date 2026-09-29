@@ -201,8 +201,13 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // His season list counts only if he has touched it since this week began.
   // Otherwise the wire itself is the ranking: who all of Sleeper is adding,
   // minus anyone who did not actually play last week.
-  const labFresh = isFreshForRun(lab.postedAt);
-  const jingles = await readWaivers(season, nflWeek);
+  // Dynasty reads none of his lists. He writes for redraft, and a redraft
+  // list crowned a TE33 over a young receiver in week 4. Dynasty's wire is the
+  // dynasty research pass (Dynasty Nerds, Dynasty Daddy, FantasyPros dynasty,
+  // r/DynastyFF) plus Sleeper's most-added, ordered by dynasty trade value.
+  const isDynastyWire = profile.type === "dynasty";
+  const labFresh = !isDynastyWire && isFreshForRun(lab.postedAt);
+  const jingles = isDynastyWire ? null : await readWaivers(season, nflWeek);
   let freeAgents: WaiverPlayer[];
   let source: WaiverContext["source"];
   if (labFresh) {
@@ -270,7 +275,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     source = {
       label: research ? "Web consensus and Sleeper trending adds" : "Sleeper trending adds",
       fresh: false,
-      note: staleNote(lab.title, lab.postedAt) + researched,
+      note: isDynastyWire
+        ? `Dynasty reads none of Jingles' redraft lists; season claims are ordered by dynasty trade value and only shown when clearly worth more than the drop.${researched}`
+        : staleNote(lab.title, lab.postedAt) + researched,
     };
   }
 
@@ -329,7 +336,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // half PPR, Dalton Schultz was TE10 and free, the board recommended
   // Freiermuth (TE11) over Loveland (TE13), and Schultz was never considered.
   const onBoard = new Set(freeAgents.map((p) => p.playerId));
-  const weeklyOnly = [...new Set([...index.positional.keys(), ...index.flex.keys()])]
+  const weeklyOnly = isDynastyWire ? [] : [...new Set([...index.positional.keys(), ...index.flex.keys()])]
     .filter((id) => !owned.has(id) && !onBoard.has(id))
     .map(toPlayer)
     .filter((p) => isStartableIn(p.position, startable));
@@ -354,7 +361,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     roster,
     freeAgents: freeAgents.filter(notHisDrop),
     weeklyOnly: weeklyOnly.filter(notHisDrop),
-    seasonOrder: labFresh ? "rank" : "given",
+    seasonOrder: isDynastyWire && market ? "value" : labFresh ? "rank" : "given",
   });
 
   // --- Pricing ---

@@ -146,7 +146,7 @@ export function waiverTargets(input: {
    * the weeks his list is stale and the wire is doing the ranking; there is
    * no rank to compare, so the only rule is not to drop a real asset.
    */
-  seasonOrder?: "rank" | "given";
+  seasonOrder?: "rank" | "given" | "value";
   /** In "given" mode, never propose dropping a player ranked this high. */
   protectRankedWithin?: number;
   /**
@@ -215,7 +215,15 @@ export function waiverTargets(input: {
   // those, every claim is a swap and has to name its price.
   const openSpots = Math.max(0, rosterPositions.length - roster.length);
 
-  const seasonUpgrades: SeasonTarget[] = givenOrder
+  const seasonUpgrades: SeasonTarget[] = input.seasonOrder === "value" && worth
+    ? seasonByValue(
+        freeAgents.filter((p) => !startable.slice(0, limit).some((t) => t.player.playerId === p.playerId)),
+        droppable,
+        openSpots,
+        limit,
+        worth,
+      )
+    : givenOrder
     ? seasonByWeek({
         // A player already offered as a start is already a claim; naming him
         // twice in one email is noise, not emphasis.
@@ -405,4 +413,43 @@ function spareByPosition(roster: WaiverPlayer[], rosterPositions: string[]): Map
     spare.set(pos, healthy - n);
   }
   return spare;
+}
+
+/**
+ * Dynasty season claims: by trade value, each clearly worth more than its
+ * drop. A roster spot in dynasty is an asset, so the question is never "who
+ * scores more this week" but "who is worth more to own", and a young receiver
+ * with upside outranks a blocking tight end whatever one week's list says.
+ */
+const DYNASTY_MARGIN = 1.15;
+
+function seasonByValue(
+  freeAgents: WaiverPlayer[],
+  droppable: WaiverPlayer[],
+  openSpots: number,
+  limit: number,
+  worth: (playerId: string) => number | null,
+): SeasonTarget[] {
+  const v = (p: WaiverPlayer) => worth(p.playerId) ?? 0;
+  const pool = freeAgents.filter((p) => !cannotPlay(p) && v(p) > 0).sort((a, b) => v(b) - v(a));
+  const drops = droppable.filter((d) => !d.injuryStatus).sort((a, b) => v(a) - v(b));
+  const out: SeasonTarget[] = [];
+  let di = 0;
+  for (const player of pool) {
+    if (out.length >= limit) break;
+    if (out.length < openSpots) {
+      out.push({ player, dropFor: null, placesBetter: null, why: `worth ${v(player).toLocaleString()} in dynasty value` });
+      continue;
+    }
+    const drop = drops[di];
+    if (!drop || v(player) < v(drop) * DYNASTY_MARGIN || v(player) - v(drop) < 50) break;
+    di += 1;
+    out.push({
+      player,
+      dropFor: drop,
+      placesBetter: null,
+      why: `dynasty value ${v(player).toLocaleString()}, ${drop.name} is ${v(drop).toLocaleString()}`,
+    });
+  }
+  return out;
 }
