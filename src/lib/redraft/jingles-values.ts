@@ -48,6 +48,13 @@ export function blendWithJingles(
   market: PlayerValuesBySleeperId,
   list: SeasonList,
   weight = JINGLES_WEIGHT,
+  /**
+   * His latest "Players I'm Fine Dropping". Newer than a stale season list and
+   * more pointed than any rank: whatever the list says, these are priced as if
+   * he had left them just off it, so the trade tools sell them rather than
+   * buy them (week 4: Marvin Harrison Jr., "I'd shop him first").
+   */
+  fineDropping: ReadonlySet<string> = new Set(),
 ): BlendResult {
   // The market's value curve per position, best first. Sorting by value
   // rather than trusting the source's positionRank field keeps this right for
@@ -83,14 +90,21 @@ export function blendWithJingles(
     // Off his list: only meaningful when the market has the player somewhere
     // he would have had to rank. A player below the last one he ranked at the
     // position is outside the exercise, not a fade.
+    const dropped = fineDropping.has(id);
     let effectiveRank: number | null = null;
     if (his) effectiveRank = his.positionRank;
     else if (ranked > 0 && marketPositionRank <= ranked) effectiveRank = ranked + 1;
+    // His drop list overrides his older rank, but never lifts a player: one
+    // the market already has below his cut stays where the market put him.
+    if (dropped && ranked > 0) effectiveRank = Math.max(effectiveRank ?? 0, ranked + 1, marketPositionRank);
 
-    if (effectiveRank === null) return [id, { ...v }];
+    if (effectiveRank === null) return [id, dropped ? { ...v, jinglesDrop: true } : { ...v }];
 
     const target = valueAtRank(v.position, effectiveRank);
-    const value = Math.round(v.value * (1 - weight) + target * weight);
+    const value = Math.min(
+      Math.round(v.value * (1 - weight) + target * weight),
+      dropped ? v.value : Infinity,
+    );
     if (value !== v.value) moved += 1;
 
     return [
@@ -102,6 +116,7 @@ export function blendWithJingles(
         marketPositionRank,
         jinglesRank: his?.rank ?? null,
         jinglesPositionRank: his?.positionRank ?? null,
+        ...(dropped ? { jinglesDrop: true } : {}),
       },
     ];
   });

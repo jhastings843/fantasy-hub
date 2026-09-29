@@ -805,6 +805,7 @@ function jinglesLift(p: PlayerRow): number {
 }
 
 function hisLabel(p: PlayerRow): string {
+  if (p.jinglesDrop) return `${p.name} is on his "fine dropping" list`;
   if (p.jinglesRank === null || p.jinglesRank === undefined) {
     return `he left ${p.name} off his list`;
   }

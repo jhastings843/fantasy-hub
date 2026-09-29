@@ -96,3 +96,19 @@ describe("blendWithJingles", () => {
     expect(swapped.values.a.value).toBe(800);
   });
 });
+
+describe("blendWithJingles, his drop list", () => {
+  it("prices a player he just said to drop as if he were off his list, and flags him", () => {
+    // He had b as his WR1 on the old list; this week's post says drop him.
+    const his = list([["a", "RB"], ["b", "WR"], ["c", "RB"], ["e", "TE"]]);
+    const plain = blendWithJingles(MARKET, his);
+    const dropped = blendWithJingles(MARKET, his, undefined, new Set(["b"]));
+    expect(dropped.values.b.jinglesDrop).toBe(true);
+    expect(dropped.values.b.value).toBeLessThan(plain.values.b.value);
+  });
+
+  it("never raises a dropped player above the market", () => {
+    const { values } = blendWithJingles(MARKET, list([["d", "WR"], ["b", "WR"]]), undefined, new Set(["d"]));
+    expect(values.d.value).toBeLessThanOrEqual(400);
+  });
+});

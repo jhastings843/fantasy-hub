@@ -127,6 +127,16 @@ function PlayerRowItem({
  * is a call; a deep bench player he never got to is not.
  */
 function JinglesRankChip({ p }: { p: PlayerRow }) {
+  if (p.jinglesDrop) {
+    return (
+      <span
+        title="On Jingles' latest 'Players I'm Fine Dropping' list, so priced as a sell"
+        className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+      >
+        J drop
+      </span>
+    );
+  }
   if (p.marketValue === undefined) return null;
   if (p.jinglesRank === null || p.jinglesRank === undefined) {
     return (

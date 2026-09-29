@@ -25,6 +25,8 @@ export interface PlayerValueLike {
   marketPositionRank?: number;
   jinglesRank?: number | null;
   jinglesPositionRank?: number | null;
+  /** On his latest "Players I'm Fine Dropping" list. */
+  jinglesDrop?: boolean;
 }
 export type PlayerValuesBySleeperId = Record<string, PlayerValueLike>;
 
@@ -48,6 +50,7 @@ export type PlayerRow = {
   marketPositionRank?: number;
   jinglesRank?: number | null;
   jinglesPositionRank?: number | null;
+  jinglesDrop?: boolean;
 };
 
 export type TeamSummary = {
@@ -108,6 +111,7 @@ export function computeTeamSummaries(
           marketPositionRank: v?.marketPositionRank,
           jinglesRank: v?.jinglesRank,
           jinglesPositionRank: v?.jinglesPositionRank,
+          jinglesDrop: v?.jinglesDrop ?? false,
         };
       })
       .filter((x): x is PlayerRow => x !== null)

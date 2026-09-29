@@ -1,3 +1,4 @@
+import { latestWaivers } from "@/lib/jingles/ingest";
 import Link from "next/link";
 import {
   formatKeyFromLeague,
@@ -76,15 +77,22 @@ export default async function TradePage({
     profile.type === "dynasty" ? getPicks() : Promise.resolve([]),
     readsJingles ? activeLab(profile) : Promise.resolve(null),
   ]);
+  // His newest waiver post's "Players I'm Fine Dropping". Redraft only, like
+  // the rest of his lists: he writes it for "normal redraft leagues".
+  const hisDrops = readsJingles
+    ? new Set(((await latestWaivers())?.fineDropping ?? []).map((d) => d.sleeperId).filter(Boolean) as string[])
+    : new Set<string>();
 
   // Half the market, half his list. See lib/redraft/jingles-values.ts.
   let fcValues: PlayerValuesBySleeperId = marketValues;
   let jingles: JinglesBlendInfo | null = null;
   if (lab && lab.list.length > 0) {
-    const blend = blendWithJingles(marketValues, {
-      entries: lab.list,
-      byId: lab.byId,
-    });
+    const blend = blendWithJingles(
+      marketValues,
+      { entries: lab.list, byId: lab.byId },
+      undefined,
+      hisDrops,
+    );
     fcValues = blend.values;
     jingles = {
       title: lab.title,
