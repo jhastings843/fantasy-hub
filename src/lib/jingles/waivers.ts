@@ -39,6 +39,13 @@ const NAMED_ROW = /^(.+?)\s*\|\s*\$(\d+)\s*\|\s*(\d+)\s*%(\s*rostered)?\s*$/i;
 /** "based on the standard $100 salary cap". A $1000 league is priced differently. */
 const BUDGET = /\$(\d{2,5})\s*(?:salary cap|budget|faab|fab\b)/i;
 
+/** "Players I'm Fine Dropping", with or without the curly apostrophe. */
+const DROPS_HEADER = /^players\s+i.?m\s+fine\s+dropping$/i;
+/** Where the drop list ends: his sign-off, or anything that is plainly not a name. */
+const DROPS_END = /^(one last thing|final thoughts|that'?s all)/i;
+/** A bare player name on its own line: two to four capitalised words. */
+const NAME_LINE = /^[A-Z][A-Za-z.'’-]+(?:\s+[A-Z][A-Za-z.'’-]+){1,3}$/;
+
 const TITLE_WEEK = /\bweek\s+(\d{1,2})\b/i;
 const TITLE_SEASON = /\b(20\d{2})\b/;
 
@@ -65,6 +72,12 @@ export interface ParsedWaivers {
   rows: ParsedWaiverRow[];
   /** How many of the rows came from the ranked list rather than the prose above it. */
   rankedRows: number;
+  /**
+   * His "Players I'm Fine Dropping" section. A season claim on one of these
+   * is the app arguing with the post it is quoting (week 4: Quentin Johnston
+   * offered as an add in the same post that told you to cut him).
+   */
+  fineDropping: { name: string; position: string | null }[];
 }
 
 /**
@@ -110,10 +123,35 @@ export function parseWaivers(html: string, title = ""): ParsedWaivers {
 
   let position: string | null = null;
   let inRanked = false;
+  let inDrops = false;
+  const fineDropping: { name: string; position: string | null }[] = [];
   /** The player the paragraphs under this header belong to. */
   let awaitingNote: string | null = null;
 
   for (const line of lines) {
+    if (DROPS_HEADER.test(line.trim())) {
+      inDrops = true;
+      inRanked = false;
+      position = null;
+      awaitingNote = null;
+      continue;
+    }
+    if (inDrops) {
+      const t = line.trim();
+      if (DROPS_END.test(t) || RANKED_HEADER.test(t)) {
+        inDrops = false;
+        continue;
+      }
+      const section = SECTION_POSITION.find(([re]) => re.test(t));
+      if (section) {
+        position = section[1];
+        continue;
+      }
+      // Names sit alone on a line; his reasons are paragraphs.
+      if (t.length <= 40 && NAME_LINE.test(t)) fineDropping.push({ name: t, position });
+      continue;
+    }
+
     if (RANKED_HEADER.test(line)) {
       inRanked = true;
       awaitingNote = null;
@@ -212,5 +250,6 @@ export function parseWaivers(html: string, title = ""): ParsedWaivers {
     budget,
     rows,
     rankedRows: ranked.length,
+    fineDropping,
   };
 }

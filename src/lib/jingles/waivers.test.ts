@@ -100,3 +100,39 @@ describe("parseWaivers", () => {
     expect(parsed.rows.some((r) => r.name.includes("Kyler"))).toBe(false);
   });
 });
+
+// The week 4 post's drop list, markup kept in shape: an h2 header, position
+// labels and names as bold paragraphs, his reasons as plain ones.
+const DROPS_EXCERPT = `
+<p><span>Free Agent Budget amounts are based on the standard $100 salary cap.</span></p>
+<h3><strong><span>30 Waiver Adds Ranked</span></strong></h3>
+${Array.from({ length: 10 }, (_, i) => `<p><strong><span>${i + 1}: WR Player Number${i}</span></strong><span> | $1 | 5%</span></p>`).join("\n")}
+<h2 class="header-anchor-post"><strong>Players I’m Fine Dropping</strong></h2>
+<p>Obviously league size matters here. I’m talking normal redraft leagues with normal sized benches. In a 14 team league please do not cut somebody.</p>
+<p><strong>Quarterbacks</strong></p>
+<p><strong>Justin Herbert</strong></p>
+<p>This one feels gross because the actual QB is obviously better than his fantasy production. But Herbert has opened the year slowly.</p>
+<p><strong>Wide Receivers</strong></p>
+<p><strong>Chris Godwin Jr.</strong></p>
+<p>The playing time has been there more than the targets, that is the problem, and Tampa is moving to an undrafted rookie QB.</p>
+<p><strong>Quentin Johnston</strong></p>
+<h3><strong>One Last Thing</strong></h3>
+<p><strong>Rankings Page</strong></p>
+`;
+
+describe("parseWaivers, his drop list", () => {
+  const parsed = parseWaivers(DROPS_EXCERPT, "Week 4 Fantasy Waivers & 25 Things You Need to Know From Week 3");
+
+  it("reads every name under Players I'm Fine Dropping, with its position", () => {
+    expect(parsed.fineDropping).toEqual([
+      { name: "Justin Herbert", position: "QB" },
+      { name: "Chris Godwin Jr.", position: "WR" },
+      { name: "Quentin Johnston", position: "WR" },
+    ]);
+  });
+
+  it("stops at his sign-off and leaves the ranked list alone", () => {
+    expect(parsed.fineDropping.map((d) => d.name)).not.toContain("Rankings Page");
+    expect(parsed.rankedRows).toBe(10);
+  });
+});

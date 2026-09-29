@@ -156,6 +156,8 @@ export interface StoredWaivers {
   ingestedAt: string;
   rows: StoredWaiverRow[];
   unresolved: { name: string; position: string; team: string | null; reason: string }[];
+  /** His "Players I'm Fine Dropping", resolved. Absent on posts stored before 2026-09-29. */
+  fineDropping?: { name: string; sleeperId: string | null }[];
 }
 
 export interface StoredNote {
@@ -781,7 +783,11 @@ async function ingestWaivers(
   const existing = await readWaivers(parsed.season ?? season, week);
   const signature = (rows: { name: string; faab: number }[]) =>
     rows.map((r) => `${r.name}:${r.faab}`).join("|");
-  if (existing && signature(existing.rows) === signature(parsed.rows)) {
+  if (
+    existing &&
+    signature(existing.rows) === signature(parsed.rows) &&
+    (existing.fineDropping?.length ?? 0) === parsed.fineDropping.length
+  ) {
     report.waiversIngested.push({
       season: existing.season,
       week: existing.week,
@@ -799,6 +805,11 @@ async function ingestWaivers(
     toCandidates(players),
   );
   const idByName = new Map(resolved.map((r) => [r.input.name, r.playerId]));
+  const drops = resolveNames(
+    parsed.fineDropping.map((d) => ({ name: d.name, position: d.position ?? "", team: null })),
+    toCandidates(players),
+  );
+  const dropIdByName = new Map(drops.resolved.map((r) => [r.input.name, r.playerId]));
 
   const stored: StoredWaivers = {
     season: parsed.season ?? season,
@@ -817,6 +828,10 @@ async function ingestWaivers(
       faabPercent: r.faabPercent,
       rostered: r.rostered,
       note: r.note,
+    })),
+    fineDropping: parsed.fineDropping.map((d) => ({
+      name: d.name,
+      sleeperId: dropIdByName.get(d.name) ?? null,
     })),
     unresolved: [
       ...unresolved.map((u) => ({

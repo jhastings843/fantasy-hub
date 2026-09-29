@@ -283,12 +283,19 @@ function seasonByWeek(input: {
   const drops = [...input.droppable].sort((a, b) => scoreOf(a) - scoreOf(b));
   for (const d of drops) {
     if (out.length >= input.limit) break;
+    // An injured player is a wait-and-see or an IR spot, never a season drop
+    // on the app's say-so: his rank this week is his injury talking.
+    if (d.injuryStatus) continue;
     // A drop with no rank this week (a stash, a bye, a player he left off)
     // gives the weekly list nothing to compare, and sorting everyone by it
     // anyway puts every receiver ahead of every quarterback, which is how a
     // superflex league's injury-replacement QBs vanished. So only a ranked
     // drop is decided by the weekly list; an unranked one falls to the board.
-    const comparable = rankedThisWeek(d);
+    // Nor is a player his season list rates: a one-week rank says nothing
+    // about whether he is worth the roster spot (week 4 told Jack to cut an
+    // injured Mike Evans, WR77 this week, for Quentin Johnston). Those drops
+    // go to the board branch below, which never touches a protected asset.
+    const comparable = rankedThisWeek(d) && !protectedAsset(d);
     let pick = comparable ? (byWeek.find((p) => !used.has(p.playerId) && beatsThisWeek(p, d)) ?? null) : null;
     let why: string | null = pick ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}` : null;
     // Nobody his weekly list has ahead of this drop. The board's own order

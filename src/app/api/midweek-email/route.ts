@@ -46,6 +46,8 @@ export async function POST(request: Request) {
     messageId?: string;
     subject?: string;
     force?: boolean;
+    /** Send this week's reply again, e.g. after a fix. Never set by the relay's own schedule. */
+    resend?: boolean;
   };
   if (!body.messageId || !body.subject) {
     return Response.json({ ok: false, error: "messageId and subject are required" }, { status: 400 });
@@ -53,5 +55,6 @@ export async function POST(request: Request) {
   return runMidweekEmail({
     replyTo: { messageId: body.messageId, subject: body.subject },
     requireWaiverPost: !body.force,
+    resend: body.resend === true,
   });
 }

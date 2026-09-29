@@ -333,11 +333,17 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     .map(toPlayer)
     .filter((p) => isStartableIn(p.position, startable));
 
+  // Nobody he just told readers to cut. Week 4 offered Quentin Johnston as a
+  // season claim in the email replying to the post that listed him under
+  // "Players I'm Fine Dropping".
+  const hisDrops = new Set((jingles?.fineDropping ?? []).map((d) => d.sleeperId).filter(Boolean) as string[]);
+  const notHisDrop = (p: WaiverPlayer) => !hisDrops.has(p.playerId);
+
   const report = waiverTargets({
     rosterPositions: profile.rosterPositions,
     roster,
-    freeAgents,
-    weeklyOnly,
+    freeAgents: freeAgents.filter(notHisDrop),
+    weeklyOnly: weeklyOnly.filter(notHisDrop),
     seasonOrder: labFresh ? "rank" : "given",
   });
 

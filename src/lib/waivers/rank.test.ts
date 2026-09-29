@@ -279,6 +279,26 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades).toEqual([]);
   });
 
+  it("never cuts an injured player for a weekly rank (week 4: Mike Evans, out, WR77)", () => {
+    const hurt = roster.map((p) =>
+      p.playerId === "wicks" ? wk("evans", "WR", 160, 77, { injuryStatus: "Out" }) : p,
+    );
+    const r = waiverTargets({
+      rosterPositions: slots, roster: hurt, freeAgents: [], weeklyOnly: [wk("johnston", "WR", 110, 55)], seasonOrder: "given",
+    });
+    expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("evans");
+  });
+
+  it("does not cut a player his season list rates on one week's rank", () => {
+    const rated = roster.map((p) =>
+      p.playerId === "wicks" ? wk("vet", "WR", 150, 70, { seasonRank: 60 }) : p,
+    );
+    const r = waiverTargets({
+      rosterPositions: slots, roster: rated, freeAgents: [], weeklyOnly: [wk("dart", "WR", 110, 55)], seasonOrder: "given",
+    });
+    expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("vet");
+  });
+
   it("does not drop a player on bye who his season list rates", () => {
     const onBye = roster.map((p) =>
       p.playerId === "wicks" ? wk("star", "WR", null, null, { onBye: true, seasonRank: 30 }) : p,
