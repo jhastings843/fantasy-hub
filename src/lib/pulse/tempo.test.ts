@@ -116,7 +116,7 @@ describe("tempoFor, sends", () => {
     // FAAB Tuesday morning, the other leagues' waivers Tuesday evening, the
     // lineup email Wednesday morning with Thursday as its fallback.
     expect(tempoFor(at("2026-09-15T12:00:00Z")).dueSends).toContain("faab");
-    expect(tempoFor(at("2026-09-15T23:30:00Z")).dueSends).toContain("midweek");
+    expect(tempoFor(at("2026-09-16T02:30:00Z")).dueSends).toContain("midweek");
     expect(tempoFor(at("2026-09-16T12:00:00Z")).dueSends).toContain("thursday");
     expect(tempoFor(at("2026-09-17T12:00:00Z")).dueSends).toContain("thursday");
     expect(tempoFor(at("2026-09-13T13:00:00Z")).dueSends).toContain("sunday");
@@ -178,10 +178,11 @@ describe("the week's shape, after the 3am waiver run was accounted for", () => {
     expect(due("2026-09-17T12:00:00Z")).toContain("thursday");
   });
 
-  it("sends the waiver email after the evening's injury reports", () => {
-    // 6:45pm ET Tuesday is too early; 7:30pm is the window.
-    expect(due("2026-09-15T22:45:00Z")).not.toContain("midweek");
-    expect(due("2026-09-15T23:30:00Z")).toContain("midweek");
+  it("holds the waiver email backstop until 10pm, leaving the evening to the relay", () => {
+    // The relay replies to his email when it lands; the pulse only covers a
+    // week it never called. 9:45pm ET Tuesday is too early; 10:30pm is due.
+    expect(due("2026-09-16T01:45:00Z")).not.toContain("midweek");
+    expect(due("2026-09-16T02:30:00Z")).toContain("midweek");
   });
 
   it("keeps both Tuesday emails out of each other's way", () => {

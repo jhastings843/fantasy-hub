@@ -127,12 +127,12 @@ export function etClock(now: Date): EtClock {
 function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until?: number }[] {
   return [
     { id: "faab", day: days.faabDay ?? 2, at: 8 * 60 },
-    // Tuesday evening, not Wednesday morning. Every league except the
-    // guillotine one processes its claims at 3am Wednesday, so a Wednesday 8am
-    // email about what to claim arrived five hours after the claims ran. 7pm
-    // is after the day's practice reports and after Jingles posts his waiver
-    // article, and still eight hours clear of the run.
-    { id: "midweek", day: 2, at: 19 * 60 },
+    // The backstop. Normally this email is a reply to Jingles' waiver email,
+    // sent the moment it lands (the relay on Jack's Mac, POST
+    // /api/midweek-email). 10pm is for the week the Mac is asleep or he posts
+    // late: still five hours clear of the 3am Wednesday claims run, and the
+    // send log makes it a no-op when the reply already went.
+    { id: "midweek", day: 2, at: 22 * 60 },
     // Twice, deliberately. The lineup email waits for waivers to process and
     // for his rankings to be published, and on a week where either is late
     // there has to be a second chance at it rather than no email at all. The

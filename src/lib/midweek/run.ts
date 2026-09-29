@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
 import { midweekSubject, renderMidweekEmail } from "./email";
 import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
+import { readWaivers } from "@/lib/jingles/ingest";
 
 // The Wednesday job.
 //
@@ -23,6 +24,14 @@ export interface MidweekOptions {
   dry?: boolean;
   resend?: boolean;
   test?: boolean;
+  /**
+   * His waiver email, as it landed in Jack's inbox. The relay on Jack's Mac
+   * sees it arrive and calls in with its Message-ID, so this email goes out as
+   * a reply in his thread: timed off his post, and sitting right under it.
+   */
+  replyTo?: { messageId: string; subject: string };
+  /** Hold the send (answer retry) until this week's waiver post is stored. */
+  requireWaiverPost?: boolean;
 }
 
 /** The job, behind its lock. See withSendLock: two callers, one send. */
@@ -33,7 +42,7 @@ export function runMidweekEmail(options: MidweekOptions = {}): Promise<Response>
 }
 
 async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Response> {
-  const { dry = false, resend = false, test = false } = options;
+  const { dry = false, resend = false, test = false, replyTo, requireWaiverPost = false } = options;
   // His waiver post and weekly list, read now rather than trusted from the
   // last scheduled ingest. Skipped for a dry run, which anyone can request.
   const refreshed = dry ? null : await refreshJinglesBeforeSend();
@@ -73,8 +82,28 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
     appUrl: APP_URL(),
   };
 
-  const subject = `${test ? "[Test] " : ""}${midweekSubject(input)}`;
+  // His email can land a few minutes before his site serves the post. Say so
+  // and let the relay try again, rather than send his thread a reply that
+  // does not know what he said.
+  if (requireWaiverPost && !dry && !(await readWaivers(season, week))) {
+    return Response.json({
+      ok: false,
+      retry: true,
+      refreshed,
+      reason: `His week ${week} waiver post is not stored yet.`,
+    });
+  }
+
+  // In his thread the subject has to be his, or Gmail starts a new one. The
+  // claim count is still the email's headline.
+  const threadSubject = replyTo
+    ? (/^re:/i.test(replyTo.subject) ? replyTo.subject : `Re: ${replyTo.subject}`)
+    : null;
+  const subject = `${test ? "[Test] " : ""}${threadSubject ?? midweekSubject(input)}`;
   const html = renderMidweekEmail(input);
+  const headers = replyTo
+    ? { "In-Reply-To": replyTo.messageId, References: replyTo.messageId }
+    : undefined;
 
   if (dry) {
     return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
@@ -90,7 +119,12 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
   }
   if (previous && resend) await clearSent("midweek", season, week);
 
-  const result = await sendEmail(subject, html, `midweek:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
+  const result = await sendEmail(
+    subject,
+    html,
+    `midweek:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`,
+    headers,
+  );
   if (!result.sent) {
     return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
   }
@@ -104,6 +138,7 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
   return Response.json({
     ok: true,
     sent: true,
+    threaded: Boolean(replyTo),
     refreshed,
     subject,
     week,

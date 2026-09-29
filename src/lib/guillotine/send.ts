@@ -31,6 +31,7 @@ export async function sendEmail(
   subject: string,
   html: string,
   key?: string,
+  headers?: Record<string, string>,
 ): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.FAAB_EMAIL_TO;
@@ -50,7 +51,7 @@ export async function sendEmail(
       "Content-Type": "application/json",
       ...(key ? { "Idempotency-Key": key } : {}),
     },
-    body: JSON.stringify({ from, to: [to], subject, html }),
+    body: JSON.stringify({ from, to: [to], subject, html, ...(headers ? { headers } : {}) }),
   });
 
   if (!res.ok) {
