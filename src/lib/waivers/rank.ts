@@ -219,7 +219,11 @@ export function waiverTargets(input: {
     ? seasonByWeek({
         // A player already offered as a start is already a claim; naming him
         // twice in one email is noise, not emphasis.
-        pool: [...freeAgents, ...(input.weeklyOnly ?? [])].filter(
+        // Not the weekly-only names: a player whose only case is this week's
+        // rank is a start, never a roster spot for the season (week 4 dynasty
+        // offered Darnell Washington, TE33 on the weekly list and nowhere
+        // else, as a season claim).
+        pool: freeAgents.filter(
           (p) => !startable.slice(0, limit).some((t) => t.player.playerId === p.playerId),
         ),
         droppable,

@@ -252,9 +252,9 @@ describe("season claims off his weekly list (season list stale)", () => {
   });
   const worthy = wk("worthy", "WR", 82, 38);
 
-  it("takes the free agent his weekly list has ahead of the drop, and names his post pick as the alternative", () => {
+  it("takes the board player his weekly list has ahead of the drop", () => {
     const r = waiverTargets({
-      rosterPositions: slots, roster, freeAgents: [gadsden], weeklyOnly: [worthy], seasonOrder: "given",
+      rosterPositions: slots, roster, freeAgents: [gadsden, worthy], seasonOrder: "given",
     });
     expect(r.seasonUpgrades[0].player.playerId).toBe("worthy");
     expect(r.seasonUpgrades[0].dropFor?.playerId).toBe("wicks");
@@ -262,10 +262,17 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades[0].alternative?.playerId).toBe("gadsden");
   });
 
+  it("never makes a season claim out of a name found only on his weekly list", () => {
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [], weeklyOnly: [worthy], seasonOrder: "given",
+    });
+    expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("worthy");
+  });
+
   it("does not repeat a start as a season claim", () => {
     const star = wk("star", "WR", 20, 10);
     const r = waiverTargets({
-      rosterPositions: slots, roster, freeAgents: [], weeklyOnly: [star, worthy], seasonOrder: "given",
+      rosterPositions: slots, roster, freeAgents: [star, worthy], seasonOrder: "given",
     });
     expect(r.startable.map((t) => t.player.playerId)).toContain("star");
     expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("star");
