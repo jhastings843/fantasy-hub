@@ -10,6 +10,7 @@ import { inferTrajectory } from "@/lib/dynasty/season-plan";
 import { bestLineup } from "@/lib/lineup/solve";
 import { cannotPlay, scoreOf } from "@/lib/lineup/weekly-advice";
 import { getRosterGrades } from "@/lib/rosteraudit/client";
+import { getValuesForProfile } from "@/lib/values";
 import type { RAGradesByRosterId } from "@/lib/rosteraudit/types";
 import {
   getAllPlayers,
@@ -339,7 +340,16 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   const hisDrops = new Set((jingles?.fineDropping ?? []).map((d) => d.sleeperId).filter(Boolean) as string[]);
   const notHisDrop = (p: WaiverPlayer) => !hisDrops.has(p.playerId);
 
+  // Dynasty: a roster spot is also a trade chip, so no drop may be worth more
+  // on the market than what it buys. Values missing is not a reason to skip
+  // the email; it only means this guard sits out.
+  const market =
+    profile.type === "dynasty"
+      ? await getValuesForProfile(profile, league).then((v) => v.values).catch(() => null)
+      : null;
+
   const report = waiverTargets({
+    marketValue: market ? (id) => market[id]?.value ?? null : undefined,
     rosterPositions: profile.rosterPositions,
     roster,
     freeAgents: freeAgents.filter(notHisDrop),

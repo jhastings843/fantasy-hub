@@ -132,6 +132,12 @@ export function waiverTargets(input: {
   rosterPositions: string[];
   roster: WaiverPlayer[];
   freeAgents: WaiverPlayer[];
+  /**
+   * Dynasty only: each player's trade-market value. A drop is never worth
+   * more than the claim it pays for (week 4 told Jack to cut Jacoby Brissett,
+   * a superflex trade chip, for the #30 name on a waiver post).
+   */
+  marketValue?: (playerId: string) => number | null;
   /** How many of each list to return. */
   limit?: number;
   /**
@@ -184,10 +190,26 @@ export function waiverTargets(input: {
   // By his weekly ordering, which is what "best" means for this week.
   startable.sort((a, b) => scoreOf(b.player) - scoreOf(a.player));
 
-  // The worst thing on the roster that is not holding up this week's lineup.
+  // The worst thing on the roster that is not holding up this week's lineup,
+  // and never so many at one position that the league's starting slots
+  // cannot be filled by healthy players (week 4, superflex: two of three QBs
+  // offered as drops, leaving one healthy QB for two QB slots).
+  const spare = spareByPosition(roster, rosterPositions);
   const droppable = roster
     .filter((p) => !untouchable.has(p.playerId))
-    .sort((a, b) => bySeasonRank(b, a));
+    .sort((a, b) => bySeasonRank(b, a))
+    .filter((p) => {
+      if (p.injuryStatus) return true; // never a season drop anyway, see seasonByWeek
+      const left = spare.get(p.position);
+      if (left === undefined) return true;
+      if (left <= 0) return false;
+      spare.set(p.position, left - 1);
+      return true;
+    });
+  const worth = input.marketValue;
+  /** A drop may pay for a claim only when it is not worth more on the market. */
+  const valueOk = (pick: WaiverPlayer, drop: WaiverPlayer | null) =>
+    !worth || !drop || (worth(drop.playerId) ?? 0) <= (worth(pick.playerId) ?? 0);
 
   // A claim on an empty roster spot costs nothing, so it needs no drop. Beyond
   // those, every claim is a swap and has to name its price.
@@ -204,8 +226,9 @@ export function waiverTargets(input: {
         openSpots,
         limit,
         protectWithin,
+        valueOk,
       })
-    : seasonByRank(freeAgents, droppable, openSpots, limit);
+    : seasonByRank(freeAgents, droppable, openSpots, limit, valueOk);
 
   return {
     startable: startable.slice(0, limit),
@@ -237,6 +260,7 @@ function seasonByWeek(input: {
   openSpots: number;
   limit: number;
   protectWithin: number;
+  valueOk: (pick: WaiverPlayer, drop: WaiverPlayer | null) => boolean;
 }): SeasonTarget[] {
   const seen = new Set<string>();
   const pool = input.pool.filter((p) => {
@@ -296,7 +320,9 @@ function seasonByWeek(input: {
     // injured Mike Evans, WR77 this week, for Quentin Johnston). Those drops
     // go to the board branch below, which never touches a protected asset.
     const comparable = rankedThisWeek(d) && !protectedAsset(d);
-    let pick = comparable ? (byWeek.find((p) => !used.has(p.playerId) && beatsThisWeek(p, d)) ?? null) : null;
+    let pick = comparable
+      ? (byWeek.find((p) => !used.has(p.playerId) && beatsThisWeek(p, d) && input.valueOk(p, d)) ?? null)
+      : null;
     let why: string | null = pick ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}` : null;
     // Nobody his weekly list has ahead of this drop. The board's own order
     // (his post, then the research, then Sleeper's most-added) still fills it,
@@ -306,7 +332,10 @@ function seasonByWeek(input: {
     if (!pick && !protectedAsset(d)) {
       pick =
         pool.find(
-          (p) => !used.has(p.playerId) && !(comparable && rankedThisWeek(p) && !beatsThisWeek(p, d)),
+          (p) =>
+            !used.has(p.playerId) &&
+            !(comparable && rankedThisWeek(p) && !beatsThisWeek(p, d)) &&
+            input.valueOk(p, d),
         ) ?? null;
       why = null;
     }
@@ -323,8 +352,10 @@ function seasonByRank(
   droppable: WaiverPlayer[],
   openSpots: number,
   limit: number,
+  valueOk: (pick: WaiverPlayer, drop: WaiverPlayer | null) => boolean = () => true,
 ): SeasonTarget[] {
   const seasonPool = freeAgents.filter((p) => p.seasonRank !== null).sort(bySeasonRank);
+  const usedDrops = new Set<string>();
 
   return seasonPool
     .slice(0, limit)
@@ -332,8 +363,9 @@ function seasonByRank(
       if (i < openSpots) return { player, dropFor: null, placesBetter: null };
       // Pair the best available with the worst droppable, second with second,
       // so a list of five claims does not tell him to drop the same man five
-      // times over.
-      const dropFor = droppable[i - openSpots] ?? null;
+      // times over. Skipping any drop worth more than the claim.
+      const dropFor = droppable.find((d) => !usedDrops.has(d.playerId) && valueOk(player, d)) ?? null;
+      if (dropFor) usedDrops.add(dropFor.playerId);
       const placesBetter =
         dropFor && dropFor.seasonRank !== null && player.seasonRank !== null
           ? dropFor.seasonRank - player.seasonRank
@@ -350,4 +382,23 @@ function seasonByRank(
       if (t.dropFor.seasonRank === null) return true;
       return t.player.seasonRank !== null && t.player.seasonRank < t.dropFor.seasonRank;
     });
+}
+
+/**
+ * How many healthy players at each position the roster can spare before the
+ * league's own starting slots go unfilled. SUPER_FLEX counts as a QB slot,
+ * because in practice it is one. FLEX and bench slots count for nothing.
+ */
+function spareByPosition(roster: WaiverPlayer[], rosterPositions: string[]): Map<string, number> {
+  const need = new Map<string, number>();
+  for (const slot of rosterPositions) {
+    const pos = slot === "SUPER_FLEX" ? "QB" : slot;
+    if (["QB", "RB", "WR", "TE", "K", "DEF"].includes(pos)) need.set(pos, (need.get(pos) ?? 0) + 1);
+  }
+  const spare = new Map<string, number>();
+  for (const [pos, n] of need) {
+    const healthy = roster.filter((p) => p.position === pos && !p.injuryStatus && !p.onBye).length;
+    spare.set(pos, healthy - n);
+  }
+  return spare;
 }

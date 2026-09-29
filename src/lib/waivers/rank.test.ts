@@ -299,6 +299,31 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("vet");
   });
 
+  it("keeps enough healthy QBs to fill QB and superflex (week 4 dynasty)", () => {
+    const sf = ["QB", "SUPER_FLEX", "RB", "RB", "WR", "WR", "TE", "FLEX", "BN", "BN", "BN", "BN"];
+    const qbs = [
+      wk("starter", "QB", null, 5), wk("bagent", "QB", null, 40), wk("brissett", "QB", null, 38),
+      wk("hurtqb", "QB", null, null, { injuryStatus: "Out" }),
+      wk("walker", "RB", 2, 2), wk("love", "RB", 41, 24), wk("lamb", "WR", 14, 6),
+      wk("washington", "WR", 28, 12), wk("loveland", "TE", 91, 13),
+    ];
+    const r = waiverTargets({
+      rosterPositions: sf, roster: qbs, seasonOrder: "given",
+      freeAgents: [wk("mumpfield", "WR", 150, 70), wk("tremayne", "WR", 160, 80)],
+    });
+    const qbDrops = r.seasonUpgrades.filter((t) => ["bagent", "brissett"].includes(t.dropFor?.playerId ?? ""));
+    expect(qbDrops.length).toBeLessThanOrEqual(1);
+  });
+
+  it("never drops a player worth more on the dynasty market than the claim", () => {
+    const worth: Record<string, number> = { wicks: 1800, worthy: 300 };
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [], weeklyOnly: [worthy], seasonOrder: "given",
+      marketValue: (id) => worth[id] ?? null,
+    });
+    expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("wicks");
+  });
+
   it("does not drop a player on bye who his season list rates", () => {
     const onBye = roster.map((p) =>
       p.playerId === "wicks" ? wk("star", "WR", null, null, { onBye: true, seasonRank: 30 }) : p,
