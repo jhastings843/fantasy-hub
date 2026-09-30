@@ -64,7 +64,7 @@ function alternativeText(t: { alternative?: { name: string; jingles?: { rank: nu
   const a = t.alternative;
   if (!a) return "";
   const his = a.jingles
-    ? `, his waiver pick${a.jingles.rank != null ? ` #${a.jingles.rank}` : ""} at $${a.jingles.faab} of $${a.jingles.budget}`
+    ? `, his waiver pick${a.jingles.rank != null ? ` #${a.jingles.rank}` : ""} at ${Math.round((a.jingles.faab / a.jingles.budget) * 100)}% of a season budget`
     : "";
   return ` Or ${a.name}${his}.`;
 }
@@ -82,7 +82,9 @@ function usageNote(p: {
   // number in this email with a name behind it, and on most weeks it is the
   // only one with an actual price in it.
   const jingles = p.jingles
-    ? ` Jingles${p.jingles.rank != null ? ` #${p.jingles.rank}` : ""}: $${p.jingles.faab} of $${p.jingles.budget} (${Math.round(p.jingles.faabPercent)}%).${p.jingles.note ? ` ${p.jingles.note}` : ""}`
+    // His dollars are against his own $100 budget, not Jack's balance; read
+    // as "$22 of $100" it looked like Jack had $100 left when he had $84.
+    ? ` Jingles${p.jingles.rank != null ? ` #${p.jingles.rank}` : ""} bids ${Math.round(p.jingles.faabPercent)}% of a season budget ($${p.jingles.faab} of his standard $${p.jingles.budget}).${p.jingles.note ? ` ${p.jingles.note}` : ""}`
     : "";
   return `${usage}${research}${jingles}`;
 }
