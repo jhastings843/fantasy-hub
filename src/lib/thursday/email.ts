@@ -3,6 +3,7 @@ import { poolMeta } from "@/lib/survivor/pools";
 import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
 import type { StartableTarget } from "@/lib/waivers/rank";
+import type { WaiverReview } from "@/lib/guillotine/waiver-review";
 import {
   card,
   emailPage,
@@ -12,6 +13,9 @@ import {
   PALETTE,
   pct,
   statCell,
+  statRow,
+  money,
+  BAD,
   GOOD,
   WARN,
 } from "@/lib/email/shell";
@@ -42,6 +46,8 @@ export interface ThursdayInput {
    * each is an instant add in Sleeper, no bid. Absent when the scan failed.
    */
   pickups?: { leagueName: string; targets: StartableTarget[] }[];
+  /** The guillotine waiver run, graded. Absent when there was none or it failed. */
+  waiverReviews?: WaiverReview[];
   generatedAt: string;
   appUrl: string;
 }
@@ -317,6 +323,95 @@ ${l.targets.slice(0, PICKUPS_PER_LEAGUE).map(pickupRow).join("")}`),
   return `${label("Free agents to grab")}<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-bottom:6px;">Waivers have cleared, so these are instant adds in Sleeper, no bid. Each ranks ahead of someone in your lineup on his weekly list; add him, make the drop, and start him.</div>${blocks}`;
 }
 
+/**
+ * The guillotine waiver run, the morning after: what the room paid, what it
+ * did to the field, and whether Tuesday's model saw it coming. Stacked rows,
+ * not a table, because this is read on a phone.
+ */
+function waiverReviewSection(input: ThursdayInput): string {
+  const reviews = input.waiverReviews ?? [];
+  if (reviews.length === 0) return "";
+  const line = (html: string, color: string = PALETTE.body) =>
+    `<div style="font:400 13px/1.55 -apple-system,sans-serif;color:${color};padding-top:4px;">${html}</div>`;
+  const strong = (t: string, color: string = PALETTE.ink) =>
+    `<strong style="color:${color};">${escapeHtml(t)}</strong>`;
+
+  return reviews
+    .map((r) => {
+      const me = r.me;
+      const danger = me != null && me.rankAfter <= 2;
+      const rankText = (n: number) => (n === 1 ? "lowest" : `${ordinal(n)} lowest`);
+      const head = me
+        ? `After the claims you project ${me.after.toFixed(1)}, ${rankText(me.rankAfter)} of ${r.teamsAlive}${me.rankAfter !== me.rankBefore ? ` (was ${rankText(me.rankBefore)})` : ""}.`
+        : `${r.teamsAlive} teams alive.`;
+
+      const lessons = r.lessons.map((l) => line(escapeHtml(l))).join("");
+
+      const claims = r.claims
+        .filter((c) => c.price > 0 || c.bidders > 1)
+        .slice(0, 6)
+        .map((c) =>
+          line(
+            `${strong(`${c.name} ${c.position}`)} ${strong(money(c.price))} to ${escapeHtml(c.winner)}` +
+              `<span style="color:${PALETTE.muted};"> \u00b7 ${c.bidders} bid${c.bidders === 1 ? "" : "s"}${c.runnerUp != null ? `, next ${money(c.runnerUp)}` : ""}${c.myBid != null ? `, you ${money(c.myBid)}` : ""}${c.gain > 0 ? `, +${c.gain.toFixed(1)} to his lineup` : ""}</span>`,
+          ),
+        )
+        .join("");
+
+      const movers = r.field
+        .filter((f) => !f.isMine && f.after - f.before >= 2)
+        .sort((a, b) => b.after - b.before - (a.after - a.before))
+        .slice(0, 4)
+        .map((f) =>
+          line(
+            `${escapeHtml(f.name)} +${(f.after - f.before).toFixed(1)} <span style="color:${PALETTE.muted};">\u00b7 now ${f.after.toFixed(1)}, ${rankText(f.rankAfter)}</span>`,
+          ),
+        )
+        .join("");
+
+      const bottom = r.field
+        .slice(0, 4)
+        .map((f) =>
+          line(
+            `${f.rankAfter}. ${f.isMine ? strong(f.name) : escapeHtml(f.name)} <span style="color:${PALETTE.muted};">${f.after.toFixed(1)}</span>`,
+            f.isMine ? PALETTE.ink : PALETTE.body,
+          ),
+        )
+        .join("");
+
+      const p = r.prediction;
+      const check = p
+        ? line(
+            `Tuesday's room model, replayed: it had you ${rankText(p.predictedMyRank)} after the claims, actual ${rankText(p.actualMyRank)}. ${p.called} of ${p.predicted} players it expected to go were claimed${p.missed.length ? ` (not: ${escapeHtml(p.missed.slice(0, 3).join(", "))})` : ""}.`,
+            PALETTE.muted,
+          )
+        : "";
+
+      return card(
+        `${label(`${r.leagueName} \u00b7 waiver run`)}
+        <div style="font:600 16px/1.35 -apple-system,sans-serif;color:${danger ? PALETTE.bad : PALETTE.ink};">${escapeHtml(head)}</div>
+        ${statRow([
+          { name: "Room spent", value: money(r.roomSpent) },
+          { name: "Claims", value: String(r.claims.length) },
+          { name: "You won", value: String(r.myWins.length) },
+          { name: "You lost", value: String(r.myLosses.length) },
+        ])}
+        ${lessons ? `<div style="padding-top:10px;">${lessons}</div>` : ""}
+        ${claims ? `<div style="padding-top:12px;">${label("What went, and for how much")}${claims}</div>` : ""}
+        ${movers ? `<div style="padding-top:12px;">${label("Who got better")}${movers}</div>` : ""}
+        ${bottom ? `<div style="padding-top:12px;">${label("Bottom of the table now")}${bottom}</div>` : ""}
+        ${check ? `<div style="padding-top:10px;">${check}</div>` : ""}`,
+        danger ? BAD : undefined,
+      );
+    })
+    .join("");
+}
+
+function ordinal(n: number): string {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
 export function renderThursdayEmail(input: ThursdayInput): string {
   const { lineups } = input;
   const changes = totalChanges(input.lineups);
@@ -349,7 +444,7 @@ export function renderThursdayEmail(input: ThursdayInput): string {
       changes === 0
         ? "Nothing to change in any league."
         : `${changes} slots to change before kickoff.`,
-    body: `${survivorSection(input)}<div style="padding-top:6px;">${lineupSection}</div><div style="padding-top:6px;">${pickupsSection(input)}</div>`,
+    body: `${survivorSection(input)}<div style="padding-top:6px;">${lineupSection}</div><div style="padding-top:6px;">${pickupsSection(input)}</div><div style="padding-top:6px;">${waiverReviewSection(input)}</div>`,
     cta: input.survivors.length > 0 && input.survivors.every((s) => !s.status.alive)
       ? { href: input.appUrl, text: "Open fantasy hub" }
       : { href: `${input.appUrl}/survivor`, text: "Open survivor" },

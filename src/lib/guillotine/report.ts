@@ -20,9 +20,10 @@ import { bestLineup, slotAccepts } from "./lineup";
 import { availability, injuryFor } from "./availability";
 import { getInjuryReport } from "@/lib/survivor/intel";
 import { snapshotFrom } from "./roster-diff";
+import { projectRoomClaims, withClaims, type RoomCandidate, type RoomTeam } from "./room-claims";
 import { scoringSkewNotes } from "./scoring";
 import type { LeagueProfile } from "@/lib/league/types";
-import type { PoolPlayer, Wallet, WeeklyFaabReport } from "./types";
+import type { PoolPlayer, RoomOutlook, Wallet, WeeklyFaabReport } from "./types";
 
 // The one assembly. The page, the API and the email all call this, so a number
 // shown in the app and a number sent in the email cannot disagree. That lesson
@@ -44,7 +45,7 @@ const POOL_PER_POSITION = 30;
  * projection is "zero for likely inactives", and doubtful players sit out far
  * more often than they play.
  */
-const UNAVAILABLE = new Set(["Out", "IR", "NA", "PUP", "Sus", "Suspended", "DNR", "Doubtful"]);
+export const UNAVAILABLE = new Set(["Out", "IR", "NA", "PUP", "Sus", "Suspended", "DNR", "Doubtful"]);
 
 const EMPTY_FRAGILITY: Fragility = {
   bestTotal: 0,
@@ -265,28 +266,78 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     return user?.metadata?.team_name || user?.display_name || user?.username || `Roster ${rosterId}`;
   };
 
-  const simTeams: SimTeam[] = state.aliveRosterIds.map((rosterId) => {
+  // Every living roster as the lineup solver sees it. A player ruled out is a
+  // zero, not a projection. Treating him as healthy is the single most
+  // expensive mistake this report could make. Sleeper uses several strings for
+  // "will not play", and NA is the one that caught this out: Josh Jacobs
+  // carried it with no week-1 stat line at all.
+  const lineupPlayersFor = (rosterId: number) => {
     const roster = rosters.find((r) => r.roster_id === rosterId);
-    const players = poolFor(roster?.players ?? []).map((p) => ({
+    return poolFor(roster?.players ?? []).map((p) => ({
       playerId: p.playerId,
       position: p.position,
-      // A player ruled out is a zero, not a projection. Treating him as healthy
-      // is the single most expensive mistake this report could make. Sleeper
-      // uses several strings for "will not play", and NA is the one that caught
-      // this out: Josh Jacobs carried it with no week-1 stat line at all.
       points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints,
     }));
-    return toSimTeam(
+  };
+
+  const simTeams: SimTeam[] = state.aliveRosterIds.map((rosterId) =>
+    toSimTeam(
       rosterId,
       teamName(rosterId),
       rosterId === myRoster.roster_id,
-      players,
+      lineupPlayersFor(rosterId),
       profile.rosterPositions,
-    );
-  });
+    ),
+  );
+
+  // The field as it stands, and the field after the room's likely claims.
+  // Tuesday's rosters are not Sunday's: every rival with a hole and money
+  // fills it overnight, and a chop line drawn without that tells a team at the
+  // bottom it is safer than it is. See room-claims.ts for week 4, which is
+  // where that cost Jack the table. My own claims are left out on purpose:
+  // posture is the answer to "what if I do nothing".
+  const asIsRisk = simulateChop(simTeams);
+  const roomCandidates: RoomCandidate[] = Object.keys(weekProjections)
+    .filter((id) => !state.rosteredPlayerIds.has(id))
+    .map(toPool)
+    .filter((p): p is PoolPlayer => p !== null)
+    .map((p) => ({
+      playerId: p.playerId,
+      name: p.name,
+      position: p.position,
+      points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints * (p.plays ?? 1),
+    }));
+  const roomTeams: RoomTeam[] = state.aliveRosterIds
+    .filter((id) => id !== myRoster.roster_id)
+    .map((id) => ({
+      rosterId: id,
+      name: teamName(id),
+      faabLeft: state.faabRemaining[id] ?? 0,
+      players: lineupPlayersFor(id),
+    }));
+  const projectedClaims = projectRoomClaims(roomTeams, roomCandidates, profile.rosterPositions);
+  const claimed = withClaims(roomTeams, projectedClaims, roomCandidates);
+  const risk =
+    projectedClaims.length === 0
+      ? asIsRisk
+      : simulateChop(
+          simTeams.map((team) => {
+            const after = claimed.find((t) => t.rosterId === team.rosterId);
+            return after
+              ? toSimTeam(team.rosterId, team.name, false, after.players, profile.rosterPositions)
+              : team;
+          }),
+        );
+  const asIsMine = asIsRisk.teams.find((t) => t.isMine);
+  const roomOutlook: RoomOutlook = {
+    claims: projectedClaims,
+    before: {
+      rank: asIsMine?.projectionRank ?? null,
+      chopProbability: asIsRisk.myChopProbability,
+    },
+  };
 
   const lastWeek = lastWeekFor(results, myRoster.roster_id);
-  const risk = simulateChop(simTeams);
 
   // Forward-looking: what one absence does to my roster, and whether the
   // lineup as set on Sleeper has a hole in it. Uses the same zeroing rule as
@@ -489,6 +540,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     posture,
     phase: budget.phase,
     risk,
+    roomOutlook,
     field: risk.teams,
     me: {
       rosterId: myRoster.roster_id,

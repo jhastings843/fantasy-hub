@@ -6,6 +6,19 @@ import type { MarketModel, Tier } from "./market";
 import type { SeasonOutlook } from "./outlook";
 import type { LastWeek } from "./results";
 import type { Fragility } from "./fragility";
+import type { ProjectedClaim } from "./room-claims";
+
+/**
+ * The field after the room's likely claims, against the field as it stands.
+ *
+ * `risk` and the posture are drawn against the claimed field, because that is
+ * the one that plays on Sunday. `before` keeps the as-is numbers so the email
+ * can say how much the overnight claims moved things.
+ */
+export interface RoomOutlook {
+  claims: ProjectedClaim[];
+  before: { rank: number | null; chopProbability: number | null };
+}
 
 /** A player with everything the advisor needs to price him. */
 export interface PoolPlayer {
@@ -113,6 +126,8 @@ export interface WeeklyFaabReport {
   posture: PostureCall;
   phase: Phase;
   risk: ChopLineResult;
+  /** Absent on a fallback report. */
+  roomOutlook?: RoomOutlook;
   /** The field, most at risk first. */
   field: TeamRisk[];
 

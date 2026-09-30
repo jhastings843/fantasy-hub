@@ -14,6 +14,7 @@ import { thisWeeksClaims, waiversAreSettled } from "@/lib/waivers/settled";
 import { weeklyRankingsReady } from "@/lib/jingles/ingest";
 import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
 import { buildWaivers } from "@/lib/waivers/build";
+import { buildWaiverReviews } from "@/lib/guillotine/waiver-review-build";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -172,6 +173,10 @@ async function runThursdayEmailLocked(options: {
     .then((rs) => rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])))
     .catch(() => undefined);
 
+  // The guillotine waiver run, graded. Optional in the same way pickups are:
+  // a failure costs this card, never the email.
+  const waiverReviews = await buildWaiverReviews().catch(() => undefined);
+
   const week = survivorResult.reports[0]?.week ?? lineups.week;
   const season = String(survivorResult.reports[0]?.season ?? lineups.season ?? "");
 
@@ -187,6 +192,7 @@ async function runThursdayEmailLocked(options: {
     survivorError: survivorResult.error,
     lineups,
     pickups,
+    waiverReviews,
     generatedAt: new Date().toISOString(),
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app",
   };

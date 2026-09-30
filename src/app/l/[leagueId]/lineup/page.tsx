@@ -2,8 +2,14 @@ import { buildWeeklyLineups, type LeagueLineup } from "@/lib/lineup/build";
 import type { AdvicePlayer, SlotAdvice } from "@/lib/lineup/weekly-advice";
 import { season } from "@/lib/scorecard/pure";
 import { isSettled, readSeason, type Settled as SettledWeek } from "@/lib/scorecard/store";
+import { buildWaivers } from "@/lib/waivers/build";
+import type { StartableTarget } from "@/lib/waivers/rank";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+/** Past three it is the waivers page, not a lineup page. */
+const PICKUPS_SHOWN = 3;
 
 // Who to start this week, from his weekly rankings and this league's own slots.
 //
@@ -319,13 +325,54 @@ function subhead(changes: number, locked: number, slots: number): string {
   return played ? `${played} ${rest}` : rest;
 }
 
+/**
+ * Free agents who would start for this team this week, with the drop that
+ * makes room. The same scan the Wednesday email runs, so the page and the
+ * email cannot disagree. Hidden when nobody on the wire beats a starter:
+ * "if needed" means an empty section is noise.
+ */
+function PickupCard({ target }: { target: StartableTarget }) {
+  const rank =
+    target.player.positionalRank != null
+      ? `${target.player.position}${target.player.positionalRank} this week`
+      : "ranked this week";
+  const drop =
+    target.dropFor === null
+      ? "You have an open roster spot."
+      : target.dropFor
+        ? `Drop ${target.dropFor.name}.`
+        : "Nobody on your bench is a safe drop, so pick one yourself or skip it.";
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+      <div className="flex items-center gap-2">
+        <SlotBadge slot={target.slot} />
+        <Eyebrow>Grab this</Eyebrow>
+      </div>
+      <p className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+        Add {target.player.name}
+      </p>
+      <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+        {rank}
+        {target.displaces ? `, starts at ${target.slot} over ${target.displaces.name}` : ` at ${target.slot}`}.{" "}
+        {drop}
+      </p>
+    </div>
+  );
+}
+
 export default async function LineupPage({
   params,
 }: {
   params: Promise<{ leagueId: string }>;
 }) {
   const { leagueId } = await params;
-  const result = await buildWeeklyLineups({ leagueId });
+  const [result, pickups] = await Promise.all([
+    buildWeeklyLineups({ leagueId }),
+    // One failure costs this section, never the page.
+    buildWaivers(leagueId)
+      .then((ctx) => ctx.report.startable.slice(0, PICKUPS_SHOWN))
+      .catch(() => [] as StartableTarget[]),
+  ]);
   const league = result.leagues[0];
   // Keyed on the season the rankings are for, not the calendar year: in January
   // those disagree and the scorecard would silently look at the wrong season.
@@ -438,6 +485,29 @@ export default async function LineupPage({
           {changes.map((s) => (
             <ChangeCard key={`${s.slot}-${s.index}`} slot={s} />
           ))}
+        </div>
+      )}
+
+      {pickups.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-baseline justify-between gap-3">
+            <Eyebrow>Free agents to grab</Eyebrow>
+            <Link
+              href={`/l/${leagueId}/waivers`}
+              className="text-xs font-medium text-zinc-500 underline-offset-2 hover:underline dark:text-zinc-400"
+            >
+              All waivers
+            </Link>
+          </div>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            Each ranks ahead of someone in your lineup on his weekly list. Once waivers clear these
+            are instant adds in Sleeper, no bid.
+          </p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {pickups.map((t) => (
+              <PickupCard key={t.player.playerId} target={t} />
+            ))}
+          </div>
         </div>
       )}
 

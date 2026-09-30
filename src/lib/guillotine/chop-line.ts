@@ -288,7 +288,7 @@ function callFor(result: ChopLineResult, ratio: number, pct: string): PostureCal
     // the field is the honest version of the same number.
     const standing =
       rank > 0 && rank <= 3
-        ? `You project ${ordinal(rank)} lowest of ${field}, so the margin is thinner than it looks.`
+        ? `You project ${rank === 1 ? "the" : ordinal(rank)} lowest of ${field}, so the margin is thinner than it looks.`
         : `You project ${ordinal(field - rank + 1)} highest of ${field}.`;
     return {
       posture: "yellow",

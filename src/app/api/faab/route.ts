@@ -61,6 +61,10 @@ export async function GET(request: Request) {
       summary: report.card.summary,
     },
 
+    // What the rest of the room likely buys tonight. The chop probability
+    // above is already drawn against this field.
+    room: report.roomOutlook ?? null,
+
     me: {
       team: report.me.name,
       faabRemaining: report.me.faabRemaining,

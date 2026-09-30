@@ -161,6 +161,45 @@ function chainBlock(
   </table>`;
 }
 
+/**
+ * What the rest of the room is likely to buy tonight, and where that leaves
+ * Jack. The chop line above is already drawn against this field; this says so,
+ * and names the teams, because "burnerr28 fixes his WR hole" is something you
+ * can bid against and "the field improves" is not.
+ */
+function roomBlock(report: WeeklyFaabReport): string {
+  const room = report.roomOutlook;
+  if (!room || room.claims.length === 0) return "";
+  const mine = report.field.find((t) => t.isMine);
+  const rankAfter = mine?.projectionRank ?? null;
+  const rankBefore = room.before.rank;
+  const n = report.league.teamsAlive;
+  const place = (r: number) => (r === 1 ? "lowest" : `${ordinalWord(r)} lowest`);
+  const moved =
+    rankBefore != null && rankAfter != null && rankAfter < rankBefore
+      ? `On today's rosters you are ${place(rankBefore)} of ${n}. After these claims you are <strong style="color:${POSTURE_COLOR.red.ink};">${place(rankAfter)}</strong>, and the risk above already counts that.`
+      : rankAfter != null
+        ? `After these claims you are still ${place(rankAfter)} of ${n}. The risk above already counts them.`
+        : "The risk above already counts these.";
+  const rows = room.claims
+    .slice(0, 5)
+    .map(
+      (c) =>
+        `<div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.body};">${escapeHtml(c.team)} <span style="color:${PALETTE.muted};">likely adds</span> ${escapeHtml(c.name)} ${escapeHtml(c.position)} <span style="color:${PALETTE.muted};">(+${c.gain.toFixed(1)})</span></div>`,
+    )
+    .join("");
+  return `<div style="border-top:1px solid ${PALETTE.hairline};margin-top:12px;padding-top:12px;">
+          <div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:${PALETTE.muted};padding-bottom:6px;">What the room buys tonight</div>
+          ${rows}
+          <div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.body};padding-top:6px;">${moved}</div>
+        </div>`;
+}
+
+function ordinalWord(n: number): string {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
 export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
   const link = `${appUrl.replace(/\/$/, "")}/l/${report.league.id}/faab`;
 
@@ -236,6 +275,7 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
             ? `<div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.body};padding-top:8px;">If one starter sits: lose ${escapeHtml(report.me.fragility.worstOneOut.name)} and you project <strong style="color:${report.me.fragility.fragile ? POSTURE_COLOR.red.ink : PALETTE.ink};">${report.me.fragility.worstOneOut.total.toFixed(1)}</strong>.${report.me.fragility.shakyStarters.length > 0 ? ` Tagged: ${escapeHtml(report.me.fragility.shakyStarters.join(", "))}.` : ""}</div>`
             : ""
         }
+        ${roomBlock(report)}
         ${
           report.me.lastWeek
             ? `<div style="font:400 13px/1.6 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:8px;">Last week: <strong style="color:${report.me.lastWeek.margin < 10 ? POSTURE_COLOR.red.ink : PALETTE.ink};">${report.me.lastWeek.score.toFixed(1)}</strong>, ${report.me.lastWeek.rankFromBottom} of ${report.me.lastWeek.teams} from the bottom, ${report.me.lastWeek.margin.toFixed(1)} clear of the low score.</div>`
