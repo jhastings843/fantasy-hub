@@ -98,7 +98,13 @@ export function blendWithJingles(
     // the market already has below his cut stays where the market put him.
     if (dropped && ranked > 0) effectiveRank = Math.max(effectiveRank ?? 0, ranked + 1, marketPositionRank);
 
-    if (effectiveRank === null) return [id, dropped ? { ...v, jinglesDrop: true } : { ...v }];
+    // No usable list at his position (a stale season list is passed as
+    // empty): his drop call alone still prices him as a sell, a flat 15% off.
+    if (effectiveRank === null && dropped) {
+      moved += 1;
+      return [id, { ...v, value: Math.round(v.value * 0.85), marketValue: v.value, marketPositionRank, jinglesRank: null, jinglesPositionRank: null, jinglesDrop: true }];
+    }
+    if (effectiveRank === null) return [id, { ...v }];
 
     const target = valueAtRank(v.position, effectiveRank);
     const value = Math.min(

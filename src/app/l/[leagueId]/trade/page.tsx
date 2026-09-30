@@ -86,15 +86,22 @@ export default async function TradePage({
   // Half the market, half his list. See lib/redraft/jingles-values.ts.
   let fcValues: PlayerValuesBySleeperId = marketValues;
   let jingles: JinglesBlendInfo | null = null;
-  if (lab && lab.list.length > 0) {
+  // His season list prices trades only while it is current (two weeks). The
+  // Sep 5 Lab 300 was still moving week 4 trade values by half.
+  const labCurrent =
+    !!lab && lab.list.length > 0 && !!lab.postedAt &&
+    Date.now() - new Date(lab.postedAt).getTime() < 14 * 24 * 60 * 60 * 1000;
+  if (lab && (labCurrent || hisDrops.size > 0)) {
     const blend = blendWithJingles(
       marketValues,
-      { entries: lab.list, byId: lab.byId },
+      labCurrent ? { entries: lab.list, byId: lab.byId } : { entries: [], byId: {} },
       undefined,
       hisDrops,
     );
     fcValues = blend.values;
-    jingles = {
+    // The banner describes his season list; with only a drop list applied
+    // there is no list to credit, and the J drop chips speak for themselves.
+    if (labCurrent) jingles = {
       title: lab.title,
       url: lab.url,
       postedAt: lab.postedAt,

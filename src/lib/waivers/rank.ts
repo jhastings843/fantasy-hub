@@ -138,6 +138,18 @@ export function waiverTargets(input: {
    * a superflex trade chip, for the #30 name on a waiver post).
    */
   marketValue?: (playerId: string) => number | null;
+  /**
+   * Redraft: players the live market rates too highly to cut on a weekly
+   * rank (FantasyCalc's top 150), standing in for a season list that has
+   * gone stale. The same protection a fresh list's top 150 gives.
+   */
+  protectedIds?: ReadonlySet<string>;
+  /**
+   * His latest "Players I'm Fine Dropping". Never protected, and first in
+   * line as a drop: when he says cut Chris Godwin, the claim should cost
+   * Godwin, not the bench player the market happens to rate lowest.
+   */
+  hisDrops?: ReadonlySet<string>;
   /** How many of each list to return. */
   limit?: number;
   /**
@@ -239,6 +251,8 @@ export function waiverTargets(input: {
         limit,
         protectWithin,
         valueOk,
+        protectedIds: input.protectedIds,
+        hisDrops: input.hisDrops,
       })
     : seasonByRank(freeAgents, droppable, openSpots, limit, valueOk);
 
@@ -273,6 +287,8 @@ function seasonByWeek(input: {
   limit: number;
   protectWithin: number;
   valueOk: (pick: WaiverPlayer, drop: WaiverPlayer | null) => boolean;
+  protectedIds?: ReadonlySet<string>;
+  hisDrops?: ReadonlySet<string>;
 }): SeasonTarget[] {
   const seen = new Set<string>();
   const pool = input.pool.filter((p) => {
@@ -284,7 +300,10 @@ function seasonByWeek(input: {
   const his = pool
     .filter((p) => p.jingles)
     .sort((a, b) => (a.jingles!.rank ?? Infinity) - (b.jingles!.rank ?? Infinity));
-  const protectedAsset = (d: WaiverPlayer) => d.seasonRank !== null && d.seasonRank <= input.protectWithin;
+  const hisDrop = (d: WaiverPlayer) => !!input.hisDrops?.has(d.playerId);
+  const protectedAsset = (d: WaiverPlayer) =>
+    !hisDrop(d) &&
+    ((d.seasonRank !== null && d.seasonRank <= input.protectWithin) || !!input.protectedIds?.has(d.playerId));
 
   const used = new Set<string>();
   const alternativesShown = new Set<string>();
@@ -316,7 +335,9 @@ function seasonByWeek(input: {
 
   // Worst this week first. A bench player on bye or off his list this week
   // has no rank to beat, so he is only droppable if he is not a real asset.
-  const drops = [...input.droppable].sort((a, b) => scoreOf(a) - scoreOf(b));
+  const drops = [...input.droppable].sort(
+    (a, b) => Number(hisDrop(b)) - Number(hisDrop(a)) || scoreOf(a) - scoreOf(b),
+  );
   for (const d of drops) {
     if (out.length >= input.limit) break;
     // An injured player is a wait-and-see or an IR spot, never a season drop
@@ -335,7 +356,9 @@ function seasonByWeek(input: {
     let pick = comparable
       ? (byWeek.find((p) => !used.has(p.playerId) && beatsThisWeek(p, d) && input.valueOk(p, d)) ?? null)
       : null;
-    let why: string | null = pick ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}` : null;
+    let why: string | null = pick
+      ? `${weekLabel(pick)} this week, ${d.name} is ${weekLabel(d)}${hisDrop(d) ? ` and on his fine-dropping list` : ""}`
+      : null;
     // Nobody his weekly list has ahead of this drop. The board's own order
     // (his post, then the research, then Sleeper's most-added) still fills it,
     // but only when the drop is not a player his season list rates.

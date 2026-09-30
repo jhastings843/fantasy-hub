@@ -112,3 +112,12 @@ describe("blendWithJingles, his drop list", () => {
     expect(values.d.value).toBeLessThanOrEqual(400);
   });
 });
+
+describe("blendWithJingles, drop list with no current season list", () => {
+  it("still prices his drops as sells", () => {
+    const { values } = blendWithJingles(MARKET, { entries: [], byId: {} }, undefined, new Set(["b"]));
+    expect(values.b.value).toBe(680);
+    expect(values.b.jinglesDrop).toBe(true);
+    expect(values.a.value).toBe(1000);
+  });
+});

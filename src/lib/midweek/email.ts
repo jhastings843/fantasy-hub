@@ -158,9 +158,11 @@ function leagueCard(league: WaiverContext): string {
             ? /this week/.test(t.why)
               ? `His weekly list: ${t.why}`
               : t.why.charAt(0).toUpperCase() + t.why.slice(1)
-            : `${t.player.seasonPositionRank ?? "Ranked"} on the season list${
-                t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
-              }`
+            : t.player.seasonPositionRank
+              ? `${t.player.seasonPositionRank} on the season list${
+                  t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
+                }`
+              : "Near the top of this week's waiver board"
         }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${usageNote(t.player)}${bidText(t.price)}${alternativeText(t)}`,
         "season",
       ),

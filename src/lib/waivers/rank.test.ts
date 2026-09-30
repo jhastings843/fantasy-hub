@@ -358,6 +358,26 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades).toHaveLength(1);
   });
 
+  it("with no season list, protects the market's top 150 from weekly-rank drops", () => {
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [worthy], seasonOrder: "given",
+      protectedIds: new Set(["wicks"]),
+    });
+    expect(r.seasonUpgrades.map((t) => t.dropFor?.playerId)).not.toContain("wicks");
+  });
+
+  it("drops the player he said to cut first, even if the market protects him", () => {
+    // Wicks is the worst bench player, but he said cut Downs, whom his old
+    // season list (#90) and the market would otherwise both protect.
+    const riser = wk("riser", "RB", 76, 30);
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [riser], seasonOrder: "given",
+      protectedIds: new Set(["wicks", "downs"]), hisDrops: new Set(["downs"]),
+    });
+    expect(r.seasonUpgrades[0]?.dropFor?.playerId).toBe("downs");
+    expect(r.seasonUpgrades[0]?.why).toContain("fine-dropping list");
+  });
+
   it("does not drop a player on bye who his season list rates", () => {
     const onBye = roster.map((p) =>
       p.playerId === "wicks" ? wk("star", "WR", null, null, { onBye: true, seasonRank: 30 }) : p,

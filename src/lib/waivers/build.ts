@@ -105,6 +105,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     getUser(username),
     getNflState().catch(() => null),
   ]);
+  const labUsable = profile.type !== "dynasty" && isFreshForRun(lab.postedAt);
 
   const mine = rosters.find((r) => r.owner_id === me.user_id);
   if (!mine) {
@@ -168,7 +169,10 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       | undefined;
     const name =
       raw?.full_name ?? [raw?.first_name, raw?.last_name].filter(Boolean).join(" ").trim() ?? id;
-    const onList = lab.byId[id];
+    // His season list only counts when he has touched it this week. A stale
+    // one (the Sep 5 Lab 300 was still being read on week 4) protected drops
+    // he had since told readers to cut and named the wrong bench player.
+    const onList = labUsable ? lab.byId[id] : undefined;
     const pr = index.positional.get(id) ?? null;
     const fr = index.flex.get(id) ?? null;
     const m = index.meta.get(id) ?? null;
@@ -377,13 +381,24 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // Dynasty: a roster spot is also a trade chip, so no drop may be worth more
   // on the market than what it buys. Values missing is not a reason to skip
   // the email; it only means this guard sits out.
-  const market =
-    profile.type === "dynasty"
-      ? await getValuesForProfile(profile, league).then((v) => v.values).catch(() => null)
-      : null;
+  // Redraft reads FantasyCalc's live trade values the same way: with his
+  // season list stale they are the only current read on who is worth a spot,
+  // so no drop may be worth more than the claim that replaces him.
+  const market = await getValuesForProfile(profile, league).then((v) => v.values).catch(() => null);
+
+  // Dynasty guards every drop by trade value. Redraft only protects the
+  // market's top 150: its values lag a sudden starter (week 4, Ollie Gordon
+  // the day he took over Miami), so a value-for-value rule would block the
+  // week's best adds.
+  const protectedIds =
+    market && profile.type !== "dynasty"
+      ? new Set(Object.entries(market).filter(([, v]) => v.overallRank > 0 && v.overallRank <= 150).map(([id]) => id))
+      : undefined;
 
   const report = waiverTargets({
-    marketValue: market ? (id) => market[id]?.value ?? null : undefined,
+    marketValue: market && profile.type === "dynasty" ? (id) => market[id]?.value ?? null : undefined,
+    protectedIds,
+    hisDrops,
     rosterPositions: profile.rosterPositions,
     roster,
     freeAgents: freeAgents.filter(notHisDrop),
@@ -446,7 +461,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       playerId: id,
       position,
       age: players[id]?.age ?? null,
-      seasonPositionRank: lab.byId[id]?.positionRank ?? null,
+      seasonPositionRank: labUsable ? (lab.byId[id]?.positionRank ?? null) : null,
       seasonRankStale: !labFresh,
       ...gain,
       lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
