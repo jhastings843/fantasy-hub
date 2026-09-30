@@ -164,7 +164,8 @@
     "2026-09-29: Dynasty Nerds' weekly FAAB guide (dynastynerds.com/waiver-wire/week-N-waiver-wire-faab-guide-YYYY/) now leads the dynasty wire, parsed directly; their picks may replace a bench scrub under 25 value. Week 4: Jalon Daniels over Kendrick Bourne.",
     "2026-09-29: Stale Lab 300 no longer read anywhere in waivers (fresh-this-week gate) or trades (14-day gate). Redraft drop protection = FantasyCalc top 150; his 'fine dropping' players unprotected and dropped first. Week 4: Gordon for Godwin in Half PPR.",
     "2026-09-29: Wednesday lineup email gains 'Free agents to grab': per league, free agents who outrank a starter on his weekly list, with add / drop / start-over, one per benched starter, DEF/K swap in place. First real run tomorrow after the 3am waivers.",
-    "2026-09-30: Chopped FAAB now projects the room's likely claims before the chop line (room-claims.ts; backtest on week 4 called 3 of 3 big claims). Wednesday lineup email gains a waiver review card (spend, runner-up bids, who got better, bottom of table, model replay). Lineup page shows 'Free agents to grab' per league. 895 tests pass."
+    "2026-09-30: Chopped FAAB now projects the room's likely claims before the chop line (room-claims.ts; backtest on week 4 called 3 of 3 big claims). Wednesday lineup email gains a waiver review card (spend, runner-up bids, who got better, bottom of table, model replay). Lineup page shows 'Free agents to grab' per league. 895 tests pass.",
+    "2026-09-30: Free agents fold into the lineup change for the slot they take (lib/waivers/merge.ts), in the Wednesday email and on the lineup page. No more 'start Pat' then 'sub Pat for a pickup'. Change counts include pickups. 898 tests pass."
   ],
   "tags": [
     "personal",

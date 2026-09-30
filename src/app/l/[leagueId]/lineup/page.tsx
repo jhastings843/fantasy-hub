@@ -4,6 +4,7 @@ import { season } from "@/lib/scorecard/pure";
 import { isSettled, readSeason, type Settled as SettledWeek } from "@/lib/scorecard/store";
 import { buildWaivers } from "@/lib/waivers/build";
 import type { StartableTarget } from "@/lib/waivers/rank";
+import { mergePickups } from "@/lib/waivers/merge";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -331,7 +332,8 @@ function subhead(changes: number, locked: number, slots: number): string {
  * email cannot disagree. Hidden when nobody on the wire beats a starter:
  * "if needed" means an empty section is noise.
  */
-function PickupCard({ target }: { target: StartableTarget }) {
+function PickupCard({ target, slot }: { target: StartableTarget; slot?: string }) {
+  const at = slot ?? target.slot;
   const rank =
     target.player.positionalRank != null
       ? `${target.player.position}${target.player.positionalRank} this week`
@@ -345,15 +347,15 @@ function PickupCard({ target }: { target: StartableTarget }) {
   return (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
       <div className="flex items-center gap-2">
-        <SlotBadge slot={target.slot} />
-        <Eyebrow>Grab this</Eyebrow>
+        <SlotBadge slot={at} />
+        <Eyebrow>{slot ? "Change this: free agent" : "Grab this"}</Eyebrow>
       </div>
       <p className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">
         Add {target.player.name}
       </p>
       <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
         {rank}
-        {target.displaces ? `, starts at ${target.slot} over ${target.displaces.name}` : ` at ${target.slot}`}.{" "}
+        {target.displaces ? `, starts at ${at} ahead of ${target.displaces.name}` : ` at ${at}`}.{" "}
         {drop}
       </p>
     </div>
@@ -402,7 +404,11 @@ export default async function LineupPage({
     );
   }
 
-  const changes = league.advice.changes;
+  // Free agents fold into the slot they take, so a card never says "start
+  // Freiermuth" above one saying "add Ferguson over Freiermuth".
+  const merged = mergePickups(league.advice, pickups);
+  const changes = merged.changes;
+  const leftover = merged.leftover;
   const problems = league.advice.problems;
   // Slots that are spent rather than correct. Without this the page says the
   // lineup "already matches his rankings", which is not what it means when
@@ -482,13 +488,17 @@ export default async function LineupPage({
 
       {changes.length > 0 && (
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
-          {changes.map((s) => (
-            <ChangeCard key={`${s.slot}-${s.index}`} slot={s} />
-          ))}
+          {changes.map((c) =>
+            c.pickup ? (
+              <PickupCard key={`${c.slot.slot}-${c.slot.index}`} target={c.pickup} slot={c.slot.slot} />
+            ) : (
+              <ChangeCard key={`${c.slot.slot}-${c.slot.index}`} slot={c.slot} />
+            ),
+          )}
         </div>
       )}
 
-      {pickups.length > 0 && (
+      {leftover.length > 0 && (
         <div className="mt-6">
           <div className="flex items-baseline justify-between gap-3">
             <Eyebrow>Free agents to grab</Eyebrow>
@@ -504,7 +514,7 @@ export default async function LineupPage({
             are instant adds in Sleeper, no bid.
           </p>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            {pickups.map((t) => (
+            {leftover.map((t) => (
               <PickupCard key={t.player.playerId} target={t} />
             ))}
           </div>

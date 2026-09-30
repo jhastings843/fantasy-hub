@@ -166,7 +166,7 @@ async function runThursdayEmailLocked(options: {
       Promise.allSettled(
         all.filter((l) => l.source !== "manual").map(async (l) => {
           const ctx = await buildWaivers(l.id);
-          return { leagueName: ctx.leagueName, targets: ctx.report.startable };
+          return { leagueId: l.id, leagueName: ctx.leagueName, targets: ctx.report.startable };
         }),
       ),
     )
@@ -298,7 +298,7 @@ async function runThursdayEmailLocked(options: {
     subject,
     week,
     season,
-    changes: totalChanges(lineups),
+    changes: totalChanges(lineups, pickups),
     messageId: result.id,
   });
 }

@@ -4,6 +4,7 @@ import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
 import type { StartableTarget } from "@/lib/waivers/rank";
 import type { WaiverReview } from "@/lib/guillotine/waiver-review";
+import { mergePickups, type MergedChange } from "@/lib/waivers/merge";
 import {
   card,
   emailPage,
@@ -45,7 +46,7 @@ export interface ThursdayInput {
    * the drop that makes room. Waivers have cleared by the time this sends, so
    * each is an instant add in Sleeper, no bid. Absent when the scan failed.
    */
-  pickups?: { leagueName: string; targets: StartableTarget[] }[];
+  pickups?: { leagueId?: string; leagueName: string; targets: StartableTarget[] }[];
   /** The guillotine waiver run, graded. Absent when there was none or it failed. */
   waiverReviews?: WaiverReview[];
   generatedAt: string;
@@ -61,7 +62,7 @@ export interface ThursdayInput {
 export function thursdaySubject(input: ThursdayInput): string {
   const { survivors, lineups } = input;
   const week = survivors[0]?.week ?? lineups.week;
-  const changes = totalChanges(lineups);
+  const changes = totalChanges(lineups, input.pickups);
   const tail =
     changes === 0
       ? "lineups all set"
@@ -100,8 +101,30 @@ function opponentOf(survivor: SurvivorReport): string {
   return best?.opponent ?? "";
 }
 
-export function totalChanges(lineups: WeeklyLineups): number {
-  return lineups.leagues.reduce((n, l) => n + l.advice.changes.length, 0);
+export function totalChanges(lineups: WeeklyLineups, pickups?: ThursdayInput["pickups"]): number {
+  return lineups.leagues.reduce((n, l) => n + mergedFor(l, pickups).changes.length, 0);
+}
+
+/** Most pickups worth naming per league; past three it is a waiver page, not a lineup email. */
+const PICKUPS_PER_LEAGUE = 3;
+
+function pickupsFor(
+  league: WeeklyLineups["leagues"][number],
+  pickups: ThursdayInput["pickups"],
+): StartableTarget[] {
+  const entry = (pickups ?? []).find((p) =>
+    p.leagueId ? p.leagueId === league.leagueId : p.leagueName === league.leagueName,
+  );
+  return (entry?.targets ?? []).slice(0, PICKUPS_PER_LEAGUE);
+}
+
+/** A league's changes with its free agents folded into the slots they take. */
+function mergedFor(
+  league: WeeklyLineups["leagues"][number],
+  pickups: ThursdayInput["pickups"],
+): ReturnType<typeof mergePickups> {
+  if (league.error) return { changes: [], leftover: [] };
+  return mergePickups(league.advice, pickupsFor(league, pickups));
 }
 
 
@@ -239,7 +262,38 @@ function changeRow(slot: SlotAdvice): string {
 </div>`;
 }
 
-function leagueBlock(league: WeeklyLineups["leagues"][number]): string {
+function dropText(t: StartableTarget): string {
+  return t.dropFor === null
+    ? "You have an open roster spot."
+    : t.dropFor
+      ? `Drop ${t.dropFor.name}.`
+      : "Nobody on your bench is a safe drop, so pick one yourself.";
+}
+
+/**
+ * A slot a free agent takes. Replaces the ordinary row for that slot, so the
+ * email never says "start Pat" and then "sub Pat out for a pickup".
+ */
+function pickupChangeRow(slot: SlotAdvice, t: StartableTarget): string {
+  const rank = t.player.positionalRank != null ? `${t.player.position}${t.player.positionalRank} this week` : "ranked this week";
+  const over = t.displaces ? `, ahead of ${t.displaces.name}` : "";
+  return `<div style="padding:8px 0;border-top:1px solid ${PALETTE.hairline};">
+  <div style="font:600 13px/1.4 -apple-system,sans-serif;color:${PALETTE.ink};">
+    <span style="display:inline-block;background:${PALETTE.goodBg};color:${PALETTE.good};border:1px solid ${PALETTE.goodBorder};border-radius:5px;padding:1px 6px;font:600 10px/1.5 -apple-system,sans-serif;letter-spacing:.04em;margin-right:6px;">${escapeHtml(slot.slot)}</span>
+    Add ${escapeHtml(t.player.name)} <span style="font-weight:400;color:${PALETTE.muted};">free agent</span>
+  </div>
+  <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">${escapeHtml(`${rank}${over}. ${dropText(t)} Instant add in Sleeper, then start him here.`)}</div>
+</div>`;
+}
+
+function mergedRow(c: MergedChange): string {
+  return c.pickup ? pickupChangeRow(c.slot, c.pickup) : changeRow(c.slot);
+}
+
+function leagueBlock(
+  league: WeeklyLineups["leagues"][number],
+  pickups: ThursdayInput["pickups"],
+): string {
   const head = `<div style="font:600 14px/1.3 -apple-system,sans-serif;color:${PALETTE.ink};">${escapeHtml(league.leagueName)}</div>
 <div style="font:400 11px/1.4 -apple-system,sans-serif;color:${PALETTE.muted};padding-top:2px;">${escapeHtml(league.scoringLabel)}</div>`;
 
@@ -274,7 +328,9 @@ function leagueBlock(league: WeeklyLineups["leagues"][number]): string {
     )
     .join("");
 
-  if (league.advice.changes.length === 0) {
+  const { changes } = mergedFor(league, pickups);
+
+  if (changes.length === 0) {
     return card(
       `${head}
 <div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:8px;">Nothing to change.</div>
@@ -285,13 +341,10 @@ ${problems}${superflex}${ours}`,
 
   return card(
     `${head}
-<div style="padding-top:6px;">${league.advice.changes.map(changeRow).join("")}</div>
+<div style="padding-top:6px;">${changes.map(mergedRow).join("")}</div>
 ${problems}${superflex}${ours}`,
   );
 }
-
-/** Most pickups worth naming per league; past three it is a waiver page, not a lineup email. */
-const PICKUPS_PER_LEAGUE = 3;
 
 function pickupRow(t: StartableTarget): string {
   const rank = t.player.positionalRank != null ? `${t.player.position}${t.player.positionalRank} this week` : "ranked this week";
@@ -307,20 +360,34 @@ function pickupRow(t: StartableTarget): string {
 </div>`;
 }
 
+/**
+ * Free agents that did not fold into a lineup slot above, which is rare: a
+ * pickup with no starter to displace, or a league whose lineup could not be
+ * read. Everything else already sits in its slot's row.
+ */
 function pickupsSection(input: ThursdayInput): string {
-  const leagues = (input.pickups ?? []).filter((l) => l.targets.length > 0);
   if (!input.pickups) return "";
-  if (leagues.length === 0) {
-    return `${label("Free agents")}${card(`<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};">No free agent ranks ahead of anyone in your lineups this week.</div>`, GOOD)}`;
-  }
+  const byLeague = input.lineups.leagues;
+  const leagues = input.pickups
+    .map((p) => {
+      const league = byLeague.find((l) =>
+        p.leagueId ? l.leagueId === p.leagueId : l.leagueName === p.leagueName,
+      );
+      const targets = league
+        ? mergedFor(league, input.pickups).leftover
+        : p.targets.slice(0, PICKUPS_PER_LEAGUE);
+      return { leagueName: p.leagueName, targets };
+    })
+    .filter((l) => l.targets.length > 0);
+  if (leagues.length === 0) return "";
   const blocks = leagues
     .map(
       (l) =>
         card(`<div style="font:600 14px/1.3 -apple-system,sans-serif;color:${PALETTE.ink};">${escapeHtml(l.leagueName)}</div>
-${l.targets.slice(0, PICKUPS_PER_LEAGUE).map(pickupRow).join("")}`),
+${l.targets.map(pickupRow).join("")}`),
     )
     .join("");
-  return `${label("Free agents to grab")}<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-bottom:6px;">Waivers have cleared, so these are instant adds in Sleeper, no bid. Each ranks ahead of someone in your lineup on his weekly list; add him, make the drop, and start him.</div>${blocks}`;
+  return `${label("Free agents to grab")}<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-bottom:6px;">Instant adds in Sleeper, no bid.</div>${blocks}`;
 }
 
 /**
@@ -414,14 +481,14 @@ function ordinal(n: number): string {
 
 export function renderThursdayEmail(input: ThursdayInput): string {
   const { lineups } = input;
-  const changes = totalChanges(input.lineups);
+  const changes = totalChanges(input.lineups, input.pickups);
 
   const lineupSection = lineups.blocked
     ? card(
         `${label("Lineups")}<div style="font:400 14px/1.55 -apple-system,sans-serif;color:${PALETTE.body};">${escapeHtml(lineups.blocked)}</div>`,
         WARN,
       )
-    : `${label(changes === 0 ? "Lineups, all set" : `Lineups, ${changes} to change`)}${lineups.leagues.map(leagueBlock).join("")}`;
+    : `${label(changes === 0 ? "Lineups, all set" : `Lineups, ${changes} to change`)}${lineups.leagues.map((l) => leagueBlock(l, input.pickups)).join("")}`;
 
   // Named once at the bottom rather than per league, because it is the same
   // sentence four times otherwise. The per-league scoring line above already
