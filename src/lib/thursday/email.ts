@@ -518,3 +518,63 @@ export function renderThursdayEmail(input: ThursdayInput): string {
     footnote: `${provenance}<div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
 }
+
+/**
+ * One lineup change, named stably enough to tell whether Jack has already been
+ * told about it. The slot index and the player going in: the same advice
+ * reworded is the same key, a different player for that slot is a new one.
+ */
+export interface WatchItem {
+  key: string;
+  leagueId: string;
+  leagueName: string;
+  text: string;
+}
+
+export function watchItems(lineups: WeeklyLineups, pickups: ThursdayInput["pickups"]): WatchItem[] {
+  return lineups.leagues.flatMap((league) =>
+    mergedFor(league, pickups).changes.map((c) => {
+      const who = c.pickup ? c.pickup.player : c.slot.recommended;
+      const id = who?.playerId ?? "empty";
+      return {
+        key: `${league.leagueId}:${c.slot.index}:${c.pickup ? "fa:" : ""}${id}`,
+        leagueId: league.leagueId,
+        leagueName: league.leagueName,
+        text: c.pickup
+          ? `Add ${who?.name ?? "?"} at ${c.slot.slot}`
+          : `Start ${who?.name ?? "nobody"} at ${c.slot.slot}`,
+      };
+    }),
+  );
+}
+
+export function watchSubject(fresh: WatchItem[]): string {
+  const first = `${fresh[0].text} (${fresh[0].leagueName})`;
+  return fresh.length === 1 ? `Lineup update: ${first}` : `Lineup update: ${first}, +${fresh.length - 1} more`;
+}
+
+/**
+ * The between-emails nudge: something moved since the last lineup email and
+ * the lineup no longer matches. Only the leagues with something new, and each
+ * league's full list of changes, because a new change sitting next to an old
+ * one Jack has not made yet is still one trip into Sleeper.
+ */
+export function renderWatchEmail(input: ThursdayInput, fresh: WatchItem[]): string {
+  const leagueIds = new Set(fresh.map((f) => f.leagueId));
+  const leagues = input.lineups.leagues.filter((l) => leagueIds.has(l.leagueId));
+  const newList = fresh
+    .map(
+      (f) =>
+        `<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:4px;"><span style="font-weight:600;color:${PALETTE.ink};">${escapeHtml(f.text)}</span> <span style="color:${PALETTE.muted};">${escapeHtml(f.leagueName)}</span></div>`,
+    )
+    .join("");
+  return emailPage({
+    title: watchSubject(fresh),
+    kicker: `Lineup check · Week ${input.lineups.week ?? ""}`,
+    heading: fresh.length === 1 ? "One new change" : `${fresh.length} new changes`,
+    preheader: fresh.map((f) => f.text).join(", "),
+    body: `${card(`${label("New since your last email")}${newList}`, WARN)}<div style="padding-top:6px;">${label("Everything to change in these leagues")}${leagues.map((l) => leagueBlock(l, input.pickups)).join("")}</div>`,
+    cta: { href: input.appUrl, text: "Open fantasy hub" },
+    footnote: `<div style="font:400 11px/1.55 -apple-system,sans-serif;color:${PALETTE.muted};">Checked once a day from Thursday until the Sunday 1pm lock. No email means nothing new.</div><div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
+  });
+}

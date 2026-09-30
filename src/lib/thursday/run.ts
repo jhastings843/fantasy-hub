@@ -3,7 +3,8 @@ import { buildReports } from "@/lib/survivor/report";
 import type { SurvivorReport } from "@/lib/survivor/types";
 import { buildWeeklyLineups } from "@/lib/lineup/build";
 import { sendEmail } from "@/lib/guillotine/send";
-import { renderThursdayEmail, thursdaySubject, totalChanges } from "./email";
+import { renderThursdayEmail, thursdaySubject, totalChanges, watchItems, type ThursdayInput } from "./email";
+import { addSeen } from "@/lib/watch/store";
 import { alreadySent, clearSent, recordSent, type ThursdaySendRecord } from "./sent-log";
 import { recordBaseline, type Baselines } from "@/lib/survivor/baseline";
 import { withSendLock } from "@/lib/email/sent-log";
@@ -161,17 +162,7 @@ async function runThursdayEmailLocked(options: {
 
   // Every league's free agents against its lineup, after waivers have run.
   // One league failing costs that league's pickups, never the email.
-  const pickups = await getMyLeagues()
-    .then((all) =>
-      Promise.allSettled(
-        all.filter((l) => l.source !== "manual").map(async (l) => {
-          const ctx = await buildWaivers(l.id);
-          return { leagueId: l.id, leagueName: ctx.leagueName, targets: ctx.report.startable };
-        }),
-      ),
-    )
-    .then((rs) => rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])))
-    .catch(() => undefined);
+  const pickups = await buildPickups();
 
   // The guillotine waiver run, graded. Optional in the same way pickups are:
   // a failure costs this card, never the email.
@@ -285,6 +276,10 @@ async function runThursdayEmailLocked(options: {
   }
   await recordBaseline(season, week, baselines);
 
+  // What this email told him, so the daily lineup check only speaks up about
+  // changes that are new since.
+  await addSeen(season, week, watchItems(lineups, pickups).map((i) => i.key));
+
   await recordSent(season, week, {
     sentAt: new Date().toISOString(),
     subject,
@@ -301,4 +296,19 @@ async function runThursdayEmailLocked(options: {
     changes: totalChanges(lineups, pickups),
     messageId: result.id,
   });
+}
+
+/** Every league's free agents who would start, with the drop. Undefined when the scan failed. */
+export function buildPickups(): Promise<ThursdayInput["pickups"]> {
+  return getMyLeagues()
+    .then((all) =>
+      Promise.allSettled(
+        all.filter((l) => l.source !== "manual").map(async (l) => {
+          const ctx = await buildWaivers(l.id);
+          return { leagueId: l.id, leagueName: ctx.leagueName, targets: ctx.report.startable };
+        }),
+      ),
+    )
+    .then((rs) => rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])))
+    .catch(() => undefined);
 }

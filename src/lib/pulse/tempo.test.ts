@@ -191,3 +191,24 @@ describe("the week's shape, after the 3am waiver run was accounted for", () => {
     expect(morning).not.toContain("midweek");
   });
 });
+
+describe("daily lineup check", () => {
+  // EDT is UTC-4 in October.
+  it("is due from noon Thursday to Saturday", () => {
+    expect(tempoFor(at("2026-10-01T16:05:00Z")).dueSends).toContain("watch"); // Thu 12:05
+    expect(tempoFor(at("2026-10-03T20:00:00Z")).dueSends).toContain("watch"); // Sat 16:00
+    expect(tempoFor(at("2026-10-01T15:55:00Z")).dueSends).not.toContain("watch"); // Thu 11:55
+  });
+
+  it("runs Sunday only between 12:15 and the 1pm lock", () => {
+    expect(tempoFor(at("2026-10-04T16:20:00Z")).dueSends).toContain("watch"); // Sun 12:20
+    expect(tempoFor(at("2026-10-04T16:10:00Z")).dueSends).not.toContain("watch"); // Sun 12:10
+    expect(tempoFor(at("2026-10-04T17:00:00Z")).dueSends).not.toContain("watch"); // Sun 13:00
+  });
+
+  it("is never due Monday to Wednesday", () => {
+    for (const iso of ["2026-10-05T16:30:00Z", "2026-10-06T16:30:00Z", "2026-09-30T16:30:00Z"]) {
+      expect(tempoFor(at(iso)).dueSends).not.toContain("watch");
+    }
+  });
+});

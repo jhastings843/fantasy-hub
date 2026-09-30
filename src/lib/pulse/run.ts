@@ -20,6 +20,7 @@ import { runFaabEmail, configuredSendDay } from "@/lib/guillotine/run";
 import { runThursdayEmail, configuredSendDay as thursdaySendDay } from "@/lib/thursday/run";
 import { runMidweekEmail } from "@/lib/midweek/run";
 import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
+import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
@@ -368,6 +369,8 @@ async function runSend(id: SendId): Promise<Response> {
       // Day only. The waiver and rankings gates are the reason this send
       // waits, and the pulse is the caller that most needs them.
       return runThursdayEmail({ ignoreDayGate: true });
+    case "watch":
+      return runLineupWatch();
     case "sunday":
       return runSundayBrief();
     case "alarm":
@@ -412,6 +415,8 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
   // The alarm is one email per problem, not per week, and only it knows
   // which problems this week's earlier alarms covered. It checks itself.
   if (id === "alarm") return false;
+  // The lineup check can send more than once a week and keeps its own log.
+  if (id === "watch") return false;
   try {
     const state = await getNflState();
     const week = state.display_week ?? state.week;

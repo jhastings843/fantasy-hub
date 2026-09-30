@@ -19,7 +19,7 @@ export type PulseTier = "live" | "hourly" | "overnight" | "idle";
 // than a minute window here that a late run would fall straight through.
 
 /** The emails, by the moment each one belongs to. */
-export type SendId = "faab" | "midweek" | "thursday" | "sunday" | "alarm";
+export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm";
 
 export type TimedJobId = "refresh-all-early" | "refresh-all-late";
 
@@ -53,6 +53,8 @@ const SUN = 0;
 const MON = 1;
 const WED = 3;
 const THU = 4;
+const FRI = 5;
+const SAT = 6;
 
 /**
  * Sunday's live window closes at 20:00 rather than at the end of the night
@@ -118,7 +120,7 @@ export function etClock(now: Date): EtClock {
 /**
  * When each email is meant to leave, in ET.
  *
- * `until` is only for the alarm. Every other send is due from its time until
+ * `until` is only for the alarm and the Sunday lineup check. Every other send is due from its time until
  * the end of its day, because an email that missed 8am is still worth having
  * at noon. The alarm is the opposite: it exists for the 75 minutes before the
  * 1pm lock, and one arriving at 8pm about a slot nobody can change any more
@@ -139,6 +141,13 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
     // send log makes the Thursday slot a no-op when Wednesday went out.
     { id: "thursday", day: days.thursdayDay ?? WED, at: 8 * 60 },
     { id: "thursday", day: THU, at: 8 * 60 },
+    // The daily lineup check. It mails only when a change appears that no
+    // earlier email mentioned, and checks itself off once a day. Sunday's is
+    // after the 11:30 inactives and must finish before the 13:00 lock.
+    { id: "watch", day: THU, at: 12 * 60 },
+    { id: "watch", day: FRI, at: 12 * 60 },
+    { id: "watch", day: SAT, at: 12 * 60 },
+    { id: "watch", day: SUN, at: 12 * 60 + 15, until: 13 * 60 },
     { id: "sunday", day: SUN, at: 9 * 60 },
     // After the 11:30 inactive reports and well before the 13:00 lock. This one
     // is allowed to send nothing at all, which is its normal outcome.
