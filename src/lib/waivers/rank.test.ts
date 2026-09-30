@@ -344,6 +344,20 @@ describe("season claims off his weekly list (season list stale)", () => {
     expect(r.seasonUpgrades.map((t) => t.player.playerId)).not.toContain("te33");
   });
 
+  it("lets a Dynasty Nerds pick replace a written-off bench player, but nobody better", () => {
+    const worth: Record<string, number> = { wicks: 9, downs: 300, daniels: 6 };
+    const daniels = wk("daniels", "QB", null, null, {
+      research: { tier: "multiweek", faabPercent: 15, note: "Dynasty Nerds: 10-20% FAAB", source: "dynasty-nerds" },
+    });
+    const r = waiverTargets({
+      rosterPositions: slots, roster, freeAgents: [daniels], seasonOrder: "value",
+      marketValue: (id) => worth[id] ?? 0,
+    });
+    expect(r.seasonUpgrades[0]?.player.playerId).toBe("daniels");
+    expect(r.seasonUpgrades[0]?.dropFor?.playerId).toBe("wicks");
+    expect(r.seasonUpgrades).toHaveLength(1);
+  });
+
   it("does not drop a player on bye who his season list rates", () => {
     const onBye = roster.map((p) =>
       p.playerId === "wicks" ? wk("star", "WR", null, null, { onBye: true, seasonRank: 30 }) : p,

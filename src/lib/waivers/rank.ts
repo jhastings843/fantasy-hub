@@ -28,7 +28,7 @@ export interface WaiverPlayer extends AdvicePlayer {
   /** What he actually did last week. Null before any week has been played. */
   lastWeek?: LastWeekUsage | null;
   /** The web consensus on him this week, when the research named him. */
-  research?: { tier: string; faabPercent: number | null; note: string } | null;
+  research?: { tier: string; faabPercent: number | null; note: string; source?: "dynasty-nerds" } | null;
   /**
    * His waiver post on him this week.
    *
@@ -422,6 +422,15 @@ function spareByPosition(roster: WaiverPlayer[], rosterPositions: string[]): Map
  * with upside outranks a blocking tight end whatever one week's list says.
  */
 const DYNASTY_MARGIN = 1.15;
+/**
+ * Below this, a rostered player is a bench scrub the market has already
+ * written off, and a Dynasty Nerds pick may take his spot even before the
+ * market prices the pick in. Market values lag a sudden starter: week 4,
+ * Jalon Daniels was worth 6 the week he took over in Tampa, with Dynasty
+ * Nerds at 10-20% FAAB for him in superflex.
+ */
+const SCRUB_VALUE = 25;
+const isNerdsPick = (p: WaiverPlayer) => p.research?.source === "dynasty-nerds";
 
 function seasonByValue(
   freeAgents: WaiverPlayer[],
@@ -431,7 +440,15 @@ function seasonByValue(
   worth: (playerId: string) => number | null,
 ): SeasonTarget[] {
   const v = (p: WaiverPlayer) => worth(p.playerId) ?? 0;
-  const pool = freeAgents.filter((p) => !cannotPlay(p) && v(p) > 0).sort((a, b) => v(b) - v(a));
+  // Their picks first, by the bid they set; then anyone the market values.
+  const pool = freeAgents
+    .filter((p) => !cannotPlay(p) && (v(p) > 0 || isNerdsPick(p)))
+    .sort(
+      (a, b) =>
+        Number(isNerdsPick(b)) - Number(isNerdsPick(a)) ||
+        (b.research?.faabPercent ?? 0) - (a.research?.faabPercent ?? 0) ||
+        v(b) - v(a),
+    );
   const drops = droppable.filter((d) => !d.injuryStatus).sort((a, b) => v(a) - v(b));
   const out: SeasonTarget[] = [];
   let di = 0;
@@ -442,13 +459,18 @@ function seasonByValue(
       continue;
     }
     const drop = drops[di];
-    if (!drop || v(player) < v(drop) * DYNASTY_MARGIN || v(player) - v(drop) < 50) break;
+    if (!drop) break;
+    const beatsOnValue = v(player) >= v(drop) * DYNASTY_MARGIN && v(player) - v(drop) >= 50;
+    const nerdsOverScrub = isNerdsPick(player) && v(drop) < SCRUB_VALUE;
+    if (!beatsOnValue && !nerdsOverScrub) continue;
     di += 1;
     out.push({
       player,
       dropFor: drop,
       placesBetter: null,
-      why: `dynasty value ${v(player).toLocaleString()}, ${drop.name} is ${v(drop).toLocaleString()}`,
+      why: beatsOnValue
+        ? `dynasty value ${v(player).toLocaleString()}, ${drop.name} is ${v(drop).toLocaleString()}`
+        : `a Dynasty Nerds pick for a bench player worth ${v(drop).toLocaleString()} in dynasty value`,
     });
   }
   return out;

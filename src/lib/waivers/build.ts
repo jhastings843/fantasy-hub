@@ -30,6 +30,7 @@ import { claimGain, type ClaimGain } from "./gain";
 import { isFreshForRun, mergeWire, rankWire, staleNote, usageFrom, type WireCandidate } from "./freshness";
 import { resolveNames, toCandidates } from "@/lib/jingles/resolve";
 import { readWaiverResearch } from "./research";
+import { readDynastyNerds } from "./dynastynerds";
 import type { ClaimTier } from "./price";
 import {
   classifyClaim,
@@ -219,10 +220,11 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     source = { label: lab.title, fresh: true, note: null };
   } else {
     const format = profile.type === "dynasty" ? "dynasty" : "redraft";
-    const [trending, ownResearch, redraftResearch] = await Promise.all([
+    const [trending, ownResearch, redraftResearch, nerds] = await Promise.all([
       getTrendingAdds(100).catch(() => []),
       readWaiverResearch(season, nflWeek, format),
       format === "dynasty" ? readWaiverResearch(season, nflWeek, "redraft") : Promise.resolve(null),
+      format === "dynasty" ? readDynastyNerds(season, nflWeek) : Promise.resolve(null),
     ]);
     // The redraft consensus is a fair second-best for dynasty when the
     // dynasty pass has not run: the role changes are the same players.
@@ -264,9 +266,34 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       ...toPlayer(c.playerId),
       tier: `${c.adds.toLocaleString()} adds`,
     }));
-    freeAgents = mergeWire(researchPlayers, trendingPlayers);
+    // Dynasty Nerds' FAAB guide leads a dynasty wire, their range setting the
+    // bid; the research and the most-added list fill in behind it.
+    const nerdsPlayers: WaiverPlayer[] = nerds
+      ? resolveNames(
+          nerds.rows.map((r) => ({ name: r.name, position: r.position, team: r.team, row: r })),
+          toCandidates(players),
+        )
+          .resolved.filter((r) => !owned.has(r.playerId))
+          .map((r) => ({
+            ...toPlayer(r.playerId),
+            research: {
+              source: "dynasty-nerds" as const,
+              // Their bid is the only tier signal they give: a double-digit
+              // range is a player they expect to start for weeks.
+              tier: r.input.row.faabHigh >= 10 ? "multiweek" : r.input.row.faabHigh >= 4 ? "filler" : "stash",
+              faabPercent: (r.input.row.faabLow + r.input.row.faabHigh) / 2,
+              note: `Dynasty Nerds: ${r.input.row.faabLow === r.input.row.faabHigh ? r.input.row.faabLow : `${r.input.row.faabLow}-${r.input.row.faabHigh}`}% FAAB in 12-team superflex dynasty, ${r.input.row.rostered ?? "?"}% rostered in Sleeper dynasty leagues.`,
+            },
+          }))
+          .filter((p) => isStartableIn(p.position, startable))
+      : [];
+    freeAgents = mergeWire(mergeWire(nerdsPlayers, researchPlayers), trendingPlayers);
 
-    const lead = jingles ? "His waiver post leads the list" : null;
+    const lead = jingles
+      ? "His waiver post leads the list"
+      : nerds
+        ? `Dynasty Nerds' week ${nerds.week} FAAB guide leads the list`
+        : null;
     const researched = research
       ? ` ${lead ? `${lead}; this` : "This"} week's ${borrowed ? "redraft " : ""}waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and ${lead ? "follow it" : "lead the list"}; Sleeper's most-added players fill in behind them.`
       : lead

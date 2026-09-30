@@ -153,7 +153,9 @@ function leagueCard(league: WaiverContext): string {
         t.player.name,
         `${
           t.why
-            ? `His weekly list: ${t.why}`
+            ? /this week/.test(t.why)
+              ? `His weekly list: ${t.why}`
+              : t.why.charAt(0).toUpperCase() + t.why.slice(1)
             : `${t.player.seasonPositionRank ?? "Ranked"} on the season list${
                 t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
               }`
