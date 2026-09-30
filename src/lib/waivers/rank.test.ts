@@ -67,7 +67,8 @@ describe("waiverTargets", () => {
       const weeklyOnly = [p({ playerId: "schultz", position: "TE", positionalRank: 10, flexRank: 76 })];
       const r = waiverTargets({ rosterPositions: SLOTS, roster: tes, freeAgents: board, weeklyOnly, seasonOrder: "given" });
       expect(r.startable[0].player.playerId).toBe("schultz");
-      expect(r.startable.map((t) => t.player.playerId)).toContain("freiermuth");
+      // Both would bench Loveland; only the better one is a real move.
+      expect(r.startable.map((t) => t.player.playerId)).not.toContain("freiermuth");
     });
 
     it("never suggests a free agent who cannot play", () => {
@@ -79,13 +80,13 @@ describe("waiverTargets", () => {
       expect(r.startable).toHaveLength(0);
     });
 
-    it("orders by his weekly ranking, best first", () => {
+    it("keeps the best of two free agents who would bench the same starter", () => {
       const free = [
         p({ playerId: "faOk", position: "WR", flexRank: 20, seasonRank: 60 }),
         p({ playerId: "faBest", position: "WR", flexRank: 1, seasonRank: 3 }),
       ];
       const r = waiverTargets({ rosterPositions: SLOTS, roster, freeAgents: free });
-      expect(r.startable.map((s) => s.player.playerId)).toEqual(["faBest", "faOk"]);
+      expect(r.startable.map((s) => s.player.playerId)).toEqual(["faBest"]);
     });
   });
 
@@ -376,6 +377,13 @@ describe("season claims off his weekly list (season list stale)", () => {
     });
     expect(r.seasonUpgrades[0]?.dropFor?.playerId).toBe("downs");
     expect(r.seasonUpgrades[0]?.why).toContain("fine-dropping list");
+  });
+
+  it("offers one add per starter it would bench", () => {
+    const a = wk("teA", "TE", 40, 5), b = wk("teB", "TE", 50, 8);
+    const r = waiverTargets({ rosterPositions: slots, roster, freeAgents: [a, b], seasonOrder: "given" });
+    const overLoveland = r.startable.filter((t) => t.displaces?.playerId === "loveland");
+    expect(overLoveland.map((t) => t.player.playerId)).toEqual(["teA"]);
   });
 
   it("does not drop a player on bye who his season list rates", () => {

@@ -13,6 +13,7 @@ import { getWeekTransactions } from "@/lib/guillotine/league-state";
 import { thisWeeksClaims, waiversAreSettled } from "@/lib/waivers/settled";
 import { weeklyRankingsReady } from "@/lib/jingles/ingest";
 import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
+import { buildWaivers } from "@/lib/waivers/build";
 
 // The Thursday job itself, kept out of route.ts.
 //
@@ -157,6 +158,20 @@ async function runThursdayEmailLocked(options: {
     buildWeeklyLineups(),
   ]);
 
+  // Every league's free agents against its lineup, after waivers have run.
+  // One league failing costs that league's pickups, never the email.
+  const pickups = await getMyLeagues()
+    .then((all) =>
+      Promise.allSettled(
+        all.filter((l) => l.source !== "manual").map(async (l) => {
+          const ctx = await buildWaivers(l.id);
+          return { leagueName: ctx.leagueName, targets: ctx.report.startable };
+        }),
+      ),
+    )
+    .then((rs) => rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])))
+    .catch(() => undefined);
+
   const week = survivorResult.reports[0]?.week ?? lineups.week;
   const season = String(survivorResult.reports[0]?.season ?? lineups.season ?? "");
 
@@ -171,6 +186,7 @@ async function runThursdayEmailLocked(options: {
     survivors: survivorResult.reports,
     survivorError: survivorResult.error,
     lineups,
+    pickups,
     generatedAt: new Date().toISOString(),
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app",
   };

@@ -367,7 +367,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // half PPR, Dalton Schultz was TE10 and free, the board recommended
   // Freiermuth (TE11) over Loveland (TE13), and Schultz was never considered.
   const onBoard = new Set(freeAgents.map((p) => p.playerId));
-  const weeklyOnly = isDynastyWire ? [] : [...new Set([...index.positional.keys(), ...index.flex.keys()])]
+  // Dynasty too: his weekly list answers "would he start Sunday", which is a
+  // lineup question in any format. rank.ts keeps these out of season claims.
+  const weeklyOnly = [...new Set([...index.positional.keys(), ...index.flex.keys()])]
     .filter((id) => !owned.has(id) && !onBoard.has(id))
     .map(toPlayer)
     .filter((p) => isStartableIn(p.position, startable));

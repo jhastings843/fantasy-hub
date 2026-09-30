@@ -142,7 +142,7 @@ function leagueCard(league: WaiverContext): string {
           t.player.positionalRank != null
             ? `He has him ${t.player.position}${t.player.positionalRank} this week.`
             : "Unranked this week, so this is the season list talking."
-        }${usageNote(t.player)}${bidText(t.price)}`,
+        }${t.dropFor ? ` Drop ${t.dropFor.name}.` : t.dropFor === null ? " There is a free spot." : ""}${usageNote(t.player)}${bidText(t.price)}`,
         "start",
       ),
     )

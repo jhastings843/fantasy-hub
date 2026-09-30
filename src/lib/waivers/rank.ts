@@ -55,6 +55,11 @@ export interface StartableTarget {
   slot: string;
   /** The player he would push out of the lineup. */
   displaces: WaiverPlayer | null;
+  /**
+   * Who to cut to make room: null with a free roster spot, undefined when
+   * nobody on the bench can go without breaking a rule below.
+   */
+  dropFor?: WaiverPlayer | null;
   /** What to bid, once the league's budget and market are known. */
   price?: ClaimPrice;
 }
@@ -199,8 +204,20 @@ export function waiverTargets(input: {
       displaces: displaces ? (byId.get(displaces.playerId) ?? null) : null,
     });
   }
-  // By his weekly ordering, which is what "best" means for this week.
+  // By his weekly ordering, which is what "best" means for this week. Then
+  // one add per benched starter: three free agents each "starting over
+  // Colston Loveland" is one real move and two that cannot all happen.
   startable.sort((a, b) => scoreOf(b.player) - scoreOf(a.player));
+  {
+    const seenSlot = new Set<string>();
+    const kept = startable.filter((t) => {
+      const key = t.displaces?.playerId ?? `open:${t.slot}`;
+      if (seenSlot.has(key)) return false;
+      seenSlot.add(key);
+      return true;
+    });
+    startable.splice(0, startable.length, ...kept);
+  }
 
   // The worst thing on the roster that is not holding up this week's lineup,
   // and never so many at one position that the league's starting slots
@@ -218,14 +235,47 @@ export function waiverTargets(input: {
       spare.set(p.position, left - 1);
       return true;
     });
+  // A claim on an empty roster spot costs nothing, so it needs no drop. Beyond
+  // those, every claim is a swap and has to name its price.
+  const openSpots = Math.max(0, rosterPositions.length - roster.length);
+
   const worth = input.marketValue;
   /** A drop may pay for a claim only when it is not worth more on the market. */
   const valueOk = (pick: WaiverPlayer, drop: WaiverPlayer | null) =>
     !worth || !drop || (worth(drop.playerId) ?? 0) <= (worth(pick.playerId) ?? 0);
 
-  // A claim on an empty roster spot costs nothing, so it needs no drop. Beyond
-  // those, every claim is a swap and has to name its price.
-  const openSpots = Math.max(0, rosterPositions.length - roster.length);
+  // A drop for each start, so the lineup email can say "add X, drop Y, start
+  // X over Z" in one line. His "fine dropping" names go first; nobody injured,
+  // nobody the market or a fresh season list protects, and in dynasty nobody
+  // worth more than the add. The benched starter is never the drop: he just
+  // lost a slot for a week, not his spot.
+  {
+    const his = (d: WaiverPlayer) => !!input.hisDrops?.has(d.playerId);
+    const shielded = (d: WaiverPlayer) =>
+      !his(d) &&
+      ((d.seasonRank !== null && d.seasonRank <= protectWithin) || !!input.protectedIds?.has(d.playerId));
+    const order = droppable
+      .filter((d) => !d.injuryStatus && !shielded(d))
+      .sort((a, b) => Number(his(b)) - Number(his(a)) || (worth ? (worth(a.playerId) ?? 0) - (worth(b.playerId) ?? 0) : scoreOf(a) - scoreOf(b)));
+    const taken = new Set<string>();
+    let free = openSpots;
+    for (const t of startable.slice(0, limit)) {
+      if (free > 0) {
+        t.dropFor = null;
+        free -= 1;
+        continue;
+      }
+      // A streamed defense or kicker replaces the one he benches.
+      if (t.displaces && (t.displaces.position === "DEF" || t.displaces.position === "K")) {
+        t.dropFor = t.displaces;
+        continue;
+      }
+      const d = order.find((x) => !taken.has(x.playerId) && x.playerId !== t.displaces?.playerId && valueOk(t.player, x));
+      if (d) taken.add(d.playerId);
+      t.dropFor = d;
+    }
+  }
+
 
   const seasonUpgrades: SeasonTarget[] = input.seasonOrder === "value" && worth
     ? seasonByValue(

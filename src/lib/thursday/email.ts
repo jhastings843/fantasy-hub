@@ -2,6 +2,7 @@ import type { SurvivorReport } from "@/lib/survivor/types";
 import { poolMeta } from "@/lib/survivor/pools";
 import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
+import type { StartableTarget } from "@/lib/waivers/rank";
 import {
   card,
   emailPage,
@@ -35,6 +36,12 @@ export interface ThursdayInput {
   survivors: SurvivorReport[];
   survivorError: string | null;
   lineups: WeeklyLineups;
+  /**
+   * Free agents who would start over someone in the lineup, per league, with
+   * the drop that makes room. Waivers have cleared by the time this sends, so
+   * each is an instant add in Sleeper, no bid. Absent when the scan failed.
+   */
+  pickups?: { leagueName: string; targets: StartableTarget[] }[];
   generatedAt: string;
   appUrl: string;
 }
@@ -277,6 +284,39 @@ ${problems}${superflex}${ours}`,
   );
 }
 
+/** Most pickups worth naming per league; past three it is a waiver page, not a lineup email. */
+const PICKUPS_PER_LEAGUE = 3;
+
+function pickupRow(t: StartableTarget): string {
+  const rank = t.player.positionalRank != null ? `${t.player.position}${t.player.positionalRank} this week` : "ranked this week";
+  const over = t.displaces ? `, starting at ${t.slot} over ${t.displaces.name}` : ` at ${t.slot}`;
+  const drop =
+    t.dropFor === null
+      ? "You have an open roster spot."
+      : t.dropFor
+        ? `Drop ${t.dropFor.name}.`
+        : "Nobody on your bench is a safe drop, so pick one yourself or skip it.";
+  return `<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:6px;">
+  <span style="font-weight:600;color:${PALETTE.ink};">Add ${escapeHtml(t.player.name)}</span> (${escapeHtml(rank)})${escapeHtml(over)}. ${escapeHtml(drop)}
+</div>`;
+}
+
+function pickupsSection(input: ThursdayInput): string {
+  const leagues = (input.pickups ?? []).filter((l) => l.targets.length > 0);
+  if (!input.pickups) return "";
+  if (leagues.length === 0) {
+    return `${label("Free agents")}${card(`<div style="font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};">No free agent ranks ahead of anyone in your lineups this week.</div>`, GOOD)}`;
+  }
+  const blocks = leagues
+    .map(
+      (l) =>
+        card(`<div style="font:600 14px/1.3 -apple-system,sans-serif;color:${PALETTE.ink};">${escapeHtml(l.leagueName)}</div>
+${l.targets.slice(0, PICKUPS_PER_LEAGUE).map(pickupRow).join("")}`),
+    )
+    .join("");
+  return `${label("Free agents to grab")}<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};padding-bottom:6px;">Waivers have cleared, so these are instant adds in Sleeper, no bid. Each ranks ahead of someone in your lineup on his weekly list; add him, make the drop, and start him.</div>${blocks}`;
+}
+
 export function renderThursdayEmail(input: ThursdayInput): string {
   const { lineups } = input;
   const changes = totalChanges(input.lineups);
@@ -309,7 +349,7 @@ export function renderThursdayEmail(input: ThursdayInput): string {
       changes === 0
         ? "Nothing to change in any league."
         : `${changes} slots to change before kickoff.`,
-    body: `${survivorSection(input)}<div style="padding-top:6px;">${lineupSection}</div>`,
+    body: `${survivorSection(input)}<div style="padding-top:6px;">${lineupSection}</div><div style="padding-top:6px;">${pickupsSection(input)}</div>`,
     cta: input.survivors.length > 0 && input.survivors.every((s) => !s.status.alive)
       ? { href: input.appUrl, text: "Open fantasy hub" }
       : { href: `${input.appUrl}/survivor`, text: "Open survivor" },
