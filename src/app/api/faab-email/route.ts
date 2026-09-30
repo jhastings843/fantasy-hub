@@ -68,3 +68,15 @@ export async function GET(request: Request) {
     leagueId: params.get("league") ?? undefined,
   });
 }
+
+// POST /api/faab-email - a by-hand resend from Jack's Mac (the same relay and
+// RELAY_SECRET as the midweek email), so this week's guide can be sent again
+// without CRON_SECRET ever leaving Vercel. Body: { resend?: boolean }.
+export async function POST(request: Request) {
+  const secret = process.env.RELAY_SECRET;
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const body = (await request.json().catch(() => ({}))) as { resend?: boolean };
+  return runFaabEmail({ force: true, resend: body.resend === true });
+}
