@@ -157,7 +157,7 @@ async function runThursdayEmailLocked(options: {
         error: e instanceof Error ? e.message : String(e),
       }),
     ),
-    buildWeeklyLineups(),
+    buildWeeklyLineups({ freshStatus: true }),
   ]);
 
   // Every league's free agents against its lineup, after waivers have run.

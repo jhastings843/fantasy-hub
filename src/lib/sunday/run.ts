@@ -42,7 +42,7 @@ async function gather(): Promise<{
   // Thursday: a Sunday with lineups and no board is still worth sending.
   const [survivors, lineups] = await Promise.all([
     buildReports().catch(() => [] as SurvivorReport[]),
-    buildWeeklyLineups(),
+    buildWeeklyLineups({ freshStatus: true }),
   ]);
   const week = survivors[0]?.week ?? lineups.week;
   const season = String(survivors[0]?.season ?? lineups.season ?? "");

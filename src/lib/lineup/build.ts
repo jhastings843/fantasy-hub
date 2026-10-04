@@ -11,7 +11,7 @@ import type { Scoring } from "@/lib/jingles/parse";
 import { getMyLeagues } from "@/lib/league/discover";
 import type { LeagueProfile } from "@/lib/league/types";
 import { getAllPlayers, getLeague, getLeagueRosters, getUser } from "@/lib/sleeper/client";
-import { getWeekProjections } from "@/lib/guillotine/projections";
+import { getWeekProjections, revalidateProjections } from "@/lib/guillotine/projections";
 import { normalizeTeam } from "@/lib/jingles/resolve";
 import { scoringSkewNotes, type ScoringSettings } from "@/lib/guillotine/scoring";
 import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
@@ -87,8 +87,23 @@ function listScoringFor(league: ScoringSettings, listPpr: number): ScoringSettin
 const PPR_FOR: Record<string, number> = { half_ppr: 0.5, full_ppr: 1, standard: 0 };
 
 export async function buildWeeklyLineups(
-  options: { week?: number; leagueId?: string } = {},
+  options: {
+    week?: number;
+    leagueId?: string;
+    /**
+     * Drop the week projections first, so injury statuses are read live.
+     *
+     * That feed is the only place a starter's status comes from, and it keeps
+     * for six hours. On 2026-10-04 Sleeper tagged Terry McLaurin Out at 8:15
+     * and the 9:00 Sunday email still told Jack to start him at FLEX, off a
+     * copy cached before the news. Every email that recommends a lineup asks
+     * for this; the page does not, so browsing stays cheap.
+     */
+    freshStatus?: boolean;
+  } = {},
 ): Promise<WeeklyLineups> {
+  if (options.freshStatus) await revalidateProjections().catch(() => 0);
+
   const weekly =
     options.week !== undefined
       ? await readWeeklyForCurrentSeason(options.week)

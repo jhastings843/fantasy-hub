@@ -48,7 +48,10 @@ async function runLocked({
     return Response.json({ ok: true, skipped: true, reason: "Already checked today." });
   }
 
-  const [lineups, pickups] = await Promise.all([buildWeeklyLineups(), buildPickups()]);
+  // Lineups first: they drop the cached statuses, and pickups read the same
+  // cache, so running the two side by side would let pickups see the old copy.
+  const lineups = await buildWeeklyLineups({ freshStatus: true });
+  const pickups = await buildPickups();
   if (lineups.blocked) {
     // Not recorded as checked, so the next pulse tries again.
     return Response.json({ ok: true, skipped: true, reason: lineups.blocked });
