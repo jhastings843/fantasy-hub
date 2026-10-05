@@ -178,6 +178,8 @@ export function findBestTrades(
         if (!recvPos) continue;
         const bilateral = scoreBoth(myTeam, partner, allTeams, send, receive, totalTeams);
         if (!bilateral.mutual) continue;
+        // Fixing one room by hollowing out another is not a fit.
+        if (weakensAHole(bilateral.positionalImpact)) continue;
         const from = myTeam.positionRanks[recvPos] ?? 99;
         const to = projectedRank(myTeam, allTeams, recvPos, send, receive);
         const fillsDeficit = send.some((p) => deficits.has(p.position));
@@ -263,6 +265,7 @@ export function findBestTrades(
 
         const bilateral = scoreBoth(myTeam, partner, allTeams, [oldPlayer], [youngPlayer], totalTeams);
         if (!bilateral.mutual) continue;
+        if (weakensAHole(bilateral.positionalImpact)) continue;
         ideas.push({
           ...bilateral,
           partnerRosterId: partner.rosterId,
@@ -727,6 +730,14 @@ export function verdictLabel(v: TradeVerdict): string {
   return VERDICT_LABEL[v];
 }
 
+// Share of a last-ranked room's value that, once traded away, deepens the
+// hole even though the rank cannot drop any further.
+const ROOM_DRAIN_SHARE = 0.2;
+
+function weakensAHole(impact: PositionalImpact[]): boolean {
+  return impact.some((p) => p.holeChange === "opens" || p.holeChange === "deepens");
+}
+
 export function scoreSideFor(
   team: TeamSummary,
   allTeams: TeamSummary[],
@@ -761,10 +772,19 @@ export function scoreSideFor(
     );
     const wasHole = beforeRank >= holeThreshold;
     const willBeHole = afterRank >= holeThreshold;
+    // A room ranked last cannot fall in rank, so emptying it read as free:
+    // the tool offered Jack's young QB from the league's worst superflex QB
+    // room. Losing a real share of the room's value counts as deepening.
+    const roomBefore = team.positionTotals[pos] ?? 0;
+    const roomLost =
+      bundleValue(giving.filter((p) => p.position === pos)) -
+      bundleValue(receiving.filter((p) => p.position === pos));
+    const atFloor = beforeRank >= totalTeams;
+    const drainsRoom = atFloor && roomBefore > 0 && roomLost / roomBefore >= ROOM_DRAIN_SHARE;
     let holeChange: HoleChange;
     if (!wasHole && willBeHole) holeChange = "opens";
     else if (wasHole && !willBeHole) holeChange = "closes";
-    else if (wasHole && willBeHole && afterRank > beforeRank)
+    else if (wasHole && willBeHole && (afterRank > beforeRank || drainsRoom))
       holeChange = "deepens";
     else if (wasHole) holeChange = "stays_hole";
     else holeChange = "stays_strong";
@@ -945,7 +965,13 @@ export function evaluateTrade(
 
   // Jack's do-not-trade list outranks the market: say so first and decline.
   const untouchables = proposal.myPlayers.filter((p) => !tradeable(p));
-  const verdict: TradeVerdict = untouchables.length > 0 ? "decline" : marketVerdict;
+  // Deepening a bottom-three room is never a yes, however good the other
+  // side looks: the rank math can't see a last-place room being emptied.
+  const deepensHole = positionalImpact.some((p) => p.holeChange === "deepens");
+  const verdict: TradeVerdict =
+    untouchables.length > 0 ? "decline"
+    : deepensHole && ["accept", "lean_accept", "even"].includes(marketVerdict) ? "lean_decline"
+    : marketVerdict;
 
   const reasoning: string[] = [];
   if (untouchables.length > 0) reasoning.push(untouchableNote(untouchables));

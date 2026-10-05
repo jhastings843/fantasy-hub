@@ -8,9 +8,11 @@ export const DAH_DYNASTY_LEAGUE_ID = "1312136721281859584";
 
 // Keyed by Sleeper league id, then Sleeper player id.
 // 2026-10-05: Gibbs is the core of the 2027 retool (24, top-2 dynasty asset).
+// Dart is the young superflex QB, on IR for 2026 so any offer is at his low.
 const UNTOUCHABLES: Record<string, Record<string, string>> = {
   [DAH_DYNASTY_LEAGUE_ID]: {
     "9221": "Jahmyr Gibbs",
+    "12508": "Jaxson Dart",
   },
 };
 
