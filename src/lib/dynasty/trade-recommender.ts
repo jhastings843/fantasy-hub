@@ -10,6 +10,7 @@
 
 import type { PlayerRow, TeamSummary } from "./power-rankings";
 import { tradeRooms } from "./trade-fits";
+import { tradeable, untouchableNote } from "./untouchables";
 import type { RAPick } from "@/lib/rosteraudit/types";
 
 const TRADE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
@@ -157,7 +158,7 @@ export function findBestTrades(
   // Fifteen candidates yield at most 120 bundles per side. Surplus-only
   // additions keep packages from stripping two scarce starters at once.
   const surplus = new Set<string>(tradeRooms(myTeam, totalTeams).surplus);
-  const sendBundles = playerBundles(myTeam.players.filter((p) => p.value > 200))
+  const sendBundles = playerBundles(myTeam.players.filter((p) => p.value > 200 && tradeable(p)))
     .filter((bundle) => bundle.length === 1 || bundle.some((p) =>
       surplus.has(p.position)));
 
@@ -202,7 +203,7 @@ export function findBestTrades(
   // positional fit. For each of my aging stars, find a younger player
   // on a partner's roster within 70-110% of my player's value.
   const myAgingStars = myTeam.players
-    .filter((p) => youth && isAging(p) && p.value >= 1500)
+    .filter((p) => youth && tradeable(p) && isAging(p) && p.value >= 1500)
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
@@ -526,7 +527,7 @@ export function suggestLevelers({
     // 1. Players I can ADD from my roster (excluding already-selected)
     for (const p of myTeam.players) {
       if (mySelectedIds.has(p.id)) continue;
-      if (p.value <= 0) continue;
+      if (p.value <= 0 || !tradeable(p)) continue;
       const resulting = delta - p.value; // adding to my side reduces delta
       // Only show if it actually moves us closer to zero
       if (Math.abs(resulting) >= target) continue;
@@ -937,12 +938,17 @@ export function evaluateTrade(
   const baseline = Math.max(myValue, theirValue);
   const pctDelta = baseline > 0 ? delta / baseline : 0;
 
-  const { verdict, positionalImpact, partner: partnerAssessment, mutual, mutualScore } = scoreBoth(
+  const { verdict: marketVerdict, positionalImpact, partner: partnerAssessment, mutual, mutualScore } = scoreBoth(
     myTeam, partner, allTeams, proposal.myPlayers, proposal.theirPlayers,
     totalTeams, myValue, theirValue,
   );
 
+  // Jack's do-not-trade list outranks the market: say so first and decline.
+  const untouchables = proposal.myPlayers.filter((p) => !tradeable(p));
+  const verdict: TradeVerdict = untouchables.length > 0 ? "decline" : marketVerdict;
+
   const reasoning: string[] = [];
+  if (untouchables.length > 0) reasoning.push(untouchableNote(untouchables));
   if (Math.abs(pctDelta) >= 0.05) {
     const pct = Math.round(pctDelta * 100);
     reasoning.push(

@@ -5,6 +5,7 @@ import {
   getPicks,
 } from "@/lib/rosteraudit/client";
 import { computeTeamSummaries } from "@/lib/dynasty/power-rankings";
+import { markUntouchables } from "@/lib/dynasty/untouchables";
 import {
   getAllPlayers,
   getLeague,
@@ -131,6 +132,9 @@ export default async function TradePage({
   }
 
   const teams = computeTeamSummaries(rosters, users, players, fcValues);
+  // Do-not-trade list (lib/dynasty/untouchables): recommenders skip these
+  // and the analyzer declines any proposal that includes one.
+  markUntouchables(teams, leagueId, myRoster.roster_id);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

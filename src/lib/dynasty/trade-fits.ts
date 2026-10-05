@@ -2,6 +2,7 @@
 // positional surplus / deficit. Safe to import from client components.
 
 import type { PlayerRow, TeamSummary } from "./power-rankings";
+import { tradeable } from "./untouchables";
 
 export interface TradeFit {
   position: string;
@@ -36,7 +37,7 @@ export function suggestTradeFits(
 
     if (yours.surplus.includes(pos) && theirs.deficit.includes(pos)) {
       const candidates = myTeam.players
-        .filter((p) => p.position === pos)
+        .filter((p) => p.position === pos && tradeable(p))
         .sort((a, b) => a.value - b.value);
       const lowest = candidates.slice(1, 4);
       if (lowest.length > 0) {

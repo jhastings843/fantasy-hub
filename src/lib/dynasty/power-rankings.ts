@@ -51,6 +51,8 @@ export type PlayerRow = {
   jinglesRank?: number | null;
   jinglesPositionRank?: number | null;
   jinglesDrop?: boolean;
+  /** On Jack's do-not-trade list for this league (lib/dynasty/untouchables). */
+  untouchable?: boolean;
 };
 
 export type TeamSummary = {
