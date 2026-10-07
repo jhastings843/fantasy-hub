@@ -26,6 +26,7 @@ const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/", label: "Leagues", exact: true },
   { href: "/strategy", label: "Strategy" },
   { href: "/survivor", label: "Survivor" },
+  { href: "/picks", label: "Picks" },
   { href: "/resources", label: "Resources" },
 ];
 

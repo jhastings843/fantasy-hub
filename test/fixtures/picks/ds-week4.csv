@@ -1,0 +1,17 @@
+homeTeam,awayTeam,predicted,side,sideLine,homeScore,awayScore,margin,atsWin,,Wins,Losses,Pushes
+Cleveland Browns,Pittsburgh Steelers,2.027635479,Cleveland Browns,2.5,27,24,3,Win,,12,3,1
+Washington Commanders,Indianapolis Colts,1.125136342,Washington Commanders,3.5,13,30,-17,Loss,,,,
+New York Giants,Arizona Cardinals,-2.313718679,New York Giants,1.5,36,24,12,Win,,,,
+Houston Texans,Dallas Cowboys,-2.44262568,Dallas Cowboys,2.5,30,34,-4,Win,,,,
+Tampa Bay Buccaneers,Green Bay Packers,-1.436196757,Tampa Bay Buccaneers,3.5,14,17,-3,Win,,Wins,Losses,Pushes
+Cincinnati Bengals,Jacksonville Jaguars,2.301820695,Jacksonville Jaguars,2.5,17,22,-5,Win,,21,10,1
+Philadelphia Eagles,Los Angeles Rams,2.621489165,Philadelphia Eagles,3,20,24,-4,Loss,,,,
+Buffalo Bills,New England Patriots,-5.48706268,New England Patriots,7,26,29,-3,Win,,,,
+Chicago Bears,New York Jets,-10.34015161,Chicago Bears,-3.5,23,12,11,Win,,,,
+Baltimore Ravens,Tennessee Titans,-11.31372,Tennessee Titans,11.5,24,18,6,Win,,,,
+Minnesota Vikings,Miami Dolphins,-8.361516313,Miami Dolphins,11.5,15,10,5,Win,,,,
+San Francisco 49ers,Denver Broncos,-6.068972913,San Francisco 49ers,-3,24,14,10,Win,,,,
+Las Vegas Raiders,Kansas City Chiefs,5.110105537,Kansas City Chiefs,-4.5,27,30,-3,Loss,,,,
+Seattle Seahawks,Los Angeles Chargers,-11.046208,Seattle Seahawks,-7,30,23,7,Push,,,,
+Carolina Panthers,Detroit Lions,1.690531266,Carolina Panthers,3.5,32,26,6,Win,,,,
+New Orleans Saints,Atlanta Falcons,-0.5233010384,Atlanta Falcons,3,21,45,-24,Win,,,,

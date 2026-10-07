@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, Compass, ShieldCheck } from "lucide-react";
+import { BookOpen, Compass, ShieldCheck, Target } from "lucide-react";
 import { RefreshButton } from "@/components/RefreshButton";
 import { getMyLeagues } from "@/lib/league/discover";
 import { leaguePath } from "@/lib/league/tools";
@@ -40,6 +40,12 @@ const OTHER_TOOLS = [
     title: "Survivor pool",
     blurb: "Pool sizing, team scarcity, and leverage against the field.",
     icon: ShieldCheck,
+  },
+  {
+    href: "/picks",
+    title: "Model picks",
+    blurb: "Where two NFL and college models agree against the spread, plus straight-up winners.",
+    icon: Target,
   },
   {
     href: "/resources",

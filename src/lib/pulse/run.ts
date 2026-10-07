@@ -22,6 +22,8 @@ import { runMidweekEmail } from "@/lib/midweek/run";
 import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
 import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
+import { getPicksReport } from "@/lib/picks/report";
+import { runPicksEmail } from "@/lib/picks/run";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
 
@@ -323,6 +325,22 @@ async function refreshValues(): Promise<string> {
   return `${formats.length} value format${formats.length === 1 ? "" : "s"}, picks, players`;
 }
 
+/**
+ * The two model boards behind the Picks tab.
+ *
+ * Not forced: the report keeps itself for three hours, so most hourly calls
+ * are a Redis read and the two sites see a handful of requests a day.
+ */
+async function refreshPicksBoards(): Promise<string> {
+  const [nfl, cfb] = await Promise.all([getPicksReport("nfl"), getPicksReport("cfb")]);
+  const say = (name: string, f: typeof nfl) =>
+    f.value
+      ? `${name} wk ${f.value.week ?? "?"} ${f.value.graded.length} graded${f.stale ? " (stale)" : ""}`
+      : `${name} unavailable`;
+  if (!nfl.value && !cfb.value) throw new Error("neither model board could be read");
+  return `${say("NFL", nfl)}, ${say("CFB", cfb)}`;
+}
+
 function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }[] {
   switch (tier) {
     case "live":
@@ -337,6 +355,7 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "survivor", work: () => refreshSurvivor(false) },
         { name: "lineups", work: () => refreshLineups() },
         { name: "waivers", work: () => refreshWaivers() },
+        { name: "picks", work: () => refreshPicksBoards() },
       ];
     case "overnight":
       return [{ name: "values", work: () => refreshValues() }];
@@ -375,6 +394,8 @@ async function runSend(id: SendId): Promise<Response> {
       return runSundayBrief();
     case "alarm":
       return runLockAlarm();
+    case "picks":
+      return runPicksEmail();
   }
 }
 

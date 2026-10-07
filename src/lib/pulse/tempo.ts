@@ -19,7 +19,7 @@ export type PulseTier = "live" | "hourly" | "overnight" | "idle";
 // than a minute window here that a late run would fall straight through.
 
 /** The emails, by the moment each one belongs to. */
-export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm";
+export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm" | "picks";
 
 export type TimedJobId = "refresh-all-early" | "refresh-all-late";
 
@@ -149,6 +149,11 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
     { id: "watch", day: SAT, at: 12 * 60 },
     { id: "watch", day: SUN, at: 12 * 60 + 15, until: 13 * 60 },
     { id: "sunday", day: SUN, at: 9 * 60 },
+    // Both model sites post their boards on Tuesday; by Wednesday morning the
+    // opening moves are in. It waits (answers "skipped") until both are up,
+    // and Thursday is the second chance for a week one of them posts late.
+    { id: "picks", day: WED, at: 9 * 60 },
+    { id: "picks", day: THU, at: 9 * 60 },
     // After the 11:30 inactive reports and well before the 13:00 lock. This one
     // is allowed to send nothing at all, which is its normal outcome.
     { id: "alarm", day: SUN, at: 11 * 60 + 45, until: 16 * 60 },

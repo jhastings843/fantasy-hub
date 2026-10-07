@@ -1,0 +1,1001 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sam&#x27;s Models — Week 6 NCAAF</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0b1d33;--navy2:#16304f;--cream:#fffbf2;--paper:#fff;--rule:#e6e2d8;--rule2:#f0ece2;
+--ink:#0b1d33;--body:#4a5668;--mute:#8a8578;--accent:#1c4e7a;--pos:#0f7b5f;--neg:#a8443c;
+--sans:'Inter',system-ui,-apple-system,sans-serif;--serif:'Source Serif 4',Georgia,serif;
+--mono:'IBM Plex Mono',ui-monospace,monospace;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+a{color:inherit;text-decoration:none}
+img{max-width:100%}
+header{background:var(--navy);color:var(--cream);position:sticky;top:env(safe-area-inset-top,0);z-index:20}
+.hbar{max-width:1080px;margin:0 auto;padding:12px 24px;display:flex;justify-content:space-between;
+align-items:center;gap:16px}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand .mk{width:38px;height:38px;border-radius:50%;background:var(--cream);color:var(--navy);
+display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;
+font-size:17px;letter-spacing:.5px;flex:none}
+.bt{display:flex;flex-direction:column;line-height:1.1}
+.bt .n1{font-family:var(--serif);font-size:17px;font-weight:700;letter-spacing:2px}
+.bt .n2{font-family:var(--mono);font-size:8.5px;letter-spacing:2.4px;color:#9fb3c8;margin-top:3px}
+.hright{display:flex;align-items:center;gap:10px;min-width:0}
+.search{display:flex;align-items:center}
+.sbtn{background:transparent;border:0;color:#9fb3c8;padding:7px;border-radius:6px;cursor:pointer;
+display:flex}
+.sbtn:hover{color:var(--cream);background:rgba(255,251,242,.12)}
+.search input{width:0;opacity:0;padding:0;border:0;border-radius:6px;background:rgba(255,251,242,.12);
+color:var(--cream);font-family:var(--sans);font-size:16px;transition:width .18s ease,opacity .18s ease,
+padding .18s ease;outline:none;min-width:0}
+.search input::placeholder{color:#8ba1b8}
+.search.open input{width:170px;opacity:1;padding:7px 10px}
+.search.open .sbtn{color:var(--cream)}
+.nores{padding:26px 0;color:var(--mute);font-family:var(--mono);font-size:12px;letter-spacing:1px}
+nav{display:flex;gap:2px}
+nav a{font-family:var(--mono);font-size:11px;letter-spacing:1.3px;color:#9fb3c8;padding:8px 12px;border-radius:5px}
+nav a.on{color:var(--cream);background:rgba(255,251,242,.13)}
+.hero{background:var(--cream);border-bottom:1px solid var(--rule)}
+.hero .in{max-width:1080px;margin:0 auto;padding:44px 24px 34px}
+h1{font-family:var(--serif);font-size:50px;font-weight:600;line-height:1.05;letter-spacing:-.7px;color:var(--navy)}
+.sub{color:var(--body);font-size:16px;line-height:1.65;margin-top:13px;max-width:62ch}
+.stamp{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:.7px;margin-top:15px}
+.strip{background:var(--cream);border-bottom:1px solid var(--rule)}
+.strip .grid{max-width:1080px;margin:0 auto;padding:0 24px 28px;display:grid;
+grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:28px}
+.cmp{margin-top:18px}
+.cmprow{display:grid;grid-template-columns:86px repeat(3,1fr);gap:14px;align-items:center;
+padding:13px 0;border-top:1px solid var(--rule2)}
+.cl{font-family:var(--mono);font-size:10px;letter-spacing:1.6px;color:var(--mute)}
+.cmprow .lbl{margin-bottom:3px}
+.cv{font-family:var(--mono);font-size:14px;color:var(--body);display:block}
+.cv.big{font-weight:700;color:var(--navy)}
+.pick{display:grid;grid-template-columns:2fr 1.3fr .7fr 1.1fr 1fr .8fr;gap:14px;align-items:center;
+padding:13px 0;border-top:1px solid var(--rule2)}
+.pg{display:flex;flex-direction:column;min-width:0}
+.pd{font-family:var(--mono);font-size:10px;color:var(--mute);letter-spacing:.5px}
+.pm{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}
+.pf{display:flex;flex-direction:column;min-width:0}
+.pf .lbl{margin-bottom:3px}
+.pv{font-family:var(--mono);font-size:13px;color:var(--body);white-space:nowrap;overflow:hidden;
+text-overflow:ellipsis}
+.pf.res .pv{font-weight:700}
+.filterbar{font-family:var(--mono);font-size:10.5px;letter-spacing:1.2px;color:var(--mute);
+padding:18px 0 4px;text-transform:uppercase}
+.tile.on{background:var(--navy);color:var(--cream)}
+.tile.on .k,.tile.on .n{color:#9fb3c8}
+.tile.on .v{color:var(--cream)}
+.tile{display:block;color:inherit;border-radius:9px;padding:4px 6px;margin:-4px -6px}
+.tile:hover{background:#f4eee1}
+.tile:hover .v{color:var(--accent)}
+.k{font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;color:var(--mute)}
+.v{font-family:var(--serif);font-size:25px;font-weight:700;color:var(--navy);margin-top:6px}
+.n{font-size:12px;color:var(--body);margin-top:3px}
+.wrap{max-width:1080px;margin:0 auto;padding:8px 24px 80px}
+.day{display:flex;align-items:baseline;gap:12px;margin:36px 0 13px}
+.day h2{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--navy)}
+.day span{font-family:var(--mono);font-size:10px;color:var(--mute);letter-spacing:1.3px}
+.game{border:1px solid var(--rule);border-radius:10px;padding:16px 18px;margin-bottom:10px}
+.game:hover{border-color:#d6d0c2;background:#fffdf8}
+.when{display:flex;gap:8px;font-family:var(--mono);font-size:10.5px;color:var(--mute);letter-spacing:.6px;
+margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.when span:last-child{overflow:hidden;text-overflow:ellipsis}
+.when .dot{color:var(--rule)}
+.teams{display:grid;gap:10px}
+.team{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:12px}
+.team img{width:28px;height:28px;object-fit:contain}
+.tn{display:flex;flex-direction:column;min-width:0}
+.nm{font-size:15px;font-weight:600;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec{font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-top:1px}
+.pts{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--body)}
+.team.win .nm,.team.win .pts{color:var(--navy);font-weight:700}
+/* three fields, label above value, left aligned. Fixed columns so they can never wrap onto
+   each other, and values are allowed to wrap rather than being cut off. */
+.mkt{display:grid;grid-template-columns:repeat(2, minmax(130px, max-content));gap:14px 34px;
+margin-top:14px;padding-top:13px;border-top:1px solid var(--rule2)}
+.pickrow{display:flex;align-items:baseline;gap:12px;margin-top:12px;padding-top:11px;
+border-top:1px solid var(--rule2)}
+.pickval{font-size:14.5px;font-weight:700;color:var(--accent);overflow:visible;text-overflow:clip;
+white-space:normal}
+.lbl{display:block;font-family:var(--mono);font-size:9px;letter-spacing:1.3px;color:var(--mute)}
+.val{display:block;font-size:13.5px;font-weight:600;color:var(--body);margin-top:5px;
+white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.val.mono{font-family:var(--mono)}
+.pick .val{color:var(--accent);font-weight:700}
+.bdbtn{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 14px;border:1px solid var(--rule);
+border-radius:7px;font-family:var(--mono);font-size:10px;letter-spacing:1.4px;color:var(--navy);background:var(--cream)}
+.bdbtn:hover{background:var(--navy);color:var(--cream);border-color:var(--navy)}
+.hero.landing .in{padding:64px 24px 52px;text-align:center}
+.hero.landing .mark{width:74px;height:74px;border-radius:50%;background:var(--navy);color:var(--cream);
+display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:30px;
+font-weight:700;letter-spacing:1px;margin:0 auto 22px}
+.hero.landing h1{font-size:58px}
+.lead{font-size:19px;line-height:1.6;color:var(--ink);margin:18px auto 0;max-width:34ch;font-weight:500}
+.hero.landing .sub{margin:16px auto 0;max-width:62ch}
+.lrec{margin:30px auto 0;padding:18px 24px;border:1px solid var(--rule);border-radius:11px;
+background:var(--paper);display:inline-block}
+.lrec .v{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--navy);margin-top:4px}
+.lrec .n{font-size:12.5px;color:var(--body);margin-top:3px}
+.lrec a{color:var(--accent);font-weight:600}
+.sportgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:34px}
+.sportcard{display:flex;flex-direction:column;gap:4px;padding:22px;border:1px solid var(--rule);
+border-radius:11px;background:var(--paper)}
+.sportcard:hover{border-color:var(--navy);background:var(--cream)}
+.sportcard .sp{font-family:var(--serif);font-size:25px;font-weight:700;color:var(--navy)}
+.sportcard .sn{font-size:13px;color:var(--body)}
+.sportcard .sgo{font-family:var(--mono);font-size:10px;letter-spacing:1.3px;color:var(--accent);margin-top:10px}
+.sportcard.off{opacity:.55}
+.sportcard.off .sgo{color:var(--mute)}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:26px}
+.how .hn{font-family:var(--mono);font-size:10px;letter-spacing:1.6px;color:var(--mute)}
+.how h4{font-size:15.5px;font-weight:600;color:var(--navy);margin:7px 0 6px}
+.how p{font-size:13.5px;line-height:1.65;color:var(--body)}
+footer{border-top:1px solid var(--rule);background:var(--cream)}
+footer .in{max-width:1080px;margin:0 auto;padding:24px;color:var(--mute);font-size:12.5px;line-height:1.75;max-width:78ch}
+/* breakdown page */
+.back{font-family:var(--mono);font-size:10px;letter-spacing:1.4px;color:var(--mute)}
+.bd h1{font-size:40px}
+.score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px;margin:26px 0 8px;
+background:var(--cream);border:1px solid var(--rule);border-radius:12px;padding:26px 24px}
+.sc{display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center}
+.sc img{width:54px;height:54px;object-fit:contain}
+.sc .t{font-size:15px;font-weight:600;color:var(--body)}
+.sc .p{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--navy);line-height:1}
+.sc.lose .p,.sc.lose .t{color:var(--mute)}
+.vs{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:2px}
+.sec{margin-top:40px}
+.sec>h3{font-family:var(--mono);font-size:10px;letter-spacing:2.2px;color:var(--mute);
+padding-bottom:9px;border-bottom:1px solid var(--rule);margin-bottom:16px}
+.sec>h3 b{color:var(--navy);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-family:var(--mono);font-size:9px;letter-spacing:1.3px;color:var(--mute);text-align:right;
+font-weight:500;padding:0 0 9px}
+th:first-child{text-align:left}
+td{padding:9px 0;border-top:1px solid var(--rule2);text-align:right;font-family:var(--mono);color:var(--body)}
+td:first-child{text-align:left;font-family:var(--sans);color:var(--ink)}
+td.big{font-weight:700;color:var(--navy)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.bar{display:grid;grid-template-columns:150px 1fr 96px;align-items:center;gap:14px;padding:9px 0;
+border-top:1px solid var(--rule2)}
+.bar .t{font-size:13.5px}
+.track{position:relative;height:9px;background:var(--rule2);border-radius:5px}
+.track i{position:absolute;top:0;height:9px;border-radius:5px;background:var(--navy)}
+.track u{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--rule);left:50%}
+.bar .a{font-family:var(--mono);font-size:12px;text-align:right;color:var(--body)}
+.radars{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.rtitle{font-family:var(--mono);font-size:9.5px;letter-spacing:1.6px;color:var(--mute);margin-bottom:6px;
+text-align:center}
+.legend{display:flex;gap:20px;justify-content:center;margin-top:8px;font-size:12px;color:var(--body)}
+.legend .sw{display:inline-block;width:14px;height:3px;margin-right:7px;vertical-align:middle}
+.legend .sw.home{background:var(--navy)}
+.legend .sw.away{background:var(--neg)}
+.why{background:var(--cream);border:1px solid var(--rule);border-radius:11px;padding:20px 22px;margin-top:8px}
+.why p{font-size:14px;line-height:1.7;color:var(--body)}
+.why .hl{font-weight:700;color:var(--navy)}
+.note{font-size:12px;color:var(--mute);line-height:1.7;margin-top:10px}
+@media(max-width:640px){
+ h1{font-size:33px}.bd h1{font-size:27px}.hero .in{padding:28px 16px 22px}
+ .wrap{padding:8px 16px 70px}.strip .grid{padding:0 16px 22px;gap:18px}
+ .hbar{padding:11px 16px}nav a{padding:7px 9px;font-size:10px;letter-spacing:.8px}
+ .mkt{grid-template-columns:1fr 1fr;gap:14px 16px}
+ .mkt .val{font-size:13px}
+ .pickrow{flex-wrap:wrap;gap:4px 10px}
+ .pts{font-size:20px}
+ .cmprow{grid-template-columns:1fr 1fr;gap:10px 14px}
+ .cmprow .cl{grid-column:1/-1}
+ .score{grid-template-columns:1fr;gap:14px;padding:20px}
+ .sc .p{font-size:36px}.vs{display:none}
+ .radars{grid-template-columns:1fr;gap:26px}
+ .hero.landing h1{font-size:36px}.hero.landing .in{padding:44px 16px 36px}
+ .lead{font-size:16.5px}
+ .pick{grid-template-columns:1fr 1fr;gap:10px 14px;padding:15px 0}
+ .pg{grid-column:1/-1}
+ .pf.res{align-items:flex-end}
+ table{font-size:11.5px}
+ th{font-size:8px}
+ table{font-size:12.5px}
+}
+</style></head><body>
+<header><div class="hbar">
+  <a class="brand" href="../index.html"><div class="mk">SM</div>
+    <div class="bt"><span class="n1">SAM'S</span><span class="n2">MODELS</span></div></a>
+  <div class="hright">
+    <div class="search" id="search">
+      <button class="sbtn" id="sbtn" aria-label="Search games">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="M13.5 13.5 18 18"/></svg>
+      </button>
+      <input id="sinput" type="search" placeholder="Search teams…" autocomplete="off" spellcheck="false">
+    </div>
+    <nav><a class="on" href="../ncaaf/index.html">NCAAF</a><a class="" href="../nfl/index.html">NFL</a><a class="" href="../nba/index.html">NBA</a><a class="" href="../cbb/index.html">CBB</a></nav>
+  </div>
+</div></header><section class="hero"><div class="in">
+  <h1>Week 6 Projections.</h1>
+  <p class="sub">A projected score for every game on the board — built from play-by-play efficiency,
+  adjusted for opponent, beside the first line the model saw for that game. Open any game for the
+  full breakdown.</p>
+  <div class="stamp">UPDATED TUESDAY 8:47 AM ET</div>
+</div></section>
+<section class="strip"><div class="grid">
+  <a class="tile" href="record.html"><span class="k">NCAAF ATS RECORD</span>
+    <div class="v">59-53-2</div><div class="n">52.7% · 37-35 on 3+ edges</div></a>
+  <a class="tile" href="#board"><span class="k">GAMES</span>
+    <div class="v">58</div><div class="n">this week</div></a>
+  <a class="tile" href="gaps.html"><span class="k">MODEL DISAGREES 3+</span>
+    <div class="v">37</div>
+    <div class="n">points off the market</div></a>
+  <a class="tile" href="game/401858256.html"><span class="k">BIGGEST GAP</span>
+    <div class="v">15.3</div><div class="n">North Carolina at Pittsburgh</div></a>
+</div></section><div class="wrap" id="board"><div class="day"><h2>Tuesday, October 6</h2><span>1 game</span></div><article class="game" data-gap="2.23" data-teams="troy southern miss sun belt sun belt">
+  <div class="when"><span>8:00 PM ET</span><span class="dot">·</span><span>Veterans Memorial Stadium (AL)</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Southern_Miss.png" alt="" loading="lazy"><div class="tn"><span class="nm">Southern Miss</span><span class="rec">1-3</span></div><div class="pts">20.5</div></div>
+    <div class="team win"><img src="logos/Troy.png" alt="" loading="lazy"><div class="tn"><span class="nm">Troy</span><span class="rec">2-2</span></div><div class="pts">32.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Troy -9.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Troy -11.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Troy -9.5  (2.2)</span></div>
+  <a class="bdbtn" href="game/401871090.html">GAME BREAKDOWN →</a>
+</article><div class="day"><h2>Wednesday, October 7</h2><span>2 games</span></div><article class="game" data-gap="1.99" data-teams="kennesaw state jacksonville state conference usa conference usa">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Fifth Third Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Jacksonville_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Jacksonville State</span><span class="rec">3-2</span></div><div class="pts">28.8</div></div>
+    <div class="team"><img src="logos/Kennesaw_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Kennesaw State</span><span class="rec">1-3</span></div><div class="pts">27.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Jacksonville State -3</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Jacksonville State -1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Kennesaw State +3  (2.0)</span></div>
+  <a class="bdbtn" href="game/401871051.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="4.11" data-teams="florida international new mexico state conference usa conference usa">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Pitbull Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/New_Mexico_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">New Mexico State</span><span class="rec">2-3</span></div><div class="pts">20.3</div></div>
+    <div class="team win"><img src="logos/Florida_International.png" alt="" loading="lazy"><div class="tn"><span class="nm">Florida International</span><span class="rec">2-2</span></div><div class="pts">28.9</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Florida International -4.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Florida International -8.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Florida International -4.5  (4.1)</span></div>
+  <a class="bdbtn" href="game/401871066.html">GAME BREAKDOWN →</a>
+</article><div class="day"><h2>Thursday, October 8</h2><span>4 games</span></div><article class="game" data-gap="13.83" data-teams="liberty sam houston conference usa conference usa">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Williams Stadium (VA)</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Sam_Houston.png" alt="" loading="lazy"><div class="tn"><span class="nm">Sam Houston</span><span class="rec">1-3</span></div><div class="pts">13.9</div></div>
+    <div class="team win"><img src="logos/Liberty.png" alt="" loading="lazy"><div class="tn"><span class="nm">Liberty</span><span class="rec">4-1</span></div><div class="pts">41.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Liberty -13.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Liberty -27.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Liberty -13.5  (13.8)</span></div>
+  <a class="bdbtn" href="game/401870766.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="4.00" data-teams="western kentucky missouri state conference usa conference usa">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Houchens Industries-L.T. Smith Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Missouri_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Missouri State</span><span class="rec">1-3</span></div><div class="pts">26.3</div></div>
+    <div class="team win"><img src="logos/Western_Kentucky.png" alt="" loading="lazy"><div class="tn"><span class="nm">Western Kentucky</span><span class="rec">1-4</span></div><div class="pts">28.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Missouri State -1.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Western Kentucky -2.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Western Kentucky +1.5  (4.0)</span></div>
+  <a class="bdbtn" href="game/401871052.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.88" data-teams="utsa south florida american athletic american athletic">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Alamodome</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/South_Florida.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Florida</span><span class="rec">4-1</span></div><div class="pts">26.2</div></div>
+    <div class="team win"><img src="logos/UTSA.png" alt="" loading="lazy"><div class="tn"><span class="nm">UTSA</span><span class="rec">4-1</span></div><div class="pts">26.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">UTSA -6.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">UTSA -0.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">South Florida +6.5  (5.9)</span></div>
+  <a class="bdbtn" href="game/401862794.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.61" data-teams="arkansas state south alabama sun belt sun belt">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Centennial Bank Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/South_Alabama.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Alabama</span><span class="rec">3-2</span></div><div class="pts">27.2</div></div>
+    <div class="team win"><img src="logos/Arkansas_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Arkansas State</span><span class="rec">2-3</span></div><div class="pts">31.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Arkansas State -1.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Arkansas State -4.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Arkansas State -1.5  (2.6)</span></div>
+  <a class="bdbtn" href="game/401869933.html">GAME BREAKDOWN →</a>
+</article><div class="day"><h2>Friday, October 9</h2><span>5 games</span></div><article class="game" data-gap="0.56" data-teams="louisville florida state acc acc">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>L&amp;N Federal Credit Union Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Florida_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Florida State</span><span class="rec">3-2</span></div><div class="pts">25.9</div></div>
+    <div class="team win"><img src="logos/Louisville.png" alt="" loading="lazy"><div class="tn"><span class="nm">Louisville</span><span class="rec">2-3</span></div><div class="pts">32.9</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Louisville -6.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Louisville -7.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Louisville -6.5  (0.6)</span></div>
+  <a class="bdbtn" href="game/401858254.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.63" data-teams="utah state washington state mountain west pac-12">
+  <div class="when"><span>9:00 PM ET</span><span class="dot">·</span><span>Maverik Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Washington_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Washington State</span><span class="rec">1-4</span></div><div class="pts">25.4</div></div>
+    <div class="team win"><img src="logos/Utah_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Utah State</span><span class="rec">1-4</span></div><div class="pts">25.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Utah State -3</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Utah State -0.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Washington State +3  (2.6)</span></div>
+  <a class="bdbtn" href="game/401860922.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.03" data-teams="san josé state wyoming mountain west mountain west">
+  <div class="when"><span>9:00 PM ET</span><span class="dot">·</span><span>CEFCU Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Wyoming.png" alt="" loading="lazy"><div class="tn"><span class="nm">Wyoming</span><span class="rec">2-3</span></div><div class="pts">21.2</div></div>
+    <div class="team win"><img src="logos/San_José_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">San José State</span><span class="rec">3-2</span></div><div class="pts">29.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">San José State -6.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">San José State -8.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">San José State -6.5  (2.0)</span></div>
+  <a class="bdbtn" href="game/401864519.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="0.36" data-teams="washington iowa big ten big ten">
+  <div class="when"><span>9:00 PM ET</span><span class="dot">·</span><span>Husky Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Iowa.png" alt="" loading="lazy"><div class="tn"><span class="nm">Iowa</span><span class="rec">4-1</span></div><div class="pts">25.4</div></div>
+    <div class="team win"><img src="logos/Washington.png" alt="" loading="lazy"><div class="tn"><span class="nm">Washington</span><span class="rec">3-2</span></div><div class="pts">27.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Washington -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Washington -2.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Iowa +2.5  (0.4)</span></div>
+  <a class="bdbtn" href="game/401858487.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="0.43" data-teams="byu iowa state big 12 big 12">
+  <div class="when"><span>10:15 PM ET</span><span class="dot">·</span><span>LaVell Edwards Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Iowa_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Iowa State</span><span class="rec">3-2</span></div><div class="pts">22.8</div></div>
+    <div class="team win"><img src="logos/BYU.png" alt="" loading="lazy"><div class="tn"><span class="nm">BYU</span><span class="rec">4-0</span></div><div class="pts">33.9</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">BYU -10.75</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">BYU -11.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">BYU -10.75  (0.4)</span></div>
+  <a class="bdbtn" href="game/401856826.html">GAME BREAKDOWN →</a>
+</article><div class="day"><h2>Saturday, October 10</h2><span>46 games</span></div><article class="game" data-gap="15.29" data-teams="pittsburgh north carolina acc acc">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Acrisure Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/North_Carolina.png" alt="" loading="lazy"><div class="tn"><span class="nm">North Carolina</span><span class="rec">2-2</span></div><div class="pts">17.9</div></div>
+    <div class="team win"><img src="logos/Pittsburgh.png" alt="" loading="lazy"><div class="tn"><span class="nm">Pittsburgh</span><span class="rec">5-0</span></div><div class="pts">36.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Pittsburgh -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Pittsburgh -18.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Pittsburgh -3.5  (15.3)</span></div>
+  <a class="bdbtn" href="game/401858256.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.14" data-teams="nebraska indiana big ten big ten">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Memorial Stadium (Lincoln, NE)</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Indiana.png" alt="" loading="lazy"><div class="tn"><span class="nm">Indiana</span><span class="rec">5-0</span></div><div class="pts">33.7</div></div>
+    <div class="team"><img src="logos/Nebraska.png" alt="" loading="lazy"><div class="tn"><span class="nm">Nebraska</span><span class="rec">5-0</span></div><div class="pts">21.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Indiana -9.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Indiana -12.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Indiana -9.5  (3.1)</span></div>
+  <a class="bdbtn" href="game/401858481.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="7.35" data-teams="west virginia arizona big 12 big 12">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Milan Puskar Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Arizona.png" alt="" loading="lazy"><div class="tn"><span class="nm">Arizona</span><span class="rec">4-1</span></div><div class="pts">32.6</div></div>
+    <div class="team"><img src="logos/West_Virginia.png" alt="" loading="lazy"><div class="tn"><span class="nm">West Virginia</span><span class="rec">3-2</span></div><div class="pts">22.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Arizona -3</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Arizona -10.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Arizona -3  (7.4)</span></div>
+  <a class="bdbtn" href="game/401856823.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.90" data-teams="army tulane american athletic american athletic">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Michie Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Tulane.png" alt="" loading="lazy"><div class="tn"><span class="nm">Tulane</span><span class="rec">2-2</span></div><div class="pts">25.1</div></div>
+    <div class="team win"><img src="logos/Army.png" alt="" loading="lazy"><div class="tn"><span class="nm">Army</span><span class="rec">2-2</span></div><div class="pts">32.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Army -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Army -7.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Army -3.5  (3.9)</span></div>
+  <a class="bdbtn" href="game/401862795.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="0.10" data-teams="nc state wake forest acc acc">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Carter-Finley Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Wake_Forest.png" alt="" loading="lazy"><div class="tn"><span class="nm">Wake Forest</span><span class="rec">4-1</span></div><div class="pts">29.8</div></div>
+    <div class="team"><img src="logos/NC_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">NC State</span><span class="rec">3-2</span></div><div class="pts">27.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Wake Forest -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Wake Forest -2.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">NC State +2.5  (0.1)</span></div>
+  <a class="bdbtn" href="game/401858260.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="1.90" data-teams="missouri texas a&amp;m sec sec">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Memorial Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Texas_A_M.png" alt="" loading="lazy"><div class="tn"><span class="nm">Texas A&amp;M</span><span class="rec">3-2</span></div><div class="pts">23.7</div></div>
+    <div class="team win"><img src="logos/Missouri.png" alt="" loading="lazy"><div class="tn"><span class="nm">Missouri</span><span class="rec">4-1</span></div><div class="pts">28.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Missouri -3</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Missouri -4.9</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Missouri -3  (1.9)</span></div>
+  <a class="bdbtn" href="game/401856716.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.94" data-teams="bowling green sacramento state mid-american big sky">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Doyt L. Perry Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Sacramento_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Sacramento State</span><span class="rec">1-4</span></div><div class="pts">23.3</div></div>
+    <div class="team win"><img src="logos/Bowling_Green.png" alt="" loading="lazy"><div class="tn"><span class="nm">Bowling Green</span><span class="rec">1-4</span></div><div class="pts">26.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Bowling Green -7</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Bowling Green -3.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Sacramento State +7  (3.9)</span></div>
+  <a class="bdbtn" href="game/401866436.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="11.97" data-teams="oklahoma state ucf big 12 big 12">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Boone Pickens Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/UCF.png" alt="" loading="lazy"><div class="tn"><span class="nm">UCF</span><span class="rec">3-2</span></div><div class="pts">27.1</div></div>
+    <div class="team"><img src="logos/Oklahoma_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Oklahoma State</span><span class="rec">3-1</span></div><div class="pts">25.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Oklahoma State -10.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">UCF -1.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">UCF +10.5  (12.0)</span></div>
+  <a class="bdbtn" href="game/401856824.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="1.35" data-teams="northwestern ball state big ten mid-american">
+  <div class="when"><span>12:30 PM ET</span><span class="dot">·</span><span>Ryan Field</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Ball_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Ball State</span><span class="rec">1-4</span></div><div class="pts">11.9</div></div>
+    <div class="team win"><img src="logos/Northwestern.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northwestern</span><span class="rec">3-1</span></div><div class="pts">45.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Northwestern -34.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Northwestern -33.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Ball State +34.5  (1.4)</span></div>
+  <a class="bdbtn" href="game/401858482.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="6.98" data-teams="florida south carolina sec sec">
+  <div class="when"><span>12:45 PM ET</span><span class="dot">·</span><span>Ben Hill Griffin Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/South_Carolina.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Carolina</span><span class="rec">2-3</span></div><div class="pts">24.6</div></div>
+    <div class="team win"><img src="logos/Florida.png" alt="" loading="lazy"><div class="tn"><span class="nm">Florida</span><span class="rec">4-1</span></div><div class="pts">31.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Florida -14</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Florida -7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">South Carolina +14  (7.0)</span></div>
+  <a class="bdbtn" href="game/401856714.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.09" data-teams="app state old dominion sun belt sun belt">
+  <div class="when"><span>1:00 PM ET</span><span class="dot">·</span><span>Kidd Brewer Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Old_Dominion.png" alt="" loading="lazy"><div class="tn"><span class="nm">Old Dominion</span><span class="rec">1-4</span></div><div class="pts">21.8</div></div>
+    <div class="team win"><img src="logos/App_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">App State</span><span class="rec">3-1</span></div><div class="pts">28.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">App State -9.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">App State -6.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Old Dominion +9.5  (3.1)</span></div>
+  <a class="bdbtn" href="game/401869843.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="0.91" data-teams="massachusetts miami (oh) mid-american mid-american">
+  <div class="when"><span>2:00 PM ET</span><span class="dot">·</span><span>Warren McGuirk Alumni Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Miami__OH_.png" alt="" loading="lazy"><div class="tn"><span class="nm">Miami (OH)</span><span class="rec">2-3</span></div><div class="pts">27.7</div></div>
+    <div class="team"><img src="logos/Massachusetts.png" alt="" loading="lazy"><div class="tn"><span class="nm">Massachusetts</span><span class="rec">4-1</span></div><div class="pts">26.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Miami (OH) -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Miami (OH) -1.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Massachusetts +2.5  (0.9)</span></div>
+  <a class="bdbtn" href="game/401866440.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="11.63" data-teams="navy tulsa american athletic american athletic">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Navy-Marine Corps Memorial Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Tulsa.png" alt="" loading="lazy"><div class="tn"><span class="nm">Tulsa</span><span class="rec">3-2</span></div><div class="pts">19.3</div></div>
+    <div class="team win"><img src="logos/Navy.png" alt="" loading="lazy"><div class="tn"><span class="nm">Navy</span><span class="rec">1-3</span></div><div class="pts">34.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Navy -3</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Navy -14.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Navy -3  (11.6)</span></div>
+  <a class="bdbtn" href="game/401862799.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="11.96" data-teams="vanderbilt ole miss sec sec">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>FirstBank Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Ole_Miss.png" alt="" loading="lazy"><div class="tn"><span class="nm">Ole Miss</span><span class="rec">3-1</span></div><div class="pts">30.2</div></div>
+    <div class="team win"><img src="logos/Vanderbilt.png" alt="" loading="lazy"><div class="tn"><span class="nm">Vanderbilt</span><span class="rec">3-2</span></div><div class="pts">31.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Ole Miss -10.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Vanderbilt -1.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Vanderbilt +10.5  (12.0)</span></div>
+  <a class="bdbtn" href="game/401856718.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.18" data-teams="oklahoma texas sec sec">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Cotton Bowl</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Texas.png" alt="" loading="lazy"><div class="tn"><span class="nm">Texas</span><span class="rec">4-0</span></div><div class="pts">25.1</div></div>
+    <div class="team"><img src="logos/Oklahoma.png" alt="" loading="lazy"><div class="tn"><span class="nm">Oklahoma</span><span class="rec">2-2</span></div><div class="pts">18.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Texas -9</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Texas -6.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Oklahoma +9  (2.2)</span></div>
+  <a class="bdbtn" href="game/401856717.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.71" data-teams="ohio central michigan mid-american mid-american">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Peden Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Central_Michigan.png" alt="" loading="lazy"><div class="tn"><span class="nm">Central Michigan</span><span class="rec">3-2</span></div><div class="pts">23.0</div></div>
+    <div class="team win"><img src="logos/Ohio.png" alt="" loading="lazy"><div class="tn"><span class="nm">Ohio</span><span class="rec">3-2</span></div><div class="pts">32.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Ohio -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Ohio -9.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Ohio -3.5  (5.7)</span></div>
+  <a class="bdbtn" href="game/401866438.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.21" data-teams="kansas state houston big 12 big 12">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Bill Snyder Family Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Houston.png" alt="" loading="lazy"><div class="tn"><span class="nm">Houston</span><span class="rec">4-1</span></div><div class="pts">25.5</div></div>
+    <div class="team win"><img src="logos/Kansas_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Kansas State</span><span class="rec">3-1</span></div><div class="pts">33.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Kansas State -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Kansas State -7.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Kansas State -2.5  (5.2)</span></div>
+  <a class="bdbtn" href="game/401856825.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="7.26" data-teams="california virginia tech acc acc">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>California Memorial Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Virginia_Tech.png" alt="" loading="lazy"><div class="tn"><span class="nm">Virginia Tech</span><span class="rec">4-1</span></div><div class="pts">31.4</div></div>
+    <div class="team"><img src="logos/California.png" alt="" loading="lazy"><div class="tn"><span class="nm">California</span><span class="rec">2-3</span></div><div class="pts">26.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Virginia Tech -12.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Virginia Tech -5.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">California +12.5  (7.3)</span></div>
+  <a class="bdbtn" href="game/401858259.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.69" data-teams="toledo buffalo mid-american mid-american">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Glass Bowl</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Buffalo.png" alt="" loading="lazy"><div class="tn"><span class="nm">Buffalo</span><span class="rec">2-3</span></div><div class="pts">12.7</div></div>
+    <div class="team win"><img src="logos/Toledo.png" alt="" loading="lazy"><div class="tn"><span class="nm">Toledo</span><span class="rec">4-1</span></div><div class="pts">37.9</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Toledo -19.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Toledo -25.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Toledo -19.5  (5.7)</span></div>
+  <a class="bdbtn" href="game/401866437.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="1.37" data-teams="akron eastern michigan mid-american mid-american">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>InfoCision Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Eastern_Michigan.png" alt="" loading="lazy"><div class="tn"><span class="nm">Eastern Michigan</span><span class="rec">3-3</span></div><div class="pts">31.9</div></div>
+    <div class="team"><img src="logos/Akron.png" alt="" loading="lazy"><div class="tn"><span class="nm">Akron</span><span class="rec">1-4</span></div><div class="pts">24.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Eastern Michigan -6.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Eastern Michigan -7.9</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Eastern Michigan -6.5  (1.4)</span></div>
+  <a class="bdbtn" href="game/401866435.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="6.36" data-teams="georgia tech duke acc acc">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Bobby Dodd Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Duke.png" alt="" loading="lazy"><div class="tn"><span class="nm">Duke</span><span class="rec">4-0</span></div><div class="pts">28.8</div></div>
+    <div class="team"><img src="logos/Georgia_Tech.png" alt="" loading="lazy"><div class="tn"><span class="nm">Georgia Tech</span><span class="rec">1-3</span></div><div class="pts">28.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Duke -6.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Duke -0.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Georgia Tech +6.5  (6.4)</span></div>
+  <a class="bdbtn" href="game/401858255.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="9.16" data-teams="western michigan kent state mid-american mid-american">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Waldo Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Kent_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Kent State</span><span class="rec">2-3</span></div><div class="pts">15.1</div></div>
+    <div class="team win"><img src="logos/Western_Michigan.png" alt="" loading="lazy"><div class="tn"><span class="nm">Western Michigan</span><span class="rec">3-2</span></div><div class="pts">37.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Western Michigan -13.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Western Michigan -22.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Western Michigan -13.5  (9.2)</span></div>
+  <a class="bdbtn" href="game/401866439.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="7.93" data-teams="notre dame stanford fbs independents acc">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Notre Dame Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Stanford.png" alt="" loading="lazy"><div class="tn"><span class="nm">Stanford</span><span class="rec">2-3</span></div><div class="pts">4.9</div></div>
+    <div class="team win"><img src="logos/Notre_Dame.png" alt="" loading="lazy"><div class="tn"><span class="nm">Notre Dame</span><span class="rec">5-0</span></div><div class="pts">49.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Notre Dame -36.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Notre Dame -44.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Notre Dame -36.5  (7.9)</span></div>
+  <a class="bdbtn" href="game/401858257.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.92" data-teams="michigan state illinois big ten big ten">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Spartan Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Illinois.png" alt="" loading="lazy"><div class="tn"><span class="nm">Illinois</span><span class="rec">2-3</span></div><div class="pts">28.4</div></div>
+    <div class="team win"><img src="logos/Michigan_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Michigan State</span><span class="rec">2-3</span></div><div class="pts">28.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Illinois -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Michigan State -0.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Michigan State +3.5  (3.9)</span></div>
+  <a class="bdbtn" href="game/401858480.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.55" data-teams="oregon ucla big ten big ten">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>Autzen Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/UCLA.png" alt="" loading="lazy"><div class="tn"><span class="nm">UCLA</span><span class="rec">4-0</span></div><div class="pts">21.8</div></div>
+    <div class="team win"><img src="logos/Oregon.png" alt="" loading="lazy"><div class="tn"><span class="nm">Oregon</span><span class="rec">3-1</span></div><div class="pts">36.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Oregon -12</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Oregon -14.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Oregon -12  (2.6)</span></div>
+  <a class="bdbtn" href="game/401858484.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="10.41" data-teams="north texas charlotte american athletic american athletic">
+  <div class="when"><span>3:30 PM ET</span><span class="dot">·</span><span>DATCU Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Charlotte.png" alt="" loading="lazy"><div class="tn"><span class="nm">Charlotte</span><span class="rec">0-5</span></div><div class="pts">9.7</div></div>
+    <div class="team win"><img src="logos/North_Texas.png" alt="" loading="lazy"><div class="tn"><span class="nm">North Texas</span><span class="rec">3-2</span></div><div class="pts">47.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">North Texas -27.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">North Texas -37.9</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">North Texas -27.5  (10.4)</span></div>
+  <a class="bdbtn" href="game/401862796.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="1.59" data-teams="temple uconn american athletic fbs independents">
+  <div class="when"><span>3:45 PM ET</span><span class="dot">·</span><span>Lincoln Financial Field</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/UConn.png" alt="" loading="lazy"><div class="tn"><span class="nm">UConn</span><span class="rec">2-3</span></div><div class="pts">28.2</div></div>
+    <div class="team win"><img src="logos/Temple.png" alt="" loading="lazy"><div class="tn"><span class="nm">Temple</span><span class="rec">2-3</span></div><div class="pts">30.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Temple -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Temple -1.9</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">UConn +3.5  (1.6)</span></div>
+  <a class="bdbtn" href="game/401861964.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="9.79" data-teams="east carolina rice american athletic american athletic">
+  <div class="when"><span>4:00 PM ET</span><span class="dot">·</span><span>Dowdy-Ficklen Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Rice.png" alt="" loading="lazy"><div class="tn"><span class="nm">Rice</span><span class="rec">1-4</span></div><div class="pts">15.9</div></div>
+    <div class="team win"><img src="logos/East_Carolina.png" alt="" loading="lazy"><div class="tn"><span class="nm">East Carolina</span><span class="rec">2-2</span></div><div class="pts">35.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">East Carolina -10</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">East Carolina -19.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">East Carolina -10  (9.8)</span></div>
+  <a class="bdbtn" href="game/401862797.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.29" data-teams="ohio state maryland big ten big ten">
+  <div class="when"><span>4:15 PM ET</span><span class="dot">·</span><span>Ohio Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Maryland.png" alt="" loading="lazy"><div class="tn"><span class="nm">Maryland</span><span class="rec">2-3</span></div><div class="pts">9.0</div></div>
+    <div class="team win"><img src="logos/Ohio_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Ohio State</span><span class="rec">4-1</span></div><div class="pts">46.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Ohio State -35.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Ohio State -37.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Ohio State -35.5  (2.3)</span></div>
+  <a class="bdbtn" href="game/401858483.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.71" data-teams="arkansas tennessee sec sec">
+  <div class="when"><span>4:15 PM ET</span><span class="dot">·</span><span>Razorback Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Tennessee.png" alt="" loading="lazy"><div class="tn"><span class="nm">Tennessee</span><span class="rec">4-1</span></div><div class="pts">32.9</div></div>
+    <div class="team"><img src="logos/Arkansas.png" alt="" loading="lazy"><div class="tn"><span class="nm">Arkansas</span><span class="rec">2-3</span></div><div class="pts">25.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Tennessee -13.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Tennessee -7.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Arkansas +13.5  (5.7)</span></div>
+  <a class="bdbtn" href="game/401856713.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="8.09" data-teams="oregon state san diego state pac-12 mountain west">
+  <div class="when"><span>6:00 PM ET</span><span class="dot">·</span><span>Reser Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/San_Diego_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">San Diego State</span><span class="rec">2-3</span></div><div class="pts">21.1</div></div>
+    <div class="team win"><img src="logos/Oregon_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Oregon State</span><span class="rec">3-2</span></div><div class="pts">28.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Oregon State -15.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Oregon State -7.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">San Diego State +15.5  (8.1)</span></div>
+  <a class="bdbtn" href="game/401860902.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.37" data-teams="unlv north dakota state mountain west mvfc">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Allegiant Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/North_Dakota_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">North Dakota State</span><span class="rec">5-0</span></div><div class="pts">27.7</div></div>
+    <div class="team"><img src="logos/UNLV.png" alt="" loading="lazy"><div class="tn"><span class="nm">UNLV</span><span class="rec">3-2</span></div><div class="pts">27.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">North Dakota State -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">North Dakota State -0.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">UNLV +3.5  (3.4)</span></div>
+  <a class="bdbtn" href="game/401864518.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.22" data-teams="memphis uab american athletic american athletic">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Simmons Bank Liberty Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/UAB.png" alt="" loading="lazy"><div class="tn"><span class="nm">UAB</span><span class="rec">3-2</span></div><div class="pts">21.4</div></div>
+    <div class="team win"><img src="logos/Memphis.png" alt="" loading="lazy"><div class="tn"><span class="nm">Memphis</span><span class="rec">4-1</span></div><div class="pts">38.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Memphis -14.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Memphis -16.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Memphis -14.5  (2.2)</span></div>
+  <a class="bdbtn" href="game/401862798.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="0.89" data-teams="utep nevada conference usa mountain west">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Sun Bowl</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Nevada.png" alt="" loading="lazy"><div class="tn"><span class="nm">Nevada</span><span class="rec">1-3</span></div><div class="pts">30.6</div></div>
+    <div class="team"><img src="logos/UTEP.png" alt="" loading="lazy"><div class="tn"><span class="nm">UTEP</span><span class="rec">1-4</span></div><div class="pts">21.9</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Nevada -9.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Nevada -8.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">UTEP +9.5  (0.9)</span></div>
+  <a class="bdbtn" href="game/401864517.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="6.65" data-teams="marshall coastal carolina sun belt sun belt">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Joan C. Edwards Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Coastal_Carolina.png" alt="" loading="lazy"><div class="tn"><span class="nm">Coastal Carolina</span><span class="rec">1-4</span></div><div class="pts">22.9</div></div>
+    <div class="team win"><img src="logos/Marshall.png" alt="" loading="lazy"><div class="tn"><span class="nm">Marshall</span><span class="rec">3-2</span></div><div class="pts">32.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Marshall -2.75</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Marshall -9.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Marshall -2.75  (6.7)</span></div>
+  <a class="bdbtn" href="game/401869943.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="2.28" data-teams="kentucky lsu sec sec">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Kroger Field</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/LSU.png" alt="" loading="lazy"><div class="tn"><span class="nm">LSU</span><span class="rec">4-1</span></div><div class="pts">29.9</div></div>
+    <div class="team"><img src="logos/Kentucky.png" alt="" loading="lazy"><div class="tn"><span class="nm">Kentucky</span><span class="rec">4-1</span></div><div class="pts">22.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">LSU -10</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">LSU -7.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Kentucky +10  (2.3)</span></div>
+  <a class="bdbtn" href="game/401856715.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="4.39" data-teams="northern illinois air force mid-american mountain west">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Huskie Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Air_Force.png" alt="" loading="lazy"><div class="tn"><span class="nm">Air Force</span><span class="rec">3-1</span></div><div class="pts">31.1</div></div>
+    <div class="team"><img src="logos/Northern_Illinois.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northern Illinois</span><span class="rec">0-4</span></div><div class="pts">25.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Air Force -10</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Air Force -5.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Northern Illinois +10  (4.4)</span></div>
+  <a class="bdbtn" href="game/401864516.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="6.15" data-teams="georgia southern james madison sun belt sun belt">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Allen E. Paulson Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/James_Madison.png" alt="" loading="lazy"><div class="tn"><span class="nm">James Madison</span><span class="rec">5-0</span></div><div class="pts">35.5</div></div>
+    <div class="team"><img src="logos/Georgia_Southern.png" alt="" loading="lazy"><div class="tn"><span class="nm">Georgia Southern</span><span class="rec">2-3</span></div><div class="pts">20.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">James Madison -8.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">James Madison -14.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">James Madison -8.5  (6.1)</span></div>
+  <a class="bdbtn" href="game/401869949.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.12" data-teams="alabama georgia sec sec">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Bryant-Denny Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Georgia.png" alt="" loading="lazy"><div class="tn"><span class="nm">Georgia</span><span class="rec">5-0</span></div><div class="pts">26.3</div></div>
+    <div class="team win"><img src="logos/Alabama.png" alt="" loading="lazy"><div class="tn"><span class="nm">Alabama</span><span class="rec">5-0</span></div><div class="pts">29.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Georgia -2</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Alabama -3.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Alabama +2  (5.1)</span></div>
+  <a class="bdbtn" href="game/401856712.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.28" data-teams="louisiana tech louisiana conference usa sun belt">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Joe Aillet Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Louisiana.png" alt="" loading="lazy"><div class="tn"><span class="nm">Louisiana</span><span class="rec">4-1</span></div><div class="pts">22.2</div></div>
+    <div class="team win"><img src="logos/Louisiana_Tech.png" alt="" loading="lazy"><div class="tn"><span class="nm">Louisiana Tech</span><span class="rec">2-2</span></div><div class="pts">28.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Louisiana Tech -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Louisiana Tech -5.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Louisiana Tech -2.5  (3.3)</span></div>
+  <a class="bdbtn" href="game/401869965.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="6.03" data-teams="penn state usc big ten big ten">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Beaver Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/USC.png" alt="" loading="lazy"><div class="tn"><span class="nm">USC</span><span class="rec">5-1</span></div><div class="pts">25.8</div></div>
+    <div class="team win"><img src="logos/Penn_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Penn State</span><span class="rec">3-2</span></div><div class="pts">30.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">USC -1.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Penn State -4.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Penn State +1.5  (6.0)</span></div>
+  <a class="bdbtn" href="game/401858485.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="8.54" data-teams="virginia syracuse acc acc">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Scott Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Syracuse.png" alt="" loading="lazy"><div class="tn"><span class="nm">Syracuse</span><span class="rec">2-2</span></div><div class="pts">18.7</div></div>
+    <div class="team win"><img src="logos/Virginia.png" alt="" loading="lazy"><div class="tn"><span class="nm">Virginia</span><span class="rec">3-2</span></div><div class="pts">35.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Virginia -8.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Virginia -17</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Virginia -8.5  (8.5)</span></div>
+  <a class="bdbtn" href="game/401858258.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="3.22" data-teams="purdue minnesota big ten big ten">
+  <div class="when"><span>8:00 PM ET</span><span class="dot">·</span><span>Ross-Ade Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Minnesota.png" alt="" loading="lazy"><div class="tn"><span class="nm">Minnesota</span><span class="rec">4-1</span></div><div class="pts">27.4</div></div>
+    <div class="team win"><img src="logos/Purdue.png" alt="" loading="lazy"><div class="tn"><span class="nm">Purdue</span><span class="rec">2-3</span></div><div class="pts">28.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Minnesota -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Purdue -0.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Purdue +2.5  (3.2)</span></div>
+  <a class="bdbtn" href="game/401858486.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="6.24" data-teams="arizona state hawai&#x27;i big 12 mountain west">
+  <div class="when"><span>9:30 PM ET</span><span class="dot">·</span><span>Mountain America Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Hawai_i.png" alt="" loading="lazy"><div class="tn"><span class="nm">Hawai&#x27;i</span><span class="rec">1-4</span></div><div class="pts">21.0</div></div>
+    <div class="team win"><img src="logos/Arizona_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Arizona State</span><span class="rec">2-2</span></div><div class="pts">35.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Arizona State -20.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Arizona State -14.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Hawai&#x27;i +20.5  (6.2)</span></div>
+  <a class="bdbtn" href="game/401856808.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="0.73" data-teams="utah kansas big 12 big 12">
+  <div class="when"><span>10:15 PM ET</span><span class="dot">·</span><span>Rice-Eccles Stadium</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Kansas.png" alt="" loading="lazy"><div class="tn"><span class="nm">Kansas</span><span class="rec">2-2</span></div><div class="pts">21.7</div></div>
+    <div class="team win"><img src="logos/Utah.png" alt="" loading="lazy"><div class="tn"><span class="nm">Utah</span><span class="rec">4-0</span></div><div class="pts">36.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Utah -15.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Utah -14.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Kansas +15.5  (0.7)</span></div>
+  <a class="bdbtn" href="game/401856827.html">GAME BREAKDOWN →</a>
+</article><article class="game" data-gap="5.38" data-teams="fresno state boise state mountain west mountain west">
+  <div class="when"><span>10:30 PM ET</span><span class="dot">·</span><span>Valley Children&#x27;s Stadium</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Boise_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Boise State</span><span class="rec">4-1</span></div><div class="pts">27.4</div></div>
+    <div class="team"><img src="logos/Fresno_State.png" alt="" loading="lazy"><div class="tn"><span class="nm">Fresno State</span><span class="rec">4-1</span></div><div class="pts">26.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Boise State -6.25</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Boise State -0.9</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Fresno State +6.25  (5.4)</span></div>
+  <a class="bdbtn" href="game/401860901.html">GAME BREAKDOWN →</a>
+</article></div>
+<script>
+(function () {
+  var board = document.getElementById('board');
+  if (!board) return;
+  var cards = Array.prototype.slice.call(board.querySelectorAll('.game'));
+  var days = Array.prototype.slice.call(board.querySelectorAll('.day'));
+  var tile = document.getElementById('gapTile');
+  var all = document.getElementById('allTile');
+  var input = document.getElementById('sinput');
+  var sbtn = document.getElementById('sbtn');
+  var wrap = document.getElementById('search');
+  var min = 0, term = '';
+
+  function apply() {
+    var shown = 0;
+    cards.forEach(function (el) {
+      var ok = (min === 0 || parseFloat(el.dataset.gap) >= min) &&
+               (!term || el.dataset.teams.indexOf(term) !== -1);
+      el.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    days.forEach(function (h) {
+      var n = 0, el = h.nextElementSibling;
+      while (el && el.classList.contains('game')) {
+        if (el.style.display !== 'none') n++;
+        el = el.nextElementSibling;
+      }
+      h.style.display = n ? '' : 'none';
+    });
+    var none = document.getElementById('nores');
+    if (!none) {
+      none = document.createElement('div');
+      none.id = 'nores';
+      none.className = 'nores';
+      board.appendChild(none);
+    }
+    none.textContent = shown ? '' : 'NO GAMES MATCH THAT SEARCH';
+  }
+
+  if (tile) tile.addEventListener('click', function (e) {
+    e.preventDefault();
+    var on = tile.classList.toggle('on');
+    if (all) all.classList.toggle('on', !on);
+    min = on ? parseFloat(tile.dataset.min) : 0;
+    apply();
+    board.scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
+  if (all) all.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (tile) tile.classList.remove('on');
+    all.classList.add('on');
+    min = 0;
+    apply();
+  });
+  if (sbtn) sbtn.addEventListener('click', function () {
+    wrap.classList.toggle('open');
+    if (wrap.classList.contains('open')) { try { input.focus({preventScroll: true}); }
+      catch (err) { input.focus(); } }
+    else { input.value = ''; term = ''; apply(); }
+  });
+  if (input) {
+    input.addEventListener('input', function () {
+      term = input.value.trim().toLowerCase();
+      apply();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { input.value = ''; term = ''; wrap.classList.remove('open'); apply(); }
+    });
+  }
+})();
+</script><footer><div class="in">Projections are model output, not betting advice. Every number on this
+page comes from the same model that produced the score — nothing is hand-entered.</div></footer>
+</body></html>
