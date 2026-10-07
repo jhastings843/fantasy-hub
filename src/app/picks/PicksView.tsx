@@ -189,6 +189,15 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
               </b>{" "}
               Each model only publishes graded games from the weeks it has covered. Treat small samples as an early read.
             </span>
+            {lg === "cfb" && (
+              <span>
+                PEM (Jay, @FansOfCFB) is a third model here:{" "}
+                {r.pem.length
+                  ? r.pem.map((w) => `Week ${w.week}${w.verified ? "" : " (failed its check, left out)"}`).join(", ")
+                  : "no cards on file yet"}
+                . Its cards arrive from X on Tuesday.
+              </span>
+            )}
             {stale && <span>Showing the last good copy: one of the sites didn&apos;t load on the latest try.</span>}
             {r.errors.map((e) => (
               <span key={e}>Couldn&apos;t read {e}</span>
@@ -262,7 +271,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
               : ""}
           </p>
           {plays.length > 0 ? (
-            <BoardTable games={plays} name={name} />
+            <BoardTable games={plays} name={name} withPem={lg === "cfb"} />
           ) : (
             <div className={s.tile}>
               <div className={s.tileK}>No games fit the rule or the runner-up this week.</div>
@@ -271,7 +280,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           {rest.length > 0 && (
             <details className={s.details}>
               <summary>The other {rest.length} games</summary>
-              <BoardTable games={rest} name={name} />
+              <BoardTable games={rest} name={name} withPem={lg === "cfb"} />
             </details>
           )}
         </section>
@@ -621,7 +630,7 @@ function matchesRule(g: PicksReport["graded"][number], rule: CutResult): boolean
   return matches(g.read, rule.test);
 }
 
-function BoardTable({ games, name }: { games: BoardGame[]; name: (k: string) => string }) {
+function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: string) => string; withPem: boolean }) {
   const ml = (team: string, m?: { market: number; model: number }) =>
     m ? `${team} ${line(m.market)} / ${line(Math.round(m.model * 10) / 10)}` : "not posted";
   return (
@@ -635,6 +644,7 @@ function BoardTable({ games, name }: { games: BoardGame[]; name: (k: string) => 
             <th>Avg edge</th>
             <th>Sam: Vegas / model</th>
             <th>David: Vegas / model</th>
+            {withPem && <th>PEM</th>}
           </tr>
         </thead>
         <tbody>
@@ -659,11 +669,17 @@ function BoardTable({ games, name }: { games: BoardGame[]; name: (k: string) => 
                 </td>
                 <td className={`${s.play} ${g.tier === "t1" || g.tier === "t2" ? "" : s.dim}`}>
                   {play}
+                  {g.pemPick && <div className={s.thin}>Sam and David split; PEM breaks it.</div>}
                   {moved && <div className={s.thin} style={{ color: "var(--gold)" }}>{moved}</div>}
                 </td>
                 <td className={s.num}>{g.read?.agree ? g.read.avgEdge.toFixed(1) : "·"}</td>
                 <td className={`${s.num} ${s.nw} ${s.dim}`}>{ml(home, g.sam)}</td>
                 <td className={`${s.num} ${s.nw} ${s.dim}`}>{ml(home, g.david)}</td>
+                {withPem && (
+                  <td className={`${s.num} ${s.nw} ${s.dim}`}>
+                    {g.pem ? `${home} ${line(g.pem.model)}${g.read?.pemSide ? ` · ${name(g.read.pemSide === "home" ? g.home : g.away)}` : ""}` : "·"}
+                  </td>
+                )}
               </tr>
             );
           })}

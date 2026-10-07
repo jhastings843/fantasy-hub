@@ -28,7 +28,15 @@ export interface Game {
   away: string;
   sam?: ModelLine;
   david?: ModelLine;
+  /** Jay's PEM (college only): its home-side line and the market line on its card. */
+  pem?: PemLine;
   final?: { home: number; away: number };
+}
+
+export interface PemLine {
+  model: number;
+  /** The line PEM's card graded against (DraftKings), home side. */
+  market?: number;
 }
 
 /** What both models together say about a game. */
@@ -55,11 +63,13 @@ export interface Read {
   /** Average of the two model lines, home side. Negative: home team projected to win. */
   avgModel: number;
   avgMarket: number;
+  /** PEM's side against the average market line, when PEM covers the game. */
+  pemSide?: "home" | "away";
 }
 
-export function read(sam: ModelLine, david: ModelLine): Read {
-  const samSide = sam.model < sam.market ? "home" : "away";
-  const davidSide = david.model < david.market ? "home" : "away";
+export function read(sam: ModelLine, david: ModelLine, pem?: PemLine): Read {
+  const samSide: "home" | "away" = sam.model < sam.market ? "home" : "away";
+  const davidSide: "home" | "away" = david.model < david.market ? "home" : "away";
   // A model sitting exactly on the number has no side; treat it as a split.
   const agree = samSide === davidSide && sam.model !== sam.market && david.model !== david.market;
   const avgModel = (sam.model + david.model) / 2;
@@ -75,7 +85,8 @@ export function read(sam: ModelLine, david: ModelLine): Read {
     davidSide,
     avgModel,
     avgMarket,
-  } as const;
+    pemSide: pem && pem.model !== avgMarket ? (pem.model < avgMarket ? ("home" as const) : ("away" as const)) : undefined,
+  };
   if (!agree) return { ...base };
   const home = samSide === "home";
   // Home bettor wants the larger home number, road bettor the smaller.
@@ -112,6 +123,10 @@ export interface CutTest {
   minAbsLine?: number;
   maxAbsLine?: number;
   flip?: boolean;
+  /** PEM on the same side as the other two, or against them. */
+  pem?: "agree" | "disagree";
+  /** Sam and David split; back whichever side PEM takes. */
+  pemSplit?: boolean;
 }
 
 export interface Cut {
@@ -124,7 +139,10 @@ export interface Cut {
 }
 
 export function matches(r: Read, t: CutTest): boolean {
+  if (t.pemSplit) return !r.agree && !!r.pemSide;
   if (!r.agree || r.line === undefined) return false;
+  if (t.pem === "agree" && (!r.pemSide || r.pemSide !== r.side)) return false;
+  if (t.pem === "disagree" && (!r.pemSide || r.pemSide === r.side)) return false;
   if (t.side === "dog" && !r.dog) return false;
   if (t.side === "fav" && r.dog) return false;
   if (t.venue === "home" && r.side !== "home") return false;
@@ -154,7 +172,7 @@ const c = (id: string, label: string, group: string, test: CutTest, candidate = 
  * The cuts tested every week. College lines run far larger than NFL lines, so
  * the size thresholds are set per league; everything else is shared.
  */
-export function cutsFor(league: "nfl" | "cfb"): Cut[] {
+export function cutsFor(league: "nfl" | "cfb", withPem = false): Cut[] {
   const big = league === "nfl" ? 6.5 : 14;
   const small = league === "nfl" ? 3.5 : 7;
   const e = league === "nfl" ? [2, 3, 4] : [3, 5, 5];
@@ -178,6 +196,15 @@ export function cutsFor(league: "nfl" | "cfb"): Cut[] {
     c(`any-${big}`, `Agree, line ${big}+ either side`, "Line size", { minAbsLine: big }),
     c(`under-${small}`, `Agree, line under ${small} either side`, "Line size", { maxAbsLine: small }),
     c("flip", "Both models pick the dog to win outright", "Line size", { flip: true }),
+    ...(withPem
+      ? [
+          c("pem-agree", "All three agree (with PEM)", "PEM, third model", { pem: "agree" }),
+          c("pem-agree-dog", "All three agree on the dog", "PEM, third model", { pem: "agree", side: "dog" }),
+          c("pem-agree-fav", "All three agree on the favorite", "PEM, third model", { pem: "agree", side: "fav" }),
+          c("pem-disagree", "Sam + David agree, PEM disagrees", "PEM, third model", { pem: "disagree" }),
+          c("pem-split", "Sam and David split: PEM's side", "PEM, third model", { pemSplit: true }),
+        ]
+      : []),
   ];
 }
 
@@ -223,10 +250,14 @@ export interface GradedGame extends Game {
   result?: Result;
   samResult: Result;
   davidResult: Result;
+  /** On a split, the result of whichever model PEM sided with. */
+  pemSplitResult?: Result;
+  /** PEM alone, at its card's line (or the average market line). */
+  pemResult?: Result;
 }
 
 export function gradeGame(g: Game & { final: { home: number; away: number }; sam: ModelLine; david: ModelLine }): GradedGame {
-  const r = read(g.sam, g.david);
+  const r = read(g.sam, g.david, g.pem);
   const samSide = g.sam.model < g.sam.market ? "home" : "away";
   const davidSide = g.david.model < g.david.market ? "home" : "away";
   return {
@@ -239,7 +270,20 @@ export function gradeGame(g: Game & { final: { home: number; away: number }; sam
         : undefined,
     samResult: grade(g.final, g.sam.market, samSide),
     davidResult: grade(g.final, g.david.market, davidSide),
+    pemSplitResult:
+      !r.agree && r.pemSide
+        ? r.pemSide === samSide
+          ? grade(g.final, g.sam.market, samSide)
+          : grade(g.final, g.david.market, davidSide)
+        : undefined,
+    pemResult: g.pem ? pemAlone(g.final, g.pem, r.avgMarket) : undefined,
   };
+}
+
+function pemAlone(final: { home: number; away: number }, pem: PemLine, avgMarket: number): Result | undefined {
+  const m = pem.market ?? avgMarket;
+  if (pem.model === m) return undefined;
+  return grade(final, m, pem.model < m ? "home" : "away");
 }
 
 export interface CutResult extends Cut {
@@ -265,7 +309,12 @@ function rank(a: CutResult, b: CutResult): number {
 
 export function strategies(league: "nfl" | "cfb", games: GradedGame[]): StrategyBoard {
   const agreed = games.filter((g) => g.read.agree && g.result);
-  const cuts: CutResult[] = cutsFor(league).map((cut) => {
+  const withPem = games.some((g) => g.pem);
+  const cuts: CutResult[] = cutsFor(league, withPem).map((cut) => {
+    if (cut.test.pemSplit) {
+      const hits = games.filter((g) => matches(g.read, cut.test) && g.pemSplitResult);
+      return { ...cut, record: tally(hits.map((g) => g.pemSplitResult as Result)), games: hits.length };
+    }
     const hits = agreed.filter((g) => matches(g.read, cut.test));
     return { ...cut, record: tally(hits.map((g) => g.result as Result)), games: hits.length };
   });
@@ -277,6 +326,9 @@ export function strategies(league: "nfl" | "cfb", games: GradedGame[]): Strategy
     { id: "sam", label: "Sam alone, all games", record: tally(games.map((g) => g.samResult)) },
     { id: "david", label: "David alone, all games", record: tally(games.map((g) => g.davidResult)) },
     { id: "dogs", label: "Every underdog, no model", record: tally(dogResults) },
+    ...(withPem
+      ? [{ id: "pem", label: "PEM alone, games it covers", record: tally(games.flatMap((g) => (g.pemResult ? [g.pemResult] : []))) }]
+      : []),
   ];
 
   const split = games.filter((g) => !g.read.agree);
@@ -286,9 +338,9 @@ export function strategies(league: "nfl" | "cfb", games: GradedGame[]): Strategy
   const rule = eligible[0] ?? null;
   let second: CutResult | null = null;
   if (rule) {
-    const inRule = new Set(agreed.filter((g) => matches(g.read, rule.test)).map(key));
+    const inRule = new Set(games.filter((g) => matches(g.read, rule.test)).map(key));
     second =
-      eligible.slice(1).find((x) => agreed.some((g) => matches(g.read, x.test) && !inRule.has(key(g)))) ?? null;
+      eligible.slice(1).find((x) => games.some((g) => matches(g.read, x.test) && !inRule.has(key(g)))) ?? null;
   }
 
   return {
@@ -321,13 +373,16 @@ export interface BoardGame {
   play: string;
   /** Straight-up call. */
   su?: StraightUp;
+  pem?: PemLine;
+  /** The play is PEM's side of a Sam/David split. */
+  pemPick?: boolean;
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
 
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine }[],
   s: StrategyBoard,
 ): BoardGame[] {
   return rows.map((row) => {
@@ -338,9 +393,17 @@ export function tierBoard(
       const side = m.model < m.market ? row.home : row.away;
       return { ...row, tier: "one", play: `${only} only: ${side}`, su };
     }
-    const r = read(row.sam, row.david);
+    const r = read(row.sam, row.david, row.pem);
     if (!r.agree || !r.side || r.line === undefined) {
       const team = (side: "home" | "away") => (side === "home" ? row.home : row.away);
+      // A split PEM breaks, when breaking splits is a cut that is winning.
+      const pemTier: Tier | null =
+        r.pemSide && s.rule?.test.pemSplit ? "t1" : r.pemSide && s.second?.test.pemSplit ? "t2" : null;
+      if (pemTier && r.pemSide) {
+        const m = r.pemSide === r.samSide ? row.sam : row.david;
+        const l = r.pemSide === "home" ? m.market : -m.market;
+        return { ...row, read: r, tier: pemTier, play: `${team(r.pemSide)} ${fmt(l)}`, su, pemPick: true };
+      }
       return { ...row, read: r, tier: "split", play: `Sam: ${team(r.samSide)} · David: ${team(r.davidSide)}`, su };
     }
     const team = r.side === "home" ? row.home : row.away;

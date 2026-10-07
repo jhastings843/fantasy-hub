@@ -99,7 +99,7 @@ export function teamKey(league: League, name: string): string {
     if (/^[A-Z]{2,3}$/.test(raw)) return raw;
     return NFL_TEAMS[raw] ?? raw;
   }
-  return raw
+  const folded = raw
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
@@ -109,7 +109,37 @@ export function teamKey(league: League, name: string): string {
     .replace(/['’.()]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+  return CFB_ALIASES[folded] ?? folded;
 }
+
+/**
+ * College names that fold differently across sources, mapped to the spelling
+ * Sam and David share. PEM's cards turned most of these up; extend the list
+ * when the page reports an unmatched game.
+ */
+const CFB_ALIASES: { [folded: string]: string } = {
+  "miami fl": "miami",
+  "miami florida": "miami",
+  "miami ohio": "miami oh",
+  "m oh": "miami oh",
+  umass: "massachusetts",
+  ulm: "ul monroe",
+  "louisiana monroe": "ul monroe",
+  "louisiana lafayette": "louisiana",
+  "ul lafayette": "louisiana",
+  fiu: "florida international",
+  "app state": "appalachian state",
+  usf: "south florida",
+  connecticut: "uconn",
+  "north carolina state": "nc state",
+  "southern methodist": "smu",
+  "texas christian": "tcu",
+  "brigham young": "byu",
+  "central florida": "ucf",
+  "southern mississippi": "southern miss",
+  "sam houston state": "sam houston",
+  nmsu: "new mexico state",
+};
 
 /** A line written as "<team> <number>" from the home side. */
 function homeLine(league: League, text: string, home: string): number {

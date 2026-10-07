@@ -13,8 +13,12 @@ import {
   parseSheetWeek,
   weekOf,
 } from "./parse";
+import { pemWeeks } from "./pem";
+import type { PemWeek } from "./pem-card";
 import {
   type BoardGame,
+  type PemLine,
+  gradeGame,
   type GradedGame,
   type Record,
   type Result,
@@ -222,6 +226,8 @@ export interface PicksReport {
   live: LiveWeek[];
   notes: string[];
   errors: string[];
+  /** PEM weeks on file (college), and whether each checked out. */
+  pem: { week: number; verified: boolean; games: number; source: string }[];
   /** Team key to the name a site printed, for display. NFL keys map to themselves. */
   names: { [key: string]: string };
 }
@@ -252,7 +258,22 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const samRows = samRecordHtml ? parseSamRecord(league, samRecordHtml, (d) => weekOf(league, d)) : [];
 
   const [sam, david] = await Promise.all([archive(league, "sam", samRows), archive(league, "david", davidRows)]);
-  const j = join(sam, david);
+  const joined = join(sam, david);
+
+  // PEM, college only. Only weeks whose card checked out count.
+  const seasonGuess = seasonNow();
+  const pem = league === "cfb" ? await pemWeeks(seasonGuess) : [];
+  const pemLines = new Map<string, PemLine>();
+  for (const w of pem.filter((x) => x.verified)) {
+    for (const r of w.rows) pemLines.set(key({ week: w.week, home: r.home, away: r.away }), { model: r.model, market: r.market });
+  }
+  const j = {
+    ...joined,
+    graded: joined.graded.map((g) => {
+      const p = pemLines.get(key(g));
+      return p ? gradeGame({ ...g, pem: p }) : g;
+    }),
+  };
   const s = strategies(league, j.graded);
   const su = suRecords(league, j.graded);
 
@@ -265,12 +286,13 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const samLive = sb.week === week ? sb.rows : [];
   const davidLive = db.week === week ? db.rows : [];
   const dmap = new Map(davidLive.map((r) => [`${r.away}@${r.home}`, r]));
-  const rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine }[] = samLive.map((r) => {
+  const pemNow = (home: string, away: string) => (week ? pemLines.get(key({ week, home, away })) : undefined);
+  const rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine }[] = samLive.map((r) => {
     const d = dmap.get(`${r.away}@${r.home}`);
     dmap.delete(`${r.away}@${r.home}`);
-    return { home: r.home, away: r.away, sam: r.line, david: d?.line };
+    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away) };
   });
-  for (const d of dmap.values()) rows.push({ home: d.home, away: d.away, sam: undefined, david: d.line });
+  for (const d of dmap.values()) rows.push({ home: d.home, away: d.away, sam: undefined, david: d.line, pem: pemNow(d.home, d.away) });
   const board = tierBoard(league, rows, s);
 
   const season = sb.season ?? db.season ?? seasonNow();
@@ -286,6 +308,15 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
       `${j.onlyDavid} graded game${j.onlyDavid === 1 ? "" : "s"} only David has and ${j.onlySam} only Sam has are left out of the agreement backtest (mostly weeks one site does not cover).`,
     );
   }
+  for (const w of pem.filter((x) => !x.verified)) {
+    notes.push(`PEM Week ${w.week} card didn't pass its check and is left out: ${w.problems.slice(0, 3).join("; ")}.`);
+  }
+  if (pem.length && week) {
+    const unmatched = (pem.find((w) => w.week === week && w.verified)?.rows ?? []).filter(
+      (r) => !rows.some((x) => x.home === r.home && x.away === r.away),
+    );
+    if (unmatched.length) notes.push(`PEM games not matched to the board (team names): ${unmatched.map((r) => `${r.awayName} at ${r.homeName}`).join(", ")}.`);
+  }
   if (sb.week !== db.week && sb.week && db.week) {
     notes.push(`The sites are on different weeks (Sam ${sb.week}, David ${db.week}); only Week ${week} games are on the board.`);
   }
@@ -297,6 +328,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   }
 
   return {
+    pem: pem.map((w: PemWeek) => ({ week: w.week, verified: w.verified, games: w.rows.length, source: w.source })),
     names,
     league,
     season,
