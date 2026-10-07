@@ -3,7 +3,8 @@ import { cardKind } from "@/lib/picks/pem-card";
 import { refreshPicks } from "@/lib/picks/report";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Four vision reads, plus a Sonnet retry on any that fail their check.
+export const maxDuration = 300;
 
 // POST /api/picks/pem - a PEM card for the college tab.
 //

@@ -84,14 +84,16 @@ async function readTile(client: Anthropic, model: string, tile: Buffer): Promise
 export async function readCard(imageUrl: string): Promise<{ rows: PemRow[]; problems: string[] }> {
   const client = new Anthropic({ timeout: 90_000 });
   const parts = await tiles(imageUrl);
-  const all: PemRow[] = [];
-  const problems: string[] = [];
-  for (const [i, tile] of parts.entries()) {
-    let read = toRows(await readTile(client, FAST, tile));
-    if (read.problems.length) read = toRows(await readTile(client, CAREFUL, tile));
-    all.push(...read.rows);
-    problems.push(...read.problems.map((p) => `column ${i + 1}: ${p}`));
-  }
+  // Columns are read at the same time; one slow read must not run the
+  // request past its time limit.
+  const reads = await Promise.all(
+    parts.map(async (tile) => {
+      const first = toRows(await readTile(client, FAST, tile));
+      return first.problems.length ? toRows(await readTile(client, CAREFUL, tile)) : first;
+    }),
+  );
+  const all: PemRow[] = reads.flatMap((r) => r.rows);
+  const problems = reads.flatMap((r, i) => r.problems.map((p) => `column ${i + 1}: ${p}`));
   // Overlap between columns can repeat a game; keep the first.
   const seen = new Set<string>();
   const rows = all.filter((r) => {
