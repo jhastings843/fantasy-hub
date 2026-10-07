@@ -59,6 +59,23 @@ function sideOf(name: string, away: string, home: string): "home" | "away" | nul
   const kk = k.replace(/ /g, "");
   if (h.replace(/ /g, "").startsWith(kk) || initials(h) === kk) return "home";
   if (a.replace(/ /g, "").startsWith(kk) || initials(a) === kk) return "away";
+  // Last resort for abbreviations like JXST or TLSA: whichever team's name
+  // holds more of the letters, in order. Only when one clearly wins.
+  const fit = (abbr: string, team: string) => {
+    let i = 0;
+    let hit = 0;
+    for (const ch of abbr) {
+      const j = team.indexOf(ch, i);
+      if (j >= 0) {
+        hit++;
+        i = j + 1;
+      }
+    }
+    return hit / abbr.length;
+  };
+  const fh = fit(kk, h.replace(/ /g, ""));
+  const fa = fit(kk, a.replace(/ /g, ""));
+  if (kk.length <= 5 && Math.abs(fh - fa) >= 0.25) return fh > fa ? "home" : "away";
   return null;
 }
 

@@ -23,9 +23,10 @@ const PROMPT = `This image is one column of a college football picks card from t
 Each game box shows: the matchup "Away @ Home" with full team names; "Line: TEAM -X" (the market line, favorite named by abbreviation or name); "PEM: TEAM -Y" (the model's line); "PEM ATS Pick"; and an EDGE number. Some cards instead show a final score and "ATS: TEAM line PEM: TEAM -Y".
 
 Return ONLY a JSON array, one object per game box fully visible in this image, top to bottom:
-{"away": "full away name as printed", "home": "full home name as printed", "lineTeam": "team named in the Line", "line": X, "pemTeam": "team named after PEM:", "pem": Y, "edge": EDGE or null, "awayPts": n or null, "homePts": n or null}
+{"away": "full away name as printed", "home": "full home name as printed", "lineTeam": "the team favored in the Line", "line": X, "pemTeam": "the team favored after PEM:", "pem": Y, "edge": EDGE or null, "awayPts": n or null, "homePts": n or null}
 
 Rules:
+- lineTeam and pemTeam must be the FULL name copied from that box's matchup line, never an abbreviation. The Line and PEM entries name one of the two teams in the box by abbreviation (JXST, MOST, TLSA); write out which of the two it is.
 - Numbers as positive decimals exactly as printed (line 10.5, pem 17.6). If the line is a pick'em, use "lineTeam": "", "line": 0.
 - If a box is cut off at the top or bottom edge of the image, leave it out.
 - Copy what is printed. Never compute or guess a number.`;
@@ -144,7 +145,8 @@ export async function ingestPem(input: IngestInput): Promise<PemWeek | { skipped
   };
   await redis.set(keyFor(input.season, input.week), week);
   await redis.sadd(indexKey(input.season), input.week);
-  if (input.tweetId) await redis.set(seenKey(input.tweetId), 1, { ex: 60 * 60 * 24 * 60 });
+  // A card that failed its check is not done: let the relay send it again.
+  if (input.tweetId && week.verified) await redis.set(seenKey(input.tweetId), 1, { ex: 60 * 60 * 24 * 60 });
   return week;
 }
 

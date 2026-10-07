@@ -44,6 +44,16 @@ describe("PEM card", () => {
     expect(toRows([{ away: "Southern Miss", home: "Troy", lineTeam: "TROY", line: 10.5, pemTeam: "TROY", pem: 17.6, edge: 7.1 }]).problems).toEqual([]);
   });
 
+  it("resolves the card's abbreviations to one of the two teams", () => {
+    const row = (away: string, home: string, abbr: string) =>
+      toRows([{ away, home, lineTeam: abbr, line: 3, pemTeam: abbr, pem: 4 }]);
+    expect(row("Jacksonville State", "Kennesaw State", "JXST").rows[0].model).toBe(4);
+    expect(row("Tulsa", "Navy", "TLSA").rows[0].model).toBe(4);
+    expect(row("Missouri State", "Western Kentucky", "MOST").rows[0].model).toBe(4);
+    expect(row("Charlotte", "North Texas", "UNT").rows[0].model).toBe(-4);
+    expect(row("Maryland", "Ohio State", "OSU").rows[0].model).toBe(-4);
+  });
+
   it("reads the post text", () => {
     expect(cardKind("Week 6 PEM picks. All 58 games, in kickoff order.")).toEqual({ week: 6, kind: "picks" });
     expect(cardKind("The full PEM Week 5 card, with every final result.")).toEqual({ week: 5, kind: "final" });
