@@ -23,6 +23,7 @@ import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
 import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
 import { getPicksReport } from "@/lib/picks/report";
+import { archiveTracker } from "@/lib/picks/tracker";
 import { runPicksEmail } from "@/lib/picks/run";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
@@ -356,6 +357,7 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "lineups", work: () => refreshLineups() },
         { name: "waivers", work: () => refreshWaivers() },
         { name: "picks", work: () => refreshPicksBoards() },
+        { name: "tracker", work: () => archiveTracker() },
       ];
     case "overnight":
       return [{ name: "values", work: () => refreshValues() }];
