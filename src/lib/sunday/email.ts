@@ -1,5 +1,8 @@
 import { changeDetail, confirmedDetails } from "@/lib/email/lineup-detail";
 import type { SurvivorReport } from "@/lib/survivor/types";
+import type { PicksReport } from "@/lib/picks/report";
+import type { UpdateDiff } from "@/lib/picks/update";
+import { updateBlock } from "@/lib/picks/email";
 import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { AlarmReason } from "./alarm";
 import {
@@ -34,6 +37,8 @@ const pctText = (n: number) => `${(n * 100).toFixed(1)}%`;
 export interface SundayInput {
   survivors: SurvivorReport[];
   lineups: WeeklyLineups;
+  /** NFL picks re-checked at today's line (absent if the board couldn't be read). */
+  picks?: { r: PicksReport; diff: UpdateDiff } | null;
   /** The engine's pick per pool in Thursday's email, keyed by poolId. */
   thursdayCalls?: Record<string, string | null>;
   generatedAt: string;
@@ -201,7 +206,9 @@ ${lineups.leagues.map(leagueLine).join("")}`,
       : left > 0
         ? `${left} lineup change${left === 1 ? "" : "s"} before 1pm.`
         : "Something could not be checked. Worth opening.",
-    body: `${survivorCards}${lineupCard}`,
+    body: `${survivorCards}${lineupCard}${
+      input.picks ? card(`${label(`Picks at today's line · Week ${input.picks.r.week}`)}${updateBlock(input.picks.r, input.picks.diff)}`) : ""
+    }`,
     cta:
       survivors.length > 0 && live.length === 0
         ? { href: input.appUrl, text: "Open fantasy hub" }

@@ -7,6 +7,21 @@ import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/se
 import { readBaseline } from "@/lib/survivor/baseline";
 import { lockAlarms, unseenAlarms, type PoolAlarmInput, type SlotAlarmInput } from "./alarm";
 import { alarmSubject, renderLockAlarm, renderSundayBrief, sundaySubject } from "./email";
+import { refreshPicks, type PicksReport } from "@/lib/picks/report";
+import { loadIssued, saveIssued } from "@/lib/picks/issued-store";
+import { toIssuedUpdate } from "@/lib/picks/issued";
+import { diffUpdate, type UpdateDiff } from "@/lib/picks/update";
+
+/** The NFL picks at today's line, for the brief. Never blocks the brief. */
+async function nflPicks(): Promise<{ r: PicksReport; diff: UpdateDiff } | null> {
+  try {
+    const r = await refreshPicks("nfl");
+    if (!r?.week) return null;
+    return { r, diff: diffUpdate(r, await loadIssued("nfl", r.season)) };
+  } catch {
+    return null;
+  }
+}
 
 // The two Sunday jobs.
 //
@@ -71,10 +86,12 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
     Object.entries(baseline).map(([poolId, b]) => [poolId, b.recommended ?? null]),
   );
 
+  const picks = await nflPicks();
   const input = {
     survivors,
     lineups,
     thursdayCalls,
+    picks,
     generatedAt: new Date().toISOString(),
     appUrl: APP_URL(),
   };
@@ -106,7 +123,18 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
     messageId: result.id,
   });
 
-  return Response.json({ ok: true, sent: true, subject, week, season });
+  // New NFL plays in the brief are issued picks, recorded like Tuesday's.
+  let issued = "no new picks";
+  if (picks && !test && (picks.diff.added.length || picks.diff.addedTotals.length)) {
+    try {
+      const rec = toIssuedUpdate(picks.r, picks.diff, "sun", { issuedAt: new Date().toISOString(), emailId: result.id, subject });
+      issued = (await saveIssued(rec)) ? "recorded" : "already on file, kept";
+    } catch (e) {
+      issued = `NOT RECORDED (${e instanceof Error ? e.message : String(e)})`;
+    }
+  }
+
+  return Response.json({ ok: true, sent: true, subject, week, season, issued });
 }
 
 /**

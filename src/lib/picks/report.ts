@@ -170,6 +170,36 @@ async function saveSnapshot(league: League, season: number, week: number, board:
   }
 }
 
+// ------------------------------------------------------------- posting log
+
+/**
+ * When each source first showed this week's board, as this app saw it (to
+ * within the report refresh, up to three hours outside the Tuesday send
+ * window). Kept so the send schedule can be checked against
+ * real posting times over a season rather than one week's observation.
+ */
+async function notePosted(
+  league: League,
+  season: number,
+  week: number,
+  sam: boolean,
+  david: boolean,
+  pem: boolean,
+): Promise<{ [source: string]: string }> {
+  const k = `picks:v1:${league}:posted:${season}:w${week}`;
+  const now = new Date().toISOString();
+  try {
+    await Promise.all([
+      sam ? redis.hsetnx(k, "sam", now) : null,
+      david ? redis.hsetnx(k, "david", now) : null,
+      pem ? redis.hsetnx(k, "pem", now) : null,
+    ]);
+    return ((await redis.hgetall<{ [source: string]: string }>(k)) ?? {}) as { [source: string]: string };
+  } catch {
+    return {};
+  }
+}
+
 // ------------------------------------------------------------------ report
 
 export interface PicksReport {
@@ -183,7 +213,7 @@ export interface PicksReport {
   strategies: StrategyBoard;
   su: { methods: SuRecord[]; bands: SuRecord[]; best: SuRecord | null };
   board: BoardGame[];
-  /** The issued record: what each Wednesday email actually sent, graded. */
+  /** The issued record: what each picks email actually sent (Tuesday card plus game-day additions), graded. */
   live: IssuedWeek[];
   notes: string[];
   errors: string[];
@@ -201,6 +231,8 @@ export interface PicksReport {
   reference: { source: string | null; fetchedAt: string | null; priced: number; games: number; problem?: string };
   /** Over/under: Sam-alone history, the forward agreement archive, and this week at one current total. */
   totals: { backtest: TotalsBacktest; board: TotalsBoardGame[]; edge: number; newlyArchived: number; archived: number };
+  /** When each source's board for this week was first seen here (ISO). */
+  posted: { [source: string]: string };
 }
 
 function seasonNow(): number {
@@ -259,6 +291,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const dmap = new Map(davidLive.map((r) => [`${r.away}@${r.home}`, r]));
   const pemNow = (home: string, away: string) => (week ? pemLines.get(key({ week, home, away })) : undefined);
   const season = sb.season ?? db.season ?? seasonNow();
+  const posted = week ? await notePosted(league, season, week, sb.week === week, db.week === week, pem.some((w) => w.week === week && w.verified)) : {};
 
   // One current quote per game, every model judged against it.
   let refs = new Map<string, RefLine>();
@@ -377,6 +410,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     research,
     pemCompare: pemCmp,
     totals,
+    posted,
     reference: {
       source: priced[0]?.ref?.source ?? null,
       fetchedAt: priced[0]?.ref?.fetchedAt ?? null,

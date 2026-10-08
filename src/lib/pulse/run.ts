@@ -24,7 +24,8 @@ import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
 import { getPicksReport } from "@/lib/picks/report";
 import { archiveTracker } from "@/lib/picks/tracker";
-import { runPicksEmail } from "@/lib/picks/run";
+import { runPicksEmail, runPicksSaturday } from "@/lib/picks/run";
+import { weekOf } from "@/lib/picks/parse";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
 
@@ -398,6 +399,8 @@ async function runSend(id: SendId): Promise<Response> {
       return runLockAlarm();
     case "picks":
       return runPicksEmail();
+    case "picks-sat":
+      return runPicksSaturday();
   }
 }
 
@@ -440,6 +443,18 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
   if (id === "alarm") return false;
   // The lineup check can send more than once a week and keeps its own log.
   if (id === "watch") return false;
+  // The picks sends key on the calendar NFL week (Tuesday to Monday), which
+  // is what the picks code itself uses. Sleeper's week may not have rolled
+  // over by Tuesday evening, and asking it would read last week's log.
+  if (id === "picks" || id === "picks-sat") {
+    try {
+      const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+      const season = new Date().getUTCMonth() <= 1 ? new Date().getUTCFullYear() - 1 : new Date().getUTCFullYear();
+      return (await sharedAlreadySent(id, String(season), weekOf("nfl", day))) !== null;
+    } catch {
+      return false;
+    }
+  }
   try {
     const state = await getNflState();
     const week = state.display_week ?? state.week;

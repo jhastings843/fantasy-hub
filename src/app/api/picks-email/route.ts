@@ -1,13 +1,14 @@
-import { runPicksEmail } from "@/lib/picks/run";
+import { runPicksEmail, runPicksSaturday } from "@/lib/picks/run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET /api/picks-email - the Wednesday picks email.
+// GET /api/picks-email - the Tuesday picks card.
 //
-//   ?dry=1     render and return the HTML without sending
-//   ?resend=1  send again even though this week already went out
-//   ?test=1    mark the subject [Test] and leave the week unfrozen
+//   ?update=sat  the Saturday college update instead
+//   ?dry=1       render and return the HTML without sending
+//   ?resend=1    send again even though this week already went out
+//   ?test=1      mark the subject [Test] and record nothing as issued
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -16,9 +17,6 @@ export async function GET(request: Request) {
   if (secret && !dry && request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  return runPicksEmail({
-    dry,
-    resend: params.get("resend") === "1",
-    test: params.get("test") === "1",
-  });
+  const options = { dry, resend: params.get("resend") === "1", test: params.get("test") === "1" };
+  return params.get("update") === "sat" ? runPicksSaturday(options) : runPicksEmail(options);
 }

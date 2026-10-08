@@ -19,7 +19,7 @@ export type PulseTier = "live" | "hourly" | "overnight" | "idle";
 // than a minute window here that a late run would fall straight through.
 
 /** The emails, by the moment each one belongs to. */
-export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm" | "picks";
+export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm" | "picks" | "picks-sat";
 
 export type TimedJobId = "refresh-all-early" | "refresh-all-late";
 
@@ -51,6 +51,7 @@ export interface SendDays {
 
 const SUN = 0;
 const MON = 1;
+const TUE = 2;
 const WED = 3;
 const THU = 4;
 const FRI = 5;
@@ -149,11 +150,18 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
     { id: "watch", day: SAT, at: 12 * 60 },
     { id: "watch", day: SUN, at: 12 * 60 + 15, until: 13 * 60 },
     { id: "sunday", day: SUN, at: 9 * 60 },
-    // Both model sites post their boards on Tuesday; by Wednesday morning the
-    // opening moves are in. It waits (answers "skipped") until both are up,
-    // and Thursday is the second chance for a week one of them posts late.
+    // The picks card leaves Tuesday evening, as soon as all four boards are
+    // up (one week measured: the last, David's NFL board, at 4:18pm ET), so
+    // it catches the lines before they move toward the models and lands
+    // before college's Tuesday-night game. It answers "skipped" until then;
+    // Wednesday and Thursday 9am are fallbacks that need only the NFL boards.
+    { id: "picks", day: TUE, at: 17 * 60 + 30 },
     { id: "picks", day: WED, at: 9 * 60 },
     { id: "picks", day: THU, at: 9 * 60 },
+    // Saturday college update at the current line, before the noon kickoffs
+    // (339 of 902 college games start before 1pm). Silent when nothing
+    // changed. The NFL equivalent rides in the Sunday 9am brief.
+    { id: "picks-sat", day: SAT, at: 9 * 60 + 30 },
     // Alongside the 12:15 lineup check, 45 minutes before the 13:00 lock. This one
     // is allowed to send nothing at all, which is its normal outcome.
     { id: "alarm", day: SUN, at: 12 * 60 + 15, until: 16 * 60 },

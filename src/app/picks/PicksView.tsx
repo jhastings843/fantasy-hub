@@ -191,6 +191,14 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
             </span>
             <span>Updated {updated} ET</span>
             <span>Graded at −110</span>
+            {r.posted && Object.keys(r.posted).length > 0 && (
+              <span>
+                {`Boards first seen: ${Object.entries(r.posted)
+                  .map(([who, at]) => `${who === "pem" ? "PEM" : who[0].toUpperCase() + who.slice(1)} ${new Date(at).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })}`)
+                  .join(", ")} ET`}
+              </span>
+            )}
+            <span>Emails: Tue evening card · Sat 9:30am college update · NFL update in the Sun 9am brief</span>
           </div>
           <div className={s.scope}>
             <span>
@@ -452,7 +460,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
               <h2 className={s.h2}>The plays as sent</h2>
             </div>
             <p className={s.p}>
-              Only what each Wednesday email actually showed, at the lines it showed, under the rule in force that week.
+              Only what the emails actually showed (Tuesday&apos;s card, plus anything new in the Saturday college or Sunday NFL update), each game once at the line it was first sent, under the rule in force that week.
               This is forward performance, separate from the backtest the rule was chosen on. Tier 1 so far:{" "}
               {rec(liveT1 as Rec)}.
             </p>

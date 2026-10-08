@@ -1,9 +1,10 @@
 import { type BoardGame, type Record as Rec } from "./engine";
 import { type EmailSelection, selectForEmail } from "./issued";
+import type { UpdateDiff } from "./update";
 import type { PicksReport } from "./report";
 import { PALETTE, card, emailPage, escapeHtml, generatedLine, label, paragraph, small } from "@/lib/email/shell";
 
-// The Wednesday picks email. Both leagues in one, NFL first because that is
+// The Tuesday picks card. Both leagues in one, NFL first because that is
 // the pick'em, each with the plays that fit the rule and the straight-up list.
 // Everything here is read off the same report the page renders.
 
@@ -71,6 +72,21 @@ ${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.rec
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
 }
 
+/** Last week as sent, once its games are graded. */
+function lastWeekLine(r: PicksReport): string {
+  const w = (r.live ?? []).filter((x) => r.week !== null && x.week < r.week).sort((a, b) => b.week - a.week)[0];
+  if (!w) return "";
+  const n = (x: Rec) => x.w + x.l + x.p;
+  const parts = [
+    n(w.t1) ? `Tier 1 ${rec(w.t1)}` : "",
+    n(w.t2) ? `Tier 2 ${rec(w.t2)}` : "",
+    w.totals && n(w.totals) ? `totals ${rec(w.totals)}` : "",
+    w.su.w + w.su.l ? `straight up ${w.su.w}-${w.su.l}` : "",
+  ].filter(Boolean);
+  if (!parts.length) return "";
+  return small(`Last week as sent (Week ${w.week}): ${parts.join(", ")}${w.pending ? `, ${w.pending} still to grade` : ""}.`, PALETTE.body);
+}
+
 function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string {
   const st = r.strategies;
   const plays = sel.plays;
@@ -87,6 +103,7 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
   ].filter(Boolean);
   const su = r.su.best ? `Straight up follows ${r.su.best.label.toLowerCase()} (${r.su.best.w}-${r.su.best.l}).` : "";
   return card(`${label(`${league} · Week ${r.week ?? "?"}`)}
+${lastWeekLine(r)}
 ${paragraph(ruleLine)}
 ${
   shown.length
@@ -132,7 +149,7 @@ export function buildPicksEmail(input: {
   ].join("");
   const html = emailPage({
     title: subject,
-    kicker: `Wednesday · Week ${week ?? ""}`,
+    kicker: `${new Date(input.generatedAt).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" })} · Week ${week ?? ""}`,
     heading: "Where both models agree",
     preheader: subject,
     body,
@@ -141,4 +158,82 @@ export function buildPicksEmail(input: {
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
+}
+
+// ------------------------------------------------------------ game-day update
+
+/**
+ * What changed since Tuesday, at the current line. Used on its own for the
+ * Saturday college email and as a block inside the Sunday brief for the NFL.
+ */
+export function updateBlock(r: PicksReport, d: UpdateDiff): string {
+  const name = (k: string) => r.names[k] ?? k;
+  const at = (side: "home" | "away", homeLine: number) => (side === "home" ? homeLine : -homeLine);
+  const row = (main: string, sub: string, right: string) => `<tr>
+  <td style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(main)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(sub)}</div></td>
+  <td align="right" style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${escapeHtml(right)}</td>
+</tr>`;
+  const table = (rows: string) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>`;
+  const team = (side: "home" | "away", g: { home: string; away: string }) => name(side === "home" ? g.home : g.away);
+  const opp = (side: "home" | "away", g: { home: string; away: string }) => name(side === "home" ? g.away : g.home);
+  const parts: string[] = [];
+  if (d.added.length || d.addedTotals.length) {
+    parts.push(`<div style="padding-top:12px;">${label("New in an email: qualifies at the current line")}</div>${table(
+      [
+        ...d.added.map((g) =>
+          row(
+            `${team(g.side!, g)} ${line(at(g.side!, g.homeLine!))}`,
+            `vs ${opp(g.side!, g)}${d.pageOnly.includes(`${d.week}:${g.away}@${g.home}`) ? " · was on the page Tuesday, not in the email" : ""}`,
+            g.tier === "t1" ? "Tier 1" : "Tier 2",
+          ),
+        ),
+        ...d.addedTotals.map((g) => row(g.play!, `${name(g.away)} at ${name(g.home)}`, "Total")),
+      ].join(""),
+    )}`);
+  }
+  if (d.off.length) {
+    parts.push(`<div style="padding-top:12px;">${label("Off now: don't bet these at today's number")}</div>${table(
+      d.off.map((o) => row(`${team(o.sent.side, o.sent)} ${line(at(o.sent.side, o.sent.homeLine))} (as sent)`, o.reason, "")).join(""),
+    )}`);
+  }
+  if (d.stillOn.length) {
+    parts.push(`<div style="padding-top:12px;">${label("Still on")}</div>${table(
+      d.stillOn
+        .map((x) =>
+          row(
+            `${team(x.sent.side, x.sent)} ${line(at(x.sent.side, x.nowLine))} now`,
+            `sent at ${line(at(x.sent.side, x.sent.homeLine))} vs ${opp(x.sent.side, x.sent)}`,
+            x.moved === 0 ? "same number" : x.moved > 0 ? `${x.moved} better now` : `${-x.moved} worse now`,
+          ),
+        )
+        .join(""),
+    )}`);
+  }
+  if (!parts.length) parts.push(paragraph("Nothing has changed since Tuesday's card.", PALETTE.muted));
+  const asOf = r.reference.fetchedAt
+    ? `Lines: ${r.reference.source}, read ${new Date(r.reference.fetchedAt).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })} ET.`
+    : "";
+  return `${parts.join("")}${small(`${asOf}${d.gone ? ` ${d.gone} sent play${d.gone === 1 ? " has" : "s have"} already kicked off.` : ""}`)}`;
+}
+
+export function buildPicksUpdate(input: { r: PicksReport; diff: UpdateDiff; appUrl: string; generatedAt: string }): { html: string; subject: string } {
+  const { r, diff, appUrl } = input;
+  const league = r.league === "nfl" ? "NFL" : "College";
+  const bits = [
+    diff.added.length + diff.addedTotals.length ? `${diff.added.length + diff.addedTotals.length} new` : "",
+    diff.off.length ? `${diff.off.length} off` : "",
+  ].filter(Boolean);
+  const subject = `${league} Week ${r.week} game-day update: ${bits.join(", ") || "no changes"}`;
+  const html = emailPage({
+    title: subject,
+    kicker: `${r.league === "cfb" ? "Saturday" : "Sunday"} · Week ${r.week}`,
+    heading: "What changed since Tuesday",
+    preheader: subject,
+    body: card(`${label(`${league} · Week ${r.week}`)}${updateBlock(r, diff)}`),
+    cta: { href: `${appUrl}/picks${r.league === "cfb" ? "/cfb" : ""}`, text: "Open Picks" },
+    footnote: `<div>Every model judged again at today's line. A game counts once in the record, at the line it was first sent.</div>
+<div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
+  });
+  return { html, subject };
 }

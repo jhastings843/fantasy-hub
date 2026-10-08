@@ -1,4 +1,4 @@
-// What the Wednesday email actually issued. Pure.
+// What the picks emails actually issued. Pure.
 //
 // The live record used to grade a board snapshot that the report kept
 // rewriting until the email froze it, and the snapshot held every Tier 1 and
@@ -26,6 +26,7 @@ import {
 import type { League } from "./parse";
 import type { PicksReport } from "./report";
 import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
+import { type Slot, type UpdateDiff, firstSends } from "./update";
 
 /** Bump when the tiering logic changes, so a record says which logic issued it. */
 export const RULE_VERSION = "2026-10-08 reference-line agreement, Tier 2 on added games";
@@ -80,6 +81,8 @@ export interface IssuedRecord {
   league: League;
   season: number;
   week: number;
+  /** Which send: Tuesday's card, or the Saturday/Sunday game-day update. Absent means Tuesday. */
+  slot?: Slot;
   issuedAt: string;
   /** "issued": written at send time. "recovered": rebuilt later from the delivered email. */
   provenance: "issued" | "recovered";
@@ -199,6 +202,27 @@ export function toIssued(
   };
 }
 
+/** A game-day update: only the games no earlier email this week sent. */
+export function toIssuedUpdate(
+  r: PicksReport,
+  diff: UpdateDiff,
+  slot: Exclude<Slot, "tue">,
+  meta: { issuedAt: string; emailId?: string; subject: string },
+): IssuedRecord {
+  const sel: EmailSelection = {
+    league: r.league,
+    plays: diff.added,
+    shownPlays: diff.added.length,
+    sourceOnly: 0,
+    waiting: 0,
+    su: [],
+    shownSu: 0,
+    totals: diff.addedTotals,
+    shownTotals: diff.addedTotals.length,
+  };
+  return { ...toIssued(r, sel, meta), slot };
+}
+
 // ------------------------------------------------------------------ grading
 
 export interface IssuedWeek {
@@ -219,8 +243,22 @@ export function gradeIssued(
   records: IssuedRecord[],
   finals: Map<string, { home: number; away: number }>,
 ): IssuedWeek[] {
-  return records
-    .slice()
+  // One row per week: Tuesday's card plus any game-day additions, each game
+  // counted once at the line it was first sent.
+  const byWeek = new Map<number, IssuedRecord[]>();
+  for (const rec of firstSends(records)) byWeek.set(rec.week, [...(byWeek.get(rec.week) ?? []), rec]);
+  return [...byWeek.values()]
+    .map((recs): IssuedRecord => {
+      const first = recs[0];
+      return {
+        ...first,
+        provenance: recs.some((x) => x.provenance === "recovered") ? "recovered" : "issued",
+        plays: recs.flatMap((x) => x.plays),
+        su: recs.flatMap((x) => x.su),
+        totals: recs.flatMap((x) => x.totals ?? []),
+        unverified: recs.flatMap((x) => x.unverified),
+      };
+    })
     .sort((a, b) => a.week - b.week)
     .map((rec) => {
       const sent = rec.plays.filter((p) => p.shownInEmail);
@@ -259,7 +297,8 @@ export function gradeIssued(
 }
 
 /** Closing-line value of the plays as sent, by tier. */
-export function issuedClv(records: IssuedRecord[], closes: Map<string, ClosingLine>) {
+export function issuedClv(all: IssuedRecord[], closes: Map<string, ClosingLine>) {
+  const records = firstSends(all);
   const at = (tier: "t1" | "t2") =>
     records.flatMap((rec) =>
       rec.plays.flatMap((p) => {
