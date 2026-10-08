@@ -16,7 +16,8 @@ import { pemWeeks } from "./pem";
 import { clvTable } from "./closing";
 import { closingLines, currentLines } from "./closing-store";
 import { issuedGames } from "./issued";
-import { loadIssued } from "./issued-store";
+import { loadIssued, loadIssuedStrict } from "./issued-store";
+import { OUTSTANDING_CAP, WEEKLY_CAP } from "./limits";
 import { pemCompare, researchRows } from "./research";
 import { TOTALS_EDGE, type TotalsSeen, totalsBacktest } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
@@ -405,20 +406,28 @@ export async function getPicksReport(
   const core = await getPicksCore(league);
   if (!core.value) return { value: null, stale: core.stale, at: core.at };
   const c = core.value;
-  const [quotes, nfl, cfb, settled, policy] = await Promise.all([
-    getQuotes(league, c.season, c.week, opts.forceQuotes),
-    loadIssued("nfl", c.season),
-    loadIssued("cfb", c.season),
-    redis.hkeys(SETTLED_KEY(c.season)).catch(() => [] as string[]),
-    loadActivePolicy(),
-  ]);
-  const settledSet = new Set<string>(settled.map(String));
-  for (const [k] of c.finals) settledSet.add(`${league}:${k}`);
-  const exposure = {
-    ...exposureFrom(league, c.week, [{ league: "nfl", records: nfl }, { league: "cfb", records: cfb }], settledSet),
-    reserved: opts.reserved ?? 0,
-  };
-  const value = compose({ core: c, quotes, issued: league === "nfl" ? nfl : cfb, exposure, policy });
+  const [quotes, policy] = await Promise.all([getQuotes(league, c.season, c.week, opts.forceQuotes), loadActivePolicy()]);
+  // Exposure must be read, not assumed: if what was issued can't be read,
+  // the room is zero and the page says why, rather than treating a failed
+  // read as "nothing issued".
+  let issuedHere: Awaited<ReturnType<typeof loadIssued>> = [];
+  let exposure;
+  let exposureProblem: string | undefined;
+  try {
+    const [nfl, cfb, settled] = await Promise.all([
+      loadIssuedStrict("nfl", c.season),
+      loadIssuedStrict("cfb", c.season),
+      redis.hkeys(SETTLED_KEY(c.season)),
+    ]);
+    const settledSet = new Set<string>(settled.map(String));
+    for (const [k] of c.finals) settledSet.add(`${league}:${k}`);
+    issuedHere = league === "nfl" ? nfl : cfb;
+    exposure = { ...exposureFrom(league, c.week, [{ league: "nfl", records: nfl }, { league: "cfb", records: cfb }], settledSet), reserved: opts.reserved ?? 0 };
+  } catch (e) {
+    exposureProblem = `Couldn't read what has already been issued (${e instanceof Error ? e.message : String(e)}), so no new stakes this read.`;
+    exposure = { weekly: WEEKLY_CAP, outstanding: OUTSTANDING_CAP, perGame: new Map<string, number>(), reserved: 0 };
+  }
+  const value = compose({ core: c, quotes: exposureProblem ? { ...quotes, problem: [quotes.problem, exposureProblem].filter(Boolean).join(" ") } : quotes, issued: issuedHere, exposure, policy });
   return { value, stale: core.stale, at: core.at };
 }
 

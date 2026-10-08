@@ -7,10 +7,11 @@ import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
 
-type Status = "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "pass";
+type Status = "sent" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "pass";
 
 function statusOf(g: BoardGame): Status {
   if (g.basis === "started") return "started";
+  if (g.issued) return "sent";
   if (g.tier === "wait") return "wait";
   const tiered = g.tier === "t1" || g.tier === "t2";
   if (!tiered) return "pass";
@@ -21,6 +22,7 @@ function statusOf(g: BoardGame): Status {
 }
 
 const STATUS_TEXT: { [k in Status]: string } = {
+  sent: "Sent",
   bet: "Bet",
   priced: "Priced out",
   budget: "Over this week's budget",
@@ -53,10 +55,10 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
             {kickoffEt(g.ref?.kickoff)}
           </div>
         </div>
-        {st === "bet" ? (
+        {st === "bet" || st === "sent" ? (
           <div className={s.stake}>
-            <b className={s.num}>{g.stake}u</b>
-            <span className={s.num}>{price(g.price)}</span>
+            <b className={s.num}>{st === "sent" ? g.issued!.units : g.stake}u</b>
+            <span className={s.num}>{st === "sent" ? `sent ${price(g.issued!.price)}` : price(g.price)}</span>
           </div>
         ) : (
           <span className={s.statusChip}>{STATUS_TEXT[st]}</span>
@@ -130,10 +132,10 @@ export function AtsWeek({ r }: { r: PicksReport }) {
   const order = (g: BoardGame) =>
     g.stake ? -(g.stake * 10 + (g.p && g.price ? kelly(g.p, g.price) : 0)) : 0;
   const all = r.board.slice().sort((a, b) => order(a) - order(b) || (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
-  const bets = all.filter((g) => statusOf(g) === "bet").sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
+  const bets = all.filter((g) => statusOf(g) === "bet" || statusOf(g) === "sent").sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
   const near = all.filter((g) => ["priced", "budget", "wait", "noquote"].includes(statusOf(g)));
   const rest = all.filter((g) => ["pass", "started"].includes(statusOf(g)));
-  const total = bets.reduce((t, g) => t + (g.stake ?? 0), 0);
+  const total = bets.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
   const name = (k: string) => r.names[k] ?? k;
   const firstT1 = all.find((g) => g.tier === "t1" && g.sam && g.david);
   const example =

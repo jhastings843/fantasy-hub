@@ -6,7 +6,7 @@ import { refreshPicks } from "./report";
 import { buildPicksEmail, buildPicksUpdate } from "./email";
 import { toIssued, toIssuedUpdate } from "./issued";
 import { loadIssued } from "./issued-store";
-import { issueAndSend } from "./issue-send";
+import { issueAndSend, recoverPending } from "./issue-send";
 import { weekOf } from "./parse";
 import { diffUpdate, updateMatters } from "./update";
 
@@ -70,6 +70,10 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
       reason: `Week ${week} already went out at ${previous.sentAt}. Add ?resend=1 to send it again.`,
     });
   }
+  if (!resend && !test) {
+    const rec = await recoverPending({ logId: "picks", season, week, idempotencyKey: `picks:${season}:w${week}` });
+    if (rec) return Response.json({ ok: rec.outcome !== "failed", sent: rec.sent, reason: `recovered earlier send: ${rec.outcome}`, issued: rec.issued, error: rec.error });
+  }
   if (resend || test) {
     // A resend or test repeats the email only; what was issued stays as it was.
     if (previous && resend) await clearSent("picks", season, week);
@@ -113,6 +117,12 @@ async function runSaturday({ dry = false, resend = false, test = false }: PicksE
   const previous = await alreadySent("picks-sat", season, week);
   if (previous && !resend && !dry) {
     return Response.json({ ok: true, skipped: true, reason: `Already checked at ${previous.sentAt} (${previous.subject}).` });
+  }
+  if (!dry && !test && !resend) {
+    // An earlier Saturday send that never confirmed is finished first, so
+    // its pending plays are never mistaken for already-sent ones.
+    const rec = await recoverPending({ logId: "picks-sat", season, week, idempotencyKey: `picks-sat:${season}:w${week}` });
+    if (rec) return Response.json({ ok: rec.outcome !== "failed", sent: rec.sent, reason: `recovered earlier send: ${rec.outcome}`, issued: rec.issued, error: rec.error });
   }
   const cfb = await refreshPicks("cfb").catch(() => null);
   if (!cfb?.week) return Response.json({ ok: false, error: "Couldn't read the college board." });

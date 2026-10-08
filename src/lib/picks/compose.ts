@@ -153,27 +153,42 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     return { ...g, p, price: quoted, priceSource: "quoted" as const, want: stakeFor(p, quoted, policy.staking) };
   });
 
-  // One allocation for spreads and totals together.
+  // One allocation for spreads and totals together. Games already issued
+  // this week (any send) are not candidates again: their stake is already in
+  // the exposure, and re-allocating them would crowd out new qualifiers.
   const gk = (g: { home: string; away: string }) => (week ? key({ week, home: g.home, away: g.away }) : `${g.away}@${g.home}`);
+  const thisWeek = issued.filter((r) => r.week === week && r.status !== "unconfirmed");
+  const issuedAts = new Map(
+    thisWeek.flatMap((r) => r.plays.filter((p) => p.shownInEmail && p.units).map((p) => [gk(p), { units: p.units!, price: p.price, homeLine: p.homeLine, side: p.side }] as const)),
+  );
+  const issuedOu = new Map(
+    thisWeek.flatMap((r) => (r.totals ?? []).filter((p) => p.shownInEmail && p.units).map((p) => [gk(p), { units: p.units!, price: p.price, line: p.line, side: p.side }] as const)),
+  );
   const alloc = allocate(
     [
       ...wanted.flatMap((g) =>
-        g.want && g.p !== undefined && g.price !== undefined
+        g.want && g.p !== undefined && g.price !== undefined && !issuedAts.has(gk(g))
           ? [{ id: `ats:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
       ...tWanted.flatMap((g) =>
-        "want" in g && g.want && g.p !== undefined && g.price !== undefined
+        "want" in g && g.want && g.p !== undefined && g.price !== undefined && !issuedOu.has(gk(g))
           ? [{ id: `ou:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
     ],
     exposure,
   );
-  const board: BoardGame[] = wanted.map((g) => ({ ...g, stake: alloc.stakes.get(`ats:${gk(g)}`) ?? (g.want !== undefined ? 0 : undefined) }));
-  const totalsBoardOut: TotalsBoardGame[] = tWanted.map((g) =>
-    "want" in g && g.want !== undefined ? { ...g, stake: alloc.stakes.get(`ou:${gk(g)}`) ?? 0 } : g,
-  );
+  const board: BoardGame[] = wanted.map((g) => ({
+    ...g,
+    stake: alloc.stakes.get(`ats:${gk(g)}`) ?? (g.want !== undefined ? 0 : undefined),
+    ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : {}),
+  }));
+  const totalsBoardOut: TotalsBoardGame[] = tWanted.map((g) => ({
+    ...g,
+    ...("want" in g && g.want !== undefined ? { stake: alloc.stakes.get(`ou:${gk(g)}`) ?? 0 } : {}),
+    ...(issuedOu.has(gk(g)) ? { issued: issuedOu.get(gk(g)) } : {}),
+  }));
 
   const finals = new Map(core.finals);
   const closes = new Map(core.closes);

@@ -112,7 +112,7 @@ export interface IssuedRecord {
    * the send is confirmed. Absent on records from before 2026-10-09 (sent).
    * Pending records count toward exposure but are not graded until sent.
    */
-  status?: "pending" | "sent";
+  status?: "pending" | "sent" | "unconfirmed";
   /** The email idempotency key the send used; a retry reuses it, so it can't duplicate. */
   idempotencyKey?: string;
   /** The picks policy the card was made under (policy.ts). */
@@ -283,9 +283,9 @@ export function toIssuedUpdate(
 
 // ------------------------------------------------------------------ grading
 
-/** Records whose send is confirmed (pending intents are exposure, not results). */
+/** Records whose send is confirmed (pending or unconfirmed intents are exposure, not results). */
 export function confirmed(records: IssuedRecord[]): IssuedRecord[] {
-  return records.filter((r) => r.status !== "pending");
+  return records.filter((r) => r.status !== "pending" && r.status !== "unconfirmed");
 }
 
 export interface IssuedWeek {

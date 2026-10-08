@@ -74,3 +74,59 @@ describe("durable issuance", () => {
     expect((await getIssued("nfl", 2026, 6))?.plays).toHaveLength(1);
   });
 });
+
+describe("durable issuance: independent review findings", () => {
+  beforeEach(() => {
+    store.r = fakeRedis();
+  });
+  const cfbRec: IssuedRecord = { ...rec, league: "cfb", plays: [{ ...rec.plays[0], home: "CH", away: "CA" }] };
+
+  it("finding 1: a crash between the two sports' records still records both before resending", async () => {
+    // Run 1 claims the two-sport card, writes NFL, then dies before CFB and before sending.
+    const { saveIssued } = await import("./issued-store");
+    await store.r.set("picks:v2:intent:picks:2026:w6", { html: "<p>both</p>", subject: "s", records: [rec, cfbRec], createdAt: new Date().toISOString() });
+    await saveIssued({ ...rec, status: "pending", idempotencyKey: "picks:2026:w6" });
+    const send = vi.fn(async () => ({ sent: true as const, id: "e1" }));
+    const out = await issueAndSend({ ...base, html: "<p>different render</p>", records: [rec], send });
+    expect(out.sent).toBe(true);
+    expect(send).toHaveBeenCalledWith("s", "<p>both</p>", "picks:2026:w6");
+    expect((await getIssued("cfb", 2026, 6))?.status).toBe("sent");
+    expect((await getIssued("nfl", 2026, 6))?.status).toBe("sent");
+  });
+
+  it("finding 2: a concurrent run that loses the claim sends the claimed card, not its own", async () => {
+    await issueAndSend({ ...base, html: "<p>A</p>", send: async () => { throw new Error("timeout"); } });
+    const send = vi.fn(async () => ({ sent: true as const, id: "e1" }));
+    await issueAndSend({ ...base, html: "<p>B</p>", records: [{ ...rec, plays: [] }], send });
+    expect(send).toHaveBeenCalledWith(base.subject, "<p>A</p>", base.idempotencyKey);
+    expect((await getIssued("nfl", 2026, 6))?.plays).toHaveLength(1);
+  });
+
+  it("finding 4: past the resend window an unconfirmed send is never resent", async () => {
+    const t0 = Date.parse("2026-10-13T21:30:00Z");
+    await issueAndSend({ ...base, now: () => t0, send: async () => { throw new Error("timeout"); } });
+    const send = vi.fn();
+    const out = await issueAndSend({ ...base, now: () => t0 + 21 * 3600 * 1000, send });
+    expect(out.outcome).toBe("unconfirmed");
+    expect(send).not.toHaveBeenCalled();
+    expect((await getIssued("nfl", 2026, 6))?.status).toBe("unconfirmed");
+  });
+
+  it("finding 3: recoverPending finishes a pending send before a new decision", async () => {
+    const { recoverPending } = await import("./issue-send");
+    await issueAndSend({ ...base, send: async () => { throw new Error("timeout"); } });
+    const send = vi.fn(async () => ({ sent: true as const, id: "e9" }));
+    const out = await recoverPending({ logId: "picks", season: "2026", week: 6, idempotencyKey: base.idempotencyKey, send });
+    expect(out?.sent).toBe(true);
+    expect((await getIssued("nfl", 2026, 6))?.status).toBe("sent");
+    expect(await recoverPending({ logId: "picks", season: "2026", week: 6, idempotencyKey: base.idempotencyKey, send })).toBeNull();
+  });
+
+  it("finding 5: a failed issued read throws for exposure instead of reading as empty", async () => {
+    const { loadIssuedStrict } = await import("./issued-store");
+    store.r.smembers = async () => {
+      throw new Error("redis down");
+    };
+    await expect(loadIssuedStrict("nfl", 2026)).rejects.toThrow("redis down");
+  });
+});

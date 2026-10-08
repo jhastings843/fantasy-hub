@@ -537,6 +537,8 @@ export interface BoardGame {
   /** Units the policy wanted before the limits, and units allocated (0 = no bet). */
   want?: number;
   stake?: number;
+  /** Already issued this week (any send): what went out. Not allocated again. */
+  issued?: { units: number; price?: number; homeLine: number; side: "home" | "away" };
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);

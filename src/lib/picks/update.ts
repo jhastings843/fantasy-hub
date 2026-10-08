@@ -103,7 +103,8 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[], now = new Da
     if (seen.has(k)) continue;
     seen.add(k);
     const g = board.get(k);
-    if (isStarted(g?.basis, p.kickoff ?? g?.ref?.kickoff, now)) {
+    // Older records keep the kickoff inside the quote they were sent with.
+    if (isStarted(g?.basis, p.kickoff ?? p.ref?.kickoff ?? g?.ref?.kickoff, now)) {
       kickedOff++;
       continue;
     }

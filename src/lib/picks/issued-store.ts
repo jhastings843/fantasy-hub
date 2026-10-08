@@ -24,28 +24,33 @@ export async function saveIssued(rec: IssuedRecord): Promise<boolean> {
 
 export async function loadIssued(league: League, season: number): Promise<IssuedRecord[]> {
   try {
-    const members = (await redis.smembers(indexKey(league, season))).map(String);
+    return await loadIssuedStrict(league, season);
+  } catch {
+    return [];
+  }
+}
+
+/** As loadIssued, but a failed read throws: exposure must never read a failure as "nothing issued". */
+export async function loadIssuedStrict(league: League, season: number): Promise<IssuedRecord[]> {
+  const members = (await redis.smembers(indexKey(league, season))).map(String);
     const recs = await Promise.all(
       members.map((m) => {
         const [w, slot] = m.split(":");
         return redis.get<IssuedRecord>(recKey(league, season, Number(w), (slot as Slot) ?? "tue"));
       }),
     );
-    return recs.filter((r): r is IssuedRecord => !!r);
-  } catch {
-    return [];
-  }
+  return recs.filter((r): r is IssuedRecord => !!r);
 }
 
 export async function getIssued(league: League, season: number, week: number, slot: Slot = "tue"): Promise<IssuedRecord | null> {
   return (await redis.get<IssuedRecord>(recKey(league, season, week, slot))) ?? null;
 }
 
-/** pending -> sent, and nothing else: a sent record is never rewritten. */
-export async function markIssuedSent(rec: IssuedRecord, emailId?: string): Promise<void> {
+/** pending -> sent | unconfirmed, and nothing else: a sent record is never rewritten. */
+export async function markIssued(rec: IssuedRecord, status: "sent" | "unconfirmed", emailId?: string): Promise<void> {
   const cur = await getIssued(rec.league, rec.season, rec.week, rec.slot);
   if (!cur || cur.status !== "pending") return;
-  await redis.set(recKey(rec.league, rec.season, rec.week, rec.slot), { ...cur, status: "sent", emailId: emailId ?? cur.emailId });
+  await redis.set(recKey(rec.league, rec.season, rec.week, rec.slot), { ...cur, status, emailId: emailId ?? cur.emailId });
 }
 
 /** Removes a pending intent whose send definitely failed. Never touches a sent record. */

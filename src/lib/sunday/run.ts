@@ -9,7 +9,7 @@ import { lockAlarms, unseenAlarms, type PoolAlarmInput, type SlotAlarmInput } fr
 import { alarmSubject, renderLockAlarm, renderSundayBrief, sundaySubject } from "./email";
 import { refreshPicks, type PicksReport } from "@/lib/picks/report";
 import { loadIssued } from "@/lib/picks/issued-store";
-import { issueAndSend } from "@/lib/picks/issue-send";
+import { issueAndSend, recoverPending } from "@/lib/picks/issue-send";
 import { toIssuedUpdate } from "@/lib/picks/issued";
 import { diffUpdate, type UpdateDiff } from "@/lib/picks/update";
 
@@ -112,6 +112,11 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
     });
   }
   if (previous && resend) await clearSent("sunday", season, week);
+  if (!test && !resend) {
+    // Finish an earlier brief that never confirmed before building a new one.
+    const rec = await recoverPending({ logId: "sunday", season, week, idempotencyKey: `sunday:${season}:w${week}` });
+    if (rec) return Response.json({ ok: rec.outcome !== "failed", sent: rec.sent, reason: `recovered earlier send: ${rec.outcome}`, error: rec.error });
+  }
 
   // New NFL plays in the brief are issued picks: recorded as an intent before
   // the brief goes, confirmed after (issue-send.ts).

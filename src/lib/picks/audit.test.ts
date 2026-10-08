@@ -159,3 +159,29 @@ describe("finding 3: updates recheck price and stake, totals, and why a game is 
     expect(d.totalsOff.map((o) => o.sent.home)).toEqual(["H0"]);
   });
 });
+
+describe("independent review findings 6 and 7", () => {
+  it("finding 6: an issued game is not allocated again, so a new qualifier gets the last of the room", () => {
+    const rows = [dogRow(0), dogRow(1)];
+    const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(0), quote(1)] };
+    const issued: IssuedRecord = {
+      league: "nfl", season: 2026, week: 6, slot: "tue", issuedAt: "t", provenance: "issued", status: "sent", subject: "s", ruleVersion: "v",
+      rule: null, second: null, suMethod: { id: "avg", label: "a" }, su: [], unverified: [],
+      plays: [{ home: "H0", away: "A0", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1.5 }],
+    };
+    const ex = { weekly: WEEKLY_CAP - 0.25, outstanding: 0, perGame: new Map([["6:A0@H0", 1.5]]) };
+    const r = compose({ core: core(rows), quotes, issued: [issued], exposure: ex, now: NOW });
+    expect(r.board.find((g) => g.home === "H0")!.issued?.units).toBe(1.5);
+    expect(r.board.find((g) => g.home === "H1")!.stake).toBe(0.25);
+  });
+  it("finding 7: an older record's kickoff inside its quote still counts as kicked off", () => {
+    const legacy: IssuedRecord = {
+      league: "nfl", season: 2026, week: 6, slot: "tue", issuedAt: "t", provenance: "issued", subject: "s", ruleVersion: "v",
+      rule: null, second: null, suMethod: { id: "avg", label: "a" }, su: [], unverified: [],
+      plays: [{ home: "H9", away: "A9", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, ref: { line: 3, source: "s", fetchedAt: "t", kickoff: "2026-10-13T20:00:00Z" } }],
+    };
+    const r = compose({ core: core([dogRow(0)]), quotes: { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(0)] }, issued: [legacy], exposure: noExposure, now: NOW });
+    const d = diffUpdate(r, [legacy], NOW);
+    expect([d.kickedOff, d.noQuote]).toEqual([1, 0]);
+  });
+});

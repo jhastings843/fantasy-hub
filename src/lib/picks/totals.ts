@@ -192,6 +192,7 @@ export interface TotalsBoardGame {
   priceSource?: "quoted" | "missing";
   want?: number;
   stake?: number;
+  issued?: { units: number; price?: number; line: number; side: OU };
 }
 
 export interface TotalsRef {
