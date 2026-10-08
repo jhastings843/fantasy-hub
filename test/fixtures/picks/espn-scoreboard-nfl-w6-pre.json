@@ -31,7 +31,8 @@
        "spread": 1.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 42.5
       }
      ]
     }
@@ -68,7 +69,8 @@
        "spread": -3.0,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 43.5
       }
      ]
     }
@@ -105,7 +107,8 @@
        "spread": 1.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 47.5
       }
      ]
     }
@@ -142,7 +145,8 @@
        "spread": 2.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 40.5
       }
      ]
     }
@@ -179,7 +183,8 @@
        "spread": -6.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 44.5
       }
      ]
     }
@@ -216,7 +221,8 @@
        "spread": -7.0,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 43.5
       }
      ]
     }
@@ -253,7 +259,8 @@
        "spread": 1.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 45.5
       }
      ]
     }
@@ -290,7 +297,8 @@
        "spread": -2.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 43.5
       }
      ]
     }
@@ -327,7 +335,8 @@
        "spread": 3.0,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 39.5
       }
      ]
     }
@@ -364,7 +373,8 @@
        "spread": -10.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 51.5
       }
      ]
     }
@@ -401,7 +411,8 @@
        "spread": -7.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 45.5
       }
      ]
     }
@@ -438,7 +449,8 @@
        "spread": 4.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 51.5
       }
      ]
     }
@@ -475,7 +487,8 @@
        "spread": 2.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 50.5
       }
      ]
     }
@@ -512,7 +525,8 @@
        "spread": -7.5,
        "provider": {
         "name": "DraftKings"
-       }
+       },
+       "overUnder": 50.5
       }
      ]
     }

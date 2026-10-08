@@ -28,6 +28,8 @@ export interface ClosingLine {
   close: number | null;
   totalOpen: number | null;
   totalClose: number | null;
+  /** ESPN's final score, so grading never depends on the two model sites alone. */
+  final?: { home: number; away: number };
 }
 
 export interface EspnEventRef {
@@ -35,6 +37,8 @@ export interface EspnEventRef {
   home: string;
   away: string;
   completed: boolean;
+  /** Final score, completed games only. */
+  final?: { home: number; away: number };
 }
 
 // ESPN's NFL abbreviations, where they differ from the ones both models use.
@@ -44,13 +48,18 @@ interface EspnTeam {
   abbreviation?: string;
   location?: string;
 }
+interface EspnCompetitor {
+  homeAway: string;
+  team: EspnTeam;
+  score?: string;
+}
 interface EspnScoreboard {
   events?: Array<{
     id: string;
     status?: { type?: { completed?: boolean; state?: string } };
     competitions?: Array<{
-      competitors?: Array<{ homeAway: string; team: EspnTeam }>;
-      odds?: Array<{ spread?: number; provider?: { name?: string } }>;
+      competitors?: EspnCompetitor[];
+      odds?: Array<{ spread?: number; overUnder?: number; provider?: { name?: string } }>;
     }>;
   }>;
 }
@@ -74,6 +83,7 @@ export function parseCurrentOdds(
     if (!ref || e.status?.type?.state !== "pre" || typeof o?.spread !== "number") return;
     out.set(key({ week, home: ref.home, away: ref.away }), {
       line: o.spread,
+      ...(typeof o.overUnder === "number" ? { total: o.overUnder } : {}),
       source: `${o.provider?.name ?? "Sportsbook"} via ESPN`,
       fetchedAt,
     });
@@ -90,7 +100,11 @@ export function parseScoreboard(league: League, data: EspnScoreboard): EspnEvent
     const h = cs.find((c) => c.homeAway === "home");
     const a = cs.find((c) => c.homeAway === "away");
     if (!h || !a) return [];
-    return [{ id: e.id, home: name(h.team), away: name(a.team), completed: !!e.status?.type?.completed }];
+    const completed = !!e.status?.type?.completed;
+    const hs = Number(h.score);
+    const as = Number(a.score);
+    const final = completed && h.score !== undefined && a.score !== undefined && !isNaN(hs) && !isNaN(as) ? { home: hs, away: as } : undefined;
+    return [{ id: e.id, home: name(h.team), away: name(a.team), completed, ...(final ? { final } : {}) }];
   });
 }
 

@@ -470,6 +470,8 @@ export type Tier = "t1" | "t2" | "wait" | "fav" | "pass" | "split" | "one";
 export interface RefLine {
   /** Home-side spread. */
   line: number;
+  /** The game total from the same quote, when there is one. */
+  total?: number;
   /** Where it came from, e.g. "DraftKings via ESPN". */
   source: string;
   /** When we read it (the feed carries no quote time of its own). */

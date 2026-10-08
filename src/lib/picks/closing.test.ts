@@ -10,7 +10,8 @@ describe("ESPN parsing", () => {
   it("reads Week 4 NFL events as the models' abbreviations", () => {
     const evs = parseScoreboard("nfl", fx("espn-scoreboard-nfl-w4.json"));
     expect(evs.length).toBeGreaterThanOrEqual(14);
-    expect(evs[0]).toEqual({ id: "401872964", home: "CLE", away: "PIT", completed: true });
+    // Final score matches David's sheet (Cleveland 27, Pittsburgh 24).
+    expect(evs[0]).toEqual({ id: "401872964", home: "CLE", away: "PIT", completed: true, final: { home: 27, away: 24 } });
     // ESPN's WSH and LAR are WAS and LA on both sites.
     expect(evs.some((e) => e.home === "WAS" || e.away === "WAS")).toBe(true);
     expect(evs.every((e) => e.home !== "WSH" && e.away !== "WSH" && e.home !== "LAR" && e.away !== "LAR")).toBe(true);
@@ -101,7 +102,7 @@ describe("current reference lines", () => {
   it("reads only games that have not kicked off", () => {
     const data = JSON.parse(readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks/espn-scoreboard-nfl-w6-pre.json"), "utf8"));
     const m = parseCurrentOdds("nfl", 6, data, "2026-10-08T01:13:00Z");
-    expect(m.get("6:SEA@DEN")).toEqual({ line: 1.5, source: "DraftKings via ESPN", fetchedAt: "2026-10-08T01:13:00Z" });
+    expect(m.get("6:SEA@DEN")).toEqual({ line: 1.5, total: 42.5, source: "DraftKings via ESPN", fetchedAt: "2026-10-08T01:13:00Z" });
     expect(m.get("6:HOU@JAX")?.line).toBe(-3);
     // Once a game is under way or over, its number is a closing line: never used pregame.
     data.events[0].status.type.state = "in";

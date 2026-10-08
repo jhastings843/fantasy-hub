@@ -1,4 +1,4 @@
-# Handoff (2026-10-08)
+# Handoff (2026-10-08, totals)
 
 Latest session (2026-10-08): a decision-quality pass on Picks. Board, checker and email now judge every model at ONE current line; Tier 2 is judged only on the games it adds; the live record is built from issued records (exactly what each email sent); research cuts added (never the rule); "Lock" replaced by margin bands. See "Decision-quality pass" below. Earlier: Picks tab, PEM, closing lines, tracker archive.
 
@@ -29,6 +29,16 @@ Latest session (2026-10-08): a decision-quality pass on Picks. Board, checker an
 **Research cuts** (`researchCuts()`, candidate false, each with a parent; thresholds fixed before grading): NFL dog bands <=3 / 3.5-6.5 / 7+; college <7 / 7-13.5 / 14+; college favorite 14+ vs dog 14+ (parent "line 14+"); average edge 2+ (NFL) / 3+ (college) vs both models that far off; within-4-of-Vegas with both at least 1 off. `researchRows()` shows record, decided n, weeks, units, CLV (n), parent record and the parent's left-out games. `pemCompare()`: the college games PEM covers, every model judged and graded at the average of Sam's and David's lines.
 **First research read (2026-10-08, weeks 3-4 NFL / 4-5 college, all small):** specificity mostly does NOT help. NFL dog bands 7-1, 4-0, 3-1 against a parent 14-2: no band stands out. NFL near-market with min edge 4-2 vs left-out 7-1 (worse). College avg edge 3+ 23-18 vs left-out 13-9 (no better); both-3+ 11-8 vs 12-10 (same). College dogs under 7: 10-9, left-out 10-5. The one split worth watching: college favorite laying 14+ 8-5 with CLV -0.83 (12) vs dog getting 14+ 6-1, CLV +1.00 (7). PEM on week 5 (56 games, common line): Sam+David agree 19-19; +PEM agrees 12-11; +PEM disagrees 7-8; split, PEM's side 11-7; PEM alone 31-25.
 
+## Totals (built 2026-10-08)
+- Model totals: each site's projected scores summed (Sam board `.pts`, Sam record "Projected a-h", David NFL/college "Projected score"). David's NFL "Market total" is ignored; every model is judged at ONE current total (`RefLine.total`, ESPN `odds.overUnder`, pregame games only). `src/lib/picks/totals.ts` (pure) and `totals-store.ts`.
+- Neither site keeps totals history, so: (1) Sam alone is graded against ESPN's OPENING total from his record page (research only; Sam may have seen a different number, and his CLV vs that open is flattered if he posted after the line had moved); (2) the agreement archive `picks:v1:{league}:totals:{season}:w{n}` saves, once and never rewritten, the first moment a game has both models' totals AND a current quote. Started 2026-10-08: 15 NFL (Week 5), 55 college (Week 6).
+- Cuts fixed before grading: both agree; over; under; both 3+ off (NFL) / 5+ (college). A totals rule needs the spread rule's test (10+ decided, >52.4%, best Wilson low end). Until then the page and email say "tracking only" and nothing is issued. Once a rule qualifies, its plays go in the email ("Totals" block) and the issued record (`totals`, `totalsRule`), graded on final points and CLV vs the closing total.
+- First read: Sam alone NFL 16-15 (weeks 3-4), +1.45 vs close on 31; college 54-60 (weeks 4-5), +0.30 on 114. NFL Week 5: both models lean the same way on 13 of 15 totals (mostly overs), worth watching for a shared bias.
+
+## Results tracking (how W/L updates)
+- Automatic on every report build (hourly pulse, 3h cache): the backtest grows as Sam's record page and David's sheet post finals; issued plays, straight-up picks and totals grade from finals; CLV fills from ESPN closes.
+- Finals: the two sites' records first, then ESPN's final score (stored with each game's closing line in `picks:v1:{league}:close:*`, field `final`). So an issued pick grades even if neither site lists the game. Older close rows (stored before 2026-10-08) have no `final`; those games are all site-graded already.
+
 ## Closing lines (built 2026-10-07, session 2)
 - `src/lib/picks/closing.ts` (pure: ESPN parsing, CLV math, tables; tests in closing.test.ts with fixtures `test/fixtures/picks/espn-*.json`) and `closing-store.ts` (fetch plus Redis). Source: ESPN game summary `pickcenter[0].pointSpread.home.open/close` (DraftKings) on finished games; the scoreboard drops odds once a game ends. Stored per week at `picks:v1:{league}:close:{season}:w{n}`, never refetched; finished-but-unpriced games are stored with null lines.
 - CLV = points better than the close (home pick: line taken minus close; road pick: close minus line taken). Each model graded at the market number on its own site, shared picks at the worse line. The rule row uses the rule's own cut. Plays as sent come from issued records (shown-in-email plays only).
@@ -44,7 +54,7 @@ Latest session (2026-10-08): a decision-quality pass on Picks. Board, checker an
 1. Wed Oct 14: first email under the new logic. Check `issued` in the send response JSON says "recorded" for both leagues, and that the board's reference line was read that morning.
 2. Watch "plays as sent" and its CLV fill in from the Week 5 recovered record after this weekend's games.
 3. Re-read the research table after Week 6 grades; the college fav-14+ vs dog-14+ split is the only one with a gap. Research cuts stay research until Jack decides otherwise.
-4. Then (Jack's order): totals (ESPN summaries already store total open/close), injury and line-move flags, public %.
+4. Totals: first archive grades after this weekend; check the Totals section shows graded counts. Then (Jack's order): injury and line-move flags, public %.
 
 ## Watch
 - Wed Oct 14 picks email; Tue Oct 13 PEM relay; the hourly "picks" job in /api/health receipts.

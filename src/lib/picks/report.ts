@@ -19,6 +19,8 @@ import { closingLines, currentLines } from "./closing-store";
 import { type IssuedWeek, gradeIssued, issuedClv, issuedGames } from "./issued";
 import { loadIssued } from "./issued-store";
 import { type PemCompareRow, type ResearchRow, pemCompare, researchRows } from "./research";
+import { type TotalsBacktest, type TotalsBoardGame, type TotalsSeen, TOTALS_EDGE, totalsBacktest, totalsBoard } from "./totals";
+import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
 import {
   type BoardGame,
@@ -197,6 +199,8 @@ export interface PicksReport {
   pemCompare: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
   /** Where this week's reference line came from, and how many board games have one. */
   reference: { source: string | null; fetchedAt: string | null; priced: number; games: number; problem?: string };
+  /** Over/under: Sam-alone history, the forward agreement archive, and this week at one current total. */
+  totals: { backtest: TotalsBacktest; board: TotalsBoardGame[]; edge: number; newlyArchived: number; archived: number };
 }
 
 function seasonNow(): number {
@@ -278,26 +282,67 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   }
   const board = tierBoard(league, rows, s, su.best?.id ?? "avg");
   if (week && board.length) await saveSnapshot(league, season, week, board, s.rule?.label ?? null);
-  const finals = new Map(j.graded.map((g) => [key(g), g.final]));
-  // Games only one model graded still have a final, and frozen plays on them count.
-  for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
+  // Totals: this week's model totals at the one current total, and the
+  // forward archive of games where both models and a quote first met.
+  const totalRows = rows.map((r) => ({
+    home: r.home,
+    away: r.away,
+    sam: samLive.find((x) => x.home === r.home && x.away === r.away)?.modelTotal,
+    david: davidLive.find((x) => x.home === r.home && x.away === r.away)?.modelTotal,
+    ref: r.ref?.total !== undefined ? { total: r.ref.total, source: r.ref.source, fetchedAt: r.ref.fetchedAt } : undefined,
+  }));
+  let newlyArchived = 0;
+  if (week) {
+    const meet: TotalsSeen[] = totalRows.flatMap((r) =>
+      r.sam !== undefined && r.david !== undefined && r.ref
+        ? [{ week, home: r.home, away: r.away, sam: r.sam, david: r.david, line: r.ref.total, source: r.ref.source, seenAt: r.ref.fetchedAt }]
+        : [],
+    );
+    newlyArchived = await archiveTotals(league, season, week, meet).catch(() => 0);
+  }
+  const seen = await loadTotalsSeen(league, season);
   const issued = await loadIssued(league, season);
-  const live = gradeIssued(issued, finals);
 
-  // Closing lines for every graded game and every finished issued pick.
-  const finished = issuedGames(issued).filter((p) => finals.has(key(p)));
-  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...finished]);
+  // Closing lines (and ESPN finals) for every graded game, every issued
+  // pick, every archived totals game and Sam's whole record. Only finished
+  // games are ever fetched; each is fetched once.
+  const { closes, problems: closeProblems } = await closingLines(league, season, [
+    ...j.graded,
+    ...issuedGames(issued),
+    ...seen,
+    ...sam,
+  ]);
+  const finals = new Map(j.graded.map((g) => [key(g), g.final]));
+  // Games only one model graded still have a final; ESPN fills in the rest,
+  // so issued picks and totals grade even when neither site lists the game.
+  for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
+  for (const [k, c] of closes) if (!finals.has(k) && c.final) finals.set(k, c.final);
+  const live = gradeIssued(issued, finals);
   const rule = s.rule;
   const sent = issuedClv(issued, closes);
   const clv = {
     models: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
-    plays: [summarize("t1", "Tier 1 as sent", sent.t1), summarize("t2", "Tier 2 as sent", sent.t2)],
+    plays: [
+      summarize("t1", "Tier 1 as sent", sent.t1),
+      summarize("t2", "Tier 2 as sent", sent.t2),
+      summarize("ou", "Totals as sent (vs closing total)", sent.totals),
+    ],
     games: j.graded.length,
     matched: j.graded.filter((g) => closes.get(key(g))?.close != null).length,
   };
   const research = researchRows(j.graded, s.cuts, closes);
   const pemCmp = league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null;
   const priced = board.filter((g) => g.basis === "reference");
+  const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));
+  const totalsMarket = new Map([...closes].map(([k, c]) => [k, { open: c.totalOpen, close: c.totalClose }]));
+  const tb = totalsBacktest(league, seen, points, sam, totalsMarket, key);
+  const totals = {
+    backtest: tb,
+    board: totalsBoard(totalRows, tb.rule),
+    edge: TOTALS_EDGE[league],
+    newlyArchived,
+    archived: seen.length,
+  };
 
   const notes = [...j.scoreMismatches.map((m) => `Final scores differ: ${m}. Sam's is used.`)];
   if (j.onlySam || j.onlyDavid) {
@@ -331,6 +376,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     clv,
     research,
     pemCompare: pemCmp,
+    totals,
     reference: {
       source: priced[0]?.ref?.source ?? null,
       fetchedAt: priced[0]?.ref?.fetchedAt ?? null,

@@ -188,6 +188,32 @@ describe("issued records", () => {
   });
 });
 
+describe("issued totals", () => {
+  it("records totals plays as sent and grades them on the final total", () => {
+    const report = {
+      league: "nfl", season: 2026, week: 6, board: [],
+      strategies: { rule: null, second: null },
+      su: { best: null },
+      totals: {
+        backtest: { rule: { id: "t-over", label: "Both agree on the over", test: { side: "over" }, record: { w: 9, l: 2, p: 0 } } },
+        board: [
+          { home: "H", away: "A", sam: 49, david: 48, ref: { total: 45, source: "DraftKings via ESPN", fetchedAt: "t" }, tier: "t1", play: "Over 45", side: "over", line: 45, read: { minEdge: 3 } },
+          { home: "H2", away: "A2", sam: 49, david: 48, ref: { total: 45, source: "s", fetchedAt: "t" }, tier: "lean", play: "Over 45", side: "over", line: 45 },
+        ],
+      },
+    } as unknown as PicksReport;
+    const sel = selectForEmail(report, 5, 5);
+    expect(sel.totals.map((g) => g.home)).toEqual(["H"]);
+    const rec = toIssued(report, sel, { issuedAt: "t", subject: "s" });
+    expect(rec.totals).toEqual([
+      { home: "H", away: "A", side: "over", line: 45, play: "Over 45", source: "DraftKings via ESPN", fetchedAt: "t", shownInEmail: true },
+    ]);
+    expect(rec.totalsRule?.id).toBe("t-over");
+    const [w] = gradeIssued([rec], new Map([["6:A@H", { home: 24, away: 24 }]]));
+    expect([w.totals.w, w.totals.l]).toEqual([1, 0]);
+  });
+});
+
 describe("research cuts", () => {
   it("are never eligible to be the rule, and report what they leave out", () => {
     expect(cutsFor("cfb").filter((c) => c.group === "Research").every((c) => !c.candidate && c.parent)).toBe(true);

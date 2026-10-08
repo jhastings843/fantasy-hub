@@ -48,6 +48,29 @@ function suRows(r: PicksReport, sel: EmailSelection): string {
     .join("");
 }
 
+function totalsBlock(r: PicksReport, sel: EmailSelection): string {
+  const t = r.totals;
+  if (!t) return "";
+  const name = (k: string) => r.names[k] ?? k;
+  if (!t.backtest.rule) {
+    return `<div style="padding-top:14px;">${small(
+      `Totals: tracking only. Agreement on over/under has ${t.backtest.archived} graded game${t.backtest.archived === 1 ? "" : "s"} so far; it becomes a play once a cut has 10+ decided games and wins.`,
+    )}</div>`;
+  }
+  const rows = sel.totals
+    .slice(0, sel.shownTotals)
+    .map(
+      (g) => `<tr>
+  <td style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(g.play!)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${name(g.away)} at ${name(g.home)}`)}</div></td>
+  <td align="right" style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">models ${g.sam!.toFixed(1)} / ${g.david!.toFixed(1)}</td>
+</tr>`,
+    )
+    .join("");
+  return `<div style="padding-top:16px;">${label("Totals")}</div>
+${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.record)} in the archive.`)}
+${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
+}
+
 function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string {
   const st = r.strategies;
   const plays = sel.plays;
@@ -71,6 +94,7 @@ ${
     : paragraph("Nothing fits this week.", PALETTE.muted)
 }
 ${caveats.map((c) => small(c)).join("")}
+${totalsBlock(r, sel)}
 <div style="padding-top:16px;">${label("Straight up, most confident first")}</div>
 ${small(su)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${suRows(r, sel)}</table>

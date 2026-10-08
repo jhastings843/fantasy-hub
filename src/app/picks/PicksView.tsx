@@ -399,6 +399,8 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           </p>
         </section>
 
+        {r.totals && <TotalsSection r={r} />}
+
         <section className={s.section}>
           <div>
             <div className={s.eyebrow}>Strategy leaderboard</div>
@@ -462,6 +464,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
                     <th>Rule that week</th>
                     <th>Tier 1</th>
                     <th>Tier 2</th>
+                    <th>Totals</th>
                     <th>Straight up</th>
                   </tr>
                 </thead>
@@ -484,6 +487,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
                       </td>
                       <td className={s.num}>{rec(w.t1)}</td>
                       <td className={s.num}>{rec(w.t2)}</td>
+                      <td className={s.num}>{w.totals ? rec(w.totals) : "·"}</td>
                       <td className={s.num}>
                         {w.su.w}-{w.su.l}
                         {w.pending ? <span className={s.dim}> · {w.pending} pending</span> : null}
@@ -737,6 +741,91 @@ function ClvSection({ clv }: { clv: PicksReport["clv"] }) {
       <p className={`${s.p} ${s.dim}`}>
         {`${clv.matched} of ${clv.games} graded games have a closing line on file. "vs close" is the average number of points better (+) or worse (−) than the closing spread; the rest landed on it exactly.`}
       </p>
+    </section>
+  );
+}
+
+function TotalsSection({ r }: { r: PicksReport }) {
+  const t = r.totals;
+  const name = (k: string) => r.names[k] ?? k;
+  const sign = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}`;
+  const order = { t1: 0, lean: 1, split: 2, one: 3, noline: 4 } as const;
+  const games = t.board
+    .slice()
+    .sort((a, b) => order[a.tier] - order[b.tier] || (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
+  const leans = t.board.filter((g) => g.tier === "t1" || g.tier === "lean").length;
+  const sa = t.backtest.samAlone;
+  const status = (g: (typeof games)[number]) =>
+    g.tier === "t1" ? "Play" : g.tier === "lean" ? "Both lean" : g.tier === "split" ? "Split" : g.tier === "one" ? "One model" : "No line";
+  return (
+    <section className={s.section} id="totals">
+      <div>
+        <div className={s.eyebrow}>Over/under</div>
+        <h2 className={s.h2}>Totals</h2>
+      </div>
+      <p className={s.p}>
+        {t.backtest.rule
+          ? `Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.record)} in the archive. Games that fit it are plays and go in the email.`
+          : `Tracking only, nothing here is a play yet. Neither site keeps a history of its totals, so agreement is archived from now on: the first time both models' projected totals and a current line are on the board together, that game is saved and graded later. ${t.backtest.archived} graded so far; a cut becomes the rule at ${MIN_SAMPLE}+ decided games and a winning rate, the same test as spreads.`}{" "}
+        {`Every model is judged at one current total (${r.reference?.source ?? "no source"}). This week: ${leans} game${leans === 1 ? "" : "s"} where both lean the same way.`}
+      </p>
+      <div className={s.tiles}>
+        <div className={s.tile}>
+          <div className={`${s.tileV} ${s.num}`}>{n(sa.record) ? rec(sa.record) : "none"}</div>
+          <div className={s.tileK}>
+            {`Sam alone vs the opening total, weeks ${sa.weeks.join(", ") || "none"}`}
+            {sa.clv.n ? ` · ${sign(sa.clv.avg)} vs close (${sa.clv.n})` : ""}
+          </div>
+        </div>
+        {t.backtest.archived === 0 && (
+          <div className={s.tile}>
+            <div className={`${s.tileV} ${s.num}`}>0 graded</div>
+            <div className={s.tileK}>
+              {`Agreement archive: ${t.archived} games saved so far, first grades after this week's games. Cuts: ${t.backtest.cuts.map((c) => c.label.toLowerCase()).join("; ")}.`}
+            </div>
+          </div>
+        )}
+        {t.backtest.archived > 0 && t.backtest.cuts.map((c) => (
+          <div key={c.id} className={s.tile}>
+            <div className={`${s.tileV} ${s.num}`}>{n(c.record) + c.record.p ? rec(c.record) : "none yet"}</div>
+            <div className={s.tileK}>
+              {c.label}
+              {t.backtest.rule?.id === c.id ? " · the rule" : ""}
+            </div>
+          </div>
+        ))}
+      </div>
+      <details className={s.details} open={t.backtest.rule !== null}>
+        <summary>This week&apos;s totals ({t.board.length} games)</summary>
+        <div className={s.tw}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Total now</th>
+                <th>Lean</th>
+                <th>Sam</th>
+                <th>David</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {games.map((g) => (
+                <tr key={`${g.away}@${g.home}`}>
+                  <td className={s.game}>
+                    {name(g.away)} @ {name(g.home)}
+                  </td>
+                  <td className={s.num}>{g.ref ? g.ref.total : "·"}</td>
+                  <td className={`${s.nw} ${g.tier === "t1" ? s.play : ""}`}>{g.side ? (g.side === "over" ? "Over" : "Under") : "·"}</td>
+                  <td className={s.num}>{g.sam !== undefined ? g.sam.toFixed(1) : "·"}</td>
+                  <td className={s.num}>{g.david !== undefined ? g.david.toFixed(1) : "·"}</td>
+                  <td className={g.tier === "t1" ? "" : s.dim}>{status(g)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </section>
   );
 }

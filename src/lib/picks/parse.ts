@@ -30,6 +30,8 @@ export interface GradedRow {
   homePts: number;
   awayPts: number;
   line: ModelLine;
+  /** The model's projected total points (away + home), when the source shows projected scores. */
+  modelTotal?: number;
   /** ISO date, when the source has one. */
   date?: string;
   /** Names as the site printed them, for display. Keys are for joining. */
@@ -42,6 +44,8 @@ export interface BoardRow {
   home: string;
   away: string;
   line: ModelLine;
+  /** The model's projected total points (away + home). */
+  modelTotal?: number;
   homeName?: string;
   awayName?: string;
 }
@@ -77,6 +81,8 @@ export function textCells(html: string): string {
     .replace(/<[^>]+>/g, " | ");
   return decode(stripped).replace(/(\s*\|\s*)+/g, " | ");
 }
+
+const round1 = (x: number) => Math.round(x * 10) / 10;
 
 /** "−3.5", "-3.5", "+7", "PK", "EVEN" to a number. */
 export function num(s: string): number {
@@ -189,6 +195,7 @@ export function parseSamRecord(league: League, html: string, weekOf: (date: stri
       awayPts: fs[0],
       homePts: fs[1],
       line: { market: pickHome ? pickLine : -pickLine, model: -(pj[1] - pj[0]) },
+      modelTotal: round1(pj[0] + pj[1]),
     });
   }
   return out;
@@ -201,6 +208,8 @@ export function parseSamBoard(league: League, html: string): Board {
   let season: number | null = null;
   for (const art of html.split(/<article class="game"/).slice(1)) {
     const names = [...art.matchAll(/class="nm">([^<]+)</g)].map((m) => m[1]);
+    // Projected points, away then home, in the same order as the names.
+    const pts = [...art.matchAll(/class="pts">([\d.]+)</g)].map((m) => Number(m[1]));
     const vegas = art.match(/Vegas line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
     const model = art.match(/Model line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
     const id = art.match(/game\/(\d{4})_(\d+)_/);
@@ -211,7 +220,14 @@ export function parseSamBoard(league: League, html: string): Board {
     const market = homeLine(league, decode(vegas), home);
     const m = homeLine(league, decode(model), home);
     if (isNaN(market) || isNaN(m)) continue;
-    rows.push({ home, away, homeName: decode(names[1]).trim(), awayName: decode(names[0]).trim(), line: { market, model: m } });
+    rows.push({
+      home,
+      away,
+      homeName: decode(names[1]).trim(),
+      awayName: decode(names[0]).trim(),
+      line: { market, model: m },
+      modelTotal: pts.length === 2 ? round1(pts[0] + pts[1]) : undefined,
+    });
   }
   return { week: title ? Number(title[1]) : null, season, rows };
 }
@@ -323,10 +339,11 @@ export function parseDavidBoard(league: League, html: string): Board {
   const rows: BoardRow[] = [];
   if (league === "nfl") {
     const re =
-      /\| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| [\d.]+ \| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| [\d.]+ \| Market line \| ([^|]+?) \| Model line \| ([^|]+?) \|/g;
+      /\| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| Market line \| ([^|]+?) \| Model line \| ([^|]+?) \|/g;
     for (const m of t.matchAll(re)) {
       const away = teamKey(league, m[1]);
-      const home = teamKey(league, m[2]);
+      const home = teamKey(league, m[3]);
+      const total = round1(Number(m[2]) + Number(m[4]));
       // "DAL −8.5": the named team is the favorite.
       const fav = (s: string) => {
         const x = s.trim().match(/^([A-Z]{2,3})\s+([−\-+]?[\d.]+)$/);
@@ -334,21 +351,24 @@ export function parseDavidBoard(league: League, html: string): Board {
         const v = num(x[2]);
         return x[1] === home ? v : -v;
       };
-      const market = fav(m[3]);
-      const model = fav(m[4]);
+      const market = fav(m[5]);
+      const model = fav(m[6]);
       if (isNaN(market) || isNaN(model)) continue;
-      rows.push({ home, away, homeName: m[2], awayName: m[1], line: { market, model } });
+      rows.push({ home, away, homeName: m[3], awayName: m[1], line: { market, model }, modelTotal: isNaN(total) ? undefined : total });
     }
   } else {
     const re =
-      /\| ([^|]+?) \| at \| ([^|]+?) \| (?:[^|]+? \| ){0,12}?Open \| [^|]+? \| Current \| ([^|]+?) \| Proj\. Line \| ([^|]+?) \|/g;
+      /\| ([^|]+?) \| at \| ([^|]+?) \| ((?:[^|]+? \| ){0,12}?)Open \| [^|]+? \| Current \| ([^|]+?) \| Proj\. Line \| ([^|]+?) \|/g;
     for (const m of t.matchAll(re)) {
       const away = teamKey(league, m[1]);
       const home = teamKey(league, m[2]);
-      const market = homeLine(league, m[3], home);
-      const model = num(m[4]);
+      const market = homeLine(league, m[4], home);
+      const model = num(m[5]);
       if (isNaN(market) || isNaN(model)) continue;
-      rows.push({ home, away, homeName: m[2].trim(), awayName: m[1].trim(), line: { market, model } });
+      // Projected scores sit between the matchup and "Open", away then home.
+      const pts = [...m[3].matchAll(/Projected score \| ([\d.]+)/g)].map((x) => Number(x[1]));
+      const modelTotal = pts.length === 2 ? round1(pts[0] + pts[1]) : undefined;
+      rows.push({ home, away, homeName: m[2].trim(), awayName: m[1].trim(), line: { market, model }, modelTotal });
     }
   }
   return { week: wk ? Number(wk[1]) : null, season: season ? Number(season[1]) : null, rows };

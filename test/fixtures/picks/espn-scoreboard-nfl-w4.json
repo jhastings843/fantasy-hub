@@ -17,7 +17,8 @@
         "abbreviation": "CLE",
         "location": "Cleveland",
         "shortDisplayName": "Browns"
-       }
+       },
+       "score": "27"
       },
       {
        "homeAway": "away",
@@ -25,7 +26,8 @@
         "abbreviation": "PIT",
         "location": "Pittsburgh",
         "shortDisplayName": "Steelers"
-       }
+       },
+       "score": "24"
       }
      ]
     }
@@ -48,7 +50,8 @@
         "abbreviation": "WSH",
         "location": "Washington",
         "shortDisplayName": "Commanders"
-       }
+       },
+       "score": "13"
       },
       {
        "homeAway": "away",
@@ -56,7 +59,8 @@
         "abbreviation": "IND",
         "location": "Indianapolis",
         "shortDisplayName": "Colts"
-       }
+       },
+       "score": "30"
       }
      ]
     }
@@ -79,7 +83,8 @@
         "abbreviation": "BUF",
         "location": "Buffalo",
         "shortDisplayName": "Bills"
-       }
+       },
+       "score": "26"
       },
       {
        "homeAway": "away",
@@ -87,7 +92,8 @@
         "abbreviation": "NE",
         "location": "New England",
         "shortDisplayName": "Patriots"
-       }
+       },
+       "score": "29"
       }
      ]
     }
@@ -110,7 +116,8 @@
         "abbreviation": "CHI",
         "location": "Chicago",
         "shortDisplayName": "Bears"
-       }
+       },
+       "score": "23"
       },
       {
        "homeAway": "away",
@@ -118,7 +125,8 @@
         "abbreviation": "NYJ",
         "location": "New York",
         "shortDisplayName": "Jets"
-       }
+       },
+       "score": "12"
       }
      ]
     }
@@ -141,7 +149,8 @@
         "abbreviation": "CIN",
         "location": "Cincinnati",
         "shortDisplayName": "Bengals"
-       }
+       },
+       "score": "17"
       },
       {
        "homeAway": "away",
@@ -149,7 +158,8 @@
         "abbreviation": "JAX",
         "location": "Jacksonville",
         "shortDisplayName": "Jaguars"
-       }
+       },
+       "score": "22"
       }
      ]
     }
@@ -172,7 +182,8 @@
         "abbreviation": "NYG",
         "location": "New York",
         "shortDisplayName": "Giants"
-       }
+       },
+       "score": "36"
       },
       {
        "homeAway": "away",
@@ -180,7 +191,8 @@
         "abbreviation": "ARI",
         "location": "Arizona",
         "shortDisplayName": "Cardinals"
-       }
+       },
+       "score": "24"
       }
      ]
     }
@@ -203,7 +215,8 @@
         "abbreviation": "PHI",
         "location": "Philadelphia",
         "shortDisplayName": "Eagles"
-       }
+       },
+       "score": "20"
       },
       {
        "homeAway": "away",
@@ -211,7 +224,8 @@
         "abbreviation": "LAR",
         "location": "Los Angeles",
         "shortDisplayName": "Rams"
-       }
+       },
+       "score": "24"
       }
      ]
     }
@@ -234,7 +248,8 @@
         "abbreviation": "TB",
         "location": "Tampa Bay",
         "shortDisplayName": "Buccaneers"
-       }
+       },
+       "score": "14"
       },
       {
        "homeAway": "away",
@@ -242,7 +257,8 @@
         "abbreviation": "GB",
         "location": "Green Bay",
         "shortDisplayName": "Packers"
-       }
+       },
+       "score": "17"
       }
      ]
     }
@@ -265,7 +281,8 @@
         "abbreviation": "BAL",
         "location": "Baltimore",
         "shortDisplayName": "Ravens"
-       }
+       },
+       "score": "24"
       },
       {
        "homeAway": "away",
@@ -273,7 +290,8 @@
         "abbreviation": "TEN",
         "location": "Tennessee",
         "shortDisplayName": "Titans"
-       }
+       },
+       "score": "18"
       }
      ]
     }
@@ -296,7 +314,8 @@
         "abbreviation": "HOU",
         "location": "Houston",
         "shortDisplayName": "Texans"
-       }
+       },
+       "score": "30"
       },
       {
        "homeAway": "away",
@@ -304,7 +323,8 @@
         "abbreviation": "DAL",
         "location": "Dallas",
         "shortDisplayName": "Cowboys"
-       }
+       },
+       "score": "34"
       }
      ]
     }
@@ -327,7 +347,8 @@
         "abbreviation": "MIN",
         "location": "Minnesota",
         "shortDisplayName": "Vikings"
-       }
+       },
+       "score": "15"
       },
       {
        "homeAway": "away",
@@ -335,7 +356,8 @@
         "abbreviation": "MIA",
         "location": "Miami",
         "shortDisplayName": "Dolphins"
-       }
+       },
+       "score": "10"
       }
      ]
     }
@@ -358,7 +380,8 @@
         "abbreviation": "LV",
         "location": "Las Vegas",
         "shortDisplayName": "Raiders"
-       }
+       },
+       "score": "27"
       },
       {
        "homeAway": "away",
@@ -366,7 +389,8 @@
         "abbreviation": "KC",
         "location": "Kansas City",
         "shortDisplayName": "Chiefs"
-       }
+       },
+       "score": "30"
       }
      ]
     }
@@ -389,7 +413,8 @@
         "abbreviation": "SF",
         "location": "San Francisco",
         "shortDisplayName": "49ers"
-       }
+       },
+       "score": "24"
       },
       {
        "homeAway": "away",
@@ -397,7 +422,8 @@
         "abbreviation": "DEN",
         "location": "Denver",
         "shortDisplayName": "Broncos"
-       }
+       },
+       "score": "14"
       }
      ]
     }
@@ -420,7 +446,8 @@
         "abbreviation": "SEA",
         "location": "Seattle",
         "shortDisplayName": "Seahawks"
-       }
+       },
+       "score": "30"
       },
       {
        "homeAway": "away",
@@ -428,7 +455,8 @@
         "abbreviation": "LAC",
         "location": "Los Angeles",
         "shortDisplayName": "Chargers"
-       }
+       },
+       "score": "23"
       }
      ]
     }
@@ -451,7 +479,8 @@
         "abbreviation": "CAR",
         "location": "Carolina",
         "shortDisplayName": "Panthers"
-       }
+       },
+       "score": "32"
       },
       {
        "homeAway": "away",
@@ -459,7 +488,8 @@
         "abbreviation": "DET",
         "location": "Detroit",
         "shortDisplayName": "Lions"
-       }
+       },
+       "score": "26"
       }
      ]
     }
@@ -482,7 +512,8 @@
         "abbreviation": "NO",
         "location": "New Orleans",
         "shortDisplayName": "Saints"
-       }
+       },
+       "score": "24"
       },
       {
        "homeAway": "away",
@@ -490,7 +521,8 @@
         "abbreviation": "ATL",
         "location": "Atlanta",
         "shortDisplayName": "Falcons"
-       }
+       },
+       "score": "45"
       }
      ]
     }

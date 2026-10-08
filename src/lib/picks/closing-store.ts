@@ -52,7 +52,10 @@ async function fillWeek(
   const got = await pool(todo, 8, async (e): Promise<ClosingLine | null> => {
     try {
       const s = parseSummary(await json(`${BASE}/${SPORT[league]}/summary?event=${e.id}`));
-      return { week, home: e.home, away: e.away, open: null, close: null, totalOpen: null, totalClose: null, ...s };
+      return {
+        week, home: e.home, away: e.away, open: null, close: null, totalOpen: null, totalClose: null, ...s,
+        ...(e.final ? { final: e.final } : {}),
+      };
     } catch {
       return null; // a blip: asked again on the next build
     }

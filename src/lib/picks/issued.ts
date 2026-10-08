@@ -25,6 +25,7 @@ import {
 } from "./engine";
 import type { League } from "./parse";
 import type { PicksReport } from "./report";
+import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
 
 /** Bump when the tiering logic changes, so a record says which logic issued it. */
 export const RULE_VERSION = "2026-10-08 reference-line agreement, Tier 2 on added games";
@@ -55,6 +56,18 @@ export interface IssuedSu {
   shownInEmail: boolean;
 }
 
+export interface IssuedTotal {
+  home: string;
+  away: string;
+  side: OU;
+  /** The total the play was issued at. */
+  line: number;
+  play: string;
+  source: string;
+  fetchedAt: string;
+  shownInEmail: boolean;
+}
+
 export interface IssuedCut {
   id: string;
   label: string;
@@ -78,6 +91,9 @@ export interface IssuedRecord {
   suMethod: { id: string; label: string };
   plays: IssuedPlay[];
   su: IssuedSu[];
+  /** Over/under plays (only when a totals rule qualified that week). Absent on older records. */
+  totals?: IssuedTotal[];
+  totalsRule?: { id: string; label: string; test: TotalsTest; evidence: Record } | null;
   /** Anything the record cannot vouch for. */
   unverified: string[];
 }
@@ -93,10 +109,13 @@ export interface EmailSelection {
   waiting: number;
   su: { g: BoardGame; side: "home" | "away"; margin: number; band: string }[];
   shownSu: number;
+  /** Over/under plays under a qualifying totals rule, biggest edge first. */
+  totals: TotalsBoardGame[];
+  shownTotals: number;
 }
 
 /** The one selection the email renders and the issued record stores. */
-export function selectForEmail(r: PicksReport, playLimit: number, suLimit: number): EmailSelection {
+export function selectForEmail(r: PicksReport, playLimit: number, suLimit: number, totalsLimit = 8): EmailSelection {
   const tiered = r.board.filter((g) => g.tier === "t1" || g.tier === "t2");
   const plays = tiered
     .filter((g) => g.basis === "reference" && g.side && g.homeLine !== undefined)
@@ -108,6 +127,9 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
       return p ? [{ g, ...p, band: marginLabel(r.league, marginBand(r.league, p.margin)) }] : [];
     })
     .sort((x, y) => y.margin - x.margin);
+  const totals = (r.totals?.board ?? [])
+    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref)
+    .sort((a, b) => (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
   return {
     league: r.league,
     plays,
@@ -116,6 +138,8 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
     waiting: r.board.filter((g) => g.tier === "wait").length,
     su,
     shownSu: Math.min(suLimit, su.length),
+    totals,
+    shownTotals: Math.min(totalsLimit, totals.length),
   };
 }
 
@@ -158,6 +182,19 @@ export function toIssued(
       band: x.band,
       shownInEmail: i < sel.shownSu,
     })),
+    totals: sel.totals.map((g, i) => ({
+      home: g.home,
+      away: g.away,
+      side: g.side!,
+      line: g.line!,
+      play: g.play!,
+      source: g.ref!.source,
+      fetchedAt: g.ref!.fetchedAt,
+      shownInEmail: i < sel.shownTotals,
+    })),
+    totalsRule: r.totals?.backtest.rule
+      ? { id: r.totals.backtest.rule.id, label: r.totals.backtest.rule.label, test: r.totals.backtest.rule.test, evidence: r.totals.backtest.rule.record }
+      : null,
     unverified: [],
   };
 }
@@ -170,6 +207,8 @@ export interface IssuedWeek {
   rule: string | null;
   t1: Record;
   t2: Record;
+  /** Over/under plays as sent. */
+  totals: Record;
   su: { w: number; l: number };
   pending: number;
   unverified: string[];
@@ -198,13 +237,20 @@ export function gradeIssued(
         if ((p.side === "home") === f.home > f.away) w++;
         else l++;
       }
-      const pending = sent.filter((p) => !finals.has(key({ week: rec.week, home: p.home, away: p.away }))).length;
+      const ou = (rec.totals ?? []).filter((p) => p.shownInEmail).flatMap((p) => {
+        const f = finals.get(key({ week: rec.week, home: p.home, away: p.away }));
+        return f ? [gradeTotal(f.home + f.away, p.line, p.side)] : [];
+      });
+      const pending = [...sent, ...(rec.totals ?? []).filter((p) => p.shownInEmail)].filter(
+        (p) => !finals.has(key({ week: rec.week, home: p.home, away: p.away })),
+      ).length;
       return {
         week: rec.week,
         provenance: rec.provenance,
         rule: rec.rule?.label ?? null,
         t1: tally(res("t1")),
         t2: tally(res("t2")),
+        totals: tally(ou),
         su: { w, l },
         pending,
         unverified: rec.unverified,
@@ -223,10 +269,18 @@ export function issuedClv(records: IssuedRecord[], closes: Map<string, ClosingLi
           : [];
       }),
     );
-  return { t1: at("t1"), t2: at("t2") };
+  const totals = records.flatMap((rec) =>
+    (rec.totals ?? []).flatMap((p) => {
+      const c = closes.get(key({ week: rec.week, home: p.home, away: p.away }))?.totalClose;
+      return p.shownInEmail && c !== null && c !== undefined ? [clvTotal(p.side, p.line, c)] : [];
+    }),
+  );
+  return { t1: at("t1"), t2: at("t2"), totals };
 }
 
 /** Every game an issued record needs a final or a close for. */
 export function issuedGames(records: IssuedRecord[]): { week: number; home: string; away: string }[] {
-  return records.flatMap((rec) => [...rec.plays, ...rec.su].map((p) => ({ week: rec.week, home: p.home, away: p.away })));
+  return records.flatMap((rec) =>
+    [...rec.plays, ...rec.su, ...(rec.totals ?? [])].map((p) => ({ week: rec.week, home: p.home, away: p.away })),
+  );
 }
