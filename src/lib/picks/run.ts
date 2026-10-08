@@ -12,6 +12,8 @@ import { GAME_DAY_SLOTS, diffUpdate, onDate } from "./update";
 import { RELEASE_MINUTE, etDate } from "./hold";
 import { redisStore } from "./learning/store";
 import { push } from "@/lib/notify/pushover";
+import { harrisNow } from "./harris";
+import { harrisSummary } from "./harris-track";
 
 // The picks emails (Jack, 2026-10-08: stakes only on the day of the game):
 //
@@ -70,7 +72,8 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
   }
 
   const learning = await redisStore.journal(40).catch(() => []);
-  const email = buildPicksEmail({ nfl, cfb, appUrl: APP_URL(), generatedAt: new Date().toISOString(), learning });
+  const harris = await harrisNow().then((h) => (h ? harrisSummary(h) : undefined)).catch(() => undefined);
+  const email = buildPicksEmail({ nfl, cfb, appUrl: APP_URL(), generatedAt: new Date().toISOString(), learning, harris });
   const html = email.html;
   const subject = `${test ? "[Test] " : ""}${email.subject}`;
   if (dry) return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });

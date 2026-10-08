@@ -1,4 +1,5 @@
 import "server-only";
+import { harrisReview } from "../harris";
 import { getPicksCore, getQuotes } from "../report";
 import { activatedFor } from "../report-scope";
 import { strategies } from "../engine";
@@ -92,7 +93,9 @@ export async function reviewIfDue(now = new Date()): Promise<string> {
   if (!due && newlySettled < 15) return `not due (next ${state?.nextReviewAt}; ${newlySettled} newly settled)`;
   try {
     const r = await runStrategyReview({ reason: due ? "scheduled" : `catch-up: ${newlySettled} newly settled`, now });
-    return r.state.lastOutcome;
+    // The Harris tracker rides along: report-only, it can file a proposal, never a change.
+    const harris = await harrisReview(now).catch((e) => `Harris tracker failed: ${e instanceof Error ? e.message : String(e)}`);
+    return `${r.state.lastOutcome} · ${harris}`;
   } catch (e) {
     const next = new Date(now.getTime() + 6 * 3600 * 1000).toISOString();
     await redis.set(BACKOFF, next, { ex: 6 * 3600 }).catch(() => {});

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // Finds Jay's (@FansOfCFB) weekly PEM picks card on X and hands it to the app.
+// Also finds John Harris's (@jhnhrris) weekly "CONTEST PICKS" post, which the
+// app tracks but never bets on (POST /api/picks/harris).
 //
 //   node scripts/pem-relay.mjs          check the latest posts, send any new card
 //   node scripts/pem-relay.mjs --dry    say what it would send
@@ -34,10 +36,10 @@ function log(msg) {
 
 const isPicksCard = (text) => /week \d+ PEM picks|PEM week \d+ picks/i.test(text);
 
-function latestPosts() {
+function latestPosts(user = "FansOfCFB") {
   const out = execFileSync(
     "opencli",
-    ["twitter", "tweets", "FansOfCFB", "--limit", "40", "--window", "background", "--keep-tab", "false", "-f", "json"],
+    ["twitter", "tweets", user, "--limit", "40", "--window", "background", "--keep-tab", "false", "-f", "json"],
     { encoding: "utf8", timeout: 180_000, env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` } },
   );
   return JSON.parse(out);
@@ -85,7 +87,47 @@ async function main() {
   }
 }
 
-main().catch((e) => {
+// John Harris: the contest post's text (his picks) and every sheet image.
+const isHarrisPost = (text) => /contest picks/i.test(text) && !/early look/i.test(text);
+
+async function harris(key, sent) {
+  let posts;
+  try {
+    posts = latestPosts("jhnhrris");
+  } catch (e) {
+    log(`couldn't read X for Harris: ${String(e.stderr ?? e.message).split("\n")[0]}`);
+    return;
+  }
+  const found = posts.filter((p) => !p.is_retweet && isHarrisPost(p.text) && !sent[`harris:${p.id}`]);
+  if (!found.length) return log("no new Harris post");
+  for (const p of found.reverse()) {
+    const body = { tweetId: p.id, text: p.text, postedAt: new Date(p.created_at).toISOString(), imageUrls: p.media_urls ?? [] };
+    if (dry) {
+      log(`would send Harris ${p.id}: ${p.text.split("\n")[0]} (${body.imageUrls.length} images)`);
+      continue;
+    }
+    const res = await fetch(`${APP_URL}/api/picks/harris`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(300_000),
+    });
+    const json = await res.json().catch(() => ({}));
+    log(`sent Harris ${p.id}: ${res.status} ${JSON.stringify(json)}`);
+    if (res.ok && json.ok) {
+      sent[`harris:${p.id}`] = { at: new Date().toISOString(), result: json };
+      mkdirSync(path.dirname(STATE), { recursive: true });
+      writeFileSync(STATE, JSON.stringify(sent, null, 2));
+    }
+  }
+}
+
+main()
+  .then(async () => {
+    const sent = existsSync(STATE) ? JSON.parse(readFileSync(STATE, "utf8")) : {};
+    await harris(secret(), sent);
+  })
+  .catch((e) => {
   log(`failed: ${e.message}`);
   process.exit(1);
 });

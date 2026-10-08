@@ -220,8 +220,9 @@ export interface PicksEmail {
 const LIMITS = { nfl: { plays: 99, su: 16 }, cfb: { plays: 99, su: 15 } } as const;
 
 /** What the strategy review did lately: the latest review plus any change, proposal or alert in the last week. */
-function learningCard(journal: JournalEntry[], now: Date): string {
-  if (!journal.length) return card(`${label("What the app learned")}${paragraph("No strategy review on file yet.", PALETTE.muted)}`);
+function learningCard(journal: JournalEntry[], now: Date, harris?: string): string {
+  const harrisLine = harris ? small(harris) : "";
+  if (!journal.length) return card(`${label("What the app learned")}${paragraph("No strategy review on file yet.", PALETTE.muted)}${harrisLine}`);
   const recent = journal.filter((e) => now.getTime() - new Date(e.at).getTime() < 7 * 86400000);
   const review = journal.find((e) => e.kind === "review");
   const changes = recent.filter((e) => ["activate", "rollback", "retain", "reject", "proposal", "ops"].includes(e.kind));
@@ -235,7 +236,8 @@ function learningCard(journal: JournalEntry[], now: Date): string {
   return card(`${label("What the app learned")}
 ${review ? paragraph(`${review.title}.`) : ""}
 ${review ? small(clip(review.why)) : ""}
-${rows ? `<div style="padding-top:10px;">${label("Rule and strategy changes this week")}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table>` : small("No rule or strategy changes this week.")}`);
+${rows ? `<div style="padding-top:10px;">${label("Rule and strategy changes this week")}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table>` : small("No rule or strategy changes this week.")}
+${harrisLine}`);
 }
 
 export function buildPicksEmail(input: {
@@ -245,6 +247,8 @@ export function buildPicksEmail(input: {
   generatedAt: string;
   /** Newest first. */
   learning?: JournalEntry[];
+  /** The John Harris tracker line (tracked, never bet). */
+  harris?: string;
 }): PicksEmail {
   const { nfl, cfb, appUrl } = input;
   const pick = (r: PicksReport | null) => (r ? selectForEmail(r, LIMITS[r.league].plays, LIMITS[r.league].su) : null);
@@ -260,7 +264,7 @@ export function buildPicksEmail(input: {
       ? `${r.league === "nfl" ? "NFL" : "College"} lines: ${r.reference.source}, read ${new Date(r.reference.fetchedAt).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })} ET.`
       : "";
   const body = [
-    learningCard(input.learning ?? [], new Date(input.generatedAt)),
+    learningCard(input.learning ?? [], new Date(input.generatedAt), input.harris),
     nfl && selections.nfl ? leagueCard(nfl, selections.nfl, appUrl) : card(paragraph("The NFL board couldn't be read this morning.")),
     cfb && selections.cfb ? leagueCard(cfb, selections.cfb, appUrl) : card(paragraph("The college board couldn't be read this morning.")),
   ].join("");
