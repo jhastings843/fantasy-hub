@@ -2,6 +2,7 @@
 import { needsPem, type BoardGame, type CutResult } from "@/lib/picks/engine";
 import { cutResult } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
+import { groupByDay } from "@/lib/picks/days";
 import { kelly } from "@/lib/picks/staking";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
@@ -134,7 +135,11 @@ export function AtsWeek({ r }: { r: PicksReport }) {
   const all = r.board.slice().sort((a, b) => order(a) - order(b) || (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
   const bets = all.filter((g) => statusOf(g) === "bet" || statusOf(g) === "sent").sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
   const near = all.filter((g) => ["priced", "budget", "wait", "noquote"].includes(statusOf(g)));
-  const rest = all.filter((g) => ["pass", "started"].includes(statusOf(g)));
+  const rest = all.filter((g) => statusOf(g) === "pass");
+  const started = all.filter((g) => statusOf(g) === "started");
+  const days = groupByDay(bets, (g) => g.ref?.kickoff, new Date());
+  const dayUnits = (gs: BoardGame[]) => gs.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
+  const u = (x: number) => `${x.toFixed(2).replace(/\.?0+$/, "")}u`;
   const total = bets.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
   const name = (k: string) => r.names[k] ?? k;
   const firstT1 = all.find((g) => g.tier === "t1" && g.sam && g.david);
@@ -158,15 +163,37 @@ export function AtsWeek({ r }: { r: PicksReport }) {
         <p className={s.notice}>{`${!r.boardUpdated.sam ? "Sam" : "David"} hasn't posted this week's board yet, so games are single-model for now.`}</p>
       ) : null}
       {bets.length ? (
-        <ul className={s.cards} data-first-pick>
-          {bets.map((g) => (
-            <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
+        <div className={s.days} data-first-pick>
+          {days.map((d) => (
+            <div key={d.key} className={s.day}>
+              <div className={`${s.dayHead} ${d.label.startsWith("Today") ? s.dayToday : ""}`}>
+                <span>{d.label}</span>
+                <span className={s.num}>{`${d.games.length} bet${d.games.length === 1 ? "" : "s"} · ${u(dayUnits(d.games))}`}</span>
+              </div>
+              <ul className={s.cards}>
+                {d.games.map((g) => (
+                  <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       ) : (
         <p className={s.calm} data-first-pick>
-          No spread bets this week. That&apos;s a normal outcome: nothing clears the rule at a price worth a stake.
+          {started.length
+            ? "No spread bets left this week. Games that have kicked off are below."
+            : "No spread bets this week. That's a normal outcome: nothing clears the rule at a price worth a stake."}
         </p>
+      )}
+      {started.length > 0 && (
+        <details className={s.details}>
+          <summary>{`Kicked off (${started.length})`}</summary>
+          <ul className={`${s.cards} ${s.cardsInset}`}>
+            {started.map((g) => (
+              <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
+            ))}
+          </ul>
+        </details>
       )}
       {near.length > 0 && (
         <details className={s.details}>

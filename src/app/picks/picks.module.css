@@ -241,3 +241,9 @@
   .poolWhen { font-size: 9.5px; letter-spacing: .04em; }
   .poolField { font-size: 10.5px; }
 }
+
+/* ---- 2026-10-08 week board: bets grouped by day, today first ---- */
+.days { display: flex; flex-direction: column; gap: 22px; }
+.day { display: flex; flex-direction: column; gap: 10px; }
+.dayHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); font-family: var(--font-plex-mono), monospace; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+.dayToday { color: var(--accent); border-bottom: 2px solid var(--accent); font-weight: 600; }
