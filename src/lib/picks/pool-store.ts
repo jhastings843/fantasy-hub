@@ -39,33 +39,48 @@ async function json<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Real pick shares per game key ("AWAY@HOME"), when Sleeper serves them; null when it won't. */
-async function fieldShares(week: number): Promise<{ shares: Map<string, number> | null; note: string }> {
-  const res = await getLegPicks(POOL.leagueId, `v1:regular:${week}`);
-  if (!res.ok) return { shares: null, note: `Sleeper won't share the pool's picks (${res.error})` };
-  // Shape: { [rosterOrUser]: { [gameOrMatchup]: "TEAM" } } or arrays of picks. Read loosely.
-  const counts = new Map<string, Map<string, number>>();
-  const add = (game: string, team: string) => {
-    const m = counts.get(game) ?? new Map<string, number>();
-    m.set(team, (m.get(team) ?? 0) + 1);
-    counts.set(game, m);
-  };
-  for (const entry of Object.values(res.data ?? {})) {
-    if (entry && typeof entry === "object") {
-      for (const [game, pick] of Object.entries(entry as Record<string, unknown>)) {
-        const team = typeof pick === "string" ? pick : Array.isArray(pick) ? String(pick[0] ?? "") : typeof pick === "object" && pick ? String((pick as { pick?: unknown; team?: unknown }).pick ?? (pick as { team?: unknown }).team ?? "") : "";
-        if (team) add(game, team.toUpperCase());
-      }
+/** Sleeper and ESPN spell a few teams differently. */
+const CANON: { [abbr: string]: string } = { WSH: "WAS", LA: "LAR", JAC: "JAX" };
+const canon = (t: string) => CANON[t.toUpperCase()] ?? t.toUpperCase();
+
+/**
+ * The field's real picks for a week: per entry, { picks: { gameId: { team } } }.
+ * Returns how many entries have picked, and each team's share of the picks
+ * on its game (matched to our games by the team picked).
+ */
+async function fieldPicks(week: number): Promise<{ entries: number; teamShare: Map<string, number>; note: string } | null> {
+  const res = await getLegPicks(POOL.leagueId, `v1:regular:${week}`, true);
+  if (!res.ok) return null;
+  const perGame = new Map<string, Map<string, number>>();
+  let entries = 0;
+  for (const e of Object.values(res.data ?? {})) {
+    const picks = (e as { picks?: Record<string, { team?: string }> } | null)?.picks ?? {};
+    const list = Object.entries(picks);
+    if (!list.length) continue;
+    entries++;
+    for (const [gameId, p] of list) {
+      if (!p?.team) continue;
+      const m = perGame.get(gameId) ?? new Map<string, number>();
+      m.set(canon(p.team), (m.get(canon(p.team)) ?? 0) + 1);
+      perGame.set(gameId, m);
     }
   }
-  if (!counts.size) return { shares: null, note: "Sleeper returned no picks for this week yet (they may stay hidden until each game locks)" };
-  const shares = new Map<string, number>();
-  for (const [game, m] of counts) {
-    const total = [...m.values()].reduce((a, b) => a + b, 0);
-    for (const [team, n] of m) shares.set(`${game}|${team}`, n / total);
+  if (!entries) return null;
+  const teamShare = new Map<string, number>();
+  for (const m of perGame.values()) {
+    const n = [...m.values()].reduce((a, b) => a + b, 0);
+    for (const [team, c] of m) teamShare.set(team, c / n);
   }
-  return { shares, note: `Real picks from ${Object.keys(res.data ?? {}).length} entries` };
+  return { entries, teamShare, note: `${entries} entries' real picks for this week` };
 }
+
+/**
+ * When a game's picks aren't visible, the field is estimated from the market
+ * with this lean, fitted to this pool's real picks on 30 games from Weeks 3
+ * and 4 (2026-10-09): the pool backs favorites far harder than the odds
+ * (a 70% favorite draws about 90-100% of the picks).
+ */
+export const FITTED_LEAN = 2.7;
 
 export async function buildPoolView(): Promise<PoolView | null> {
   const league = await json<{ metadata?: { current_pickem_leg_id?: string; latest_report_leg_id?: string } }>(`${BASE}/${POOL.leagueId}`);
@@ -82,22 +97,30 @@ export async function buildPoolView(): Promise<PoolView | null> {
   const open = slate.filter((g) => !g.completed && new Date(g.kickoff).getTime() > now);
   if (!open.length) return null;
 
-  const field = await fieldShares(week);
+  const field = await fieldPicks(week).catch(() => null);
+  let realGames = 0;
   const games: PoolGame[] = open
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
     .map((g) => {
-      const real = field.shares?.get(`${g.away}@${g.home}|${g.home}`) ?? null;
-      return { key: `${g.away}@${g.home}`, home: g.home, away: g.away, pHome: g.homeWinProb, publicHome: real ?? estimatedPublicHome(g.homeWinProb), kickoff: g.kickoff };
+      const h = field?.teamShare.get(canon(g.home));
+      const a = field?.teamShare.get(canon(g.away));
+      const real = h !== undefined ? h : a !== undefined ? 1 - a : null;
+      if (real !== null) realGames++;
+      return { key: `${g.away}@${g.home}`, home: g.home, away: g.away, pHome: g.homeWinProb, publicHome: real ?? estimatedPublicHome(g.homeWinProb, FITTED_LEAN), kickoff: g.kickoff };
     });
-  const result = optimizePool(games, entrants);
+  // Who is actually playing: this week's pickers if visible and not fewer than last week's scorers.
+  const n = Math.max(field?.entries ?? 0, entrants);
+  const result = optimizePool(games, n);
   const last = slate.slice().sort((a, b) => b.kickoff.localeCompare(a.kickoff))[0];
   return {
     week,
     name: POOL.name,
-    entrants,
-    entrantsSource: active ? `entries that scored in Week ${Number(lastLeg!.split(":").pop())}` : "all entries",
-    fieldSource: field.shares ? "actual" : "estimate",
-    fieldNote: field.shares ? field.note : `${field.note}; using an estimate: the field backs favorites harder than the odds`,
+    entrants: n,
+    entrantsSource: field && field.entries >= entrants ? `entries that have picked Week ${week} so far` : active ? `entries that scored in Week ${Number(lastLeg!.split(":").pop())}` : "all entries",
+    fieldSource: realGames === games.length ? "actual" : "estimate",
+    fieldNote: field
+      ? `real picks from ${field.entries} entries on ${realGames} of ${games.length} games${realGames < games.length ? `; the rest estimated from this pool's habit of backing favorites (lean ${FITTED_LEAN}, fitted on Weeks 3-4)` : ""}`
+      : `this week's picks aren't visible yet; estimated from this pool's habit of backing favorites (lean ${FITTED_LEAN}, fitted on Weeks 3-4)`,
     games: games.map((g, i) => ({ ...g, pick: result.picks[i] })),
     result,
     tiebreaker: last?.overUnder != null ? { game: `${last.away} at ${last.home}`, total: Math.round(last.overUnder) } : null,

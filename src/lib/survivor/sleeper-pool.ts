@@ -135,9 +135,11 @@ export async function getPoolById(poolId: string): Promise<GraphQlResult<UserPoo
 export async function getLegPicks(
   leagueId: string,
   legId: string,
+  /** The weekly pick'em only returns picks when this is true (checked 2026-10-09); survivor leaves it off. */
+  includeTiebreaker = false,
 ): Promise<GraphQlResult<Record<string, unknown>>> {
   const res = await sleeperGraphQl<{ get_pickem_picks_for_league: Record<string, unknown> }>(
-    `{ get_pickem_picks_for_league(league_id: "${leagueId}", leg_id: "${legId}", include_tiebreaker: false) }`,
+    `{ get_pickem_picks_for_league(league_id: "${leagueId}", leg_id: "${legId}", include_tiebreaker: ${includeTiebreaker}) }`,
   );
   if (!res.ok) return { ok: false, error: res.error };
   return { ok: true, data: res.data?.get_pickem_picks_for_league ?? {} };
