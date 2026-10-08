@@ -88,7 +88,7 @@ async function main() {
 }
 
 // John Harris: the contest post's text (his picks) and every sheet image.
-const isHarrisPost = (text) => /contest picks/i.test(text) && !/early look/i.test(text);
+const isHarrisPost = (text) => /contest picks/i.test(text) && !/early look/i.test(text) && !text.trim().startsWith("@");
 
 async function harris(key, sent) {
   let posts;

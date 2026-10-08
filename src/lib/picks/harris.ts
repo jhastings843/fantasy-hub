@@ -107,14 +107,18 @@ export async function ingestHarris(input: HarrisIngest): Promise<HarrisWeek | { 
       throw new Error(friendlyAiError(e) ?? (e instanceof Error ? e.message : String(e)));
     }
   }
-  const { rows, problems: rowProblems } = toHarrisRows(sheet, games);
+  const { rows: read, problems: rowProblems } = toHarrisRows(sheet, games);
   problems.push(...rowProblems);
   const picks = input.text ? parsePicks(input.text) : [];
+  if (!read.length && !picks.length) return { skipped: "no sheet rows and no picks in this post" };
+  // A post without a readable sheet never wipes a week that has one.
+  const prior = await redis.get<HarrisWeek>(keyFor(input.season, week)).catch(() => null);
+  const rows = read.length ? read : (prior?.rows ?? []);
   const out: HarrisWeek = {
     season: input.season,
     week,
     rows,
-    picks,
+    picks: picks.length ? picks : (prior?.picks ?? []),
     // Every kept row passed its own arithmetic; a week with none is not usable.
     verified: rows.length > 0,
     problems,

@@ -214,4 +214,4 @@ export function parsePicks(text: string): HarrisPick[] {
 }
 
 /** Is this post his weekly contest picks? */
-export const isContestPost = (text: string) => /contest picks/i.test(text) && !/early look/i.test(text);
+export const isContestPost = (text: string) => /contest picks/i.test(text) && !/early look/i.test(text) && !text.trim().startsWith("@");
