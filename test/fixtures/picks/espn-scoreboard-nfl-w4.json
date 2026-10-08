@@ -1,0 +1,500 @@
+{
+ "events": [
+  {
+   "id": "401872964",
+   "date": "2026-10-02T00:15Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "CLE",
+        "location": "Cleveland",
+        "shortDisplayName": "Browns"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "PIT",
+        "location": "Pittsburgh",
+        "shortDisplayName": "Steelers"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872965",
+   "date": "2026-10-04T13:30Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "WSH",
+        "location": "Washington",
+        "shortDisplayName": "Commanders"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "IND",
+        "location": "Indianapolis",
+        "shortDisplayName": "Colts"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872971",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "BUF",
+        "location": "Buffalo",
+        "shortDisplayName": "Bills"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "NE",
+        "location": "New England",
+        "shortDisplayName": "Patriots"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872972",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "CHI",
+        "location": "Chicago",
+        "shortDisplayName": "Bears"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "NYJ",
+        "location": "New York",
+        "shortDisplayName": "Jets"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872969",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "CIN",
+        "location": "Cincinnati",
+        "shortDisplayName": "Bengals"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "JAX",
+        "location": "Jacksonville",
+        "shortDisplayName": "Jaguars"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872966",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "NYG",
+        "location": "New York",
+        "shortDisplayName": "Giants"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "ARI",
+        "location": "Arizona",
+        "shortDisplayName": "Cardinals"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872970",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "PHI",
+        "location": "Philadelphia",
+        "shortDisplayName": "Eagles"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "LAR",
+        "location": "Los Angeles",
+        "shortDisplayName": "Rams"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872968",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "TB",
+        "location": "Tampa Bay",
+        "shortDisplayName": "Buccaneers"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "GB",
+        "location": "Green Bay",
+        "shortDisplayName": "Packers"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872973",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "BAL",
+        "location": "Baltimore",
+        "shortDisplayName": "Ravens"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "TEN",
+        "location": "Tennessee",
+        "shortDisplayName": "Titans"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872967",
+   "date": "2026-10-04T17:00Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "HOU",
+        "location": "Houston",
+        "shortDisplayName": "Texans"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "DAL",
+        "location": "Dallas",
+        "shortDisplayName": "Cowboys"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872974",
+   "date": "2026-10-04T20:05Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "MIN",
+        "location": "Minnesota",
+        "shortDisplayName": "Vikings"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "MIA",
+        "location": "Miami",
+        "shortDisplayName": "Dolphins"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872976",
+   "date": "2026-10-04T20:25Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "LV",
+        "location": "Las Vegas",
+        "shortDisplayName": "Raiders"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "KC",
+        "location": "Kansas City",
+        "shortDisplayName": "Chiefs"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872975",
+   "date": "2026-10-04T20:25Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "SF",
+        "location": "San Francisco",
+        "shortDisplayName": "49ers"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "DEN",
+        "location": "Denver",
+        "shortDisplayName": "Broncos"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872977",
+   "date": "2026-10-04T20:25Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "SEA",
+        "location": "Seattle",
+        "shortDisplayName": "Seahawks"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "LAC",
+        "location": "Los Angeles",
+        "shortDisplayName": "Chargers"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872978",
+   "date": "2026-10-05T00:20Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "CAR",
+        "location": "Carolina",
+        "shortDisplayName": "Panthers"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "DET",
+        "location": "Detroit",
+        "shortDisplayName": "Lions"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872979",
+   "date": "2026-10-06T00:15Z",
+   "status": {
+    "type": {
+     "completed": true
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "NO",
+        "location": "New Orleans",
+        "shortDisplayName": "Saints"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "ATL",
+        "location": "Atlanta",
+        "shortDisplayName": "Falcons"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

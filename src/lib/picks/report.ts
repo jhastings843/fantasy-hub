@@ -14,6 +14,8 @@ import {
   weekOf,
 } from "./parse";
 import { pemWeeks } from "./pem";
+import { type ClvRow, clvTable, playsClv } from "./closing";
+import { closingLines } from "./closing-store";
 import type { PemWeek } from "./pem-card";
 import {
   type BoardGame,
@@ -27,6 +29,7 @@ import {
   grade,
   join,
   key,
+  matches,
   strategies,
   suRecords,
   tally,
@@ -230,6 +233,8 @@ export interface PicksReport {
   pem: { week: number; verified: boolean; games: number; source: string }[];
   /** Team key to the name a site printed, for display. NFL keys map to themselves. */
   names: { [key: string]: string };
+  /** Closing-line value: each model and the rule over the record, and the plays as sent. */
+  clv: { models: ClvRow[]; plays: ClvRow[]; games: number; matched: number };
 }
 
 function seasonNow(): number {
@@ -300,7 +305,20 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const finals = new Map(j.graded.map((g) => [key(g), g.final]));
   // Games only one model graded still have a final, and frozen plays on them count.
   for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
-  const live = liveRecord(await snapshots(league, season), finals);
+  const snaps = await snapshots(league, season);
+  const live = liveRecord(snaps, finals);
+
+  // Closing lines for every graded game and every finished play as sent.
+  const made = snaps.flatMap((sn) => sn.plays.map((p) => ({ ...p, week: sn.week })));
+  const finished = made.filter((p) => finals.has(key(p)));
+  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...finished]);
+  const rule = s.rule;
+  const clv = {
+    models: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
+    plays: playsClv(finished, closes),
+    games: j.graded.length,
+    matched: j.graded.filter((g) => closes.get(key(g))?.close != null).length,
+  };
 
   const notes = [...j.scoreMismatches.map((m) => `Final scores differ: ${m}. Sam's is used.`)];
   if (j.onlySam || j.onlyDavid) {
@@ -317,6 +335,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     );
     if (unmatched.length) notes.push(`PEM games not matched to the board (team names): ${unmatched.map((r) => `${r.awayName} at ${r.homeName}`).join(", ")}.`);
   }
+  if (closeProblems.length) notes.push(`Some closing lines could not be read from ESPN this time (${closeProblems.join("; ")}).`);
   if (sb.week !== db.week && sb.week && db.week) {
     notes.push(`The sites are on different weeks (Sam ${sb.week}, David ${db.week}); only Week ${week} games are on the board.`);
   }
@@ -330,6 +349,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   return {
     pem: pem.map((w: PemWeek) => ({ week: w.week, verified: w.verified, games: w.rows.length, source: w.source })),
     names,
+    clv,
     league,
     season,
     week,

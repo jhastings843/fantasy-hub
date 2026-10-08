@@ -454,6 +454,8 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           </section>
         )}
 
+        {r.clv && r.clv.matched > 0 && <ClvSection clv={r.clv} />}
+
         <section className={s.section}>
           <div>
             <div className={s.eyebrow}>Your three ideas</div>
@@ -623,6 +625,69 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
         </footer>
       </div>
     </main>
+  );
+}
+
+function ClvSection({ clv }: { clv: PicksReport["clv"] }) {
+  const pts = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}`;
+  const models = clv.models.filter((m) => m.n > 0);
+  const plays = clv.plays.filter((m) => m.n > 0);
+  const solo = models.filter((m) => ["sam", "david", "pem"].includes(m.id));
+  const best = [...solo].sort((a, b) => b.avg - a.avg)[0];
+  const row = (m: PicksReport["clv"]["models"][number]) => (
+    <tr key={m.id}>
+      <td>
+        {m.label}
+        {m.note && <div className={s.dim}>{m.note}</div>}
+      </td>
+      <td className={s.num}>{m.n}</td>
+      <td className={`${s.num} ${m.avg > 0 ? s.pos : m.avg < 0 ? s.neg : ""}`}>{pts(m.avg)}</td>
+      <td className={s.num}>{m.beat}</td>
+      <td className={s.num}>{m.worse}</td>
+    </tr>
+  );
+  return (
+    <section className={s.section}>
+      <div>
+        <div className={s.eyebrow}>Faster than win-loss</div>
+        <h2 className={s.h2}>Beating the closing line</h2>
+      </div>
+      <p className={s.p}>
+        Every pick is checked against DraftKings&apos; spread at kickoff (from ESPN). If the line keeps moving toward a
+        model after it posts, the market is coming around to what it saw, and that shows up long before a record does.
+        Each model is graded at the number printed on its own site; shared picks at the worse of the two.
+        {best && best.n >= 10
+          ? ` So far ${best.label} is the one the market follows most (${pts(best.avg)} points a pick).`
+          : ""}
+      </p>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>Who</th>
+              <th>Picks</th>
+              <th>vs close</th>
+              <th>Beat</th>
+              <th>Worse</th>
+            </tr>
+          </thead>
+          <tbody>
+            {models.map(row)}
+            {plays.length > 0 && (
+              <tr>
+                <td colSpan={5} className={s.dim}>
+                  Since the tab went live
+                </td>
+              </tr>
+            )}
+            {plays.map(row)}
+          </tbody>
+        </table>
+      </div>
+      <p className={`${s.p} ${s.dim}`}>
+        {`${clv.matched} of ${clv.games} graded games have a closing line on file. "vs close" is the average number of points better (+) or worse (−) than the closing spread; the rest landed on it exactly.`}
+      </p>
+    </section>
   );
 }
 
