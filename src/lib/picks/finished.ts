@@ -69,3 +69,12 @@ export function finishedResults(
     pem: g.pem && pemAt !== undefined && g.pem.model !== pemAt ? grade(final, pemAt, g.pem.model < pemAt ? "home" : "away") : undefined,
   };
 }
+
+/**
+ * ESPN drops a game's line once it kicks off. Carry the last-seen entry for
+ * any game missing from a fresh read whose kickoff has passed, so the board
+ * still knows it started (compose marks it started and never uses the line).
+ */
+export function carryStarted<L extends { kickoff?: string }>(prev: [string, L][], fresh: Map<string, L>, now: Date): [string, L][] {
+  return prev.filter(([k, l]) => !fresh.has(k) && !!l.kickoff && new Date(l.kickoff).getTime() <= now.getTime());
+}

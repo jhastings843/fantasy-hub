@@ -26,7 +26,7 @@ import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom } 
 import { loadActivePolicy } from "./policy-store";
 import { activatedFor } from "./report-scope";
 import { archiveForecasts } from "./forecasts";
-import { boardWeek, gradeFinished } from "./finished";
+import { boardWeek, carryStarted, gradeFinished } from "./finished";
 import {
   type BoardGame,
   type PemLine,
@@ -382,7 +382,8 @@ export async function getQuotes(league: League, season: number, week: number | n
   }
   try {
     const lines = await currentLines(league, season, week);
-    const q: Quotes = { fetchedAt: new Date().toISOString(), lines: [...lines] };
+    const prev = await redis.get<Quotes>(k).catch(() => null);
+    const q: Quotes = { fetchedAt: new Date().toISOString(), lines: [...lines, ...carryStarted(prev?.lines ?? [], lines, new Date())] };
     await redis.set(k, q, { ex: 7 * 24 * 3600 }).catch(() => {});
     return q;
   } catch (e) {

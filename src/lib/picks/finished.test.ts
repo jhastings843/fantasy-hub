@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boardWeek, finishedResults, gradeFinished } from "./finished";
+import { boardWeek, carryStarted, finishedResults, gradeFinished } from "./finished";
 import { gradeGame, key } from "./engine";
 
 // ET is UTC-4 in October.
@@ -68,5 +68,19 @@ describe("finishedResults", () => {
   });
   it("leaves out a model sitting exactly on the line", () => {
     expect(finishedResults({ home: "a", away: "b", sam: { market: -3, model: -3 } }, { home: 10, away: 7 }).sam).toBeUndefined();
+  });
+});
+
+describe("carryStarted", () => {
+  const now = new Date("2026-10-08T23:45:00Z");
+  it("keeps games ESPN dropped after kickoff, not ones still listed or not yet started", () => {
+    const prev: [string, { kickoff?: string }][] = [
+      ["6:shsu@liberty", { kickoff: "2026-10-08T23:00:00Z" }], // in progress, dropped
+      ["6:usf@utsa", { kickoff: "2026-10-08T23:30:00Z" }], // still listed
+      ["6:a@b", { kickoff: "2026-10-10T16:00:00Z" }], // dropped before kickoff (pulled line)
+      ["6:c@d", {}],
+    ];
+    const fresh = new Map([["6:usf@utsa", { kickoff: "2026-10-08T23:30:00Z" }]]);
+    expect(carryStarted(prev, fresh, now).map(([k]) => k)).toEqual(["6:shsu@liberty"]);
   });
 });
