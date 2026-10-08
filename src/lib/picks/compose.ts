@@ -16,6 +16,7 @@ import { BASELINE_POLICY, type PicksPolicy } from "./policy";
 import { type IssuedRecord, type IssuedWeek, confirmed, gradeIssued, issuedClv } from "./issued";
 import { type UnitReport, unitReport } from "./units";
 import { firstSends } from "./update";
+import { heldUntil } from "./hold";
 import { kelly, shrunk, stakeFor, wantStakes } from "./staking";
 import type { PemCompareRow, ResearchRow } from "./research";
 import { type TotalsBacktest, type TotalsBoardGame, totalsBoard } from "./totals";
@@ -164,15 +165,18 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const issuedOu = new Map(
     thisWeek.flatMap((r) => (r.totals ?? []).filter((p) => p.shownInEmail && p.units).map((p) => [gk(p), { units: p.units!, price: p.price, line: p.line, side: p.side }] as const)),
   );
+  // Held games (NFL Sunday/Monday before the Sunday brief) are early looks:
+  // no stake, and none of the week's room spent on them yet.
+  const held = (g: { ref?: { kickoff?: string } }) => heldUntil(core.league, g.ref?.kickoff, now);
   const alloc = allocate(
     [
       ...wanted.flatMap((g) =>
-        g.want && g.p !== undefined && g.price !== undefined && !issuedAts.has(gk(g))
+        g.want && g.p !== undefined && g.price !== undefined && !issuedAts.has(gk(g)) && !held(g)
           ? [{ id: `ats:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
       ...tWanted.flatMap((g) =>
-        "want" in g && g.want && g.p !== undefined && g.price !== undefined && !issuedOu.has(gk(g))
+        "want" in g && g.want && g.p !== undefined && g.price !== undefined && !issuedOu.has(gk(g)) && !held(g)
           ? [{ id: `ou:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
@@ -182,12 +186,12 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const board: BoardGame[] = wanted.map((g) => ({
     ...g,
     stake: alloc.stakes.get(`ats:${gk(g)}`) ?? (g.want !== undefined ? 0 : undefined),
-    ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : {}),
+    ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
   }));
   const totalsBoardOut: TotalsBoardGame[] = tWanted.map((g) => ({
     ...g,
     ...("want" in g && g.want !== undefined ? { stake: alloc.stakes.get(`ou:${gk(g)}`) ?? 0 } : {}),
-    ...(issuedOu.has(gk(g)) ? { issued: issuedOu.get(gk(g)) } : {}),
+    ...(issuedOu.has(gk(g)) ? { issued: issuedOu.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
   }));
 
   const finals = new Map(core.finals);

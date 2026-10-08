@@ -25,9 +25,12 @@ function core(rows: PicksCore["rows"], over: Partial<PicksCore> = {}): PicksCore
     totalsEdge: 3, totalsArchived: 0, posted: {}, finals: [], closes: [], policyId: "p1", ...over,
   };
 }
+// Thursday night: not held, so these tests exercise allocation (hold.ts holds Sunday games on a Tuesday).
+const TNF = "2026-10-16T00:15:00Z";
+const SUN = "2026-10-18T17:00:00Z";
 const dogRow = (i: number) => ({ home: `H${i}`, away: `A${i}`, sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, samTotal: 50, davidTotal: 49 });
 const quote = (i: number, over: Record<string, unknown> = {}) =>
-  [`6:A${i}@H${i}`, { line: 3, total: 44.5, source: "DraftKings via ESPN", fetchedAt: "2026-10-13T21:00:00Z", homePrice: -110, awayPrice: -110, overPrice: -110, underPrice: -110, kickoff: "2026-10-18T17:00:00Z", ...over }] as [string, never];
+  [`6:A${i}@H${i}`, { line: 3, total: 44.5, source: "DraftKings via ESPN", fetchedAt: "2026-10-13T21:00:00Z", homePrice: -110, awayPrice: -110, overPrice: -110, underPrice: -110, kickoff: TNF, ...over }] as [string, never];
 const NOW = new Date("2026-10-13T21:30:00Z");
 const noExposure = { weekly: 0, outstanding: 0, perGame: new Map<string, number>() };
 const sumStakes = (r: ReturnType<typeof compose>) =>
@@ -183,5 +186,48 @@ describe("independent review findings 6 and 7", () => {
     const r = compose({ core: core([dogRow(0)]), quotes: { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(0)] }, issued: [legacy], exposure: noExposure, now: NOW });
     const d = diffUpdate(r, [legacy], NOW);
     expect([d.kickedOff, d.noQuote]).toEqual([1, 0]);
+  });
+});
+
+describe("hold: NFL Sunday and Monday games are early looks until the Sunday brief", () => {
+  const rows = [dogRow(0), dogRow(1)];
+  const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(0), quote(1, { kickoff: SUN })] };
+  it("on Tuesday the Thursday game is a bet and the Sunday game is held with no stake or room spent", () => {
+    const r = compose({ core: core(rows), quotes, issued: [], exposure: noExposure, now: NOW });
+    const thu = r.board.find((g) => g.home === "H0")!;
+    const sun = r.board.find((g) => g.home === "H1")!;
+    expect(thu.stake).toBeGreaterThan(0);
+    expect(thu.held).toBeUndefined();
+    expect(sun.want).toBeGreaterThan(0);
+    expect(sun.stake).toBe(0);
+    expect(sun.held).toBe("2026-10-18T13:00:00.000Z");
+    expect(r.allocation.used).toBe(thu.stake);
+  });
+  it("the Tuesday card issues only the Thursday game and lists the Sunday one as an early look", async () => {
+    const { selectForEmail, toIssued } = await import("./issued");
+    const r = compose({ core: core(rows), quotes, issued: [], exposure: noExposure, now: NOW });
+    const sel = selectForEmail(r, 99, 16);
+    expect(sel.plays.map((g) => g.home)).toEqual(["H0"]);
+    expect(sel.early.map((g) => g.home)).toEqual(["H1"]);
+    expect(sel.overBudget).toEqual([]);
+    expect(toIssued(r, sel, { issuedAt: NOW.toISOString(), subject: "s" }).plays.map((p) => p.home)).toEqual(["H0"]);
+  });
+  it("at the Sunday brief the held game is a new bet at that morning's line", () => {
+    const brief = new Date("2026-10-18T13:00:00Z");
+    const tuesday: IssuedRecord = {
+      league: "nfl", season: 2026, week: 6, issuedAt: NOW.toISOString(), provenance: "issued", subject: "s", ruleVersion: 1, rule: null, second: null,
+      suMethod: { id: "avg", label: "" }, slot: "tue", unverified: [], su: [], totals: [],
+      plays: [{ home: "H0", away: "A0", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1, price: -110, kickoff: TNF }],
+    } as unknown as IssuedRecord;
+    const sunQuotes = { fetchedAt: "2026-10-18T12:55:00Z", lines: [quote(0, { kickoff: TNF }), quote(1, { kickoff: SUN, line: 2.5 })] };
+    const r = compose({ core: core(rows), quotes: sunQuotes, issued: [tuesday], exposure: { weekly: 1, outstanding: 1, perGame: new Map([["6:A0@H0", 1]]) }, now: brief });
+    const d = diffUpdate(r, [tuesday], brief);
+    expect(d.added.map((g) => g.home)).toEqual(["H1"]);
+    expect(d.added[0].homeLine).toBe(2.5);
+    expect(d.added[0].stake).toBeGreaterThan(0);
+  });
+  it("college is never held", () => {
+    const r = compose({ core: core(rows, { league: "cfb" }), quotes: { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(1, { kickoff: SUN })] }, issued: [], exposure: noExposure, now: NOW });
+    expect(r.board.find((g) => g.home === "H1")!.held).toBeUndefined();
   });
 });

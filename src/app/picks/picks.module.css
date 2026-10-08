@@ -247,3 +247,5 @@
 .day { display: flex; flex-direction: column; gap: 10px; }
 .dayHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); font-family: var(--font-plex-mono), monospace; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
 .dayToday { color: var(--accent); border-bottom: 2px solid var(--accent); font-weight: 600; }
+.cardEarly { border-left: 4px dashed var(--gold); }
+.earlyChip { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 3px 7px; border-radius: 3px; background: var(--gold-soft); color: var(--gold); white-space: nowrap; margin-bottom: 4px; }

@@ -8,7 +8,7 @@ import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
 
-type Status = "sent" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "pass";
+type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "pass";
 
 function statusOf(g: BoardGame): Status {
   if (g.basis === "started") return "started";
@@ -17,6 +17,7 @@ function statusOf(g: BoardGame): Status {
   const tiered = g.tier === "t1" || g.tier === "t2";
   if (!tiered) return "pass";
   if (g.basis !== "reference") return "noquote";
+  if (g.held && g.want) return "early";
   if (g.stake) return "bet";
   if (g.want) return "budget";
   return "priced";
@@ -24,6 +25,7 @@ function statusOf(g: BoardGame): Status {
 
 const STATUS_TEXT: { [k in Status]: string } = {
   sent: "Sent",
+  early: "Early look",
   bet: "Bet",
   priced: "Priced out",
   budget: "Over this week's budget",
@@ -47,7 +49,7 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
   const opp = g.side ? name(g.side === "home" ? g.away : g.home) : null;
   const home = name(g.home);
   return (
-    <li className={`${s.card} ${st === "bet" ? s.cardBet : ""}`}>
+    <li className={`${s.card} ${st === "bet" ? s.cardBet : st === "early" ? s.cardEarly : ""}`}>
       <div className={s.cardTop}>
         <div>
           <div className={s.cardPick}>{pickText(g, name)}</div>
@@ -60,6 +62,11 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           <div className={s.stake}>
             <b className={s.num}>{st === "sent" ? g.issued!.units : g.stake}u</b>
             <span className={s.num}>{st === "sent" ? `sent ${price(g.issued!.price)}` : price(g.price)}</span>
+          </div>
+        ) : st === "early" ? (
+          <div className={s.stake}>
+            <span className={s.earlyChip}>Early look</span>
+            <span className={s.num}>{`bet ${kickoffEt(g.held)}`}</span>
           </div>
         ) : (
           <span className={s.statusChip}>{STATUS_TEXT[st]}</span>
@@ -110,6 +117,12 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
               <dd>{g.priceSource === "missing" ? "No quoted price, so no stake." : "At this price the estimated edge is under a quarter unit."}</dd>
             </>
           )}
+          {st === "early" && (
+            <>
+              <dt>Why no bet yet</dt>
+              <dd>{`Held until the Sunday 9am brief (${kickoffEt(g.held)}). It becomes a bet then if it still fits at that morning's line and price; the policy wants about ${g.want}u at today's number.`}</dd>
+            </>
+          )}
           {st === "budget" && (
             <>
               <dt>Why no bet</dt>
@@ -137,8 +150,12 @@ export function AtsWeek({ r }: { r: PicksReport }) {
   const near = all.filter((g) => ["priced", "budget", "wait", "noquote"].includes(statusOf(g)));
   const rest = all.filter((g) => statusOf(g) === "pass");
   const started = all.filter((g) => statusOf(g) === "started");
-  const days = groupByDay(bets, (g) => g.ref?.kickoff, new Date());
+  const early = all.filter((g) => statusOf(g) === "early");
+  const days = groupByDay([...bets, ...early], (g) => g.ref?.kickoff, new Date());
+  const isBet = (g: BoardGame) => statusOf(g) !== "early";
   const dayUnits = (gs: BoardGame[]) => gs.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
+  const dayLine = (b: BoardGame[], e: number) =>
+    [b.length ? `${b.length} bet${b.length === 1 ? "" : "s"} · ${u(dayUnits(b))}` : "", e ? `${e} early look${e === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
   const u = (x: number) => `${x.toFixed(2).replace(/\.?0+$/, "")}u`;
   const total = bets.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
   const name = (k: string) => r.names[k] ?? k;
@@ -155,20 +172,20 @@ export function AtsWeek({ r }: { r: PicksReport }) {
         </h2>
         <p className={s.p}>
           {st.rule
-            ? `${bets.length} bet${bets.length === 1 ? "" : "s"}, ${total.toFixed(2).replace(/\.?0+$/, "")}u. Rule: ${st.rule.label.toLowerCase()} (${rec(st.rule.record)})${st.second ? `; Tier 2: ${st.second.label.toLowerCase()} (${rec(st.second.record)} on the games it adds)` : "; no Tier 2"}.`
+            ? `${bets.length} bet${bets.length === 1 ? "" : "s"}, ${total.toFixed(2).replace(/\.?0+$/, "")}u${early.length ? `, plus ${early.length} early look${early.length === 1 ? "" : "s"} that become bets Sunday morning` : ""}. Rule: ${st.rule.label.toLowerCase()} (${rec(st.rule.record)})${st.second ? `; Tier 2: ${st.second.label.toLowerCase()} (${rec(st.second.record)} on the games it adds)` : "; no Tier 2"}.`
             : "No cut has a big enough winning record yet, so nothing is a bet this week."}
         </p>
       </div>
       {!r.boardUpdated.sam || !r.boardUpdated.david ? (
         <p className={s.notice}>{`${!r.boardUpdated.sam ? "Sam" : "David"} hasn't posted this week's board yet, so games are single-model for now.`}</p>
       ) : null}
-      {bets.length ? (
+      {bets.length || early.length ? (
         <div className={s.days} data-first-pick>
           {days.map((d) => (
             <div key={d.key} className={s.day}>
               <div className={`${s.dayHead} ${d.label.startsWith("Today") ? s.dayToday : ""}`}>
                 <span>{d.label}</span>
-                <span className={s.num}>{`${d.games.length} bet${d.games.length === 1 ? "" : "s"} · ${u(dayUnits(d.games))}`}</span>
+                <span className={s.num}>{dayLine(d.games.filter(isBet), d.games.length - d.games.filter(isBet).length)}</span>
               </div>
               <ul className={s.cards}>
                 {d.games.map((g) => (

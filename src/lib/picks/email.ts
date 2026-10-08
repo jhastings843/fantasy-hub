@@ -141,6 +141,11 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
           .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${g.price !== undefined ? price(g.price) : "(no price)"}`)
           .join(", ")}.`
       : "",
+    sel.early.length
+      ? `Early looks, not bets yet: ${sel.early
+          .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}`)
+          .join(", ")}. Sunday and Monday games become bets in the Sunday 9am brief, at that morning's line and with stakes, so line moves, model updates and injury news count first.`
+      : "",
     sel.overBudget.length
       ? `Left out by the weekly limit (worth a bet, but this week's ${r.allocation.room}u budget is used): ${sel.overBudget
           .map((g) => r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away))
@@ -227,7 +232,7 @@ export function updateBlock(r: PicksReport, d: UpdateDiff): string {
   const opp = (side: "home" | "away", g: { home: string; away: string }) => name(side === "home" ? g.away : g.home);
   const parts: string[] = [];
   if (d.added.length || d.addedTotals.length) {
-    parts.push(`<div style="padding-top:12px;">${label("New in an email: qualifies at the current line")}</div>${table(
+    parts.push(`<div style="padding-top:12px;">${label("Bets at today's line, not sent before")}</div>${table(
       [
         ...d.added.map((g) =>
           row(

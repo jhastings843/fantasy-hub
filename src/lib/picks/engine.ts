@@ -539,6 +539,8 @@ export interface BoardGame {
   stake?: number;
   /** Already issued this week (any send): what went out. Not allocated again. */
   issued?: { units: number; price?: number; homeLine: number; side: "home" | "away" };
+  /** Held until this time (ISO): an early look, not yet a bet (hold.ts). */
+  held?: string;
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);

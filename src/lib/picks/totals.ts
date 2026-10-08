@@ -193,6 +193,8 @@ export interface TotalsBoardGame {
   want?: number;
   stake?: number;
   issued?: { units: number; price?: number; line: number; side: OU };
+  /** Held until this time (ISO): an early look, not yet a bet (hold.ts). */
+  held?: string;
 }
 
 export interface TotalsRef {

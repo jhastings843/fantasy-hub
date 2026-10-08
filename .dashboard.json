@@ -76,7 +76,7 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-09",
+  "last_worked": "2026-10-08",
   "notes": [
     "2026-10-09: Picks audit in 3 stages: correctness (allocator, quotes, issuance, update rechecks), layout (mobile 12.8k->2.5k px, picks first), learning loop (frozen criteria, matched forward evidence, one activation per review, rollback). Independent review found 7 stage-1 issues, all fixed with tests.",
     "2026-10-08: staking moved to 0.25u-5u (quarter Kelly, shrunk records, real prices, 15u weekly cap) with value-gated 2-leg parlays; units now risked.",
@@ -193,7 +193,9 @@
     "2026-10-05: Added 2027 rookie class to dynasty plan (DraftSharks Oct 1, DLF Sep 11, FTN Oct 1). Plan now protects all 2027 picks, spends 2028 picks, and targets one extra 2027 1st from a contender.",
     "2026-10-05: Ran trade proposals through the app's evaluateTrade (RosterAudit values) via a scratch tsx script. RA prices vets far below FantasyCalc (Kittle 1695 vs 2436, Brissett 291 vs 1559). Final slate in next_steps.",
     "2026-10-05: Do-not-trade list (lib/dynasty/untouchables.ts, keyed by league + Sleeper id). Gibbs locked in Dah Dynasty: best trades, youth swaps, levelers and trade fits skip him; the analyzer declines any deal including him and says why first; 'Keep' chip in the trade builder. 913 tests pass. Deployed (91f0ce3).",
-    "2026-10-05: Trade tool blind spot fixed (b5433b9, deployed): a room already ranked last could be emptied for free because its rank can't fall, so it offered Dart from the worst superflex QB room for Collins. Losing 20%+ of a last-place room now counts as deepening the hole; recommendations skip any idea that opens or deepens a hole; the analyzer caps those at Lean decline. Dart added to the dynasty keep list. 916 tests pass."
+    "2026-10-05: Trade tool blind spot fixed (b5433b9, deployed): a room already ranked last could be emptied for free because its rank can't fall, so it offered Dart from the worst superflex QB room for Collins. Losing 20%+ of a last-place room now counts as deepening the hole; recommendations skip any idea that opens or deepens a hole; the analyzer caps those at Lean decline. Dart added to the dynasty keep list. 916 tests pass.",
+    "2026-10-08: Pool entry on Picks redesigned as logo tiles (win bar, pool-share tick, upset chip), 4 cols desktop / 2 phone.",
+    "2026-10-08: Week board grouped by day (today first); NFL Sun/Mon bets now held as early looks until the Sunday 9am brief (hold.ts), college unchanged."
   ],
   "tags": [
     "personal",

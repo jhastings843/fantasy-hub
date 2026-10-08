@@ -25,8 +25,11 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 - Straight up: follows the best full-slate method (NFL models' average, college Vegas favorite); margin bands only; pick'em, no stake.
 - Totals: model totals from projected scores, judged at the one current total. Tracking only until a totals cut has 10+ decided games and wins in the forward agreement archive.
 
+- HOLD (2026-10-08, Jack's call, `hold.ts`): NFL games kicking off after the next Sunday 9am brief (Sunday and Monday games, seen from Tue to Sat) are early looks: shown on the page and listed in the Tuesday card, but no stake, no room spent, never in the Tuesday issued record. At the Sunday brief they become bets at that morning's line via the update's "added" list (slot "sun"). Thursday and late-season Saturday NFL games still go out Tuesday. College is not held. Cost per the one measured week: about 0.6 pt of early line move; the "timing" hypothesis keeps measuring first vs game-day line, so revisit it on evidence.
+- Page: the week board groups bets by ET day (`days.ts`), today first with a green header, Sunday/Monday early looks as dashed-gold cards, kicked-off games in a collapsed drawer.
+
 ## Email schedule (as implemented)
-- Tuesday card from 5:30pm ET once all four boards show the new week (retries each pulse; Wed and Thu 9am fallbacks need only the NFL boards). College is allocated after NFL with NFL's card reserved.
+- Tuesday card from 5:30pm ET once all four boards show the new week (NFL Sunday/Monday games appear only as early looks; see HOLD above) (retries each pulse; Wed and Thu 9am fallbacks need only the NFL boards). College is allocated after NFL with NFL's card reserved.
 - Saturday 9:30am college update and an NFL block in the Sunday 9am brief: issued bets re-checked at today's line AND price (still on / off for anyone who hasn't bet / new); issued totals too; kicked off vs no quote told apart. A sent bet stands as sent. Saturday sends only when something is new or off.
 - Durable issuance (issue-send.ts): one atomic intent per idempotency key holds the exact HTML, subject and records; records written "pending", email sent with that key, then "sent" and the sent log. Any later run (or a concurrent one) sends the CLAIMED card and records. Pending intents are finished before a new decision. Past 20h an unconfirmed send is never resent: records become "unconfirmed" (exposure, not results) for a person to check. A refused send drops the intent.
 - First real email: Wed Oct 7 (Week 5, recovered record, unstaked). First staked sends after deploy: Sat Oct 10 college update, Sun Oct 11 brief block, Tue Oct 13 card.
@@ -69,8 +72,8 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 - Prediction Tracker: not a vote (2025 walk-forward: top-5 by ATS 51.4%, below break-even). Its daily files are archived (`picks:v1:{league}:tracker:{date}`) for a later test of the all-model median.
 
 ## Next
-1. After deploy, confirm in Research > Strategy review > Scheduler health that `data` and `review` show recent successes without anyone opening the page.
-2. Sat Oct 10 9:30am college update, Sun Oct 11 brief block, Tue Oct 13 card: check the send response says intents "confirmed sent".
+1. Done 2026-10-08: scheduler health checked in Redis (`picks:v2:ops`). `data` and `review` both succeed hourly with no recorded failures; QStash drives the pulse, the GitHub workflow is the slower backstop (runs every 3 to 7h, as documented in pulse.yml).
+2. Sat Oct 10 9:30am college update, Sun Oct 11 brief block (first held Sunday games become bets here, under "Bets at today's line, not sent before"), Tue Oct 13 card: check the send response says intents "confirmed sent".
 3. First Wednesday UI check (Oct 14) appears in the journal.
 4. After ~3 weeks of the pregame archive, the first hypotheses can clear the bar; until then expect "no change: kept p1" with reasons.
 

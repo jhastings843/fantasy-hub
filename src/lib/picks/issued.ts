@@ -155,6 +155,8 @@ export interface EmailSelection {
   pricedOut: BoardGame[];
   /** Tier 1/2 games worth a bet that the weekly or per-game limits left out. */
   overBudget: BoardGame[];
+  /** Tier 1/2 games worth a bet but held until a later send (hold.ts): early looks, never issued here. */
+  early: BoardGame[];
 }
 
 /** The one selection the email renders and the issued record stores. */
@@ -162,7 +164,8 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
   const tiered = r.board.filter((g) => g.tier === "t1" || g.tier === "t2");
   const atRef = tiered.filter((g) => g.basis === "reference" && g.side && g.homeLine !== undefined);
   const pricedOut = atRef.filter((g) => !g.want);
-  const overBudget = atRef.filter((g) => !!g.want && !g.stake);
+  const overBudget = atRef.filter((g) => !!g.want && !g.stake && !g.held);
+  const early = atRef.filter((g) => !!g.want && !g.stake && !!g.held).sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
   const plays = atRef
     .filter((g) => !!g.stake)
     .sort((a, b) => (a.tier === b.tier ? (b.read?.avgEdge ?? 0) - (a.read?.avgEdge ?? 0) : a.tier === "t1" ? -1 : 1));
@@ -183,6 +186,7 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
     sourceOnly: tiered.length - atRef.length,
     pricedOut,
     overBudget,
+    early,
     waiting: r.board.filter((g) => g.tier === "wait").length,
     su,
     shownSu: Math.min(suLimit, su.length),
@@ -277,6 +281,7 @@ export function toIssuedUpdate(
     shownTotals: diff.addedTotals.length,
     pricedOut: [],
     overBudget: [],
+    early: [],
   };
   return { ...toIssued(r, sel, meta), slot };
 }
