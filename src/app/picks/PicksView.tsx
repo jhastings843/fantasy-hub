@@ -289,8 +289,9 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
             {plays.filter((g) => g.tier === "t1").length} Tier 1 and {plays.filter((g) => g.tier === "t2").length} Tier 2
             plays. Every model is judged at one current line per game
             {ref?.source ? ` (${ref.source}, read ${refAt} ET; ${ref.priced} of ${ref.games} games priced)` : ""}, so
-            &quot;agree&quot; means agree at a number you can get. Re-check it before betting; if it has moved, run it
-            through the checker below.
+            &quot;agree&quot; means agree at a number you can get. Each pick is read from Line now against each
+            model&apos;s line: when the market moves past a model&apos;s number and the model hasn&apos;t updated, that
+            model&apos;s side flips and the game is re-tiered on the next refresh. For a newer number, use the checker.
             {ref?.problem ? ` ${ref.problem}` : ""}
             {count("wait") ? ` ${count("wait")} game${count("wait") === 1 ? "" : "s"} can't be decided until PEM's card is on file.` : ""}
             {!r.boardUpdated.sam || !r.boardUpdated.david
@@ -937,8 +938,10 @@ function matchesRule(g: PicksReport["graded"][number], rule: CutResult): boolean
 }
 
 function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: string) => string; withPem: boolean }) {
+  // Model lines only. The one market number is "Line now"; each site's own
+  // Vegas number is left off so there is a single line to read the pick from.
   const ml = (team: string, m?: { market: number; model: number }) =>
-    m ? `${team} ${line(m.market)} / ${line(Math.round(m.model * 10) / 10)}` : "not posted";
+    m ? `${team} ${line(Math.round(m.model * 10) / 10)}` : "not posted";
   return (
     <div className={s.tw}>
       <table className={s.table}>
@@ -946,21 +949,17 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
           <tr>
             <th>Tier</th>
             <th>Game</th>
-            <th>Play</th>
-            <th>Avg edge</th>
             <th>Line now (home)</th>
-            <th>Sam: Vegas / model</th>
-            <th>David: Vegas / model</th>
-            {withPem && <th>PEM</th>}
+            <th>Sam model</th>
+            <th>David model</th>
+            {withPem && <th>PEM model</th>}
+            <th>Pick at line now</th>
+            <th>Avg edge</th>
           </tr>
         </thead>
         <tbody>
           {games.map((g) => {
             const home = name(g.home);
-            const moved =
-              g.sam && g.david && Math.abs(g.sam.market - g.david.market) >= 3
-                ? `The sites' Vegas lines differ by ${Math.abs(g.sam.market - g.david.market)} points. The line has likely moved; recheck it.`
-                : "";
             const play = g.side && g.homeLine !== undefined
               ? `${name(g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine : -g.homeLine)}`
               : g.tier === "split" || (g.tier === "wait" && !g.read?.agree)
@@ -974,6 +973,14 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
                 <td className={s.game}>
                   {name(g.away)} @ {home}
                 </td>
+                <td className={`${s.num} ${s.nw}`}>{g.ref ? `${home} ${line(g.ref.line)}` : <span className={s.dim}>none</span>}</td>
+                <td className={`${s.num} ${s.nw}`}>{ml(home, g.sam)}</td>
+                <td className={`${s.num} ${s.nw}`}>{ml(home, g.david)}</td>
+                {withPem && (
+                  <td className={`${s.num} ${s.nw} ${s.dim}`}>
+                    {g.pem ? `${home} ${line(g.pem.model)}${g.read?.pemSide ? ` · ${name(g.read.pemSide === "home" ? g.home : g.away)}` : ""}` : "missing"}
+                  </td>
+                )}
                 <td className={`${s.play} ${g.tier === "t1" || g.tier === "t2" ? "" : s.dim}`}>
                   {play}
                   {g.pemPick && <div className={s.thin}>Sam and David split; PEM breaks it.</div>}
@@ -985,17 +992,8 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
                   {g.basis === "source" && (g.tier === "t1" || g.tier === "t2") && (
                     <div className={s.thin}>No current quote: judged at the sites&apos; own lines.</div>
                   )}
-                  {moved && <div className={s.thin} style={{ color: "var(--gold)" }}>{moved}</div>}
                 </td>
                 <td className={s.num}>{g.read?.agree ? g.read.avgEdge.toFixed(1) : "·"}</td>
-                <td className={`${s.num} ${s.nw}`}>{g.ref ? `${home} ${line(g.ref.line)}` : <span className={s.dim}>none</span>}</td>
-                <td className={`${s.num} ${s.nw} ${s.dim}`}>{ml(home, g.sam)}</td>
-                <td className={`${s.num} ${s.nw} ${s.dim}`}>{ml(home, g.david)}</td>
-                {withPem && (
-                  <td className={`${s.num} ${s.nw} ${s.dim}`}>
-                    {g.pem ? `${home} ${line(g.pem.model)}${g.read?.pemSide ? ` · ${name(g.read.pemSide === "home" ? g.home : g.away)}` : ""}` : "missing"}
-                  </td>
-                )}
               </tr>
             );
           })}
