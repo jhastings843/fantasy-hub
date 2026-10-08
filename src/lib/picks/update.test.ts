@@ -18,9 +18,9 @@ const tuesday: IssuedRecord = {
   league: "cfb", season: 2026, week: 7, slot: "tue", issuedAt: "t", provenance: "issued", subject: "s", ruleVersion: "v",
   rule: null, second: null, suMethod: { id: "avg", label: "a" }, su: [], unverified: [],
   plays: [
-    { home: "H1", away: "A-H1", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true },
-    { home: "H2", away: "A-H2", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true },
-    { home: "H3", away: "A-H3", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true },
+    { home: "H1", away: "A-H1", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1 },
+    { home: "H2", away: "A-H2", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1 },
+    { home: "H3", away: "A-H3", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1 },
   ],
 };
 
@@ -47,9 +47,9 @@ describe("game-day update", () => {
     const saturday: IssuedRecord = {
       ...tuesday, slot: "sat",
       plays: [
-        { home: "H4", away: "A-H4", tier: "t1", side: "home", homeLine: 7, play: "", basis: "reference", shownInEmail: true },
+        { home: "H4", away: "A-H4", tier: "t1", side: "home", homeLine: 7, play: "", basis: "reference", shownInEmail: true, units: 1 },
         // A duplicate of Tuesday's H1 at a different line must not count twice.
-        { home: "H1", away: "A-H1", tier: "t1", side: "home", homeLine: 4, play: "", basis: "reference", shownInEmail: true },
+        { home: "H1", away: "A-H1", tier: "t1", side: "home", homeLine: 4, play: "", basis: "reference", shownInEmail: true, units: 1 },
       ],
     };
     expect(firstSends([saturday, tuesday]).find((r) => r.slot === "sat")!.plays.map((p) => p.home)).toEqual(["H4"]);
@@ -78,5 +78,30 @@ describe("game-day update", () => {
     ]);
     expect(updateMatters(calm)).toBe(false);
     expect(calm.stillOn[0].moved).toBe(0);
+  });
+});
+
+describe("onDate (the 9am email's slice)", async () => {
+  const { onDate } = await import("./update");
+  const g = (home: string, kickoff: string) => ({ home, away: "X", ref: { kickoff } }) as never;
+  const sent = (home: string, kickoff: string) => ({ sent: { home, away: "X", kickoff }, reason: "r" }) as never;
+  it("keeps only games kicking off on that ET date; a Thursday 8:15pm game is Thursday", () => {
+    const d = onDate(
+      { week: 6, added: [g("THU", "2026-10-16T00:15:00Z"), g("SUN", "2026-10-18T17:00:00Z")], addedTotals: [], off: [sent("THU", "2026-10-16T00:15:00Z"), sent("SAT", "2026-10-17T16:00:00Z")], totalsOff: [], stillOn: [], totalsStillOn: [], pageOnly: ["x"], kickedOff: 0, noQuote: 0, gone: 0 },
+      "2026-10-15",
+    );
+    expect(d.added.map((x: { home: string }) => x.home)).toEqual(["THU"]);
+    expect(d.off.map((x: { sent: { home: string } }) => x.sent.home)).toEqual(["THU"]);
+    expect(d.pageOnly).toEqual([]);
+  });
+});
+
+describe("a staked send supersedes an earlier unstaked one", () => {
+  it("the unstaked card does not block a staked game-day bet, and grading uses the staked bet", () => {
+    const unstaked = { ...tuesday, plays: tuesday.plays.map((p) => ({ ...p, units: undefined })) };
+    const day: IssuedRecord = { ...tuesday, slot: "gsat", issuedAt: "u", plays: [{ ...tuesday.plays[0], homeLine: 4, units: 2 }] };
+    const fs = firstSends([unstaked, day]);
+    expect(fs[0].plays.map((p) => p.home)).toEqual(["H2", "H3"]);
+    expect(fs[1].plays.map((p) => [p.home, p.homeLine, p.units])).toEqual([["H1", 4, 2]]);
   });
 });

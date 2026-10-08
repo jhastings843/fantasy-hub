@@ -165,18 +165,20 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const issuedOu = new Map(
     thisWeek.flatMap((r) => (r.totals ?? []).filter((p) => p.shownInEmail && p.units).map((p) => [gk(p), { units: p.units!, price: p.price, line: p.line, side: p.side }] as const)),
   );
-  // Held games (NFL Sunday/Monday before the Sunday brief) are early looks:
-  // no stake, and none of the week's room spent on them yet.
+  // Held games (before 9am ET on their game day, hold.ts) are early looks.
+  // They are still allocated, by edge, so their stake is a reservation: a
+  // thinner earlier game can't take room a stronger later one needs. They are
+  // never issued until released.
   const held = (g: { ref?: { kickoff?: string } }) => heldUntil(core.league, g.ref?.kickoff, now);
   const alloc = allocate(
     [
       ...wanted.flatMap((g) =>
-        g.want && g.p !== undefined && g.price !== undefined && !issuedAts.has(gk(g)) && !held(g)
+        g.want && g.p !== undefined && g.price !== undefined && !issuedAts.has(gk(g))
           ? [{ id: `ats:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
       ...tWanted.flatMap((g) =>
-        "want" in g && g.want && g.p !== undefined && g.price !== undefined && !issuedOu.has(gk(g)) && !held(g)
+        "want" in g && g.want && g.p !== undefined && g.price !== undefined && !issuedOu.has(gk(g))
           ? [{ id: `ou:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),

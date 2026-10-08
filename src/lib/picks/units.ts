@@ -17,6 +17,8 @@ import { grade, key } from "./engine";
 import { decimal } from "./staking";
 import type { Slot } from "./update";
 
+const slotBucket = (s: Slot | undefined): "tue" | "sat" | "sun" | "day" => (!s ? "tue" : s.startsWith("g") ? "day" : (s as "tue" | "sat" | "sun"));
+
 /** The default price when a quote carried none. */
 export const DEFAULT_PRICE = -110;
 
@@ -77,7 +79,8 @@ export interface UnitReport {
   total: Ledger;
   byTier: { t1: Ledger; t2: Ledger; totals: Ledger; parlays: Ledger };
   /** Tuesday's card against game-day additions: are late bets worth it? */
-  bySlot: { [s in Slot]: Ledger };
+  /** By send: the old Tuesday/Saturday/Sunday slots, and "day" for every daily game-day email. */
+  bySlot: { [s in "tue" | "sat" | "sun" | "day"]: Ledger };
   byWeek: { week: number; ledger: Ledger }[];
   /** Plays sent before units existed: in the W-L record, not here. */
   unstaked: number;
@@ -90,11 +93,11 @@ export interface UnitReport {
 export function unitReport(records: IssuedRecord[], finals: Map<string, { home: number; away: number }>): UnitReport {
   const total = empty();
   const byTier = { t1: empty(), t2: empty(), totals: empty(), parlays: empty() };
-  const bySlot = { tue: empty(), sat: empty(), sun: empty() };
+  const bySlot = { tue: empty(), sat: empty(), sun: empty(), day: empty() };
   const weeks = new Map<number, Ledger>();
   let unstaked = 0;
   for (const rec of records) {
-    const slot = rec.slot ?? "tue";
+    const slot = slotBucket(rec.slot);
     const wk = weeks.get(rec.week) ?? empty();
     weeks.set(rec.week, wk);
     const settle = (result: Result | undefined, units: number, price: number, tier: Ledger) => {
@@ -141,7 +144,7 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
   return {
     total: finish(total),
     byTier: { t1: finish(byTier.t1), t2: finish(byTier.t2), totals: finish(byTier.totals), parlays: finish(byTier.parlays) },
-    bySlot: { tue: finish(bySlot.tue), sat: finish(bySlot.sat), sun: finish(bySlot.sun) },
+    bySlot: { tue: finish(bySlot.tue), sat: finish(bySlot.sat), sun: finish(bySlot.sun), day: finish(bySlot.day) },
     byWeek: [...weeks].filter(([, l]) => l.bets).sort((a, b) => a[0] - b[0]).map(([week, l]) => ({ week, ledger: finish(l) })),
     unstaked,
   };

@@ -164,10 +164,11 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
   const tiered = r.board.filter((g) => g.tier === "t1" || g.tier === "t2");
   const atRef = tiered.filter((g) => g.basis === "reference" && g.side && g.homeLine !== undefined);
   const pricedOut = atRef.filter((g) => !g.want);
-  const overBudget = atRef.filter((g) => !!g.want && !g.stake && !g.held);
-  const early = atRef.filter((g) => !!g.want && !g.stake && !!g.held).sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
+  const overBudget = atRef.filter((g) => !!g.want && !g.stake);
+  // Held until game day (hold.ts): shown as early looks, never issued here.
+  const early = atRef.filter((g) => !!g.stake && !!g.held).sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
   const plays = atRef
-    .filter((g) => !!g.stake)
+    .filter((g) => !!g.stake && !g.held)
     .sort((a, b) => (a.tier === b.tier ? (b.read?.avgEdge ?? 0) - (a.read?.avgEdge ?? 0) : a.tier === "t1" ? -1 : 1));
   const method = r.su.best?.id ?? "avg";
   const su = r.board
@@ -177,7 +178,7 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
     })
     .sort((x, y) => y.margin - x.margin);
   const totals = (r.totals?.board ?? [])
-    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref && !!g.stake)
+    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref && !!g.stake && !g.held)
     .sort((a, b) => (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
   return {
     league: r.league,

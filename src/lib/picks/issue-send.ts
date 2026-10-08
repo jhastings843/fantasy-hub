@@ -33,7 +33,7 @@ export interface Intent {
 }
 
 export interface IssueSendInput {
-  /** Sent-log id ("picks", "picks-sat", "sunday") and its season/week. */
+  /** Sent-log id ("picks", "picks-day", "sunday") and its season/week (picks-day: YYYYMMDD). */
   logId: string;
   season: string;
   week: number;

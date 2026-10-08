@@ -222,13 +222,16 @@ describe("daily lineup check", () => {
     }
   });
 describe("picks schedule", () => {
-  it("sends the card Tuesday evening, falls back Wednesday and Thursday, and updates college Saturday", () => {
+  it("sends the update Tuesday evening, falls back Wednesday and Thursday, and checks today's bets at 9am daily", () => {
     // 2026-10-13 is a Tuesday. 21:29Z = 5:29pm ET, 21:30Z = 5:30pm ET.
     expect(tempoFor(at("2026-10-13T21:29:00Z")).dueSends).not.toContain("picks");
     expect(tempoFor(at("2026-10-13T21:30:00Z")).dueSends).toContain("picks");
     expect(tempoFor(at("2026-10-14T13:00:00Z")).dueSends).toContain("picks");
-    expect(tempoFor(at("2026-10-17T13:29:00Z")).dueSends).not.toContain("picks-sat");
-    expect(tempoFor(at("2026-10-17T13:30:00Z")).dueSends).toContain("picks-sat");
+    // 9am ET every day: 12:59Z / 13:00Z in EDT.
+    for (const d of ["2026-10-13", "2026-10-15", "2026-10-17", "2026-10-18", "2026-10-19"]) {
+      expect(tempoFor(at(`${d}T12:59:00Z`)).dueSends).not.toContain("picks-day");
+      expect(tempoFor(at(`${d}T13:00:00Z`)).dueSends).toContain("picks-day");
+    }
   });
 });
 });

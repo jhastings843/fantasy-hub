@@ -1,4 +1,4 @@
-# Handoff (2026-10-09, Picks audit: correctness, layout, learning loop)
+# Handoff (2026-10-08, Picks: game-day stakes, daily 9am bets email + push, Tuesday update; earlier: audit, layout, learning loop)
 
 Latest session: an audit-driven pass on Picks in three stages (branch `picks-audit`, merged to main). Stage 1 fixed decision and accounting gaps (one exposure allocator, live quotes, durable issuance). Stage 2 rebuilt the page as sport > market > view with current picks first. Stage 3 added a bounded, scheduled strategy review with validation and rollback. An independent review (Astra) of stage 1 found seven issues; all are fixed with regression tests. This file describes what is implemented now; it replaces the earlier, partly contradictory notes on research promotion and the email schedule.
 
@@ -12,7 +12,7 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 - Week 5 with real picks: all favorites is best (13% to win vs 4.5% average), because the field is already fading NYJ (53% fav, 21% picked), WAS (61%, 27%) and SEA (58%, 43%).
 
 ## How Picks works now
-- Pages: `/picks` (NFL) and `/picks/cfb`, with `?m=ats|su|ou` (Spreads, Straight up, Totals) and `?v=week|results|research`. URL state is shareable and survives refresh/Back. JSON: `/api/picks?league=nfl|cfb` (`?refresh=1` with the cron secret). Email previews: `/api/picks-email?dry=1` (Tuesday card), `?update=sat&dry=1` (Saturday), `/api/sunday-email?dry=1`.
+- Pages: `/picks` (NFL) and `/picks/cfb`, with `?m=ats|su|ou` (Spreads, Straight up, Totals) and `?v=week|results|research`. URL state is shareable and survives refresh/Back. JSON: `/api/picks?league=nfl|cfb` (`?refresh=1` with the cron secret). Email previews: `/api/picks-email?dry=1` (Tuesday update, no stakes), `?update=day&dry=1` (today's bets).
 - Code map (`src/lib/picks/`): parse.ts (site parsers), engine.ts (cuts, tiers, straight up), report.ts (slow core build, quotes cache, data job), compose.ts (core + quotes + exposure -> live report, pure), allocate.ts + limits.ts (stakes inside the protected envelope), staking.ts (wanted stakes per policy), policy.ts + policy-store.ts (frozen policy versions), issued.ts + issued-store.ts + issue-send.ts (what was sent, durable), update.ts (game-day diff), forecasts.ts (append-only pregame evidence), totals*.ts, closing*.ts, research.ts, units.ts, ops.ts, learning/ (strategy review). Page: `src/app/picks/` (PicksView.tsx shell, ats.tsx, su-totals.tsx, learning.tsx, ui.tsx, TierChecker.tsx, picks.module.css).
 - Sources: davidsasser.com (board + Google history sheet), samthemodelman.smmodel.workers.dev (board + record.html), PEM cards via the Mac relay (college), current lines/prices/kickoffs/finals/closes from ESPN (DraftKings). Lines are home-side (-3.5 = home favored).
 
@@ -25,14 +25,16 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 - Straight up: follows the best full-slate method (NFL models' average, college Vegas favorite); margin bands only; pick'em, no stake.
 - Totals: model totals from projected scores, judged at the one current total. Tracking only until a totals cut has 10+ decided games and wins in the forward agreement archive.
 
-- HOLD (2026-10-08, Jack's call, `hold.ts`): NFL games kicking off after the next Sunday 9am brief (Sunday and Monday games, seen from Tue to Sat) are early looks: shown on the page and listed in the Tuesday card, but no stake, no room spent, never in the Tuesday issued record. At the Sunday brief they become bets at that morning's line via the update's "added" list (slot "sun"). Thursday and late-season Saturday NFL games still go out Tuesday. College is not held. Cost per the one measured week: about 0.6 pt of early line move; the "timing" hypothesis keeps measuring first vs game-day line, so revisit it on evidence.
+- HOLD (2026-10-08, Jack's call, `hold.ts`): no stakes on any email unless that game is played that day. Every game, NFL and college, is an early look until 9:00 ET on its own game day (or 1h before a pre-10am kickoff). Held games are still allocated by edge, so their stake is a reservation (a thin Thursday play can't take room a stronger Sunday play needs); they are never issued until released. Cost per the one measured week: about 0.6 pt of early line move; the "timing" hypothesis keeps measuring first vs game-day line.
+- Supersede rule (`firstSends`, `diffUpdate`): a staked send of a game supersedes an earlier unstaked one (the Wed Oct 7 Week 5 card was unstaked), so grading and units use the staked bet; only staked sends block a new bet; every sent pick still gets on/off advice.
 - Page: the week board groups bets by ET day (`days.ts`), today first with a green header, Sunday/Monday early looks as dashed-gold cards, kicked-off games in a collapsed drawer.
 
-## Email schedule (as implemented)
-- Tuesday card from 5:30pm ET once all four boards show the new week (NFL Sunday/Monday games appear only as early looks; see HOLD above) (retries each pulse; Wed and Thu 9am fallbacks need only the NFL boards). College is allocated after NFL with NFL's card reserved.
-- Saturday 9:30am college update and an NFL block in the Sunday 9am brief: issued bets re-checked at today's line AND price (still on / off for anyone who hasn't bet / new); issued totals too; kicked off vs no quote told apart. A sent bet stands as sent. Saturday sends only when something is new or off.
+## Email schedule (as implemented, 2026-10-08)
+- Today's bets (`runPicksToday`, pulse send `picks-day`, every day 9:00 ET): the bets for that day's games at that morning's line and price, both sports in one email, NFL allocated first. Waits for a league's boards when it plays that day (until 1h before its first kickoff). Silent on a day with no bet and nothing sent off (logs the quiet day). Sent log id `picks-day`, week field = YYYYMMDD, idempotency `picks-day:<date>`, record slot `g<weekday>` (`gthu`, `gsat`...). A Pushover push rides with each sent email (`src/lib/notify/pushover.ts`, needs PUSHOVER_APP_TOKEN + PUSHOVER_USER_KEY; without them it skips and says so in the response). Preview: `/api/picks-email?update=day&dry=1`.
+- Tuesday update (`runPicksEmail`, from 5:30pm ET once all four boards are up; Wed/Thu 9am fallbacks need only NFL): what the review learned (journal), rule changes, feeds (Sam/David/PEM/lines), last week, early looks by day, totals status, straight-up list. NO stakes: its record holds only the straight-up list. Preview: `/api/picks-email?dry=1`.
+- The Saturday college update and the Sunday brief's picks block are gone; the 9am daily covers both. The Sunday brief carries no picks.
+- New qualifiers after 9am on a game day show on the page as bets but are not emailed (one email per day, by design).
 - Durable issuance (issue-send.ts): one atomic intent per idempotency key holds the exact HTML, subject and records; records written "pending", email sent with that key, then "sent" and the sent log. Any later run (or a concurrent one) sends the CLAIMED card and records. Pending intents are finished before a new decision. Past 20h an unconfirmed send is never resent: records become "unconfirmed" (exposure, not results) for a person to check. A refused send drops the intent.
-- First real email: Wed Oct 7 (Week 5, recovered record, unstaked). First staked sends after deploy: Sat Oct 10 college update, Sun Oct 11 brief block, Tue Oct 13 card.
 
 ## Scheduled operations (no page visit needed)
 - `picks-data` (pulse live tier every 15 min on game windows, hourly otherwise): fresh quotes, compose, append pregame forecasts, archive totals, settle issued bets, board snapshot. Health in `picks:v2:ops` (last success, last failure + reason, next expected), shown under Research > Strategy review > Scheduler health.
@@ -73,9 +75,10 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 
 ## Next
 1. Done 2026-10-08: scheduler health checked in Redis (`picks:v2:ops`). `data` and `review` both succeed hourly with no recorded failures; QStash drives the pulse, the GitHub workflow is the slower backstop (runs every 3 to 7h, as documented in pulse.yml).
-2. Sat Oct 10 9:30am college update, Sun Oct 11 brief block (first held Sunday games become bets here, under "Bets at today's line, not sent before"), Tue Oct 13 card: check the send response says intents "confirmed sent".
-3. First Wednesday UI check (Oct 14) appears in the journal.
-4. After ~3 weeks of the pregame archive, the first hypotheses can clear the bar; until then expect "no change: kept p1" with reasons.
+2. Daily 9am bets emails from Oct 8 (first: Thu Oct 8, TB +8.5): check each send response says "confirmed sent", and Sat Oct 10 / Sun Oct 11 carry the weekend's bets. Tue Oct 13: first update-only Tuesday email (no stakes).
+3. Pushover: needs a NEW Pushover app token for Fantasy Hub plus Jack's user key in Vercel (PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY). Until set, emails send and pushes skip.
+4. First Wednesday UI check (Oct 14) appears in the journal.
+5. After ~3 weeks of the pregame archive, the first hypotheses can clear the bar; until then expect "no change: kept p1" with reasons.
 
 ## Dynasty (from Oct 5, unchanged)
 - Keep list in `src/lib/dynasty/untouchables.ts`: Gibbs (9221) and Dart (12508). Retooling for 2027. The app prices on RosterAudit, which values veterans far below FantasyCalc.

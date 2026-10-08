@@ -7,22 +7,7 @@ import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/se
 import { readBaseline } from "@/lib/survivor/baseline";
 import { lockAlarms, unseenAlarms, type PoolAlarmInput, type SlotAlarmInput } from "./alarm";
 import { alarmSubject, renderLockAlarm, renderSundayBrief, sundaySubject } from "./email";
-import { refreshPicks, type PicksReport } from "@/lib/picks/report";
-import { loadIssued } from "@/lib/picks/issued-store";
 import { issueAndSend, recoverPending } from "@/lib/picks/issue-send";
-import { toIssuedUpdate } from "@/lib/picks/issued";
-import { diffUpdate, type UpdateDiff } from "@/lib/picks/update";
-
-/** The NFL picks at today's line, for the brief. Never blocks the brief. */
-async function nflPicks(): Promise<{ r: PicksReport; diff: UpdateDiff } | null> {
-  try {
-    const r = await refreshPicks("nfl");
-    if (!r?.week) return null;
-    return { r, diff: diffUpdate(r, await loadIssued("nfl", r.season)) };
-  } catch {
-    return null;
-  }
-}
 
 // The two Sunday jobs.
 //
@@ -87,12 +72,13 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
     Object.entries(baseline).map(([poolId, b]) => [poolId, b.recommended ?? null]),
   );
 
-  const picks = await nflPicks();
+  // NFL bets no longer ride in the brief: they go out in the 9am "today's
+  // bets" email and push (picks/run.ts runPicksToday). The brief carries none.
   const input = {
     survivors,
     lineups,
     thursdayCalls,
-    picks,
+    picks: null,
     generatedAt: new Date().toISOString(),
     appUrl: APP_URL(),
   };
@@ -118,12 +104,7 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
     if (rec) return Response.json({ ok: rec.outcome !== "failed", sent: rec.sent, reason: `recovered earlier send: ${rec.outcome}`, error: rec.error });
   }
 
-  // New NFL plays in the brief are issued picks: recorded as an intent before
-  // the brief goes, confirmed after (issue-send.ts).
-  const records =
-    picks && !test && !resend && (picks.diff.added.length || picks.diff.addedTotals.length)
-      ? [toIssuedUpdate(picks.r, picks.diff, "sun", { issuedAt: new Date().toISOString(), subject })]
-      : [];
+  const records: never[] = [];
   const out = await issueAndSend({
     logId: "sunday",
     season,

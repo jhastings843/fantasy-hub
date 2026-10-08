@@ -17,7 +17,7 @@ function statusOf(g: BoardGame): Status {
   const tiered = g.tier === "t1" || g.tier === "t2";
   if (!tiered) return "pass";
   if (g.basis !== "reference") return "noquote";
-  if (g.held && g.want) return "early";
+  if (g.held && g.stake) return "early";
   if (g.stake) return "bet";
   if (g.want) return "budget";
   return "priced";
@@ -66,7 +66,7 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
         ) : st === "early" ? (
           <div className={s.stake}>
             <span className={s.earlyChip}>Early look</span>
-            <span className={s.num}>{`bet ${kickoffEt(g.held)}`}</span>
+            <span className={s.num}>{`~${g.stake}u · ${kickoffEt(g.held)}`}</span>
           </div>
         ) : (
           <span className={s.statusChip}>{STATUS_TEXT[st]}</span>
@@ -120,7 +120,7 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           {st === "early" && (
             <>
               <dt>Why no bet yet</dt>
-              <dd>{`Held until the Sunday 9am brief (${kickoffEt(g.held)}). It becomes a bet then if it still fits at that morning's line and price; the policy wants about ${g.want}u at today's number.`}</dd>
+              <dd>{`Held until 9am on game day (${kickoffEt(g.held)}), when it goes out by email and push if it still fits at that morning's line and price. About ${g.stake}u is set aside for it at today's number.`}</dd>
             </>
           )}
           {st === "budget" && (
@@ -172,7 +172,7 @@ export function AtsWeek({ r }: { r: PicksReport }) {
         </h2>
         <p className={s.p}>
           {st.rule
-            ? `${bets.length} bet${bets.length === 1 ? "" : "s"}, ${total.toFixed(2).replace(/\.?0+$/, "")}u${early.length ? `, plus ${early.length} early look${early.length === 1 ? "" : "s"} that become bets Sunday morning` : ""}. Rule: ${st.rule.label.toLowerCase()} (${rec(st.rule.record)})${st.second ? `; Tier 2: ${st.second.label.toLowerCase()} (${rec(st.second.record)} on the games it adds)` : "; no Tier 2"}.`
+            ? `${bets.length} bet${bets.length === 1 ? "" : "s"}, ${total.toFixed(2).replace(/\.?0+$/, "")}u${early.length ? `, plus ${early.length} early look${early.length === 1 ? "" : "s"} that become bets at 9am on game day` : ""}. Rule: ${st.rule.label.toLowerCase()} (${rec(st.rule.record)})${st.second ? `; Tier 2: ${st.second.label.toLowerCase()} (${rec(st.second.record)} on the games it adds)` : "; no Tier 2"}.`
             : "No cut has a big enough winning record yet, so nothing is a bet this week."}
         </p>
       </div>

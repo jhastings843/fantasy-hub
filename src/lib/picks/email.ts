@@ -1,6 +1,8 @@
 import { type BoardGame, type Record as Rec } from "./engine";
 import { type EmailSelection, selectForEmail } from "./issued";
 import type { UpdateDiff } from "./update";
+import type { JournalEntry } from "./learning/review";
+import type { Push } from "@/lib/notify/pushover";
 import { fmtUnits } from "./units";
 
 /** A quoted price; an unquoted one is said so, never shown as -110. */
@@ -23,8 +25,11 @@ const when = (kickoff?: string) =>
 import type { PicksReport } from "./report";
 import { PALETTE, card, emailPage, escapeHtml, generatedLine, label, paragraph, small } from "@/lib/email/shell";
 
-// The Tuesday picks card. Both leagues in one, NFL first because that is
-// the pick'em, each with the plays that fit the rule and the straight-up list.
+// Two emails (Jack, 2026-10-08: stakes only on the day of the game).
+//   - Tuesday update: what the app learned, the rules in force, whether every
+//     model and line came in, last week, and the week's early looks. No stakes.
+//   - Today's bets, 9am ET on each game day: the bets for that day's games at
+//     that morning's line, issued with stakes, plus anything sent that is off.
 // Everything here is read off the same report the page renders.
 
 const rec = (r: Rec) => `${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`;
@@ -98,10 +103,49 @@ ${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.rec
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
 }
 
+/** Early looks, grouped by slate: the pick and today's line, no stake. */
+function earlyRows(r: PicksReport, games: BoardGame[]): string {
+  const name = (k: string) => r.names[k] ?? k;
+  const sorted = games.slice().sort((a, b) => slateOf(a.ref?.kickoff).order - slateOf(b.ref?.kickoff).order);
+  let last = "";
+  return sorted
+    .map((g) => {
+      const slate = slateOf(g.ref?.kickoff).label;
+      const head =
+        slate !== last
+          ? `<tr><td colspan="2" style="padding:10px 0 2px;font:600 10px/1.3 ${FONT};letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};">${escapeHtml(slate)}</td></tr>`
+          : "";
+      last = slate;
+      const team = g.side === "home" ? g.home : g.away;
+      const opp = g.side === "home" ? g.away : g.home;
+      return `${head}<tr>
+  <td style="padding:5px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(`${name(team)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}`)} <span style="font-weight:400;color:${PALETTE.muted};font-size:12px;">vs ${escapeHtml(name(opp))}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</span></td>
+  <td align="right" style="padding:5px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${g.tier === "t1" ? "Tier 1" : "Tier 2"}</td>
+</tr>`;
+    })
+    .join("");
+}
+
+/** Did every model board and the lines come in? */
+export function feedsLine(r: PicksReport): string {
+  const posted = (ok: boolean) => (ok ? "in" : "not posted yet");
+  const pem = r.league === "cfb" ? (r.pem ?? []).find((p) => p.week === r.week) : undefined;
+  const parts = [
+    `Sam ${posted(r.boardUpdated.sam)}`,
+    `David ${posted(r.boardUpdated.david)}`,
+    r.league === "cfb" ? `PEM ${pem ? (pem.verified ? `in (${pem.games} games)` : "in, not verified") : "not posted yet"}` : "",
+    r.reference.games
+      ? `lines for ${r.reference.priced} of ${r.reference.games} games${r.reference.source ? ` (${r.reference.source})` : ""}${r.reference.stale ? ", stale" : ""}`
+      : "no lines yet",
+    r.errors.length ? `${r.errors.length} read error${r.errors.length === 1 ? "" : "s"}: ${r.errors.slice(0, 2).join("; ")}` : "",
+  ].filter(Boolean);
+  return `Feeds this week: ${parts.join(", ")}.`;
+}
+
 /** The season's unit total for this sport, from bets that went out with a stake. */
 function unitsLine(r: PicksReport): string {
   const u = r.units?.total;
-  if (!u || !u.bets) return small("Bets carry stakes from this card on (0.25u to 5u, sized to each rule's record and the price).", PALETTE.body);
+  if (!u || !u.bets) return small("No staked bets settled yet this season.", PALETTE.body);
   const rec = `${u.w}-${u.l}${u.p ? `-${u.p}` : ""}`;
   return `<div style="font:600 15px/1.4 ${FONT};color:${u.units >= 0 ? PALETTE.good : PALETTE.bad};padding-bottom:2px;">${escapeHtml(
     `Season: ${fmtUnits(u.units)} on ${rec}${u.risked ? `, ${Math.round(u.roi * 100)}% return` : ""}`,
@@ -125,8 +169,6 @@ function lastWeekLine(r: PicksReport): string {
 
 function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string {
   const st = r.strategies;
-  const plays = sel.plays;
-  const shown = plays.slice(0, sel.shownPlays);
   const league = r.league === "nfl" ? "NFL" : "College";
   const ruleLine = st.rule
     ? `Rule: ${st.rule.label.toLowerCase()}, ${rec(st.rule.record)} in the backtest.${st.second ? ` Tier 2: ${st.second.label.toLowerCase()}, ${rec(st.second.record)} on the games it adds beyond Tier 1.` : " No Tier 2: nothing else wins on the games Tier 1 leaves."}`
@@ -141,11 +183,6 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
           .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${g.price !== undefined ? price(g.price) : "(no price)"}`)
           .join(", ")}.`
       : "",
-    sel.early.length
-      ? `Early looks, not bets yet: ${sel.early
-          .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}`)
-          .join(", ")}. Sunday and Monday games become bets in the Sunday 9am brief, at that morning's line and with stakes, so line moves, model updates and injury news count first.`
-      : "",
     sel.overBudget.length
       ? `Left out by the weekly limit (worth a bet, but this week's ${r.allocation.room}u budget is used): ${sel.overBudget
           .map((g) => r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away))
@@ -157,10 +194,12 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
 ${unitsLine(r)}
 ${lastWeekLine(r)}
 ${paragraph(ruleLine)}
+${small(feedsLine(r))}
+<div style="padding-top:14px;">${label("Early looks: no stakes, not bets yet")}</div>
 ${
-  shown.length
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">${playRows(r, shown)}</table>${plays.length > shown.length ? small(`Plus ${plays.length - shown.length} more on the page.`) : ""}`
-    : paragraph("Nothing fits this week.", PALETTE.muted)
+  sel.early.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:4px;">${earlyRows(r, sel.early)}</table>${small("Each becomes a bet at 9am ET on its game day if it still fits at that morning's line and price, in that day's email and push.")}`
+    : paragraph("Nothing fits the rule at today's lines.", PALETTE.muted)
 }
 ${caveats.map((c) => small(c)).join("")}
 ${totalsBlock(r, sel)}
@@ -180,34 +219,59 @@ export interface PicksEmail {
 // Every bet goes in the email: a bet only on the page is not a bet anyone was given.
 const LIMITS = { nfl: { plays: 99, su: 16 }, cfb: { plays: 99, su: 15 } } as const;
 
+/** What the strategy review did lately: the latest review plus any change, proposal or alert in the last week. */
+function learningCard(journal: JournalEntry[], now: Date): string {
+  if (!journal.length) return card(`${label("What the app learned")}${paragraph("No strategy review on file yet.", PALETTE.muted)}`);
+  const recent = journal.filter((e) => now.getTime() - new Date(e.at).getTime() < 7 * 86400000);
+  const review = journal.find((e) => e.kind === "review");
+  const changes = recent.filter((e) => ["activate", "rollback", "retain", "reject", "proposal", "ops"].includes(e.kind));
+  const clip = (s: string, n = 260) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+  const rows = changes
+    .slice(0, 6)
+    .map(
+      (e) => `<tr><td style="padding:5px 0;border-top:1px solid ${PALETTE.hairline};font:600 13px/1.4 ${FONT};color:${PALETTE.ink};">${escapeHtml(e.title)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(clip(e.why, 200))}</div></td></tr>`,
+    )
+    .join("");
+  return card(`${label("What the app learned")}
+${review ? paragraph(`${review.title}.`) : ""}
+${review ? small(clip(review.why)) : ""}
+${rows ? `<div style="padding-top:10px;">${label("Rule and strategy changes this week")}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table>` : small("No rule or strategy changes this week.")}`);
+}
+
 export function buildPicksEmail(input: {
   nfl: PicksReport | null;
   cfb: PicksReport | null;
   appUrl: string;
   generatedAt: string;
+  /** Newest first. */
+  learning?: JournalEntry[];
 }): PicksEmail {
   const { nfl, cfb, appUrl } = input;
   const pick = (r: PicksReport | null) => (r ? selectForEmail(r, LIMITS[r.league].plays, LIMITS[r.league].su) : null);
-  const selections = { nfl: pick(nfl), cfb: pick(cfb) };
-  const t1 = (x: EmailSelection | null) => x?.plays.filter((g) => g.tier === "t1").length ?? 0;
+  // No stakes on the update: a Tuesday-night game released at 9am belongs to
+  // that day's 9am email, so plays and totals are emptied here, before render.
+  const noBets = (s: EmailSelection | null): EmailSelection | null => (s ? { ...s, plays: [], shownPlays: 0, totals: [], shownTotals: 0 } : null);
+  const selections = { nfl: noBets(pick(nfl)), cfb: noBets(pick(cfb)) };
+  const early = (x: EmailSelection | null) => x?.early.length ?? 0;
   const week = nfl?.week ?? cfb?.week;
-  const subject = `Week ${week ?? ""} picks: ${t1(selections.nfl)} NFL, ${t1(selections.cfb)} college Tier 1`;
+  const subject = `Week ${week ?? ""} update: ${early(selections.nfl)} NFL and ${early(selections.cfb)} college early looks`;
   const asOf = (r: PicksReport | null) =>
     r?.reference.fetchedAt
       ? `${r.league === "nfl" ? "NFL" : "College"} lines: ${r.reference.source}, read ${new Date(r.reference.fetchedAt).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })} ET.`
       : "";
   const body = [
+    learningCard(input.learning ?? [], new Date(input.generatedAt)),
     nfl && selections.nfl ? leagueCard(nfl, selections.nfl, appUrl) : card(paragraph("The NFL board couldn't be read this morning.")),
     cfb && selections.cfb ? leagueCard(cfb, selections.cfb, appUrl) : card(paragraph("The college board couldn't be read this morning.")),
   ].join("");
   const html = emailPage({
     title: subject,
     kicker: `${new Date(input.generatedAt).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" })} · Week ${week ?? ""}`,
-    heading: "Where both models agree",
+    heading: "This week's update",
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 15u per sport per week (card plus game-day additions), 30u open across both sports. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 15u per sport per week (card plus game-day additions), 30u open across both sports. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
@@ -293,23 +357,83 @@ export function updateBlock(r: PicksReport, d: UpdateDiff): string {
   return `${parts.join("")}${small(tail.join(" "))}`;
 }
 
-export function buildPicksUpdate(input: { r: PicksReport; diff: UpdateDiff; appUrl: string; generatedAt: string }): { html: string; subject: string } {
-  const { r, diff, appUrl } = input;
-  const league = r.league === "nfl" ? "NFL" : "College";
-  const bits = [
-    diff.added.length + diff.addedTotals.length ? `${diff.added.length + diff.addedTotals.length} new` : "",
-    diff.off.length ? `${diff.off.length} off` : "",
-  ].filter(Boolean);
-  const subject = `${league} Week ${r.week} game-day update: ${bits.join(", ") || "no changes"}`;
+// ------------------------------------------------------------- today's bets
+
+export interface TodayLeague {
+  r: PicksReport;
+  /** Already narrowed to today's games. */
+  diff: UpdateDiff;
+}
+
+const betsOf = (ls: TodayLeague[]) => ls.reduce((n, l) => n + l.diff.added.length + l.diff.addedTotals.length, 0);
+const unitsOf = (ls: TodayLeague[]) =>
+  ls.reduce((u, l) => u + l.diff.added.reduce((s, g) => s + (g.stake ?? 0), 0) + l.diff.addedTotals.reduce((s, g) => s + (g.stake ?? 0), 0), 0);
+const u = (x: number) => `${Math.round(x * 100) / 100}u`;
+const dayLabel = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+
+/** The 9am game-day email: today's bets at this morning's line, and any sent bet that is now off. */
+export function buildTodayEmail(input: { date: string; leagues: TodayLeague[]; appUrl: string; generatedAt: string }): { html: string; subject: string } {
+  const { leagues, appUrl } = input;
+  const bets = betsOf(leagues);
+  const off = leagues.reduce((n, l) => n + l.diff.off.length + l.diff.totalsOff.length, 0);
+  const subject = bets
+    ? `Today's bets: ${bets} (${u(unitsOf(leagues))}) · ${dayLabel(input.date)}`
+    : `Today: ${off} sent bet${off === 1 ? " is" : "s are"} off · ${dayLabel(input.date)}`;
+  const body = leagues
+    .filter((l) => l.diff.added.length || l.diff.addedTotals.length || l.diff.off.length || l.diff.totalsOff.length)
+    .map(({ r, diff }) => {
+      const league = r.league === "nfl" ? "NFL" : "College";
+      const name = (k: string) => r.names[k] ?? k;
+      const totals = diff.addedTotals
+        .map(
+          (g) => `<tr>
+  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(g.play!)} (${escapeHtml(price(g.price))})<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${name(g.away)} at ${name(g.home)}`)}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
+  <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 13px/1.4 ${FONT};color:${PALETTE.accent};white-space:nowrap;">${g.stake}u</td>
+</tr>`,
+        )
+        .join("");
+      const offOnly = { ...diff, added: [], addedTotals: [], stillOn: [], totalsStillOn: [], kickedOff: 0, noQuote: 0, gone: 0 };
+      return card(`${label(`${league} · Week ${r.week}`)}
+${diff.added.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${playRows(r, diff.added)}</table>` : ""}
+${totals ? `<div style="padding-top:12px;">${label("Totals")}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${totals}</table>` : ""}
+${diff.off.length || diff.totalsOff.length ? updateBlock(r, offOnly) : ""}
+${small(feedsLine(r))}`);
+    })
+    .join("");
   const html = emailPage({
     title: subject,
-    kicker: `${r.league === "cfb" ? "Saturday" : "Sunday"} · Week ${r.week}`,
-    heading: "What changed since Tuesday",
+    kicker: `${dayLabel(input.date)} · 9am ET`,
+    heading: bets ? "Today's bets" : "Today: nothing new to bet",
     preheader: subject,
-    body: card(`${label(`${league} · Week ${r.week}`)}${updateBlock(r, diff)}`),
-    cta: { href: `${appUrl}/picks${r.league === "cfb" ? "/cfb" : ""}`, text: "Open Picks" },
-    footnote: `<div>Every model judged again at today's line. A game counts once in the record, at the line it was first sent.</div>
+    body,
+    cta: { href: `${appUrl}/picks`, text: "Open Picks" },
+    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line and price. Each is graded at the line and price shown; a better number elsewhere only helps. Stakes are a quarter-Kelly estimate from each rule's record, 1u = 1% of bankroll, risked. Limits: 5u per bet and per game, 15u per sport per week, 30u open across both sports. Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject };
+}
+
+/** The phone alert that rides with today's email. Pure. */
+export function todayPush(input: { date: string; leagues: TodayLeague[]; appUrl: string }): Push {
+  const { leagues } = input;
+  const bets = betsOf(leagues);
+  const lines: string[] = [];
+  for (const { r, diff } of leagues) {
+    const league = r.league === "nfl" ? "NFL" : "CFB";
+    const name = (k: string) => r.names[k] ?? k;
+    for (const g of diff.added.slice().sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""))) {
+      const team = g.side === "home" ? g.home : g.away;
+      lines.push(`${league} ${name(team)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)} · ${g.stake}u (${price(g.price)})${g.ref?.kickoff ? ` · ${when(g.ref.kickoff).replace(/^\w+ /, "")}` : ""}`);
+    }
+    for (const g of diff.addedTotals) lines.push(`${league} ${g.play} · ${g.stake}u (${price(g.price)})`);
+    for (const o of diff.off) lines.push(`OFF ${league} ${name(o.sent.side === "home" ? o.sent.home : o.sent.away)}: ${o.reason}`);
+    for (const o of diff.totalsOff) lines.push(`OFF ${league} ${o.sent.play}: ${o.reason}`);
+  }
+  return {
+    title: bets ? `Today's bets: ${bets} · ${u(unitsOf(leagues))}` : "Picks: a sent bet is off",
+    message: lines.join("\n") || "Nothing today.",
+    url: `${input.appUrl}/picks`,
+    urlTitle: "Open Picks",
+  };
 }

@@ -19,7 +19,7 @@ export type PulseTier = "live" | "hourly" | "overnight" | "idle";
 // than a minute window here that a late run would fall straight through.
 
 /** The emails, by the moment each one belongs to. */
-export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm" | "picks" | "picks-sat";
+export type SendId = "faab" | "midweek" | "thursday" | "watch" | "sunday" | "alarm" | "picks" | "picks-day";
 
 export type TimedJobId = "refresh-all-early" | "refresh-all-late";
 
@@ -150,18 +150,17 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
     { id: "watch", day: SAT, at: 12 * 60 },
     { id: "watch", day: SUN, at: 12 * 60 + 15, until: 13 * 60 },
     { id: "sunday", day: SUN, at: 9 * 60 },
-    // The picks card leaves Tuesday evening, as soon as all four boards are
-    // up (one week measured: the last, David's NFL board, at 4:18pm ET), so
-    // it catches the lines before they move toward the models and lands
-    // before college's Tuesday-night game. It answers "skipped" until then;
+    // The Tuesday picks update (no stakes: learning, rules, feeds, early
+    // looks) leaves once all four boards are up (one week measured: the last,
+    // David's NFL board, at 4:18pm ET). It answers "skipped" until then;
     // Wednesday and Thursday 9am are fallbacks that need only the NFL boards.
     { id: "picks", day: TUE, at: 17 * 60 + 30 },
     { id: "picks", day: WED, at: 9 * 60 },
     { id: "picks", day: THU, at: 9 * 60 },
-    // Saturday college update at the current line, before the noon kickoffs
-    // (339 of 902 college games start before 1pm). Silent when nothing
-    // changed. The NFL equivalent rides in the Sunday 9am brief.
-    { id: "picks-sat", day: SAT, at: 9 * 60 + 30 },
+    // Today's bets, every day at 9am ET (hold.ts releases each game then):
+    // before the earliest kickoffs (noon college, 9:30am NFL London). Silent
+    // on a day with no bets; it logs the quiet day itself.
+    ...[SUN, MON, TUE, WED, THU, FRI, SAT].map((day) => ({ id: "picks-day" as const, day, at: 9 * 60 })),
     // Alongside the 12:15 lineup check, 45 minutes before the 13:00 lock. This one
     // is allowed to send nothing at all, which is its normal outcome.
     { id: "alarm", day: SUN, at: 12 * 60 + 15, until: 16 * 60 },

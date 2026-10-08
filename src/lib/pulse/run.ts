@@ -23,7 +23,7 @@ import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
 import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
 import { archiveTracker } from "@/lib/picks/tracker";
-import { runPicksEmail, runPicksSaturday } from "@/lib/picks/run";
+import { runPicksEmail, runPicksToday, todayLogKey } from "@/lib/picks/run";
 import { runPicksData } from "@/lib/picks/report";
 import { tracked } from "@/lib/picks/ops";
 import { reviewIfDue } from "@/lib/picks/learning/run";
@@ -410,8 +410,8 @@ async function runSend(id: SendId): Promise<Response> {
       return runLockAlarm();
     case "picks":
       return runPicksEmail();
-    case "picks-sat":
-      return runPicksSaturday();
+    case "picks-day":
+      return runPicksToday();
   }
 }
 
@@ -457,7 +457,15 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
   // The picks sends key on the calendar NFL week (Tuesday to Monday), which
   // is what the picks code itself uses. Sleeper's week may not have rolled
   // over by Tuesday evening, and asking it would read last week's log.
-  if (id === "picks" || id === "picks-sat") {
+  if (id === "picks-day") {
+    try {
+      const k = todayLogKey();
+      return (await sharedAlreadySent(k.id, k.season, k.day)) !== null;
+    } catch {
+      return false;
+    }
+  }
+  if (id === "picks") {
     try {
       const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
       const season = new Date().getUTCMonth() <= 1 ? new Date().getUTCFullYear() - 1 : new Date().getUTCFullYear();
