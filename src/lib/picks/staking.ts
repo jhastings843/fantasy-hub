@@ -1,45 +1,38 @@
-// How much to bet: 0.25u to 5u, and when a two-leg parlay is worth it. Pure.
+// How much a bet wants, before the protected limits (allocate.ts). Pure.
 //
 // A stake needs a win probability, and a cut's raw record is a poor one: a
-// 14-2 rule is not an 87% bet. So each record is pulled toward 50% as if it
-// had already gone 50-50 over PRIOR_GAMES games (100: about a season of plays
-// before the record outweighs the doubt). 14-2 reads as 55.2%, 14-6 as 53.3%.
+// 14-2 rule is not an 87% bet. Each record is pulled toward 50% as if it had
+// already gone 50-50 over the policy's prior games (100 at baseline). 14-2
+// reads as 55.2%, 14-6 as 53.3%. That is an ESTIMATE from the tier's
+// source-line history, not a calibrated probability for a common-line
+// recommendation: every issued bet stores it, with the policy version, so
+// the strategy review can measure its forward calibration before trusting it
+// further.
 //
-// The stake is a quarter of the Kelly bet for that probability at the actual
-// price, with 1u = 1% of bankroll, rounded to the quarter unit and capped at
-// 5u. Under a quarter unit it is not a bet: the price has eaten the edge
-// (the page and email say so). Reaching 5u takes a long record at ~60%+.
+// Kelly policy: the policy's fraction of the Kelly bet at the QUOTED price,
+// 1u = 1% of bankroll, rounded to the quarter unit, at most MAX_STAKE. Flat
+// policy: the same units on every bet with a positive estimated edge. No
+// quoted price, no stake: an assumed -110 is never presented as an offer.
 //
-// Parlays: two legs, different games, same sport, each leg a bet in its own
-// right. Worth sending only when the pair's estimated edge (joint probability
-// times the parlay payout, less one) is 10% or more; the bar is that high
-// because errors in each leg's probability multiply. Staked at an eighth
-// Kelly, 0.25u to 1u. Legs in different games are treated as independent.
+// Parlays: pickParlays() stays for the shadow parlay policy only. A product
+// of uncalibrated leg estimates times a computed payout (DraftKings' real
+// parlay price is not quoted to us) is not a demonstrated edge.
 
-export const PRIOR_GAMES = 100;
-export const KELLY_SCALE = 0.25;
-export const MIN_STAKE = 0.25;
-export const MAX_STAKE = 5;
+import { BASELINE_POLICY, type StakingPolicy } from "./policy";
+import { MAX_STAKE, MIN_STAKE, PARLAY_MAX } from "./limits";
+
+export const PRIOR_GAMES = BASELINE_POLICY.staking.priorGames;
 export const PARLAY_MIN_EDGE = 0.1;
 export const PARLAY_KELLY = 0.125;
-export const PARLAY_MAX = 1;
 export const MAX_PARLAYS = 2;
-/**
- * Most units at risk per sport on one card, parlays included. Every bet on a
- * card leans on the same estimate of how good the rule is, so if the rule is
- * really a coin flip they all lose together; a week heavy with plays is
- * scaled down rather than staked as if the bets were independent.
- */
-export const WEEKLY_CAP = 15;
-
 /** American price to decimal payout per unit risked (stake included). */
 export function decimal(price: number): number {
   return 1 + (price < 0 ? 100 / -price : price / 100);
 }
 
-/** The record's win rate pulled toward 50% by PRIOR_GAMES. */
-export function shrunk(w: number, l: number): number {
-  return (w + PRIOR_GAMES / 2) / (w + l + PRIOR_GAMES);
+/** The record's win rate pulled toward 50% by the prior's games. */
+export function shrunk(w: number, l: number, priorGames = PRIOR_GAMES): number {
+  return (w + priorGames / 2) / (w + l + priorGames);
 }
 
 /** Full Kelly fraction of bankroll for win probability p at this price (negative: no edge). */
@@ -50,9 +43,10 @@ export function kelly(p: number, price: number): number {
 
 const quarter = (x: number) => Math.round(x * 4) / 4;
 
-/** Units to risk, 0 when the price leaves no bet worth a quarter unit. */
-export function stakeFor(p: number, price: number): number {
-  const raw = KELLY_SCALE * kelly(p, price) * 100;
+/** Units the policy wants to risk, 0 when the price leaves no bet worth a quarter unit. */
+export function stakeFor(p: number, price: number, policy: StakingPolicy = BASELINE_POLICY.staking): number {
+  if (kelly(p, price) <= 0) return 0;
+  const raw = policy.kind === "flat" ? policy.flatUnits : policy.kellyScale * kelly(p, price) * 100;
   if (raw < MIN_STAKE) return 0;
   return Math.min(MAX_STAKE, Math.max(MIN_STAKE, quarter(raw)));
 }
@@ -119,36 +113,31 @@ export function american(dec: number): string {
   return v > 0 ? `+${v}` : `${v}`;
 }
 
-/** Stakes every Tier 1/2 game at a reference line from its tier's record, and returns the parlays worth sending. */
-export function stakeBoard<
-  G extends { home: string; away: string; tier: string; basis?: string; side?: "home" | "away"; ref?: { homePrice?: number; awayPrice?: number } },
->(board: G[], records: { t1?: { w: number; l: number }; t2?: { w: number; l: number } }, week: number | null): { board: (G & { p?: number; price?: number; stake?: number })[]; parlays: ParlayPick[] } {
-  const staked = board.map((g): G & { p?: number; price?: number; stake?: number } => {
+/** Where a bet's price came from: quoted by the book, or missing (then there is no stake). */
+export type PriceSource = "quoted" | "missing";
+
+export interface Wanted {
+  p?: number;
+  price?: number;
+  priceSource?: PriceSource;
+  /** What the policy wants before limits; the allocator decides `stake`. */
+  want?: number;
+  stake?: number;
+}
+
+/**
+ * The stake each Tier 1/2 game at a reference line WANTS under the policy.
+ * The allocator turns wants into stakes; nothing here knows the limits.
+ */
+export function wantStakes<
+  G extends { tier: string; basis?: string; side?: "home" | "away"; ref?: { homePrice?: number; awayPrice?: number } },
+>(board: G[], records: { t1?: { w: number; l: number }; t2?: { w: number; l: number } }, policy: StakingPolicy = BASELINE_POLICY.staking): (G & Wanted)[] {
+  return board.map((g): G & Wanted => {
     const rec = g.tier === "t1" ? records.t1 : g.tier === "t2" ? records.t2 : undefined;
     if (!rec || g.basis !== "reference" || !g.side) return g;
-    const p = shrunk(rec.w, rec.l);
-    const price = (g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice) ?? -110;
-    return { ...g, p, price, stake: stakeFor(p, price) };
+    const p = shrunk(rec.w, rec.l, policy.priorGames);
+    const quoted = g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice;
+    if (quoted === undefined) return { ...g, p, priceSource: "missing", want: 0 };
+    return { ...g, p, price: quoted, priceSource: "quoted", want: stakeFor(p, quoted, policy) };
   });
-  // Over the cap: scale every stake down by the same factor, never below a quarter unit.
-  const total = staked.reduce((t, g) => t + (g.stake ?? 0), 0);
-  if (total > WEEKLY_CAP * 0.8) {
-    const k = (WEEKLY_CAP * 0.8) / total;
-    for (const g of staked) if (g.stake) g.stake = Math.max(MIN_STAKE, Math.floor(g.stake * k * 4) / 4);
-  }
-  const legs: Leg[] = staked.flatMap((g) =>
-    g.stake && g.p !== undefined && g.price !== undefined
-      ? [{ id: `${week}:${g.away}@${g.home}`, game: `${week}:${g.away}@${g.home}`, p: g.p, price: g.price }]
-      : [],
-  );
-  // Parlays get the rest of the cap (singles are capped at 80% of it above).
-  const room = WEEKLY_CAP - staked.reduce((t, g) => t + (g.stake ?? 0), 0);
-  const parlays: ParlayPick[] = [];
-  let used = 0;
-  for (const pr of pickParlays(legs)) {
-    if (used + pr.units > room) break;
-    parlays.push(pr);
-    used += pr.units;
-  }
-  return { board: staked, parlays };
 }

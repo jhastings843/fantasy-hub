@@ -189,6 +189,8 @@ export interface TotalsBoardGame {
   line?: number;
   p?: number;
   price?: number;
+  priceSource?: "quoted" | "missing";
+  want?: number;
   stake?: number;
 }
 

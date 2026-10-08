@@ -36,3 +36,22 @@ export async function loadIssued(league: League, season: number): Promise<Issued
     return [];
   }
 }
+
+export async function getIssued(league: League, season: number, week: number, slot: Slot = "tue"): Promise<IssuedRecord | null> {
+  return (await redis.get<IssuedRecord>(recKey(league, season, week, slot))) ?? null;
+}
+
+/** pending -> sent, and nothing else: a sent record is never rewritten. */
+export async function markIssuedSent(rec: IssuedRecord, emailId?: string): Promise<void> {
+  const cur = await getIssued(rec.league, rec.season, rec.week, rec.slot);
+  if (!cur || cur.status !== "pending") return;
+  await redis.set(recKey(rec.league, rec.season, rec.week, rec.slot), { ...cur, status: "sent", emailId: emailId ?? cur.emailId });
+}
+
+/** Removes a pending intent whose send definitely failed. Never touches a sent record. */
+export async function dropPendingIssued(rec: IssuedRecord): Promise<void> {
+  const cur = await getIssued(rec.league, rec.season, rec.week, rec.slot);
+  if (!cur || cur.status !== "pending") return;
+  await redis.del(recKey(rec.league, rec.season, rec.week, rec.slot));
+  await redis.srem(indexKey(rec.league, rec.season), member(rec.week, rec.slot));
+}

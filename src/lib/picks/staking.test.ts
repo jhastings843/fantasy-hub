@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WEEKLY_CAP, american, decimal, kelly, pickParlays, shrunk, stakeBoard, stakeFor, worstPrice } from "./staking";
+import { american, decimal, kelly, pickParlays, shrunk, stakeFor, wantStakes, worstPrice } from "./staking";
 
 describe("sizing", () => {
   it("pulls a record toward 50% as if it had gone 50-50 over 100 games", () => {
@@ -48,14 +48,15 @@ describe("parlays", () => {
   });
 });
 
-describe("weekly cap", () => {
-  it("scales a heavy week down so singles and parlays stay within the cap", () => {
-    const ref = { homePrice: -105, awayPrice: -105 };
-    const games = Array.from({ length: 12 }, (_, i) => ({ home: `H${i}`, away: `A${i}`, tier: "t1", basis: "reference", side: "home" as const, ref }));
-    const { board, parlays } = stakeBoard(games, { t1: { w: 14, l: 2 } }, 6);
-    const singles = board.reduce((t, g) => t + (g.stake ?? 0), 0);
-    expect(singles).toBeLessThanOrEqual(WEEKLY_CAP * 0.8);
-    expect(board.every((g) => (g.stake ?? 0) >= 0.25)).toBe(true);
-    expect(singles + parlays.reduce((t, p) => t + p.units, 0)).toBeLessThanOrEqual(WEEKLY_CAP);
+describe("wants", () => {
+  it("never stakes a game with no quoted price, and says so", () => {
+    const [g] = wantStakes([{ tier: "t1", basis: "reference", side: "home" as const, ref: { awayPrice: -110 } }], { t1: { w: 14, l: 2 } });
+    expect(g).toMatchObject({ priceSource: "missing", want: 0 });
+    expect(g.price).toBeUndefined();
+  });
+  it("sizes a flat policy the same on every bet with a positive estimated edge", () => {
+    const flat = { kind: "flat" as const, kellyScale: 0.25, priorGames: 100, flatUnits: 1 };
+    expect(stakeFor(shrunk(14, 2), -110, flat)).toBe(1);
+    expect(stakeFor(shrunk(10, 12), -110, flat)).toBe(0);
   });
 });

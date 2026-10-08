@@ -8,7 +8,8 @@ import { readBaseline } from "@/lib/survivor/baseline";
 import { lockAlarms, unseenAlarms, type PoolAlarmInput, type SlotAlarmInput } from "./alarm";
 import { alarmSubject, renderLockAlarm, renderSundayBrief, sundaySubject } from "./email";
 import { refreshPicks, type PicksReport } from "@/lib/picks/report";
-import { loadIssued, saveIssued } from "@/lib/picks/issued-store";
+import { loadIssued } from "@/lib/picks/issued-store";
+import { issueAndSend } from "@/lib/picks/issue-send";
 import { toIssuedUpdate } from "@/lib/picks/issued";
 import { diffUpdate, type UpdateDiff } from "@/lib/picks/update";
 
@@ -112,29 +113,25 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
   }
   if (previous && resend) await clearSent("sunday", season, week);
 
-  const result = await sendEmail(subject, html, `sunday:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
-  if (!result.sent) {
-    return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
-  }
-
-  await recordSent("sunday", season, week, {
-    sentAt: new Date().toISOString(),
+  // New NFL plays in the brief are issued picks: recorded as an intent before
+  // the brief goes, confirmed after (issue-send.ts).
+  const records =
+    picks && !test && !resend && (picks.diff.added.length || picks.diff.addedTotals.length)
+      ? [toIssuedUpdate(picks.r, picks.diff, "sun", { issuedAt: new Date().toISOString(), subject })]
+      : [];
+  const out = await issueAndSend({
+    logId: "sunday",
+    season,
+    week,
     subject,
-    messageId: result.id,
+    html,
+    idempotencyKey: `sunday:${season}:w${week}${resend || test ? `:again-${Date.now()}` : ""}`,
+    records,
   });
-
-  // New NFL plays in the brief are issued picks, recorded like Tuesday's.
-  let issued = "no new picks";
-  if (picks && !test && (picks.diff.added.length || picks.diff.addedTotals.length)) {
-    try {
-      const rec = toIssuedUpdate(picks.r, picks.diff, "sun", { issuedAt: new Date().toISOString(), emailId: result.id, subject });
-      issued = (await saveIssued(rec)) ? "recorded" : "already on file, kept";
-    } catch (e) {
-      issued = `NOT RECORDED (${e instanceof Error ? e.message : String(e)})`;
-    }
+  if (out.outcome === "failed") {
+    return Response.json({ ok: false, error: out.error ?? "Not sent." }, { status: 500 });
   }
-
-  return Response.json({ ok: true, sent: true, subject, week, season, issued });
+  return Response.json({ ok: true, sent: out.sent, subject, week, season, issued: out.issued.join("; ") || "no new picks" });
 }
 
 /**

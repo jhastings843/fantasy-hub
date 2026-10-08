@@ -8,7 +8,6 @@
 
 import { type ClosingLine, clvPoints, pemSplitLine } from "./closing";
 import {
-  RESEARCH_FROM,
   type Cut,
   type CutResult,
   type GradedGame,
@@ -36,8 +35,6 @@ export interface ResearchRow {
   parent: { id: string; label: string; record: Record };
   /** The parent's games this refinement leaves out. */
   excluded: Record;
-  /** Since the cut was written: its record, its parent's, and whether that earned it candidacy. */
-  forward?: { record: Record; parent: Record; promoted: boolean; fromWeek: number };
 }
 
 /** The home-side line a cut's pick on this game was graded at, and the side. */
@@ -61,7 +58,6 @@ export function researchRows(
   games: GradedGame[],
   cuts: CutResult[],
   closes: Map<string, ClosingLine>,
-  league: "nfl" | "cfb" = "nfl",
 ): ResearchRow[] {
   const byId = new Map(cuts.map((c) => [c.id, c]));
   return cuts
@@ -78,9 +74,6 @@ export function researchRows(
         clv: clvOf(inCut, c, closes),
         parent: { id: parent.id, label: parent.label, record: parent.record },
         excluded: tally(left.map((g) => cutResult(g, parent) as Result)),
-        forward: c.forward && c.parentForward
-          ? { record: c.forward, parent: c.parentForward, promoted: !!c.promoted, fromWeek: RESEARCH_FROM[league] }
-          : undefined,
       };
     });
 }

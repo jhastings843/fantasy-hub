@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { type StrategyBoard, tierBoard } from "./engine";
 import { gradeIssued, type IssuedRecord } from "./issued";
 import { diffUpdate, firstSends, updateMatters } from "./update";
-import { stakeBoard } from "./staking";
+import { stakeBoard } from "./test-helpers";
 
 const staked = <T extends Parameters<typeof stakeBoard>[0]>(b: T) => stakeBoard(b, { t1: { w: 14, l: 2 } }, 7).board;
 import type { PicksReport } from "./report";
 
 const rule = { rule: { test: { side: "dog" } }, second: null } as unknown as StrategyBoard;
-const ref = (line: number) => ({ line, source: "DraftKings via ESPN", fetchedAt: "2026-10-10T13:30:00Z" });
+const ref = (line: number) => ({ line, source: "DraftKings via ESPN", fetchedAt: "2026-10-10T13:30:00Z", homePrice: -110, awayPrice: -110 });
 // Both models on the home dog: home model lines below the market.
 const row = (home: string, line: number, sam = 1, david = 0) => ({
   home, away: `A-${home}`, sam: { market: line, model: sam }, david: { market: line, model: david }, ref: ref(line),
@@ -73,7 +73,7 @@ describe("game-day update", () => {
   });
 
   it("stays quiet when nothing is new or off", () => {
-    const calm = diffUpdate({ ...report, board: tierBoard("cfb", [row("H1", 3)], rule) } as PicksReport, [
+    const calm = diffUpdate({ ...report, board: staked(tierBoard("cfb", [row("H1", 3)], rule)) } as PicksReport, [
       { ...tuesday, plays: [tuesday.plays[0]] },
     ]);
     expect(updateMatters(calm)).toBe(false);

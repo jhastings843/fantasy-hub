@@ -3,7 +3,6 @@ import { redis } from "@/lib/redis/client";
 import { cachedWithFallback } from "@/lib/redis/cached";
 import {
   type Board,
-  type ModelLine,
   type GradedRow,
   type League,
   parseDavidBoard,
@@ -14,32 +13,30 @@ import {
   weekOf,
 } from "./parse";
 import { pemWeeks } from "./pem";
-import { type ClvRow, clvTable, summarize } from "./closing";
+import { clvTable } from "./closing";
 import { closingLines, currentLines } from "./closing-store";
-import { type IssuedWeek, gradeIssued, issuedClv, issuedGames } from "./issued";
-import { type UnitReport, unitReport } from "./units";
-import { type ParlayPick, shrunk, stakeBoard, stakeFor } from "./staking";
-import { firstSends } from "./update";
+import { issuedGames } from "./issued";
 import { loadIssued } from "./issued-store";
-import { type PemCompareRow, type ResearchRow, pemCompare, researchRows } from "./research";
-import { type TotalsBacktest, type TotalsBoardGame, type TotalsSeen, TOTALS_EDGE, totalsBacktest, totalsBoard } from "./totals";
+import { pemCompare, researchRows } from "./research";
+import { TOTALS_EDGE, type TotalsSeen, totalsBacktest } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
+import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom } from "./compose";
+import { loadActivePolicy } from "./policy-store";
+import { archiveForecasts } from "./forecasts";
 import {
   type BoardGame,
   type PemLine,
   type RefLine,
   gradeGame,
-  type GradedGame,
-  type StrategyBoard,
-  type SuRecord,
   join,
   key,
   matches,
   strategies,
   suRecords,
-  tierBoard,
 } from "./engine";
+
+export type { PicksReport } from "./compose";
 
 // The Picks tab's data: both models' records joined, the strategies ranked,
 // and this week's board tiered by whichever strategy is winning.
@@ -96,13 +93,17 @@ async function davidHistory(league: League, boardHtml: string): Promise<GradedRo
 
 // ----------------------------------------------------------------- archives
 
-const archiveKey = (league: League, who: "sam" | "david") => `picks:v1:${league}:rows:${who}`;
+// Season-aware since 2026-10-09 (the v1 keys had no season; everything in
+// them is 2026 and is copied over once, then left as it was).
+const archiveKey = (league: League, season: number, who: "sam" | "david") => `picks:v2:${league}:${season}:rows:${who}`;
+const legacyArchiveKey = (league: League, who: "sam" | "david") => `picks:v1:${league}:rows:${who}`;
 
-/** Merges this fetch into everything seen before; the newest copy of a game wins. */
-async function archive(league: League, who: "sam" | "david", rows: GradedRow[]): Promise<GradedRow[]> {
+/** Merges this fetch into everything seen this season; the newest copy of a game wins. */
+async function archive(league: League, season: number, who: "sam" | "david", rows: GradedRow[]): Promise<GradedRow[]> {
   let stored: GradedRow[] = [];
   try {
-    stored = (await redis.get<GradedRow[]>(archiveKey(league, who))) ?? [];
+    stored = (await redis.get<GradedRow[]>(archiveKey(league, season, who))) ?? [];
+    if (!stored.length && season === 2026) stored = (await redis.get<GradedRow[]>(legacyArchiveKey(league, who))) ?? [];
   } catch {
     return rows;
   }
@@ -110,7 +111,7 @@ async function archive(league: League, who: "sam" | "david", rows: GradedRow[]):
   for (const r of rows) merged.set(key(r), r);
   const all = [...merged.values()];
   if (all.length !== stored.length || rows.length) {
-    await redis.set(archiveKey(league, who), all).catch(() => {});
+    await redis.set(archiveKey(league, season, who), all).catch(() => {});
   }
   return all;
 }
@@ -205,49 +206,13 @@ async function notePosted(
 
 // ------------------------------------------------------------------ report
 
-export interface PicksReport {
-  league: League;
-  season: number;
-  week: number | null;
-  generatedAt: string;
-  boardUpdated: { sam: boolean; david: boolean };
-  weeksCovered: number[];
-  graded: GradedGame[];
-  strategies: StrategyBoard;
-  su: { methods: SuRecord[]; bands: SuRecord[]; best: SuRecord | null };
-  board: BoardGame[];
-  /** The issued record: what each picks email actually sent (Tuesday card plus game-day additions), graded. */
-  live: IssuedWeek[];
-  notes: string[];
-  errors: string[];
-  /** PEM weeks on file (college), and whether each checked out. */
-  pem: { week: number; verified: boolean; games: number; source: string }[];
-  /** Team key to the name a site printed, for display. NFL keys map to themselves. */
-  names: { [key: string]: string };
-  /** Closing-line value: each model and the rule over the record, and the plays as sent. */
-  clv: { models: ClvRow[]; plays: ClvRow[]; games: number; matched: number };
-  /** Research refinements next to their parents (never eligible to be the rule). */
-  research: ResearchRow[];
-  /** College: PEM's contribution on the games all three cover, one common line. */
-  pemCompare: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
-  /** Where this week's reference line came from, and how many board games have one. */
-  reference: { source: string | null; fetchedAt: string | null; priced: number; games: number; problem?: string };
-  /** Over/under: Sam-alone history, the forward agreement archive, and this week at one current total. */
-  totals: { backtest: TotalsBacktest; board: TotalsBoardGame[]; edge: number; newlyArchived: number; archived: number };
-  /** When each source's board for this week was first seen here (ISO). */
-  posted: { [source: string]: string };
-  /** The bets the emails gave, with stakes: units +/- for this sport. */
-  units: UnitReport;
-  /** Two-leg parlays worth sending this week (often none). */
-  parlays: ParlayPick[];
-}
-
 function seasonNow(): number {
   const d = new Date();
   return d.getUTCMonth() <= 1 ? d.getUTCFullYear() - 1 : d.getUTCFullYear();
 }
 
-export async function buildPicksReport(league: League): Promise<PicksReport> {
+/** The slow part: both sites, the backtest, research, closing lines. Cached for hours. */
+export async function buildPicksCore(league: League): Promise<PicksCore> {
   const src = SOURCES[league];
   const errors: string[] = [];
   const settle = async <T>(label: string, p: Promise<T>, fallback: T): Promise<T> => {
@@ -267,12 +232,16 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const davidRows = davidBoardHtml ? await settle("David's history sheet", davidHistory(league, davidBoardHtml), []) : [];
   const samRows = samRecordHtml ? parseSamRecord(league, samRecordHtml, (d) => weekOf(league, d)) : [];
 
-  const [sam, david] = await Promise.all([archive(league, "sam", samRows), archive(league, "david", davidRows)]);
+  const empty: Board = { week: null, season: null, rows: [] };
+  const sb = samBoardHtml ? parseSamBoard(league, samBoardHtml) : empty;
+  const db = davidBoardHtml ? parseDavidBoard(league, davidBoardHtml) : empty;
+  const season = sb.season ?? db.season ?? seasonNow();
+
+  const [sam, david] = await Promise.all([archive(league, season, "sam", samRows), archive(league, season, "david", davidRows)]);
   const joined = join(sam, david);
 
   // PEM, college only. Only weeks whose card checked out count.
-  const seasonGuess = seasonNow();
-  const pem = league === "cfb" ? await pemWeeks(seasonGuess) : [];
+  const pem = league === "cfb" ? await pemWeeks(season) : [];
   const pemLines = new Map<string, PemLine>();
   for (const w of pem.filter((x) => x.verified)) {
     for (const r of w.rows) pemLines.set(key({ week: w.week, home: r.home, away: r.away }), { model: r.model, market: r.market });
@@ -284,12 +253,10 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
       return p ? gradeGame({ ...g, pem: p }) : g;
     }),
   };
-  const s = strategies(league, j.graded);
+  const policy = await loadActivePolicy();
+  const s = strategies(league, j.graded, { activated: policy.atsCandidates });
   const su = suRecords(league, j.graded);
 
-  const empty: Board = { week: null, season: null, rows: [] };
-  const sb = samBoardHtml ? parseSamBoard(league, samBoardHtml) : empty;
-  const db = davidBoardHtml ? parseDavidBoard(league, davidBoardHtml) : empty;
   // The week on the board is whichever site has moved on; a site still
   // showing last week contributes nothing to this one.
   const week = Math.max(sb.week ?? 0, db.week ?? 0) || null;
@@ -297,109 +264,30 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const davidLive = db.week === week ? db.rows : [];
   const dmap = new Map(davidLive.map((r) => [`${r.away}@${r.home}`, r]));
   const pemNow = (home: string, away: string) => (week ? pemLines.get(key({ week, home, away })) : undefined);
-  const season = sb.season ?? db.season ?? seasonNow();
   const posted = week ? await notePosted(league, season, week, sb.week === week, db.week === week, pem.some((w) => w.week === week && w.verified)) : {};
-
-  // One current quote per game, every model judged against it.
-  let refs = new Map<string, RefLine>();
-  let refProblem: string | undefined;
-  if (week) {
-    try {
-      refs = await currentLines(league, season, week);
-    } catch (e) {
-      refProblem = `Current lines unavailable (${e instanceof Error ? e.message : String(e)}); the board shows source-line research signals only.`;
-    }
-  }
-  const refNow = (home: string, away: string) => (week ? refs.get(key({ week, home, away })) : undefined);
-  const rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; ref?: RefLine }[] =
-    samLive.map((r) => {
-      const d = dmap.get(`${r.away}@${r.home}`);
-      dmap.delete(`${r.away}@${r.home}`);
-      return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), ref: refNow(r.home, r.away) };
-    });
+  const rows: PicksCore["rows"] = samLive.map((r) => {
+    const d = dmap.get(`${r.away}@${r.home}`);
+    dmap.delete(`${r.away}@${r.home}`);
+    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), samTotal: r.modelTotal, davidTotal: d?.modelTotal };
+  });
   for (const d of dmap.values()) {
-    rows.push({ home: d.home, away: d.away, sam: undefined, david: d.line, pem: pemNow(d.home, d.away), ref: refNow(d.home, d.away) });
+    rows.push({ home: d.home, away: d.away, david: d.line, pem: pemNow(d.home, d.away), davidTotal: d.modelTotal });
   }
-  const staked = stakeBoard(tierBoard(league, rows, s, su.best?.id ?? "avg"), { t1: s.rule?.record, t2: s.second?.record }, week);
-  const board = staked.board;
-  const parlays = staked.parlays;
-  if (week && board.length) await saveSnapshot(league, season, week, board, s.rule?.label ?? null);
-  // Totals: this week's model totals at the one current total, and the
-  // forward archive of games where both models and a quote first met.
-  const totalRows = rows.map((r) => ({
-    home: r.home,
-    away: r.away,
-    sam: samLive.find((x) => x.home === r.home && x.away === r.away)?.modelTotal,
-    david: davidLive.find((x) => x.home === r.home && x.away === r.away)?.modelTotal,
-    ref:
-      r.ref?.total !== undefined
-        ? {
-            total: r.ref.total,
-            source: r.ref.source,
-            fetchedAt: r.ref.fetchedAt,
-            overPrice: r.ref.overPrice,
-            underPrice: r.ref.underPrice,
-            kickoff: r.ref.kickoff,
-          }
-        : undefined,
-  }));
-  let newlyArchived = 0;
-  if (week) {
-    const meet: TotalsSeen[] = totalRows.flatMap((r) =>
-      r.sam !== undefined && r.david !== undefined && r.ref
-        ? [{ week, home: r.home, away: r.away, sam: r.sam, david: r.david, line: r.ref.total, source: r.ref.source, seenAt: r.ref.fetchedAt }]
-        : [],
-    );
-    newlyArchived = await archiveTotals(league, season, week, meet).catch(() => 0);
-  }
+
   const seen = await loadTotalsSeen(league, season);
   const issued = await loadIssued(league, season);
-
   // Closing lines (and ESPN finals) for every graded game, every issued
   // pick, every archived totals game and Sam's whole record. Only finished
   // games are ever fetched; each is fetched once.
-  const { closes, problems: closeProblems } = await closingLines(league, season, [
-    ...j.graded,
-    ...issuedGames(issued),
-    ...seen,
-    ...sam,
-  ]);
+  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam]);
   const finals = new Map(j.graded.map((g) => [key(g), g.final]));
   // Games only one model graded still have a final; ESPN fills in the rest,
   // so issued picks and totals grade even when neither site lists the game.
   for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
   for (const [k, c] of closes) if (!finals.has(k) && c.final) finals.set(k, c.final);
-  const live = gradeIssued(issued, finals);
   const rule = s.rule;
-  const sent = issuedClv(issued, closes);
-  const clv = {
-    models: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
-    plays: [
-      summarize("t1", "Tier 1 as sent", sent.t1),
-      summarize("t2", "Tier 2 as sent", sent.t2),
-      summarize("ou", "Totals as sent (vs closing total)", sent.totals),
-    ],
-    games: j.graded.length,
-    matched: j.graded.filter((g) => closes.get(key(g))?.close != null).length,
-  };
-  const research = researchRows(j.graded, s.cuts, closes, league);
-  const pemCmp = league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null;
-  const priced = board.filter((g) => g.basis === "reference");
   const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));
   const totalsMarket = new Map([...closes].map(([k, c]) => [k, { open: c.totalOpen, close: c.totalClose }]));
-  const tb = totalsBacktest(league, seen, points, sam, totalsMarket, key);
-  const totals = {
-    backtest: tb,
-    board: totalsBoard(totalRows, tb.rule).map((g) => {
-      if (g.tier !== "t1" || !tb.rule || !g.side || !g.ref) return g;
-      const p = shrunk(tb.rule.record.w, tb.rule.record.l);
-      const price = (g.side === "over" ? g.ref.overPrice : g.ref.underPrice) ?? -110;
-      return { ...g, p, price, stake: stakeFor(p, price) };
-    }),
-    edge: TOTALS_EDGE[league],
-    newlyArchived,
-    archived: seen.length,
-  };
 
   const notes = [...j.scoreMismatches.map((m) => `Final scores differ: ${m}. Sam's is used.`)];
   if (j.onlySam || j.onlyDavid) {
@@ -428,22 +316,6 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   }
 
   return {
-    pem: pem.map((w: PemWeek) => ({ week: w.week, verified: w.verified, games: w.rows.length, source: w.source })),
-    names,
-    clv,
-    research,
-    pemCompare: pemCmp,
-    totals,
-    posted,
-    units: unitReport(firstSends(issued), finals),
-    parlays,
-    reference: {
-      source: priced[0]?.ref?.source ?? null,
-      fetchedAt: priced[0]?.ref?.fetchedAt ?? null,
-      priced: priced.length,
-      games: board.length,
-      problem: refProblem,
-    },
     league,
     season,
     week,
@@ -453,28 +325,134 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     graded: j.graded,
     strategies: s,
     su,
-    board,
-    live,
+    rows,
     notes,
     errors,
+    pem: pem.map((w: PemWeek) => ({ week: w.week, verified: w.verified, games: w.rows.length, source: w.source })),
+    names,
+    clvModels: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
+    research: researchRows(j.graded, s.cuts, closes),
+    pemCompare: league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null,
+    totalsBacktest: totalsBacktest(league, seen, points, sam, totalsMarket, key),
+    totalsEdge: TOTALS_EDGE[league],
+    totalsArchived: seen.length,
+    posted,
+    finals: [...finals],
+    closes: [...closes],
+    policyId: policy.id,
   };
 }
 
-const CACHE_KEY = (league: League) => `picks:v1:${league}:report`;
+const CORE_KEY = (league: League) => `picks:v2:${league}:core`;
+const QUOTES_KEY = (league: League, season: number, week: number) => `picks:v2:${league}:quotes:${season}:w${week}`;
+/** Current lines are re-read at most this often (the pulse forces a read every run). */
+const QUOTES_TTL_S = 10 * 60;
 
-/** The page and email read this. Three hours fresh, a week of last-known-good. */
-export function getPicksReport(league: League) {
-  return cachedWithFallback<PicksReport | null>({
-    key: CACHE_KEY(league),
+/** The slow core: three hours fresh, a week of last-known-good. */
+export function getPicksCore(league: League) {
+  return cachedWithFallback<PicksCore | null>({
+    key: CORE_KEY(league),
     ttlSeconds: 3 * 60 * 60,
-    fetcher: () => buildPicksReport(league),
-    isComplete: (r) => !!r && r.graded.length > 0 && r.board.length > 0 && r.errors.length === 0,
+    fetcher: () => buildPicksCore(league),
+    isComplete: (r) => !!r && r.graded.length > 0 && r.rows.length > 0 && r.errors.length === 0,
     empty: null,
   });
 }
 
-/** Drops the cache and rebuilds. The pulse calls this. */
-export async function refreshPicks(league: League): Promise<PicksReport | null> {
-  await redis.del(CACHE_KEY(league)).catch(() => {});
-  return (await getPicksReport(league)).value;
+/** This week's quotes: ten minutes fresh; `force` re-reads ESPN now. */
+export async function getQuotes(league: League, season: number, week: number | null, force = false): Promise<Quotes> {
+  if (!week) return { fetchedAt: null, lines: [] };
+  const k = QUOTES_KEY(league, season, week);
+  if (!force) {
+    const cached = await redis.get<Quotes>(k).catch(() => null);
+    if (cached?.fetchedAt && Date.now() - new Date(cached.fetchedAt).getTime() < QUOTES_TTL_S * 1000) return cached;
+  }
+  try {
+    const lines = await currentLines(league, season, week);
+    const q: Quotes = { fetchedAt: new Date().toISOString(), lines: [...lines] };
+    await redis.set(k, q, { ex: 7 * 24 * 3600 }).catch(() => {});
+    return q;
+  } catch (e) {
+    // Keep showing the last quotes (compose marks them stale by age), and say why.
+    const last = await redis.get<Quotes>(k).catch(() => null);
+    return { ...(last ?? { fetchedAt: null, lines: [] }), problem: `Current lines unavailable (${e instanceof Error ? e.message : String(e)}).` };
+  }
 }
+
+const SETTLED_KEY = (season: number) => `picks:v2:settled:${season}`;
+
+/** Marks issued bets whose game has a final, so cross-sport exposure knows what is still open. */
+export async function settleIssued(league: League, season: number, finals: Map<string, { home: number; away: number }>): Promise<number> {
+  const issued = await loadIssued(league, season);
+  const open = issuedGames(issued)
+    .map((g) => key(g))
+    .filter((k) => finals.has(k));
+  if (!open.length) return 0;
+  const fields = Object.fromEntries(open.map((k) => [`${league}:${k}`, "1"]));
+  await redis.hset(SETTLED_KEY(season), fields);
+  return open.length;
+}
+
+/**
+ * The live report: the cached core plus current quotes and exposure.
+ * `reserved` is units another sport's card in the same send has already
+ * claimed, so a two-sport card stays inside the outstanding cap.
+ */
+export async function getPicksReport(
+  league: League,
+  opts: { forceQuotes?: boolean; reserved?: number } = {},
+): Promise<{ value: PicksReport | null; stale: boolean; at: string | null }> {
+  const core = await getPicksCore(league);
+  if (!core.value) return { value: null, stale: core.stale, at: core.at };
+  const c = core.value;
+  const [quotes, nfl, cfb, settled, policy] = await Promise.all([
+    getQuotes(league, c.season, c.week, opts.forceQuotes),
+    loadIssued("nfl", c.season),
+    loadIssued("cfb", c.season),
+    redis.hkeys(SETTLED_KEY(c.season)).catch(() => [] as string[]),
+    loadActivePolicy(),
+  ]);
+  const settledSet = new Set<string>(settled.map(String));
+  for (const [k] of c.finals) settledSet.add(`${league}:${k}`);
+  const exposure = {
+    ...exposureFrom(league, c.week, [{ league: "nfl", records: nfl }, { league: "cfb", records: cfb }], settledSet),
+    reserved: opts.reserved ?? 0,
+  };
+  const value = compose({ core: c, quotes, issued: league === "nfl" ? nfl : cfb, exposure, policy });
+  return { value, stale: core.stale, at: core.at };
+}
+
+/** Drops the core cache, re-reads the quotes, and rebuilds. The send paths call this. */
+export async function refreshPicks(league: League, opts: { reserved?: number } = {}): Promise<PicksReport | null> {
+  await redis.del(CORE_KEY(league)).catch(() => {});
+  return (await getPicksReport(league, { forceQuotes: true, reserved: opts.reserved })).value;
+}
+
+/**
+ * The data operation the pulse runs in the live and hourly tiers, with no
+ * page visit needed: re-read quotes, keep the core fresh, archive this
+ * week's pregame forecasts and totals (append-only), settle issued bets,
+ * snapshot the board. Returns one line for the receipt.
+ */
+export async function runPicksData(league: League): Promise<string> {
+  const r = (await getPicksReport(league, { forceQuotes: true })).value;
+  if (!r) throw new Error(`${league} core unavailable`);
+  const core = (await getPicksCore(league)).value!;
+  const finals = new Map(core.finals);
+  const settled = await settleIssued(league, r.season, finals);
+  let forecasts = 0;
+  let totalsNew = 0;
+  if (r.week) {
+    forecasts = await archiveForecasts(league, r.season, r.week, r.board, core.rows);
+    const meet: TotalsSeen[] = r.totals.board.flatMap((g) =>
+      g.sam !== undefined && g.david !== undefined && g.ref
+        ? [{ week: r.week as number, home: g.home, away: g.away, sam: g.sam, david: g.david, line: g.ref.total, source: g.ref.source, seenAt: g.ref.fetchedAt }]
+        : [],
+    );
+    totalsNew = await archiveTotals(league, r.season, r.week, meet).catch(() => 0);
+    if (r.board.length) await saveSnapshot(league, r.season, r.week, r.board, r.strategies.rule?.label ?? null);
+  }
+  return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${totalsNew} totals archived, ${settled} issued games final`;
+}
+
+export type { RefLine, BoardGame };

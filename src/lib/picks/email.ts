@@ -1,10 +1,10 @@
 import { type BoardGame, type Record as Rec } from "./engine";
 import { type EmailSelection, selectForEmail } from "./issued";
 import type { UpdateDiff } from "./update";
-import { DEFAULT_PRICE, fmtUnits } from "./units";
-import { american } from "./staking";
+import { fmtUnits } from "./units";
 
-const price = (p?: number) => (p === undefined ? `${DEFAULT_PRICE}` : p > 0 ? `+${p}` : `${p}`);
+/** A quoted price; an unquoted one is said so, never shown as -110. */
+const price = (p?: number) => (p === undefined ? "no price" : p > 0 ? `+${p}` : `${p}`);
 
 /** "Thursday night", "Saturday", "Sunday", "Monday night": which slate a kickoff belongs to. */
 export function slateOf(kickoff?: string): { label: string; order: number } {
@@ -98,27 +98,6 @@ ${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.rec
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
 }
 
-/** Two-leg parlays, only when the pair clears the 10% estimated-edge bar. */
-function parlayBlock(r: PicksReport, sel: EmailSelection): string {
-  if (!sel.parlays.length) return "";
-  const name = (k: string) => r.names[k] ?? k;
-  const legText = (id: string) => {
-    const g = sel.plays.find((x) => `${r.week}:${x.away}@${x.home}` === id);
-    if (!g) return id;
-    const team = g.side === "home" ? g.home : g.away;
-    return `${name(team)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}`;
-  };
-  const rows = sel.parlays
-    .map(
-      (pr) => `<tr>
-  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};width:52px;"><span style="background:${PALETTE.ink};color:#fff;border-radius:4px;padding:1px 6px;font:600 11px/1.4 ${FONT};">${pr.units}U</span></td>
-  <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(pr.legs.map((l) => legText(l.id)).join(" + "))}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">2-leg parlay · pays ${escapeHtml(american(pr.decimal))} · est. edge ${Math.round(pr.edge * 100)}%</div></td>
-</tr>`,
-    )
-    .join("");
-  return `<div style="padding-top:12px;">${label("Parlay")}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table>`;
-}
-
 /** The season's unit total for this sport, from bets that went out with a stake. */
 function unitsLine(r: PicksReport): string {
   const u = r.units?.total;
@@ -158,8 +137,13 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
       : "",
     sel.waiting ? `${sel.waiting} ${sel.waiting === 1 ? "game is" : "games are"} waiting on PEM's card.` : "",
     sel.pricedOut.length
-      ? `Priced out (fits the rule, but the price leaves under a quarter unit of value): ${sel.pricedOut
-          .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${price(g.price)}`)
+      ? `Priced out (fits the rule, but the quoted price leaves under a quarter unit, or there is no quoted price): ${sel.pricedOut
+          .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${g.price !== undefined ? price(g.price) : "(no price)"}`)
+          .join(", ")}.`
+      : "",
+    sel.overBudget.length
+      ? `Left out by the weekly limit (worth a bet, but this week's ${r.allocation.room}u budget is used): ${sel.overBudget
+          .map((g) => r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away))
           .join(", ")}.`
       : "",
   ].filter(Boolean);
@@ -173,7 +157,6 @@ ${
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">${playRows(r, shown)}</table>${plays.length > shown.length ? small(`Plus ${plays.length - shown.length} more on the page.`) : ""}`
     : paragraph("Nothing fits this week.", PALETTE.muted)
 }
-${parlayBlock(r, sel)}
 ${caveats.map((c) => small(c)).join("")}
 ${totalsBlock(r, sel)}
 <div style="padding-top:16px;">${label("Straight up, most confident first")}</div>
@@ -219,7 +202,7 @@ export function buildPicksEmail(input: {
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Parlays only when two legs together show a 10%+ estimated edge. At most 15u at risk per sport per card; a heavy week is scaled down. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 15u per sport per week (card plus game-day additions), 30u open across both sports. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
@@ -259,10 +242,13 @@ export function updateBlock(r: PicksReport, d: UpdateDiff): string {
       ].join(""),
     )}`);
   }
-  if (d.off.length) {
-    parts.push(`<div style="padding-top:12px;">${label("Off now: don't bet these at today's number")}</div>${table(
-      d.off.map((o) => row(`${team(o.sent.side, o.sent)} ${line(at(o.sent.side, o.sent.homeLine))} (as sent)`, o.reason, "")).join(""),
-    )}`);
+  if (d.off.length || d.totalsOff.length) {
+    parts.push(`<div style="padding-top:12px;">${label("Off now for anyone who hasn't bet: skip at today's number")}</div>${table(
+      [
+        ...d.off.map((o) => row(`${team(o.sent.side, o.sent)} ${line(at(o.sent.side, o.sent.homeLine))} (as sent)`, o.reason, "")),
+        ...d.totalsOff.map((o) => row(`${o.sent.play} (as sent)`, `${name(o.sent.away)} at ${name(o.sent.home)} · ${o.reason}`, "")),
+      ].join(""),
+    )}${small("Already bet it? Your bet stands as sent and is graded at the line and price it went out at.")}`);
   }
   if (d.stillOn.length) {
     parts.push(`<div style="padding-top:12px;">${label("Still on")}</div>${table(
@@ -277,11 +263,29 @@ export function updateBlock(r: PicksReport, d: UpdateDiff): string {
         .join(""),
     )}`);
   }
+  if (d.totalsStillOn.length) {
+    parts.push(`<div style="padding-top:12px;">${label("Totals still on")}</div>${table(
+      d.totalsStillOn
+        .map((x) =>
+          row(
+            `${x.sent.side === "over" ? "Over" : "Under"} ${x.nowLine} now`,
+            `sent at ${x.sent.line} · ${name(x.sent.away)} at ${name(x.sent.home)}`,
+            x.moved === 0 ? "same number" : x.moved > 0 ? `${x.moved} better now` : `${-x.moved} worse now`,
+          ),
+        )
+        .join(""),
+    )}`);
+  }
   if (!parts.length) parts.push(paragraph("Nothing has changed since Tuesday's card.", PALETTE.muted));
   const asOf = r.reference.fetchedAt
     ? `Lines: ${r.reference.source}, read ${new Date(r.reference.fetchedAt).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })} ET.`
     : "";
-  return `${parts.join("")}${small(`${asOf}${d.gone ? ` ${d.gone} sent play${d.gone === 1 ? " has" : "s have"} already kicked off.` : ""}`)}`;
+  const tail = [
+    asOf,
+    d.kickedOff ? `${d.kickedOff} sent play${d.kickedOff === 1 ? " has" : "s have"} kicked off.` : "",
+    d.noQuote ? `${d.noQuote} sent play${d.noQuote === 1 ? " has" : "s have"} no current quote, so ${d.noQuote === 1 ? "it" : "they"} can't be rechecked right now.` : "",
+  ].filter(Boolean);
+  return `${parts.join("")}${small(tail.join(" "))}`;
 }
 
 export function buildPicksUpdate(input: { r: PicksReport; diff: UpdateDiff; appUrl: string; generatedAt: string }): { html: string; subject: string } {

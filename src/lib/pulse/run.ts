@@ -22,9 +22,10 @@ import { runMidweekEmail } from "@/lib/midweek/run";
 import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
 import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
-import { getPicksReport } from "@/lib/picks/report";
 import { archiveTracker } from "@/lib/picks/tracker";
 import { runPicksEmail, runPicksSaturday } from "@/lib/picks/run";
+import { runPicksData } from "@/lib/picks/report";
+import { tracked } from "@/lib/picks/ops";
 import { weekOf } from "@/lib/picks/parse";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
@@ -333,15 +334,20 @@ async function refreshValues(): Promise<string> {
  * Not forced: the report keeps itself for three hours, so most hourly calls
  * are a Redis read and the two sites see a handful of requests a day.
  */
-async function refreshPicksBoards(): Promise<string> {
-  const [nfl, cfb] = await Promise.all([getPicksReport("nfl"), getPicksReport("cfb")]);
-  const say = (name: string, f: typeof nfl) =>
-    f.value
-      ? `${name} wk ${f.value.week ?? "?"} ${f.value.graded.length} graded${f.stale ? " (stale)" : ""}`
-      : `${name} unavailable`;
-  if (!nfl.value && !cfb.value) throw new Error("neither model board could be read");
-  return `${say("NFL", nfl)}, ${say("CFB", cfb)}`;
+/**
+ * The picks data operation: fresh quotes, kickoffs, pregame forecast
+ * archive, settlement. In the live tier as well as hourly, so it never drops
+ * out on game days; the slow core rebuild rides along on its own 3h cache.
+ */
+async function picksData(everyMinutes: number): Promise<string> {
+  return tracked("data", everyMinutes, async () => {
+    const out = await Promise.allSettled([runPicksData("nfl"), runPicksData("cfb")]);
+    const lines = out.map((o) => (o.status === "fulfilled" ? o.value : `failed: ${o.reason instanceof Error ? o.reason.message : String(o.reason)}`));
+    if (out.every((o) => o.status === "rejected")) throw new Error(lines.join("; "));
+    return lines.join("; ");
+  });
 }
+
 
 function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }[] {
   switch (tier) {
@@ -350,6 +356,7 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "survivor", work: () => refreshSurvivor(true) },
         { name: "jingles", work: () => refreshJingles(true) },
         { name: "lineups", work: () => refreshLineups(true) },
+        { name: "picks-data", work: () => picksData(15) },
       ];
     case "hourly":
       return [
@@ -357,7 +364,7 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "survivor", work: () => refreshSurvivor(false) },
         { name: "lineups", work: () => refreshLineups() },
         { name: "waivers", work: () => refreshWaivers() },
-        { name: "picks", work: () => refreshPicksBoards() },
+        { name: "picks-data", work: () => picksData(60) },
         { name: "tracker", work: () => archiveTracker() },
       ];
     case "overnight":

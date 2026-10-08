@@ -10,7 +10,6 @@ import {
   marginBand,
   marginLabel,
   needsPem,
-  RESEARCH_FROM,
   suPick,
 } from "@/lib/picks/engine";
 import { SOURCES, getPicksReport, type PicksReport } from "@/lib/picks/report";
@@ -230,9 +229,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
               <div>
                 <div className={s.eyebrow}>The rule right now · chosen on the source-line backtest</div>
                 <h2 className={s.h2}>{st.rule.label}</h2>
-                {st.rule.fromWeek !== undefined && (
-                  <p className={`${s.p} ${s.thin}`}>{`A research cut that earned its place on games from Week ${st.rule.fromWeek} on; its record here counts only those games.`}</p>
-                )}
+                {st.rule.activated && <p className={`${s.p} ${s.thin}`}>A research cut activated by the strategy review.</p>}
                 <p className={s.p}>
                   {`Picked automatically from history: of the cuts with at least ${MIN_SAMPLE} decided games (pushes don't count) and`}{" "}
                    a winning rate past break-even, this one has the highest low end of its 90% range (
@@ -798,17 +795,10 @@ function UnitsSection({ r }: { r: PicksReport }) {
         {tile("Tier 1", u.byTier.t1)}
         {tile("Tier 2", u.byTier.t2)}
         {tile("Totals", u.byTier.totals)}
-        {tile("Parlays", u.byTier.parlays)}
+        
         {tile("Tuesday card", u.bySlot.tue)}
         {tile(r.league === "cfb" ? "Saturday additions" : "Sunday additions", r.league === "cfb" ? u.bySlot.sat : u.bySlot.sun)}
       </div>
-      {(r.parlays?.length ?? 0) > 0 && (
-        <p className={s.p}>
-          {`This week's parlay${r.parlays.length > 1 ? "s" : ""}: ${r.parlays
-            .map((pr) => `${pr.legs.map((l) => { const g = r.board.find((x) => `${r.week}:${x.away}@${x.home}` === l.game); return g?.side ? `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}` : l.game; }).join(" + ")} (${pr.units}u, est. edge ${Math.round(pr.edge * 100)}%)`)
-            .join("; ")}.`}
-        </p>
-      )}
       {u.byWeek.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
@@ -938,10 +928,8 @@ function ResearchSection({ r }: { r: PicksReport }) {
         <h2 className={s.h2}>Does being more specific help?</h2>
       </div>
       <p className={s.p}>
-        Each refinement next to the cut it narrows, and the record of the parent&apos;s games it leaves out. A refinement
-        can become the rule only on games played after it was added (from NFL Week {RESEARCH_FROM.nfl}, college Week{" "}
-        {RESEARCH_FROM.cfb}): {MIN_SAMPLE}+ decided, past break-even and better than its parent over the same weeks. Its
-        earlier record was seen while choosing it, so it doesn&apos;t count. If the left-out
+        Each refinement next to the cut it narrows, and the record of the parent&apos;s games it leaves out. A refinement can
+        become a rule candidate only through the strategy review, on pregame evidence recorded after it was registered. If the left-out
         games won about as often, the narrower cut is the same signal on fewer games. Thresholds were fixed before grading:
         underdog bands at {r.league === "nfl" ? "3 and 7" : "7 and 14"}, edge at {r.league === "nfl" ? "2" : "3"} points,
         near-market agreement needing both models a point off. Source-line backtest, graded at −110.
@@ -957,7 +945,6 @@ function ResearchSection({ r }: { r: PicksReport }) {
               <th>vs close (n)</th>
               <th>Parent</th>
               <th>Left out</th>
-              <th>Since it was added</th>
             </tr>
           </thead>
           <tbody>
@@ -981,18 +968,6 @@ function ResearchSection({ r }: { r: PicksReport }) {
                 </td>
                 <td className={`${s.num} ${n(x.excluded) && x.excluded.pct > BREAK_EVEN ? s.pos : ""}`}>
                   {n(x.excluded) + x.excluded.p ? rec(x.excluded) : "·"}
-                </td>
-                <td className={`${s.num} ${s.nw}`}>
-                  {x.forward ? (n(x.forward.record) + x.forward.record.p ? rec(x.forward.record) : "none yet") : "·"}
-                  {x.forward && (
-                    <div className={s.thin}>
-                      {x.forward.promoted
-                        ? "Earned candidacy"
-                        : n(x.forward.record) < MIN_SAMPLE
-                          ? `${MIN_SAMPLE - n(x.forward.record)} more decided to qualify`
-                          : `parent ${rec(x.forward.parent)}`}
-                    </div>
-                  )}
                 </td>
               </tr>
             ))}

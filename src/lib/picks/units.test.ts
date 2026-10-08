@@ -3,7 +3,7 @@ import { tierBoard, type StrategyBoard } from "./engine";
 import { selectForEmail, toIssued, type IssuedRecord } from "./issued";
 import { parlayPayout, payout, risk, unitReport } from "./units";
 import { slateOf } from "./email";
-import { stakeBoard } from "./staking";
+import { stakeBoard } from "./test-helpers";
 import type { PicksReport } from "./report";
 
 describe("unit math (units risked)", () => {

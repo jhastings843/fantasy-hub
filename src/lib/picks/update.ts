@@ -25,6 +25,8 @@ export interface StillOn {
   nowLine: number;
   /** Points the number moved in the bettor's favor since it was sent (negative: worse now). */
   moved: number;
+  /** Today's quoted price on the same side. */
+  nowPrice?: number;
 }
 
 export interface Off {
@@ -32,17 +34,41 @@ export interface Off {
   reason: string;
 }
 
+export interface TotalStillOn {
+  sent: IssuedTotal;
+  nowLine: number;
+  /** Points better (+) or worse (-) for the bettor than when sent. */
+  moved: number;
+  nowPrice?: number;
+}
+
+export interface TotalOff {
+  sent: IssuedTotal;
+  reason: string;
+}
+
 export interface UpdateDiff {
   week: number;
   stillOn: StillOn[];
+  /**
+   * Advice changed for anyone who has NOT bet yet: the play no longer
+   * qualifies at today's line or price. An issued bet stands as sent and is
+   * graded as sent; an update never erases or reverses it.
+   */
   off: Off[];
+  totalsStillOn: TotalStillOn[];
+  totalsOff: TotalOff[];
   /** Plays at the current line that no earlier email this week sent. */
   added: BoardGame[];
   /** Of those, games an earlier card listed only on the page ("plus N more"), by key. */
   pageOnly: string[];
   /** Totals plays at the current total that no earlier email sent. */
   addedTotals: TotalsBoardGame[];
-  /** Sent plays whose game has kicked off or lost its quote: nothing to say. */
+  /** Sent plays whose game has kicked off: nothing to act on. */
+  kickedOff: number;
+  /** Sent plays with no current quote before kickoff (feed gap or stale quotes): can't recheck them now. */
+  noQuote: number;
+  /** Kept for older readers: kickedOff + noQuote. */
   gone: number;
 }
 
@@ -57,32 +83,48 @@ export function sentThisWeek(records: IssuedRecord[], week: number): { plays: Is
   };
 }
 
-export function diffUpdate(r: PicksReport, records: IssuedRecord[]): UpdateDiff {
+/** Kicked off by the board's say-so, or by the kickoff time the bet was sent with. */
+function isStarted(basis: string | undefined, kickoff: string | undefined, now: Date): boolean {
+  return basis === "started" || (!!kickoff && new Date(kickoff).getTime() <= now.getTime());
+}
+
+export function diffUpdate(r: PicksReport, records: IssuedRecord[], now = new Date()): UpdateDiff {
   const week = r.week as number;
   const sent = sentThisWeek(records, week);
   const board = new Map(r.board.map((g) => [key({ week, home: g.home, away: g.away }), g]));
   const sentPlayKeys = new Set(sent.plays.map((p) => key({ week, home: p.home, away: p.away })));
   const stillOn: StillOn[] = [];
   const off: Off[] = [];
-  let gone = 0;
+  let kickedOff = 0;
+  let noQuote = 0;
   const seen = new Set<string>();
   for (const p of sent.plays) {
     const k = key({ week, home: p.home, away: p.away });
     if (seen.has(k)) continue;
     seen.add(k);
     const g = board.get(k);
-    // Kicked off (no pregame quote any more) or off the board: nothing to act on.
+    if (isStarted(g?.basis, p.kickoff ?? g?.ref?.kickoff, now)) {
+      kickedOff++;
+      continue;
+    }
     if (!g || g.basis !== "reference") {
-      gone++;
+      noQuote++;
       continue;
     }
     const bettor = p.side === "home" ? 1 : -1;
-    if ((g.tier === "t1" || g.tier === "t2") && g.side === p.side && g.homeLine !== undefined) {
-      stillOn.push({ sent: p, nowLine: g.homeLine, moved: Math.round((g.homeLine - p.homeLine) * bettor * 10) / 10 });
+    const sameSide = (g.tier === "t1" || g.tier === "t2") && g.side === p.side && g.homeLine !== undefined;
+    // Still on means still worth a bet at today's number AND today's price:
+    // the policy still wants a stake (limits aside, since this bet is
+    // already part of the exposure).
+    if (sameSide && (g.want ?? 0) > 0) {
+      stillOn.push({ sent: p, nowLine: g.homeLine!, moved: Math.round((g.homeLine! - p.homeLine) * bettor * 10) / 10, nowPrice: g.price });
       continue;
     }
-    const reason =
-      g.tier === "split"
+    const reason = sameSide
+      ? g.priceSource === "missing"
+        ? "No price quoted now: can't confirm it's still worth a bet"
+        : `Price now ${g.price! > 0 ? "+" : ""}${g.price}: no longer worth a bet at today's number`
+      : g.tier === "split"
         ? "The models now split at the current line"
         : g.tier === "wait"
           ? "Now depends on a PEM line that isn't on file"
@@ -91,6 +133,39 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[]): UpdateDiff 
             : `No longer fits ${p.tier === "t1" ? "Tier 1" : "Tier 2"} at the current line`;
     off.push({ sent: p, reason });
   }
+
+  // Issued totals, rechecked the same way.
+  const tBoard = new Map((r.totals?.board ?? []).map((g) => [key({ week, home: g.home, away: g.away }), g]));
+  const totalsStillOn: TotalStillOn[] = [];
+  const totalsOff: TotalOff[] = [];
+  for (const t of sent.totals) {
+    const k = key({ week, home: t.home, away: t.away });
+    const g = tBoard.get(k);
+    const bg = board.get(k);
+    if (isStarted(bg?.basis, t.kickoff ?? g?.ref?.kickoff, now)) {
+      kickedOff++;
+      continue;
+    }
+    if (!g?.ref) {
+      noQuote++;
+      continue;
+    }
+    const better = t.side === "over" ? t.line - g.ref.total : g.ref.total - t.line;
+    if (g.tier === "t1" && g.side === t.side && (g.want ?? 0) > 0) {
+      totalsStillOn.push({ sent: t, nowLine: g.ref.total, moved: Math.round(better * 10) / 10, nowPrice: g.price });
+    } else {
+      totalsOff.push({
+        sent: t,
+        reason:
+          g.tier === "t1" && g.side === t.side
+            ? `Price now ${g.price ?? "not quoted"}: no longer worth a bet`
+            : g.side && g.side !== t.side
+              ? "Both models now lean the other way"
+              : "No longer fits the totals rule at the current total",
+      });
+    }
+  }
+
   const added = r.board.filter(
     (g) =>
       (g.tier === "t1" || g.tier === "t2") &&
@@ -115,12 +190,12 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[]): UpdateDiff 
       .flatMap((x) => x.plays.filter((p) => !p.shownInEmail).map((p) => key({ week, home: p.home, away: p.away }))),
   );
   const pageOnly = added.map((g) => key({ week, home: g.home, away: g.away })).filter((k) => unshown.has(k));
-  return { week, stillOn, off, added, pageOnly, addedTotals, gone };
+  return { week, stillOn, off, totalsStillOn, totalsOff, added, pageOnly, addedTotals, kickedOff, noQuote, gone: kickedOff + noQuote };
 }
 
 /** Worth an email on its own (Saturday): something new, or something to stop betting. */
 export function updateMatters(d: UpdateDiff): boolean {
-  return d.added.length > 0 || d.addedTotals.length > 0 || d.off.length > 0;
+  return d.added.length > 0 || d.addedTotals.length > 0 || d.off.length > 0 || d.totalsOff.length > 0;
 }
 
 /**

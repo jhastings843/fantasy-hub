@@ -27,7 +27,6 @@ import type { League } from "./parse";
 import type { PicksReport } from "./report";
 import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
 import { type Slot, type UpdateDiff, firstSends } from "./update";
-import type { ParlayPick } from "./staking";
 
 /** Bump when the tiering logic changes, so a record says which logic issued it. */
 export const RULE_VERSION = "2026-10-08 reference-line agreement, Tier 2 on added games";
@@ -46,10 +45,13 @@ export interface IssuedPlay {
   pemPick?: boolean;
   /** In the email itself, or only on the page ("plus N more"). */
   shownInEmail: boolean;
-  /** Stake in units, to win. Absent on plays sent before units existed. */
+  /** Units risked. Absent on plays sent before units existed. */
   units?: number;
-  /** American price on the quote it was sent with. */
+  /** American price on the quote it was sent with (always quoted; no stake without one). */
   price?: number;
+  priceSource?: "quoted";
+  /** The estimated win probability the stake was sized from (an estimate; see staking.ts). */
+  p?: number;
   kickoff?: string;
 }
 
@@ -75,9 +77,12 @@ export interface IssuedTotal {
   shownInEmail: boolean;
   units?: number;
   price?: number;
+  priceSource?: "quoted";
+  p?: number;
   kickoff?: string;
 }
 
+/** Legacy shape: parlays were briefly sized on 2026-10-08 but never sent. Kept for reading only. */
 export interface IssuedParlay {
   legs: { home: string; away: string; side: "home" | "away"; homeLine: number; price: number }[];
   /** Units risked. */
@@ -101,6 +106,17 @@ export interface IssuedRecord {
   week: number;
   /** Which send: Tuesday's card, or the Saturday/Sunday game-day update. Absent means Tuesday. */
   slot?: Slot;
+  /**
+   * "pending": written before the email is sent (the intent), so a failure
+   * after sending can never leave a sent email with no record; "sent" once
+   * the send is confirmed. Absent on records from before 2026-10-09 (sent).
+   * Pending records count toward exposure but are not graded until sent.
+   */
+  status?: "pending" | "sent";
+  /** The email idempotency key the send used; a retry reuses it, so it can't duplicate. */
+  idempotencyKey?: string;
+  /** The picks policy the card was made under (policy.ts). */
+  policyId?: string;
   issuedAt: string;
   /** "issued": written at send time. "recovered": rebuilt later from the delivered email. */
   provenance: "issued" | "recovered";
@@ -135,16 +151,18 @@ export interface EmailSelection {
   /** Over/under plays under a qualifying totals rule, biggest edge first. */
   totals: TotalsBoardGame[];
   shownTotals: number;
-  /** Tier 1/2 games whose price leaves less than a quarter-unit bet. */
+  /** Tier 1/2 games whose quoted price leaves less than a quarter-unit bet, or with no quoted price. */
   pricedOut: BoardGame[];
-  parlays: ParlayPick[];
+  /** Tier 1/2 games worth a bet that the weekly or per-game limits left out. */
+  overBudget: BoardGame[];
 }
 
 /** The one selection the email renders and the issued record stores. */
 export function selectForEmail(r: PicksReport, playLimit: number, suLimit: number, totalsLimit = 8): EmailSelection {
   const tiered = r.board.filter((g) => g.tier === "t1" || g.tier === "t2");
   const atRef = tiered.filter((g) => g.basis === "reference" && g.side && g.homeLine !== undefined);
-  const pricedOut = atRef.filter((g) => !g.stake);
+  const pricedOut = atRef.filter((g) => !g.want);
+  const overBudget = atRef.filter((g) => !!g.want && !g.stake);
   const plays = atRef
     .filter((g) => !!g.stake)
     .sort((a, b) => (a.tier === b.tier ? (b.read?.avgEdge ?? 0) - (a.read?.avgEdge ?? 0) : a.tier === "t1" ? -1 : 1));
@@ -164,7 +182,7 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
     shownPlays: Math.min(playLimit, plays.length),
     sourceOnly: tiered.length - atRef.length,
     pricedOut,
-    parlays: r.parlays ?? [],
+    overBudget,
     waiting: r.board.filter((g) => g.tier === "wait").length,
     su,
     shownSu: Math.min(suLimit, su.length),
@@ -189,6 +207,7 @@ export function toIssued(
     emailId: meta.emailId,
     subject: meta.subject,
     ruleVersion: RULE_VERSION,
+    policyId: r.policy?.id,
     rule: cut(r.strategies.rule),
     second: cut(r.strategies.second),
     suMethod: { id: r.su.best?.id ?? "avg", label: r.su.best?.label ?? "Average of both models" },
@@ -199,12 +218,14 @@ export function toIssued(
       side: g.side!,
       homeLine: g.homeLine!,
       play: g.play,
-      basis: g.basis,
+      basis: "reference" as const,
       ref: g.ref,
       pemPick: g.pemPick,
       shownInEmail: i < sel.shownPlays,
       units: g.stake,
       price: g.price,
+      priceSource: "quoted" as const,
+      p: g.p,
       kickoff: g.ref?.kickoff,
     })),
     su: sel.su.map((x, i) => ({
@@ -226,16 +247,9 @@ export function toIssued(
       shownInEmail: i < sel.shownTotals,
       units: g.stake,
       price: g.price,
+      priceSource: "quoted" as const,
+      p: g.p,
       kickoff: g.ref!.kickoff,
-    })),
-    parlays: sel.parlays.map((pr) => ({
-      legs: pr.legs.map((leg) => {
-        const g = sel.plays.find((x) => `${r.week}:${x.away}@${x.home}` === leg.game)!;
-        return { home: g.home, away: g.away, side: g.side!, homeLine: g.homeLine!, price: leg.price };
-      }),
-      units: pr.units,
-      decimal: pr.decimal,
-      shownInEmail: true,
     })),
     totalsRule: r.totals?.backtest.rule
       ? { id: r.totals.backtest.rule.id, label: r.totals.backtest.rule.label, test: r.totals.backtest.rule.test, evidence: r.totals.backtest.rule.record }
@@ -262,12 +276,17 @@ export function toIssuedUpdate(
     totals: diff.addedTotals,
     shownTotals: diff.addedTotals.length,
     pricedOut: [],
-    parlays: [],
+    overBudget: [],
   };
   return { ...toIssued(r, sel, meta), slot };
 }
 
 // ------------------------------------------------------------------ grading
+
+/** Records whose send is confirmed (pending intents are exposure, not results). */
+export function confirmed(records: IssuedRecord[]): IssuedRecord[] {
+  return records.filter((r) => r.status !== "pending");
+}
 
 export interface IssuedWeek {
   week: number;
@@ -290,7 +309,7 @@ export function gradeIssued(
   // One row per week: Tuesday's card plus any game-day additions, each game
   // counted once at the line it was first sent.
   const byWeek = new Map<number, IssuedRecord[]>();
-  for (const rec of firstSends(records)) byWeek.set(rec.week, [...(byWeek.get(rec.week) ?? []), rec]);
+  for (const rec of firstSends(confirmed(records))) byWeek.set(rec.week, [...(byWeek.get(rec.week) ?? []), rec]);
   return [...byWeek.values()]
     .map((recs): IssuedRecord => {
       const first = recs[0];
@@ -342,7 +361,7 @@ export function gradeIssued(
 
 /** Closing-line value of the plays as sent, by tier. */
 export function issuedClv(all: IssuedRecord[], closes: Map<string, ClosingLine>) {
-  const records = firstSends(all);
+  const records = firstSends(confirmed(all));
   const at = (tier: "t1" | "t2") =>
     records.flatMap((rec) =>
       rec.plays.flatMap((p) => {

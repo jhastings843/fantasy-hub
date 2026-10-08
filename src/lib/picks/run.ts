@@ -5,7 +5,8 @@ import { etClock } from "@/lib/pulse/tempo";
 import { refreshPicks } from "./report";
 import { buildPicksEmail, buildPicksUpdate } from "./email";
 import { toIssued, toIssuedUpdate } from "./issued";
-import { loadIssued, saveIssued } from "./issued-store";
+import { loadIssued } from "./issued-store";
+import { issueAndSend } from "./issue-send";
 import { weekOf } from "./parse";
 import { diffUpdate, updateMatters } from "./update";
 
@@ -36,7 +37,11 @@ export function runPicksEmail(options: PicksEmailOptions = {}): Promise<Response
 }
 
 async function runLocked({ dry = false, resend = false, test = false }: PicksEmailOptions): Promise<Response> {
-  const [nfl, cfb] = await Promise.all([refreshPicks("nfl").catch(() => null), refreshPicks("cfb").catch(() => null)]);
+  // NFL first; college is allocated with NFL's card already reserved, so the
+  // two cards together stay inside the cross-sport outstanding cap.
+  const nfl = await refreshPicks("nfl").catch(() => null);
+  const nflCard = (nfl?.board ?? []).reduce((t, g) => t + (g.stake ?? 0), 0) + (nfl?.totals.board ?? []).reduce((t, g) => t + (g.stake ?? 0), 0);
+  const cfb = await refreshPicks("cfb", { reserved: nflCard }).catch(() => null);
   const week = nfl?.week ?? null;
   const season = String(nfl?.season ?? cfb?.season ?? "");
   if (!nfl || week === null || !season) {
@@ -65,27 +70,23 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
       reason: `Week ${week} already went out at ${previous.sentAt}. Add ?resend=1 to send it again.`,
     });
   }
-  if (previous && resend) await clearSent("picks", season, week);
-
-  const result = await sendEmail(subject, html, `picks:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
-  if (!result.sent) return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
-
-  await recordSent("picks", season, week, { sentAt: new Date().toISOString(), subject, messageId: result.id });
-  const issued: string[] = [];
-  if (!test) {
-    // First record for a week wins; a resend does not rewrite what was issued.
-    const meta = { issuedAt: new Date().toISOString(), emailId: result.id, subject };
-    const save = async (label: string, rec: Parameters<typeof saveIssued>[0]) => {
-      try {
-        issued.push(`${label}: ${(await saveIssued(rec)) ? "recorded" : "already on file, kept"}`);
-      } catch (e) {
-        issued.push(`${label}: NOT RECORDED (${e instanceof Error ? e.message : String(e)})`);
-      }
-    };
-    if (email.selections.nfl) await save("NFL", { ...toIssued(nfl, email.selections.nfl, meta), slot: "tue" });
-    if (cfb?.week && email.selections.cfb) await save("College", { ...toIssued(cfb, email.selections.cfb, meta), slot: "tue" });
+  if (resend || test) {
+    // A resend or test repeats the email only; what was issued stays as it was.
+    if (previous && resend) await clearSent("picks", season, week);
+    const r = await sendEmail(subject, html, `picks:${season}:w${week}:${test ? "test" : "again"}-${Date.now()}`);
+    if (!r.sent) return Response.json({ ok: false, error: r.reason ?? "Not sent." }, { status: 500 });
+    if (resend) await recordSent("picks", season, week, { sentAt: new Date().toISOString(), subject, messageId: r.id });
+    return Response.json({ ok: true, sent: true, subject, week, season, issued: ["test or resend: nothing issued"] });
   }
-  return Response.json({ ok: true, sent: true, subject, week, season, issued });
+
+  const meta = { issuedAt: new Date().toISOString(), subject };
+  const records = [
+    ...(email.selections.nfl ? [{ ...toIssued(nfl, email.selections.nfl, meta), slot: "tue" as const }] : []),
+    ...(cfb?.week && email.selections.cfb ? [{ ...toIssued(cfb, email.selections.cfb, meta), slot: "tue" as const }] : []),
+  ];
+  const out = await issueAndSend({ logId: "picks", season, week, subject, html, idempotencyKey: `picks:${season}:w${week}`, records });
+  if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
+  return Response.json({ ok: true, sent: out.sent, skipped: !out.sent, reason: out.outcome, subject, week, season, issued: out.issued });
 }
 
 // ---------------------------------------------------------- Saturday update
@@ -126,17 +127,17 @@ async function runSaturday({ dry = false, resend = false, test = false }: PicksE
   }
   if (previous && resend) await clearSent("picks-sat", season, week);
   const subject = `${test ? "[Test] " : ""}${email.subject}`;
-  const result = await sendEmail(subject, email.html, `picks-sat:${season}:w${week}${resend ? `:again-${Date.now()}` : ""}`);
-  if (!result.sent) return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
-  await recordSent("picks-sat", season, week, { sentAt: new Date().toISOString(), subject, messageId: result.id });
-  let issued = "test, not recorded";
-  if (!test) {
-    try {
-      const rec = toIssuedUpdate(cfb, diff, "sat", { issuedAt: new Date().toISOString(), emailId: result.id, subject });
-      issued = (await saveIssued(rec)) ? "recorded" : "already on file, kept";
-    } catch (e) {
-      issued = `NOT RECORDED (${e instanceof Error ? e.message : String(e)})`;
-    }
-  }
-  return Response.json({ ok: true, sent: true, subject, week, season, issued });
+  const meta = { issuedAt: new Date().toISOString(), subject };
+  const records = test ? [] : [toIssuedUpdate(cfb, diff, "sat", meta)];
+  const out = await issueAndSend({
+    logId: "picks-sat",
+    season,
+    week,
+    subject,
+    html: email.html,
+    idempotencyKey: `picks-sat:${season}:w${week}${test || resend ? `:${Date.now()}` : ""}`,
+    records,
+  });
+  if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
+  return Response.json({ ok: true, sent: out.sent, subject, week, season, issued: out.issued });
 }

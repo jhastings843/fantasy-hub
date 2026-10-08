@@ -200,14 +200,6 @@ const research = (id: string, label: string, parent: string, test: CutTest): Cut
  *   one-point minimum on both models, the smallest whole-point step.
  *   College favorites laying 14+ are set against dogs getting 14+.
  */
-/**
- * The first week a research cut's results count toward promotion: the first
- * week not yet graded when the cuts were written (2026-10-08). Their record
- * before this was seen while choosing them, so it cannot be used to promote
- * them.
- */
-export const RESEARCH_FROM = { nfl: 5, cfb: 6 } as const;
-
 export function researchCuts(league: "nfl" | "cfb"): Cut[] {
   const e = league === "nfl" ? 2 : 3;
   const bands =
@@ -360,14 +352,8 @@ export interface CutResult extends Cut {
   games: number;
   /** Weeks with at least one game in the cut. */
   weeks: number[];
-  /** Research cuts: the record from RESEARCH_FROM on, which alone can promote them. */
-  forward?: Record;
-  /** The parent's record over the same forward weeks. */
-  parentForward?: Record;
-  /** A research cut that has earned candidacy on forward games. */
-  promoted?: boolean;
-  /** For a promoted cut: only games from this week on count for it. */
-  fromWeek?: number;
+  /** A research cut the strategy review activated as a rule candidate (policy.atsCandidates). */
+  activated?: boolean;
 }
 
 /** Tier 2: judged only on the games it adds outside Tier 1. */
@@ -416,8 +402,7 @@ export function pickSecond(games: GradedGame[], rule: Cut, cuts: CutResult[]): S
   const options = cuts
     .filter((x) => x.candidate && x.id !== rule.id)
     .map((x): SecondResult => {
-      // A promoted research cut only ever counts its forward games.
-      const hits = extra.filter((g) => cutResult(g, x) !== undefined && (x.fromWeek === undefined || g.week >= x.fromWeek));
+      const hits = extra.filter((g) => cutResult(g, x) !== undefined);
       return {
         ...x,
         fullRecord: x.record,
@@ -431,7 +416,11 @@ export function pickSecond(games: GradedGame[], rule: Cut, cuts: CutResult[]): S
   return options[0] ?? null;
 }
 
-export function strategies(league: "nfl" | "cfb", games: GradedGame[]): StrategyBoard {
+export function strategies(
+  league: "nfl" | "cfb",
+  games: GradedGame[],
+  opts: { activated?: string[] } = {},
+): StrategyBoard {
   const agreed = games.filter((g) => g.read.agree && g.result);
   const withPem = games.some((g) => g.pem);
   const cuts: CutResult[] = cutsFor(league, withPem).map((cut) => {
@@ -461,22 +450,13 @@ export function strategies(league: "nfl" | "cfb", games: GradedGame[]): Strategy
 
   const qualifies = (r: Record) => decided(r) >= MIN_SAMPLE && r.pct > BREAK_EVEN;
 
-  // Research cuts earn candidacy only on games after they were written: 10+
-  // decided forward games, past break-even, and better than their parent over
-  // the same forward weeks. A promoted cut competes on that forward record.
-  const from = RESEARCH_FROM[league];
-  const fwd = (cut: Cut) => tally(games.filter((g) => g.week >= from).flatMap((g) => cutResult(g, cut) ?? []));
-  const byId = new Map(cuts.map((c) => [c.id, c]));
-  for (const c of cuts) {
-    if (c.group !== "Research" || !c.parent || !byId.has(c.parent)) continue;
-    c.forward = fwd(c);
-    c.parentForward = fwd(byId.get(c.parent)!);
-    c.promoted = qualifies(c.forward) && c.forward.pct > c.parentForward.pct;
-  }
+  // Research cuts become candidates only when the strategy review has
+  // activated them on forward, pregame evidence (see learning/). Here they
+  // then compete on the same source-line record as every other cut.
+  const activated = new Set(opts.activated ?? []);
   const promoted: CutResult[] = cuts
-    .filter((c) => c.promoted)
-    .map((c) => ({ ...c, record: c.forward!, candidate: true, fromWeek: from }));
-
+    .filter((c) => c.group === "Research" && activated.has(c.id))
+    .map((c) => ({ ...c, candidate: true, activated: true }));
   const pool = [...cuts.filter((x) => x.candidate), ...promoted];
   const eligible = pool.filter((x) => qualifies(x.record)).sort(rank);
   const rule = eligible[0] ?? null;
@@ -535,7 +515,7 @@ export interface BoardGame {
    * judged at the number on its own site, the way the backtest is; a research
    * signal only, never sent as a play.
    */
-  basis: "reference" | "source";
+  basis: "reference" | "source" | "started";
   ref?: RefLine;
   /** Picked side and the home-side line it was picked at (plays only). */
   side?: "home" | "away";
@@ -549,9 +529,13 @@ export interface BoardGame {
   missing?: "PEM";
   /** Which tier a "wait" game would be if the missing input agreed. */
   waitFor?: "t1" | "t2";
-  /** Bets: the estimated win probability (tier record pulled toward 50%), the price, and units to risk (0 = priced out). */
+  /** Bets: the estimated win probability (tier record pulled toward 50%, an estimate, not a calibration). */
   p?: number;
+  /** The quoted price on the picked side; absent when the book quoted none. */
   price?: number;
+  priceSource?: "quoted" | "missing";
+  /** Units the policy wanted before the limits, and units allocated (0 = no bet). */
+  want?: number;
   stake?: number;
 }
 
@@ -581,12 +565,13 @@ function withoutPem(t: CutTest): CutTest {
 
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; ref?: RefLine }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; ref?: RefLine; started?: boolean }[],
   s: StrategyBoard,
   suMethod = "avg",
 ): BoardGame[] {
   return rows.map((row) => {
-    const basis: BoardGame["basis"] = row.ref ? "reference" : "source";
+    // A game that has kicked off is never actionable, whatever the cache says.
+    const basis: BoardGame["basis"] = row.started ? "started" : row.ref ? "reference" : "source";
     const su = straightUp(row.sam, row.david, league, suMethod, row.ref?.line);
     const team = (side: "home" | "away") => (side === "home" ? row.home : row.away);
     if (!row.sam || !row.david) {
