@@ -69,6 +69,11 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 ## PEM (college third model)
 - Jay (@FansOfCFB) posts "Week N PEM picks" as one image every Tuesday. `scripts/pem-relay.mjs` (LaunchAgent `com.jackh.pem-relay`, every 2 hours, log `.pem-relay/relay.log`) reads his last 40 posts through OpenCLI and Chrome's X login and POSTs new cards to /api/picks/pem (`PEM_RELAY_SECRET`). Columns read with Haiku, retried with Sonnet; a week counts only if every EDGE checks. Needs Chrome logged into X. Team names: `CFB_ALIASES` in parse.ts.
 
+## John Harris (@jhnhrris), tested 2026-10-08: not added
+- Posts a full-slate college sheet each Thursday with his "CONTEST PICKS OF THE WEEK" (images only; column C "Average" = projected home margin, so home-side line = -Average). Percival's #CFBPicker tracker has him 2nd of 60 models in 2026 (53.8% ATS vs close, 271 games); its data download is disabled.
+- Backtest (sheets transcribed into `research/harris-2026/`, finals from ESPN, script `backtest.py`): alone at his own sheet line, Weeks 1 and 3-5, 79-76 (51.0%); edge 4+ 10-7. With Sam and David (Weeks 4-5, the only weeks we have graded): Sam+David agree 23-19; when Harris also agrees 19-18; when he disagrees 4-1. No sign he adds anything; samples are small.
+- Decision: not ingested. Revisit at season end with a full season of his sheets if wanted.
+
 ## Closing lines and the Prediction Tracker
 - Closing lines from ESPN game summaries (DraftKings open/close) per finished game, stored once with the final score. CLV = points better than the close.
 - Prediction Tracker: not a vote (2025 walk-forward: top-5 by ATS 51.4%, below break-even). Its daily files are archived (`picks:v1:{league}:tracker:{date}`) for a later test of the all-model median.
