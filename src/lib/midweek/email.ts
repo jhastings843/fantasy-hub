@@ -1,3 +1,4 @@
+import { playerContext } from "@/lib/email/lineup-detail";
 import type { WaiverContext } from "@/lib/waivers/build";
 import { usageText } from "@/lib/waivers/freshness";
 import {
@@ -142,7 +143,7 @@ function leagueCard(league: WaiverContext): string {
           t.player.positionalRank != null
             ? `He has him ${t.player.position}${t.player.positionalRank} this week.`
             : "Unranked this week, so this is the season list talking."
-        }${t.dropFor ? ` Drop ${t.dropFor.name}.` : t.dropFor === null ? " There is a free spot." : ""}${usageNote(t.player)}${bidText(t.price)}`,
+        }${t.dropFor ? ` Drop ${t.dropFor.name}.` : t.dropFor === null ? " There is a free spot." : ""}${usageNote(t.player)} ${playerContext(t.player)}.${bidText(t.price)}`,
         "start",
       ),
     )
@@ -163,7 +164,7 @@ function leagueCard(league: WaiverContext): string {
                   t.placesBetter != null ? `, ${t.placesBetter} places better` : ""
                 }`
               : "Near the top of this week's waiver board"
-        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${usageNote(t.player)}${bidText(t.price)}${alternativeText(t)}`,
+        }${t.dropFor ? `. Drop ${t.dropFor.name}` : ". There is a free spot"}.${usageNote(t.player)} ${playerContext(t.player)}.${bidText(t.price)}${alternativeText(t)}`,
         "season",
       ),
     )

@@ -1,3 +1,4 @@
+import { emailPage } from "@/lib/email/shell";
 import { TIER_LABEL } from "./market";
 import type { Posture } from "./chop-line";
 import type { WeeklyFaabReport } from "./types";
@@ -17,13 +18,13 @@ import type { WeeklyFaabReport } from "./types";
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
 const PALETTE = {
-  ink: "#18181b",
-  body: "#52525b",
-  muted: "#a1a1aa",
-  hairline: "#e4e4e7",
+  ink: "#23382f",
+  body: "#536459",
+  muted: "#69776c",
+  hairline: "#dfe6d9",
   surface: "#ffffff",
-  page: "#fafaf9",
-  amber: "#f59e0b",
+  page: "#f4f1e9",
+  amber: "#865d2f",
   amberInk: "#b45309",
 };
 
@@ -105,7 +106,8 @@ function chainBlock(
                 </div>
                 <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">
                   ${escapeHtml(TIER_LABEL[target.tier])}${target.weekGain > 0 ? `. Adds ${target.weekGain.toFixed(1)} to your lineup` : ""}${target.displaces ? ` over ${escapeHtml(target.displaces.name)}` : ""}.
-                </div>${
+                </div>
+                <div style="font-size:12px;line-height:1.6;color:${PALETTE.body};padding-top:6px">${escapeHtml(target.reason)}</div>${
                   // A player carrying a tag the beat has already cleared, or
                   // one the two sources disagree about, is the case where the
                   // bid needs its reasoning attached. Everything else is left
@@ -402,47 +404,10 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
 }
 
 function wrap(inner: string, report: WeeklyFaabReport, link: string): string {
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>${escapeHtml(emailSubject(report))}</title>
-</head>
-<body style="margin:0;padding:0;background:${PALETTE.page};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(report.card.summary)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PALETTE.page};padding:20px 12px;">
-  <tr>
-    <td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-        <tr>
-          <td style="padding-bottom:16px;">
-            <div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};">
-              ${escapeHtml(report.league.name)} &middot; Week ${report.week}
-            </div>
-            <div style="font:600 20px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${PALETTE.ink};padding-top:4px;letter-spacing:-.01em;">
-              Where the money goes
-            </div>
-          </td>
-        </tr>
-        <tr><td>${inner}</td></tr>
-        <tr>
-          <td style="padding-top:4px;">
-            <a href="${escapeHtml(link)}" style="display:inline-block;background:${PALETTE.amber};color:#ffffff;font:600 14px/1 -apple-system,sans-serif;padding:12px 18px;border-radius:10px;text-decoration:none;">Open the full report</a>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding-top:18px;">
-            <div style="font:400 11px/1.5 -apple-system,sans-serif;color:${PALETTE.muted};">
-              Built from Sleeper projections scored under this league's settings. Generated ${escapeHtml(new Date(report.generatedAt).toLocaleString("en-US", { timeZone: "America/New_York" }))} ET.
-            </div>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-</body>
-</html>`;
+  return emailPage({
+    title: emailSubject(report), kicker: `${report.league.name} · Week ${report.week}`,
+    heading: "Where the money goes", preheader: report.card.summary, body: inner,
+    cta: { href: link, text: "Open the full report" },
+    footnote: `Built from Sleeper projections scored under this league's settings. Generated ${escapeHtml(new Date(report.generatedAt).toLocaleString("en-US", {timeZone: "America/New_York"}))} ET.`,
+  });
 }

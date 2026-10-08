@@ -1,3 +1,4 @@
+import { changeDetail, confirmedDetails, playerContext } from "@/lib/email/lineup-detail";
 import type { SurvivorReport } from "@/lib/survivor/types";
 import { poolMeta } from "@/lib/survivor/pools";
 import type { WeeklyLineups } from "@/lib/lineup/build";
@@ -253,13 +254,7 @@ function equityLine(
 
 
 function changeRow(slot: SlotAdvice): string {
-  return `<div style="padding:8px 0;border-top:1px solid ${PALETTE.hairline};">
-  <div style="font:600 13px/1.4 -apple-system,sans-serif;color:${PALETTE.ink};">
-    <span style="display:inline-block;background:${PALETTE.warnBg};color:${PALETTE.warn};border:1px solid ${PALETTE.warnBorder};border-radius:5px;padding:1px 6px;font:600 10px/1.5 -apple-system,sans-serif;letter-spacing:.04em;margin-right:6px;">${escapeHtml(slot.slot)}</span>
-    ${escapeHtml(slot.recommended?.name ?? "(empty)")}
-  </div>
-  <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">${escapeHtml(slot.reason)}</div>
-</div>`;
+  return changeDetail(slot);
 }
 
 function dropText(t: StartableTarget): string {
@@ -283,6 +278,7 @@ function pickupChangeRow(slot: SlotAdvice, t: StartableTarget): string {
     Add ${escapeHtml(t.player.name)} <span style="font-weight:400;color:${PALETTE.muted};">free agent</span>
   </div>
   <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">${escapeHtml(`${rank}${over}. ${dropText(t)} Instant add in Sleeper, then start him here.`)}</div>
+  <div style="font-size:12px;color:${PALETTE.body};padding-top:5px">${escapeHtml(playerContext(t.player))}</div>
 </div>`;
 }
 
@@ -334,7 +330,7 @@ function leagueBlock(
     return card(
       `${head}
 <div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:8px;">Nothing to change.</div>
-${problems}${superflex}${ours}`,
+${confirmedDetails(league.advice.slots.filter(slot => !changes.some(change => change.slot.index === slot.index)))}${problems}${superflex}${ours}`,
       GOOD,
     );
   }
@@ -342,7 +338,7 @@ ${problems}${superflex}${ours}`,
   return card(
     `${head}
 <div style="padding-top:6px;">${changes.map(mergedRow).join("")}</div>
-${problems}${superflex}${ours}`,
+${confirmedDetails(league.advice.slots.filter(slot => !changes.some(change => change.slot.index === slot.index)))}${problems}${superflex}${ours}`,
   );
 }
 

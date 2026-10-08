@@ -1,3 +1,4 @@
+import { changeDetail, confirmedDetails } from "@/lib/email/lineup-detail";
 import type { SurvivorReport } from "@/lib/survivor/types";
 import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { AlarmReason } from "./alarm";
@@ -21,8 +22,8 @@ import {
 //
 // The 9am brief is "is everything where I left it on Thursday", and it is
 // allowed to be boring: most Sundays it says yes in four lines and that is a
-// useful thing to have said. The 11:45 alarm is "something is wrong and you
-// have 75 minutes", and it only exists at all when there is something in it.
+// useful thing to have said. The 12:15 alarm is "something is wrong and you
+// have 45 minutes", and it only exists at all when there is something in it.
 //
 // They share a house style and share nothing else. Merging them would mean the
 // alarm inherits the brief's calm layout, and the whole value of the alarm is
@@ -147,7 +148,10 @@ ${statRow(
     locks ? { name: "Locks", value: locks } : null,
   ].filter((s): s is { name: string; value: string } => s !== null),
 )}
-${report.myPickNote ? small(report.myPickNote, PALETTE.body) : ""}`,
+${report.myPickNote ? small(report.myPickNote, PALETTE.body) : ""}
+${report.reasoning.length ? small(report.myPick === report.bestTeam ? "Why the model favors this pick:" : `Model recommendation: ${report.bestTeam ?? "not available"}. Your logged pick remains ${report.myPick}.`, PALETTE.body) : ""}
+${report.reasoning.slice(0, 2).map(r => small(r, PALETTE.body)).join("")}
+${report.candidates.filter(other => other.team !== report.myPick).slice(0, 1).map(other => small(`Another option: ${other.team} over ${other.opponent}, ${pctText(other.winProb)} win probability, ${pctText(other.ownership)} of the field on it.`)).join("")}`,
     GOOD,
   );
 }
@@ -158,18 +162,12 @@ function leagueLine(league: WeeklyLineups["leagues"][number]): string {
   }
 
   const changes = league.advice.changes;
-  const colour = changes.length === 0 ? PALETTE.good : PALETTE.warn;
-  const text =
-    changes.length === 0
-      ? "set"
-      : changes
-          .map((c) => `${c.slot} ${c.recommended?.name ?? "(empty)"}`)
-          .join(", ");
-
-  return `<div style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:400 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};">
-  <span style="font-weight:600;color:${PALETTE.ink};">${escapeHtml(league.leagueName)}</span>
-  <span style="color:${colour};"> &middot; ${escapeHtml(text)}</span>
-</div>`;
+  return `<div style="padding:14px 0;border-top:1px solid ${PALETTE.hairline}">
+  <div style="font-size:15px;font-weight:600;color:${PALETTE.ink}">${escapeHtml(league.leagueName)}</div>
+  ${small(league.scoringLabel)}
+  ${changes.length ? changes.map(changeDetail).join("") : small("No lineup changes recommended.", PALETTE.good)}
+  ${confirmedDetails(league.advice.slots)}
+  </div>`;
 }
 
 export function renderSundayBrief(input: SundayInput): string {
@@ -208,7 +206,7 @@ ${lineups.leagues.map(leagueLine).join("")}`,
       survivors.length > 0 && live.length === 0
         ? { href: input.appUrl, text: "Open fantasy hub" }
         : { href: `${input.appUrl}/survivor`, text: "Open survivor" },
-    footnote: `<div>Inactives land around 11:30. If anything breaks after that you will get one more email at 11:45, and silence means nothing did.</div>
+    footnote: `<div>Inactives land around 11:30. If anything breaks after that you will get one more email at 12:15, and silence means nothing did.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
 }
@@ -238,7 +236,7 @@ export function renderLockAlarm(input: AlarmInput): string {
 
   return emailPage({
     title: alarmSubject(input),
-    kicker: `Sunday 11:45 · Week ${input.week ?? ""}`,
+    kicker: `Sunday 12:15 · Week ${input.week ?? ""}`,
     heading: "This needs you now",
     preheader: input.reasons[0]?.text ?? "",
     body: `${card(`${label("Since Thursday")}${rows}`, BAD)}${card(
