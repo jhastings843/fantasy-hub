@@ -549,6 +549,10 @@ export interface BoardGame {
   missing?: "PEM";
   /** Which tier a "wait" game would be if the missing input agreed. */
   waitFor?: "t1" | "t2";
+  /** Bets: the estimated win probability (tier record pulled toward 50%), the price, and units to risk (0 = priced out). */
+  p?: number;
+  price?: number;
+  stake?: number;
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);

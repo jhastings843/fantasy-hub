@@ -11,6 +11,7 @@ import {
 } from "./engine";
 import { gradeIssued, selectForEmail, toIssued, type IssuedRecord } from "./issued";
 import { researchRows } from "./research";
+import { stakeBoard } from "./staking";
 import type { PicksReport } from "./report";
 import type { ModelLine } from "./parse";
 
@@ -141,7 +142,7 @@ describe("straight up follows the selected method", () => {
 
 describe("issued records", () => {
   const ref = { line: 3, source: "DraftKings via ESPN", fetchedAt: "2026-10-14T13:00:00Z" };
-  const board = tierBoard(
+  const board = stakeBoard(tierBoard(
     "nfl",
     [
       { home: "H1", away: "A1", sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, ref },
@@ -151,7 +152,7 @@ describe("issued records", () => {
     ],
     stub({ id: "dog", label: "Agree on underdog", test: { side: "dog" }, record: { w: 14, l: 2, p: 0 } }),
     "avg",
-  );
+  ), { t1: { w: 14, l: 2 } }, 6).board;
   const report = {
     league: "nfl",
     season: 2026,
@@ -197,7 +198,7 @@ describe("issued totals", () => {
       totals: {
         backtest: { rule: { id: "t-over", label: "Both agree on the over", test: { side: "over" }, record: { w: 9, l: 2, p: 0 } } },
         board: [
-          { home: "H", away: "A", sam: 49, david: 48, ref: { total: 45, source: "DraftKings via ESPN", fetchedAt: "t" }, tier: "t1", play: "Over 45", side: "over", line: 45, read: { minEdge: 3 } },
+          { home: "H", away: "A", sam: 49, david: 48, ref: { total: 45, source: "DraftKings via ESPN", fetchedAt: "t" }, tier: "t1", play: "Over 45", side: "over", line: 45, read: { minEdge: 3 }, stake: 1, price: -110 },
           { home: "H2", away: "A2", sam: 49, david: 48, ref: { total: 45, source: "s", fetchedAt: "t" }, tier: "lean", play: "Over 45", side: "over", line: 45 },
         ],
       },
@@ -207,7 +208,7 @@ describe("issued totals", () => {
     const rec = toIssued(report, sel, { issuedAt: "t", subject: "s" });
     expect(rec.totals).toHaveLength(1);
     expect(rec.totals![0]).toMatchObject({
-      home: "H", away: "A", side: "over", line: 45, play: "Over 45", source: "DraftKings via ESPN", fetchedAt: "t", shownInEmail: true, units: 1,
+      home: "H", away: "A", side: "over", line: 45, play: "Over 45", source: "DraftKings via ESPN", fetchedAt: "t", shownInEmail: true, units: 1, price: -110,
     });
     expect(rec.totalsRule?.id).toBe("t-over");
     const [w] = gradeIssued([rec], new Map([["6:A@H", { home: 24, away: 24 }]]));

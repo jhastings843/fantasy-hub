@@ -18,6 +18,7 @@ import { type ClvRow, clvTable, summarize } from "./closing";
 import { closingLines, currentLines } from "./closing-store";
 import { type IssuedWeek, gradeIssued, issuedClv, issuedGames } from "./issued";
 import { type UnitReport, unitReport } from "./units";
+import { type ParlayPick, shrunk, stakeBoard, stakeFor } from "./staking";
 import { firstSends } from "./update";
 import { loadIssued } from "./issued-store";
 import { type PemCompareRow, type ResearchRow, pemCompare, researchRows } from "./research";
@@ -237,6 +238,8 @@ export interface PicksReport {
   posted: { [source: string]: string };
   /** The bets the emails gave, with stakes: units +/- for this sport. */
   units: UnitReport;
+  /** Two-leg parlays worth sending this week (often none). */
+  parlays: ParlayPick[];
 }
 
 function seasonNow(): number {
@@ -317,7 +320,9 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   for (const d of dmap.values()) {
     rows.push({ home: d.home, away: d.away, sam: undefined, david: d.line, pem: pemNow(d.home, d.away), ref: refNow(d.home, d.away) });
   }
-  const board = tierBoard(league, rows, s, su.best?.id ?? "avg");
+  const staked = stakeBoard(tierBoard(league, rows, s, su.best?.id ?? "avg"), { t1: s.rule?.record, t2: s.second?.record }, week);
+  const board = staked.board;
+  const parlays = staked.parlays;
   if (week && board.length) await saveSnapshot(league, season, week, board, s.rule?.label ?? null);
   // Totals: this week's model totals at the one current total, and the
   // forward archive of games where both models and a quote first met.
@@ -385,7 +390,12 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const tb = totalsBacktest(league, seen, points, sam, totalsMarket, key);
   const totals = {
     backtest: tb,
-    board: totalsBoard(totalRows, tb.rule),
+    board: totalsBoard(totalRows, tb.rule).map((g) => {
+      if (g.tier !== "t1" || !tb.rule || !g.side || !g.ref) return g;
+      const p = shrunk(tb.rule.record.w, tb.rule.record.l);
+      const price = (g.side === "over" ? g.ref.overPrice : g.ref.underPrice) ?? -110;
+      return { ...g, p, price, stake: stakeFor(p, price) };
+    }),
     edge: TOTALS_EDGE[league],
     newlyArchived,
     archived: seen.length,
@@ -426,6 +436,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     totals,
     posted,
     units: unitReport(firstSends(issued), finals),
+    parlays,
     reference: {
       source: priced[0]?.ref?.source ?? null,
       fetchedAt: priced[0]?.ref?.fetchedAt ?? null,

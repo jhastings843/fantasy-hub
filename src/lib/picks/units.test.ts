@@ -1,19 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { tierBoard, type StrategyBoard } from "./engine";
 import { selectForEmail, toIssued, type IssuedRecord } from "./issued";
-import { payout, risk, unitReport } from "./units";
+import { parlayPayout, payout, risk, unitReport } from "./units";
 import { slateOf } from "./email";
+import { stakeBoard } from "./staking";
 import type { PicksReport } from "./report";
 
-describe("unit math", () => {
-  it("pays the stake on a win and costs the risk on a loss", () => {
-    expect(risk(1, -110)).toBeCloseTo(1.1);
-    expect(payout("W", 1, -110)).toBe(1);
-    expect(payout("L", 1, -110)).toBeCloseTo(-1.1);
-    expect(payout("L", 0.5, -118)).toBeCloseTo(-0.59);
-    // Plus money: to win 1u at +120 risks 0.833u.
-    expect(payout("L", 1, 120)).toBeCloseTo(-0.8333, 3);
+describe("unit math (units risked)", () => {
+  it("pays stake x (decimal - 1) on a win and costs the stake on a loss", () => {
+    expect(risk(2)).toBe(2);
+    expect(payout("W", 1, -110)).toBeCloseTo(0.9091, 3);
+    expect(payout("L", 1, -110)).toBe(-1);
+    expect(payout("W", 2, 120)).toBeCloseTo(2.4);
     expect(payout("P", 1, -110)).toBe(0);
+  });
+  it("grades parlays: a loss loses it, a push drops the leg", () => {
+    expect(parlayPayout([{ result: "W", price: -110 }, { result: "W", price: -110 }], 1)).toBeCloseTo(2.6446, 3); // +264
+    expect(parlayPayout([{ result: "W", price: -110 }, { result: "L", price: -110 }], 1)).toBe(-1);
+    expect(parlayPayout([{ result: "W", price: -110 }, { result: "P", price: -110 }], 1)).toBeCloseTo(0.9091, 3);
+    expect(parlayPayout([{ result: "P", price: -110 }, { result: "P", price: -110 }], 1)).toBe(0);
   });
 });
 
@@ -50,26 +55,28 @@ describe("unit ledger", () => {
 
   it("adds up staked bets at their own prices and leaves unstaked plays out", () => {
     expect(u.total).toMatchObject({ bets: 4, w: 1, l: 2, pending: 1 });
-    expect(u.total.units).toBeCloseTo(1 - 0.6 - 1.05, 2);
+    // W 1u at -110 (+0.91), L 0.5u (-0.5), L 1u (-1).
+    expect(u.total.units).toBeCloseTo(0.909 - 0.5 - 1, 2);
     expect(u.unstaked).toBe(1);
   });
   it("splits by tier and by send", () => {
-    expect(u.byTier.t2.units).toBeCloseTo(-0.6, 2);
+    expect(u.byTier.t2.units).toBeCloseTo(-0.5, 2);
     expect(u.bySlot.tue).toMatchObject({ bets: 3, w: 1, l: 1, pending: 1 });
-    expect(u.bySlot.sat.units).toBeCloseTo(-1.05, 2);
+    expect(u.bySlot.sat.units).toBeCloseTo(-1, 2);
     expect(u.byWeek.map((x) => x.week)).toEqual([6]);
   });
 });
 
 describe("stakes on issued bets", () => {
-  it("records 1u / 0.5u and the price on the side that was bet", () => {
+  it("records the sized stake and the price on the side that was bet", () => {
     const ref = { line: 3, source: "DraftKings via ESPN", fetchedAt: "t", homePrice: -118, awayPrice: -102, kickoff: "2026-10-15T00:15:00Z" };
-    const board = tierBoard("nfl", [{ home: "H", away: "A", sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, ref }], {
+    const board = stakeBoard(tierBoard("nfl", [{ home: "H", away: "A", sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, ref }], {
       rule: { id: "dog", label: "dog", test: { side: "dog" }, record: {} }, second: null,
-    } as unknown as StrategyBoard);
+    } as unknown as StrategyBoard), { t1: { w: 14, l: 2 } }, 6).board;
     const r = { league: "nfl", season: 2026, week: 6, board, strategies: { rule: null, second: null }, su: { best: null } } as unknown as PicksReport;
     const rec = toIssued(r, selectForEmail(r, 99, 0), { issuedAt: "t", subject: "s" });
-    expect(rec.plays[0]).toMatchObject({ units: 1, price: -118, kickoff: "2026-10-15T00:15:00Z" });
+    // 14-2 reads as 55.2%; quarter Kelly at -118 is 0.57u, rounded to 0.5u.
+    expect(rec.plays[0]).toMatchObject({ units: 0.5, price: -118, kickoff: "2026-10-15T00:15:00Z" });
   });
 });
 

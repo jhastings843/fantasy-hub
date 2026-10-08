@@ -94,6 +94,7 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[]): UpdateDiff 
   const added = r.board.filter(
     (g) =>
       (g.tier === "t1" || g.tier === "t2") &&
+      !!g.stake &&
       g.basis === "reference" &&
       g.side &&
       g.homeLine !== undefined &&
@@ -102,6 +103,7 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[]): UpdateDiff 
   const addedTotals = (r.totals?.board ?? []).filter(
     (g) =>
       g.tier === "t1" &&
+      !!g.stake &&
       g.side &&
       g.line !== undefined &&
       g.ref &&

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { type StrategyBoard, tierBoard } from "./engine";
 import { gradeIssued, type IssuedRecord } from "./issued";
 import { diffUpdate, firstSends, updateMatters } from "./update";
+import { stakeBoard } from "./staking";
+
+const staked = <T extends Parameters<typeof stakeBoard>[0]>(b: T) => stakeBoard(b, { t1: { w: 14, l: 2 } }, 7).board;
 import type { PicksReport } from "./report";
 
 const rule = { rule: { test: { side: "dog" } }, second: null } as unknown as StrategyBoard;
@@ -22,13 +25,13 @@ const tuesday: IssuedRecord = {
 };
 
 describe("game-day update", () => {
-  const board = tierBoard("cfb", [
+  const board = staked(tierBoard("cfb", [
     row("H1", 4), // still a dog at +4: still on, a point better
     row("H2", -1.5, -3, 0), // Sam on the home side, David on the road side: split
     // H3 has kicked off: no pregame quote
     { home: "H3", away: "A-H3", sam: { market: 3, model: 1 }, david: { market: 3, model: 0 } },
     row("H4", 7), // qualifies now, never sent
-  ], rule);
+  ], rule));
   const report = { league: "cfb", week: 7, board, reference: {}, names: {} } as unknown as PicksReport;
   const d = diffUpdate(report, [tuesday]);
 

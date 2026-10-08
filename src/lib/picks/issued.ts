@@ -27,7 +27,7 @@ import type { League } from "./parse";
 import type { PicksReport } from "./report";
 import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
 import { type Slot, type UpdateDiff, firstSends } from "./update";
-import { STAKE } from "./units";
+import type { ParlayPick } from "./staking";
 
 /** Bump when the tiering logic changes, so a record says which logic issued it. */
 export const RULE_VERSION = "2026-10-08 reference-line agreement, Tier 2 on added games";
@@ -78,6 +78,15 @@ export interface IssuedTotal {
   kickoff?: string;
 }
 
+export interface IssuedParlay {
+  legs: { home: string; away: string; side: "home" | "away"; homeLine: number; price: number }[];
+  /** Units risked. */
+  units: number;
+  /** Decimal payout per unit risked, as quoted from the legs' prices. */
+  decimal: number;
+  shownInEmail: boolean;
+}
+
 export interface IssuedCut {
   id: string;
   label: string;
@@ -105,6 +114,8 @@ export interface IssuedRecord {
   su: IssuedSu[];
   /** Over/under plays (only when a totals rule qualified that week). Absent on older records. */
   totals?: IssuedTotal[];
+  /** Two-leg parlays sent with the card (Tuesday only). */
+  parlays?: IssuedParlay[];
   totalsRule?: { id: string; label: string; test: TotalsTest; evidence: Record } | null;
   /** Anything the record cannot vouch for. */
   unverified: string[];
@@ -124,13 +135,18 @@ export interface EmailSelection {
   /** Over/under plays under a qualifying totals rule, biggest edge first. */
   totals: TotalsBoardGame[];
   shownTotals: number;
+  /** Tier 1/2 games whose price leaves less than a quarter-unit bet. */
+  pricedOut: BoardGame[];
+  parlays: ParlayPick[];
 }
 
 /** The one selection the email renders and the issued record stores. */
 export function selectForEmail(r: PicksReport, playLimit: number, suLimit: number, totalsLimit = 8): EmailSelection {
   const tiered = r.board.filter((g) => g.tier === "t1" || g.tier === "t2");
-  const plays = tiered
-    .filter((g) => g.basis === "reference" && g.side && g.homeLine !== undefined)
+  const atRef = tiered.filter((g) => g.basis === "reference" && g.side && g.homeLine !== undefined);
+  const pricedOut = atRef.filter((g) => !g.stake);
+  const plays = atRef
+    .filter((g) => !!g.stake)
     .sort((a, b) => (a.tier === b.tier ? (b.read?.avgEdge ?? 0) - (a.read?.avgEdge ?? 0) : a.tier === "t1" ? -1 : 1));
   const method = r.su.best?.id ?? "avg";
   const su = r.board
@@ -140,13 +156,15 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
     })
     .sort((x, y) => y.margin - x.margin);
   const totals = (r.totals?.board ?? [])
-    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref)
+    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref && !!g.stake)
     .sort((a, b) => (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
   return {
     league: r.league,
     plays,
     shownPlays: Math.min(playLimit, plays.length),
-    sourceOnly: tiered.length - plays.length,
+    sourceOnly: tiered.length - atRef.length,
+    pricedOut,
+    parlays: r.parlays ?? [],
     waiting: r.board.filter((g) => g.tier === "wait").length,
     su,
     shownSu: Math.min(suLimit, su.length),
@@ -185,8 +203,8 @@ export function toIssued(
       ref: g.ref,
       pemPick: g.pemPick,
       shownInEmail: i < sel.shownPlays,
-      units: STAKE[g.tier as "t1" | "t2"],
-      price: g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice,
+      units: g.stake,
+      price: g.price,
       kickoff: g.ref?.kickoff,
     })),
     su: sel.su.map((x, i) => ({
@@ -206,9 +224,18 @@ export function toIssued(
       source: g.ref!.source,
       fetchedAt: g.ref!.fetchedAt,
       shownInEmail: i < sel.shownTotals,
-      units: STAKE.total,
-      price: g.side === "over" ? g.ref!.overPrice : g.ref!.underPrice,
+      units: g.stake,
+      price: g.price,
       kickoff: g.ref!.kickoff,
+    })),
+    parlays: sel.parlays.map((pr) => ({
+      legs: pr.legs.map((leg) => {
+        const g = sel.plays.find((x) => `${r.week}:${x.away}@${x.home}` === leg.game)!;
+        return { home: g.home, away: g.away, side: g.side!, homeLine: g.homeLine!, price: leg.price };
+      }),
+      units: pr.units,
+      decimal: pr.decimal,
+      shownInEmail: true,
     })),
     totalsRule: r.totals?.backtest.rule
       ? { id: r.totals.backtest.rule.id, label: r.totals.backtest.rule.label, test: r.totals.backtest.rule.test, evidence: r.totals.backtest.rule.record }
@@ -234,6 +261,8 @@ export function toIssuedUpdate(
     shownSu: 0,
     totals: diff.addedTotals,
     shownTotals: diff.addedTotals.length,
+    pricedOut: [],
+    parlays: [],
   };
   return { ...toIssued(r, sel, meta), slot };
 }

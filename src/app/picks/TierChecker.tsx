@@ -63,11 +63,11 @@ export default function TierChecker({ rule, second, example, pem = false, pemNee
         : "";
     if (g.tier === "t1") {
       cls = `${s.out} ${s.outT1}`;
-      title = "Tier 1 · 1u bet";
+      title = "Tier 1 · bet";
       body = `${who} ${g.pemPick ? "PEM breaks the split. " : ""}Fits the current rule (${rule!.label}, ${rule!.record}).`;
     } else if (g.tier === "t2") {
       cls = `${s.out} ${s.outT2}`;
-      title = "Tier 2 · 0.5u bet";
+      title = "Tier 2 · bet";
       body = `${who} Fits Tier 2 (${second!.label}, ${second!.record}).`;
     } else if (g.tier === "wait") {
       title = "Needs PEM's line";

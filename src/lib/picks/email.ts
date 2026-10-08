@@ -1,7 +1,8 @@
 import { type BoardGame, type Record as Rec } from "./engine";
 import { type EmailSelection, selectForEmail } from "./issued";
 import type { UpdateDiff } from "./update";
-import { STAKE, DEFAULT_PRICE, fmtUnits } from "./units";
+import { DEFAULT_PRICE, fmtUnits } from "./units";
+import { american } from "./staking";
 
 const price = (p?: number) => (p === undefined ? `${DEFAULT_PRICE}` : p > 0 ? `+${p}` : `${p}`);
 
@@ -46,11 +47,8 @@ function playRows(r: PicksReport, games: BoardGame[]): string {
           ? `<tr><td colspan="3" style="padding:12px 0 4px;font:600 10px/1.3 ${FONT};letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};">${escapeHtml(slate)}</td></tr>`
           : "";
       last = slate;
-      const p = g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice;
-      const chip =
-        g.tier === "t1"
-          ? `<span style="background:${PALETTE.accent};color:#fff;border-radius:4px;padding:2px 6px;font:600 10px/1.4 ${FONT};">${STAKE.t1}U</span>`
-          : `<span style="background:${PALETTE.goodBg};color:${PALETTE.accent};border:1px solid ${PALETTE.goodBorder};border-radius:4px;padding:1px 6px;font:600 10px/1.4 ${FONT};">${STAKE.t2}U</span>`;
+      const p = g.price;
+      const chip = `<span style="background:${g.tier === "t1" ? PALETTE.accent : PALETTE.goodBg};color:${g.tier === "t1" ? "#fff" : PALETTE.accent};border:1px solid ${g.tier === "t1" ? PALETTE.accent : PALETTE.goodBorder};border-radius:4px;padding:1px 6px;font:600 11px/1.4 ${FONT};">${g.stake}U</span>`;
       return `${head}<tr>
   <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};width:52px;">${chip}</td>
   <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(`${name(team)} ${line(lineFor)} (${price(p)})`)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">vs ${escapeHtml(name(opp))}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
@@ -91,7 +89,7 @@ function totalsBlock(r: PicksReport, sel: EmailSelection): string {
     .map(
       (g) => `<tr>
   <td style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(g.play!)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${name(g.away)} at ${name(g.home)}`)}</div></td>
-  <td align="right" style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${STAKE.total}u · ${price(g.side === "over" ? g.ref?.overPrice : g.ref?.underPrice)}</td>
+  <td align="right" style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${g.stake}u · ${price(g.price)}</td>
 </tr>`,
     )
     .join("");
@@ -100,10 +98,31 @@ ${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.rec
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
 }
 
+/** Two-leg parlays, only when the pair clears the 10% estimated-edge bar. */
+function parlayBlock(r: PicksReport, sel: EmailSelection): string {
+  if (!sel.parlays.length) return "";
+  const name = (k: string) => r.names[k] ?? k;
+  const legText = (id: string) => {
+    const g = sel.plays.find((x) => `${r.week}:${x.away}@${x.home}` === id);
+    if (!g) return id;
+    const team = g.side === "home" ? g.home : g.away;
+    return `${name(team)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}`;
+  };
+  const rows = sel.parlays
+    .map(
+      (pr) => `<tr>
+  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};width:52px;"><span style="background:${PALETTE.ink};color:#fff;border-radius:4px;padding:1px 6px;font:600 11px/1.4 ${FONT};">${pr.units}U</span></td>
+  <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(pr.legs.map((l) => legText(l.id)).join(" + "))}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">2-leg parlay · pays ${escapeHtml(american(pr.decimal))} · est. edge ${Math.round(pr.edge * 100)}%</div></td>
+</tr>`,
+    )
+    .join("");
+  return `<div style="padding-top:12px;">${label("Parlay")}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table>`;
+}
+
 /** The season's unit total for this sport, from bets that went out with a stake. */
 function unitsLine(r: PicksReport): string {
   const u = r.units?.total;
-  if (!u || !u.bets) return small("Bets carry stakes from this card on: Tier 1 is 1 unit, Tier 2 half a unit.", PALETTE.body);
+  if (!u || !u.bets) return small("Bets carry stakes from this card on (0.25u to 5u, sized to each rule's record and the price).", PALETTE.body);
   const rec = `${u.w}-${u.l}${u.p ? `-${u.p}` : ""}`;
   return `<div style="font:600 15px/1.4 ${FONT};color:${u.units >= 0 ? PALETTE.good : PALETTE.bad};padding-bottom:2px;">${escapeHtml(
     `Season: ${fmtUnits(u.units)} on ${rec}${u.risked ? `, ${Math.round(u.roi * 100)}% return` : ""}`,
@@ -138,6 +157,11 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
       ? `${sel.sourceOnly} more fit at the sites' own lines but have no current quote, so they are research only, not plays.`
       : "",
     sel.waiting ? `${sel.waiting} ${sel.waiting === 1 ? "game is" : "games are"} waiting on PEM's card.` : "",
+    sel.pricedOut.length
+      ? `Priced out (fits the rule, but the price leaves under a quarter unit of value): ${sel.pricedOut
+          .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${price(g.price)}`)
+          .join(", ")}.`
+      : "",
   ].filter(Boolean);
   const su = r.su.best ? `Straight up follows ${r.su.best.label.toLowerCase()} (${r.su.best.w}-${r.su.best.l}).` : "";
   return card(`${label(`${league} · Week ${r.week ?? "?"}`)}
@@ -149,6 +173,7 @@ ${
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">${playRows(r, shown)}</table>${plays.length > shown.length ? small(`Plus ${plays.length - shown.length} more on the page.`) : ""}`
     : paragraph("Nothing fits this week.", PALETTE.muted)
 }
+${parlayBlock(r, sel)}
 ${caveats.map((c) => small(c)).join("")}
 ${totalsBlock(r, sel)}
 <div style="padding-top:16px;">${label("Straight up, most confident first")}</div>
@@ -194,7 +219,7 @@ export function buildPicksEmail(input: {
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Units are to win: a 1u bet at -110 risks 1.1u to win 1u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Parlays only when two legs together show a 10%+ estimated edge. At most 15u at risk per sport per card; a heavy week is scaled down. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
@@ -225,11 +250,11 @@ export function updateBlock(r: PicksReport, d: UpdateDiff): string {
           row(
             `${team(g.side!, g)} ${line(at(g.side!, g.homeLine!))}`,
             `vs ${opp(g.side!, g)}${d.pageOnly.includes(`${d.week}:${g.away}@${g.home}`) ? " · was on the page Tuesday, not in the email" : ""}`,
-            `${g.tier === "t1" ? STAKE.t1 : STAKE.t2}u · ${price(g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice)}`,
+            `${g.stake}u · ${price(g.price)}`,
           ),
         ),
         ...d.addedTotals.map((g) =>
-          row(g.play!, `${name(g.away)} at ${name(g.home)}`, `${STAKE.total}u · ${price(g.side === "over" ? g.ref?.overPrice : g.ref?.underPrice)}`),
+          row(g.play!, `${name(g.away)} at ${name(g.home)}`, `${g.stake}u · ${price(g.price)}`),
         ),
       ].join(""),
     )}`);

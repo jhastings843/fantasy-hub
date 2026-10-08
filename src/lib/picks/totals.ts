@@ -187,6 +187,9 @@ export interface TotalsBoardGame {
   play?: string;
   side?: OU;
   line?: number;
+  p?: number;
+  price?: number;
+  stake?: number;
 }
 
 export interface TotalsRef {

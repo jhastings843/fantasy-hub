@@ -32,8 +32,8 @@ const n = (r: Rec) => r.w + r.l;
 
 const TIER_ORDER: Tier[] = ["t1", "t2", "wait", "fav", "pass", "split", "one"];
 const TIER_LABEL: { [t in Tier]: string } = {
-  t1: "Tier 1 · 1u",
-  t2: "Tier 2 · 0.5u",
+  t1: "Tier 1",
+  t2: "Tier 2",
   wait: "Needs PEM",
   fav: "Pass · favorite",
   pass: "Pass",
@@ -782,7 +782,7 @@ function UnitsSection({ r }: { r: PicksReport }) {
         <h2 className={s.h2}>Units</h2>
       </div>
       <p className={s.p}>
-        {`Tier 1 is 1 unit, Tier 2 half a unit, a totals play 1 unit. Units are to win (a 1u bet at -110 risks 1.1u) and each bet is graded at the price it was sent with. Each game counts once, at the line it was first sent.${u.unstaked ? ` ${u.unstaked} earlier plays went out before stakes existed; they're in the win-loss record below but not in units.` : ""}`}
+        {`Stakes run 0.25u to 5u (1u = 1% of bankroll): a quarter-Kelly bet on the tier's record pulled toward 50%, as if it had already gone 50-50 over 100 games, at the price on offer. Under a quarter unit it's not a bet (priced out). Parlays: two legs, 10%+ estimated edge, 0.25u to 1u. At most 15u at risk per sport per card; a heavy week is scaled down, because every bet leans on the same estimate of the rule. Units are risked, and each bet is graded at the price it was sent with. Each game counts once, at the line it was first sent.${u.unstaked ? ` ${u.unstaked} earlier plays went out before stakes existed; they're in the win-loss record below but not in units.` : ""}`}
       </p>
       <div className={s.rule}>
         <div>
@@ -798,9 +798,17 @@ function UnitsSection({ r }: { r: PicksReport }) {
         {tile("Tier 1", u.byTier.t1)}
         {tile("Tier 2", u.byTier.t2)}
         {tile("Totals", u.byTier.totals)}
+        {tile("Parlays", u.byTier.parlays)}
         {tile("Tuesday card", u.bySlot.tue)}
         {tile(r.league === "cfb" ? "Saturday additions" : "Sunday additions", r.league === "cfb" ? u.bySlot.sat : u.bySlot.sun)}
       </div>
+      {(r.parlays?.length ?? 0) > 0 && (
+        <p className={s.p}>
+          {`This week's parlay${r.parlays.length > 1 ? "s" : ""}: ${r.parlays
+            .map((pr) => `${pr.legs.map((l) => { const g = r.board.find((x) => `${r.week}:${x.away}@${x.home}` === l.game); return g?.side ? `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)}` : l.game; }).join(" + ")} (${pr.units}u, est. edge ${Math.round(pr.edge * 100)}%)`)
+            .join("; ")}.`}
+        </p>
+      )}
       {u.byWeek.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
@@ -1042,6 +1050,7 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
         <thead>
           <tr>
             <th>Pick at line now</th>
+            <th>Bet</th>
             <th>Tier</th>
             <th>Game</th>
             <th>Line now (home)</th>
@@ -1071,6 +1080,15 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
                   )}
                   {g.basis === "source" && (g.tier === "t1" || g.tier === "t2") && (
                     <div className={s.thin}>No current quote: judged at the sites&apos; own lines.</div>
+                  )}
+                </td>
+                <td className={`${s.num} ${s.nw}`}>
+                  {g.stake ? (
+                    <b>{`${g.stake}u · ${g.price! > 0 ? "+" : ""}${g.price}`}</b>
+                  ) : (g.tier === "t1" || g.tier === "t2") && g.basis === "reference" ? (
+                    <span className={s.dim}>{`priced out at ${g.price! > 0 ? "+" : ""}${g.price}`}</span>
+                  ) : (
+                    <span className={s.dim}>·</span>
                   )}
                 </td>
                 <td>
