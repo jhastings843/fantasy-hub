@@ -541,6 +541,9 @@ export interface BoardGame {
   issued?: { units: number; price?: number; homeLine: number; side: "home" | "away" };
   /** Held until this time (ISO): an early look, not yet a bet (hold.ts). */
   held?: string;
+  /** Finished: the final score, and each pick's result at its own line (finished.ts). */
+  final?: { home: number; away: number };
+  results?: { pick?: Result; issued?: Result; sam?: Result; david?: Result; pem?: Result };
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);

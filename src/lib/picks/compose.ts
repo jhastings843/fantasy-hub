@@ -8,6 +8,7 @@
 // offered, and every stake is allocated against what has already been
 // issued.
 
+import { finishedResults } from "./finished";
 import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
 import { summarize, type ClvRow } from "./closing";
@@ -51,6 +52,8 @@ export interface PicksCore {
   week: number | null;
   generatedAt: string;
   boardUpdated: { sam: boolean; david: boolean };
+  /** The calendar week has turned over and neither site has posted it yet. */
+  awaiting?: boolean;
   weeksCovered: number[];
   graded: GradedGame[];
   strategies: StrategyBoard;
@@ -118,10 +121,12 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const lines = new Map(quotes.lines);
   const week = core.week;
   let started = 0;
+  const coreFinals = new Map(core.finals);
   const refOf = (home: string, away: string): { ref?: RefLine; started?: boolean } => {
     if (!week) return {};
     const ref = lines.get(key({ week, home, away }));
-    if (ref?.kickoff && new Date(ref.kickoff).getTime() <= nowMs) {
+    // A final counts as kicked off even after ESPN drops the game's line.
+    if (coreFinals.has(key({ week, home, away })) || (ref?.kickoff && new Date(ref.kickoff).getTime() <= nowMs)) {
       started++;
       return { started: true };
     }
@@ -185,11 +190,15 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     ],
     exposure,
   );
-  const board: BoardGame[] = wanted.map((g) => ({
-    ...g,
-    stake: alloc.stakes.get(`ats:${gk(g)}`) ?? (g.want !== undefined ? 0 : undefined),
-    ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
-  }));
+  const board: BoardGame[] = wanted.map((g) => {
+    const out: BoardGame = {
+      ...g,
+      stake: alloc.stakes.get(`ats:${gk(g)}`) ?? (g.want !== undefined ? 0 : undefined),
+      ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
+    };
+    const final = coreFinals.get(gk(g));
+    return final ? { ...out, final, results: finishedResults(out, final) } : out;
+  });
   const totalsBoardOut: TotalsBoardGame[] = tWanted.map((g) => ({
     ...g,
     ...("want" in g && g.want !== undefined ? { stake: alloc.stakes.get(`ou:${gk(g)}`) ?? 0 } : {}),

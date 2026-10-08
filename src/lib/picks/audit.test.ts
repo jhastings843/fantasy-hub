@@ -119,6 +119,18 @@ describe("finding 4 and price provenance: kickoff, stale quotes, missing prices"
     expect(r.reference.started).toBe(1);
     expect(r.board.find((g) => g.home === "H1")!.stake).toBeGreaterThan(0);
   });
+  it("a finished game with no line left on ESPN is final, not offered, and carries its results", () => {
+    // ESPN drops a game's line once it is final; the final alone must mark it.
+    const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(1), quote(2)] };
+    const r = compose({ core: core(rows, { finals: [["6:A0@H0", { home: 20, away: 17 }]] }), quotes, issued: [], exposure: noExposure, now: NOW });
+    const g0 = r.board.find((g) => g.home === "H0")!;
+    expect(g0.basis).toBe("started");
+    expect(g0.stake ?? 0).toBe(0);
+    expect(g0.final).toEqual({ home: 20, away: 17 });
+    // Both models took the home dog +3 (home line +3); it won outright.
+    expect(g0.results).toMatchObject({ sam: "W", david: "W" });
+    expect(r.board.find((g) => g.home === "H1")!.final).toBeUndefined();
+  });
   it("quotes older than the freshness limit are shown as stale, not offered", () => {
     const quotes = { fetchedAt: "2026-10-13T18:00:00Z", lines: rows.map((_, i) => quote(i)) };
     const r = compose({ core: core(rows), quotes, issued: [], exposure: noExposure, now: NOW });

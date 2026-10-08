@@ -26,6 +26,7 @@ import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom } 
 import { loadActivePolicy } from "./policy-store";
 import { activatedFor } from "./report-scope";
 import { archiveForecasts } from "./forecasts";
+import { boardWeek, gradeFinished } from "./finished";
 import {
   type BoardGame,
   type PemLine,
@@ -256,12 +257,11 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     }),
   };
   const policy = await loadActivePolicy();
-  const s = strategies(league, j.graded, { activated: activatedFor(league, policy.atsCandidates) });
-  const su = suRecords(league, j.graded);
 
-  // The week on the board is whichever site has moved on; a site still
-  // showing last week contributes nothing to this one.
-  const week = Math.max(sb.week ?? 0, db.week ?? 0) || null;
+  // The week on the board is the calendar week: it turns over at 4am ET
+  // Tuesday whether or not the sites have posted (finished.ts). A site on
+  // another week contributes nothing to this one.
+  const { week, awaiting } = boardWeek(league, Math.max(sb.week ?? 0, db.week ?? 0) || null, new Date());
   const samLive = sb.week === week ? sb.rows : [];
   const davidLive = db.week === week ? db.rows : [];
   const dmap = new Map(davidLive.map((r) => [`${r.away}@${r.home}`, r]));
@@ -281,12 +281,20 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // Closing lines (and ESPN finals) for every graded game, every issued
   // pick, every archived totals game and Sam's whole record. Only finished
   // games are ever fetched; each is fetched once.
-  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam]);
+  // This week's games too, so each one is graded the day it ends.
+  const thisWeek = week ? rows.map((r) => ({ week, home: r.home, away: r.away })) : [];
+  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam, ...thisWeek]);
   const finals = new Map(j.graded.map((g) => [key(g), g.final]));
   // Games only one model graded still have a final; ESPN fills in the rest,
   // so issued picks and totals grade even when neither site lists the game.
   for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
   for (const [k, c] of closes) if (!finals.has(k) && c.final) finals.set(k, c.final);
+  // This week's finished games, graded from ESPN finals until the sites post
+  // their own records (theirs replace these). The backtest, research and the
+  // strategy review all learn from them as they land.
+  j.graded = [...j.graded, ...gradeFinished(week, rows, finals, j.graded)];
+  const s = strategies(league, j.graded, { activated: activatedFor(league, policy.atsCandidates) });
+  const su = suRecords(league, j.graded);
   const rule = s.rule;
   const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));
   const totalsMarket = new Map([...closes].map(([k, c]) => [k, { open: c.totalOpen, close: c.totalClose }]));
@@ -323,6 +331,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     week,
     generatedAt: new Date().toISOString(),
     boardUpdated: { sam: samLive.length > 0, david: davidLive.length > 0 },
+    awaiting,
     weeksCovered: [...new Set(j.graded.map((g) => g.week))].sort((a, b) => a - b),
     graded: j.graded,
     strategies: s,
@@ -346,6 +355,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
 }
 
 const CORE_KEY = (league: League) => `picks:v2:${league}:core`;
+const CORE_REFRESH_WHILE_PLAYING_MS = 30 * 60 * 1000;
 const QUOTES_KEY = (league: League, season: number, week: number) => `picks:v2:${league}:quotes:${season}:w${week}`;
 /** Current lines are re-read at most this often (the pulse forces a read every run). */
 const QUOTES_TTL_S = 10 * 60;
@@ -356,7 +366,8 @@ export function getPicksCore(league: League) {
     key: CORE_KEY(league),
     ttlSeconds: 3 * 60 * 60,
     fetcher: () => buildPicksCore(league),
-    isComplete: (r) => !!r && r.graded.length > 0 && r.rows.length > 0 && r.errors.length === 0,
+    // A new week the sites haven't posted yet is complete with no rows.
+    isComplete: (r) => !!r && r.graded.length > 0 && (r.rows.length > 0 || !!r.awaiting) && r.errors.length === 0,
     empty: null,
   });
 }
@@ -445,7 +456,16 @@ export async function refreshPicks(league: League, opts: { reserved?: number } =
  * snapshot the board. Returns one line for the receipt.
  */
 export async function runPicksData(league: League): Promise<string> {
-  const r = (await getPicksReport(league, { forceQuotes: true })).value;
+  let got = await getPicksReport(league, { forceQuotes: true });
+  // A game that has kicked off but has no final yet: rebuild the core every
+  // half hour, so each game is graded within about 45 minutes of ending
+  // instead of waiting out the three-hour cache.
+  const playing = got.value?.board.some((g) => g.basis === "started" && !g.final);
+  if (playing && got.at && Date.now() - new Date(got.at).getTime() > CORE_REFRESH_WHILE_PLAYING_MS) {
+    await redis.del(CORE_KEY(league)).catch(() => {});
+    got = await getPicksReport(league);
+  }
+  const r = got.value;
   if (!r) throw new Error(`${league} core unavailable`);
   const core = (await getPicksCore(league)).value!;
   const finals = new Map(core.finals);

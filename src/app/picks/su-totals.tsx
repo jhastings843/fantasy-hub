@@ -15,6 +15,13 @@ export function SuWeek({ r }: { r: PicksReport }) {
       return p ? [{ g, ...p }] : [];
     })
     .sort((a, b) => b.margin - a.margin);
+  const upcoming = list.filter((x) => !x.g.final);
+  const done = list.filter((x) => x.g.final);
+  const won = (x: (typeof list)[number]) => {
+    const f = x.g.final!;
+    return f.home === f.away ? "P" : (f.home > f.away) === (x.side === "home") ? "W" : "L";
+  };
+  const doneW = done.filter((x) => won(x) === "W").length;
   return (
     <section className={s.section} aria-labelledby="su-week">
       <div className={s.sectionHead}>
@@ -25,8 +32,13 @@ export function SuWeek({ r }: { r: PicksReport }) {
           {`${r.league === "nfl" ? "For the Weekly payout pool, use the entry above. This list is ranked" : "Ranked"} for a confidence pool, most sure first. Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l}, its best record)` : ""}. Pick'em only: no stake, and not counted in units. Bands describe the projected margin, not a probability.`}
         </p>
       </div>
+      {upcoming.length === 0 && (
+        <p className={s.calm} data-first-pick>
+          {done.length ? "Every game on the board has been played. Results are below." : "No games on the board yet."}
+        </p>
+      )}
       <ol className={s.cards} data-first-pick>
-        {list.map(({ g, side, margin }, i) => {
+        {upcoming.map(({ g, side, margin }, i) => {
           const pick = side === "home" ? g.home : g.away;
           const opp = side === "home" ? g.away : g.home;
           const band = marginBand(r.league, margin);
@@ -35,7 +47,7 @@ export function SuWeek({ r }: { r: PicksReport }) {
               <div className={s.cardTop}>
                 <div>
                   <div className={s.cardPick}>
-                    <span className={`${s.num} ${s.rank}`}>{list.length - i}</span>
+                    <span className={`${s.num} ${s.rank}`}>{upcoming.length - i}</span>
                     {name(pick)}
                   </div>
                   <div className={s.cardMeta}>{`over ${name(opp)} · ${kickoffEt(g.ref?.kickoff)}`}</div>
@@ -46,6 +58,33 @@ export function SuWeek({ r }: { r: PicksReport }) {
           );
         })}
       </ol>
+      {done.length > 0 && (
+        <div className={s.finished}>
+          <div className={s.finHead}>
+            <h3 className={s.h3}>{`Finished (${done.length})`}</h3>
+            <span className={`${s.num} ${s.finTally}`}>{`Picks ${doneW}-${done.length - doneW}`}</span>
+          </div>
+          <ul className={s.finList}>
+            {done.map((x) => {
+              const f = x.g.final!;
+              const res = won(x);
+              return (
+                <li key={`${x.g.away}@${x.g.home}`} className={s.finRow}>
+                  <div className={s.finScore}>
+                    <span className={f.away > f.home ? s.finWinner : undefined}>{`${name(x.g.away)} ${f.away}`}</span>
+                    <span className={s.muted}> at </span>
+                    <span className={f.home > f.away ? s.finWinner : undefined}>{`${name(x.g.home)} ${f.home}`}</span>
+                  </div>
+                  <div className={s.finCall}>
+                    <span className={s.finPick}>{`${name(x.side === "home" ? x.g.home : x.g.away)} to win`}</span>
+                    <span className={`${s.resChip} ${res === "W" ? s.resW : res === "L" ? s.resL : s.resP}`}>{res}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
@@ -135,7 +174,18 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
   const t = r.totals;
   const name = (k: string) => r.names[k] ?? k;
   const order = { t1: 0, lean: 1, split: 2, one: 3, noline: 4 } as const;
-  const games = t.board.slice().sort((a, b) => order[a.tier] - order[b.tier] || (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
+  const finalOf = new Map(r.board.filter((g) => g.final).map((g) => [`${g.away}@${g.home}`, g.final!]));
+  const all = t.board.slice().sort((a, b) => order[a.tier] - order[b.tier] || (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
+  const games = all.filter((g) => !finalOf.has(`${g.away}@${g.home}`));
+  const done = all.filter((g) => finalOf.has(`${g.away}@${g.home}`));
+  // Over/under on the total the board judged it at; no side, no result.
+  const ouResult = (g: (typeof all)[number]): "W" | "L" | "P" | undefined => {
+    const f = finalOf.get(`${g.away}@${g.home}`)!;
+    const at = g.ref?.total;
+    if (!g.side || at === undefined) return undefined;
+    const pts = f.home + f.away;
+    return pts === at ? "P" : (pts > at) === (g.side === "over") ? "W" : "L";
+  };
   const bets = games.filter((g) => g.stake);
   const leans = games.filter((g) => !g.stake && (g.tier === "t1" || g.tier === "lean"));
   const other = games.filter((g) => !bets.includes(g) && !leans.includes(g));
@@ -206,6 +256,30 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
           <summary>{`Every other game (${other.length})`}</summary>
           <ul className={`${s.cards} ${s.cardsInset}`}>{other.map(card)}</ul>
         </details>
+      )}
+      {done.length > 0 && (
+        <div className={s.finished}>
+          <div className={s.finHead}>
+            <h3 className={s.h3}>{`Finished (${done.length})`}</h3>
+          </div>
+          <ul className={s.finList}>
+            {done.map((g) => {
+              const f = finalOf.get(`${g.away}@${g.home}`)!;
+              const res = ouResult(g);
+              return (
+                <li key={`${g.away}@${g.home}`} className={s.finRow}>
+                  <div className={s.finScore}>{`${name(g.away)} ${f.away} at ${name(g.home)} ${f.home}`}</div>
+                  <div className={s.finCall}>
+                    <span className={s.finPick}>
+                      {g.side && g.ref ? `${g.side === "over" ? "Over" : "Under"} ${g.ref.total} · ${f.home + f.away} scored` : `${f.home + f.away} scored`}
+                    </span>
+                    {res && <span className={`${s.resChip} ${res === "W" ? s.resW : res === "L" ? s.resL : s.resP}`}>{res}</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </section>
   );

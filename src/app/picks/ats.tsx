@@ -8,9 +8,10 @@ import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
 
-type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "pass";
+type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
 
 function statusOf(g: BoardGame): Status {
+  if (g.final) return "final";
   if (g.basis === "started") return "started";
   if (g.issued) return "sent";
   if (g.tier === "wait") return "wait";
@@ -31,7 +32,8 @@ const STATUS_TEXT: { [k in Status]: string } = {
   budget: "Over this week's budget",
   wait: "Needs PEM's line",
   noquote: "No current line",
-  started: "Kicked off",
+  started: "In progress",
+  final: "Final",
   pass: "Pass",
 };
 
@@ -141,6 +143,77 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
   );
 }
 
+type Res = "W" | "L" | "P";
+const RES_CLASS: { [k in Res]: string } = { W: s.resW, L: s.resL, P: s.resP };
+
+function tally(rs: (Res | undefined)[]): string | null {
+  const w = rs.filter((x) => x === "W").length;
+  const l = rs.filter((x) => x === "L").length;
+  const p = rs.filter((x) => x === "P").length;
+  return w + l + p ? rec({ w, l, p }) : null;
+}
+
+/** One finished game: the score, the board's call and how each model did. */
+function FinishedRow({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const name = (k: string) => r.names[k] ?? k;
+  const f = g.final!;
+  const res = g.results ?? {};
+  const call = res.issued ?? res.pick;
+  const models: [string, Res | undefined][] = [
+    ["Sam", res.sam],
+    ["David", res.david],
+    ...(r.league === "cfb" ? ([["PEM", res.pem]] as [string, Res | undefined][]) : []),
+  ];
+  const homeWon = f.home > f.away;
+  return (
+    <li className={s.finRow}>
+      <div className={s.finScore}>
+        <span className={!homeWon ? s.finWinner : undefined}>{`${name(g.away)} ${f.away}`}</span>
+        <span className={s.muted}> at </span>
+        <span className={homeWon ? s.finWinner : undefined}>{`${name(g.home)} ${f.home}`}</span>
+      </div>
+      <div className={s.finCall}>
+        <span className={s.finPick}>
+          {g.issued ? `Sent: ${pickText(g, name)} · ${g.issued.units}u` : g.side ? pickText(g, name) : g.read && !g.read.agree ? "Models split" : g.play}
+        </span>
+        {call && <span className={`${s.resChip} ${RES_CLASS[call]}`}>{call}</span>}
+      </div>
+      <div className={`${s.finModels} ${s.num}`}>
+        {models.map(([who, x]) => (
+          <span key={who}>
+            {`${who} `}
+            <b className={x ? RES_CLASS[x] : s.muted}>{x ?? "–"}</b>
+          </span>
+        ))}
+      </div>
+    </li>
+  );
+}
+
+function Finished({ games, r }: { games: BoardGame[]; r: PicksReport }) {
+  const calls = tally(games.map((g) => g.results?.issued ?? g.results?.pick));
+  const parts = [
+    calls ? `Board calls ${calls}` : null,
+    tally(games.map((g) => g.results?.sam)) ? `Sam ${tally(games.map((g) => g.results?.sam))}` : null,
+    tally(games.map((g) => g.results?.david)) ? `David ${tally(games.map((g) => g.results?.david))}` : null,
+    r.league === "cfb" && tally(games.map((g) => g.results?.pem)) ? `PEM ${tally(games.map((g) => g.results?.pem))}` : null,
+  ].filter(Boolean);
+  return (
+    <div className={s.finished} aria-labelledby="ats-finished">
+      <div className={s.finHead}>
+        <h3 className={s.h3} id="ats-finished">{`Finished (${games.length})`}</h3>
+        {parts.length > 0 && <span className={`${s.num} ${s.finTally}`}>{parts.join(" · ")}</span>}
+      </div>
+      <p className={s.notice}>Graded from the final score the day each game ends, each model at its own line. Clears when the week turns over Tuesday morning.</p>
+      <ul className={s.finList}>
+        {games.map((g) => (
+          <FinishedRow key={`${g.away}@${g.home}`} g={g} r={r} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function AtsWeek({ r }: { r: PicksReport }) {
   const st = r.strategies;
   const order = (g: BoardGame) =>
@@ -150,6 +223,7 @@ export function AtsWeek({ r }: { r: PicksReport }) {
   const near = all.filter((g) => ["priced", "budget", "wait", "noquote"].includes(statusOf(g)));
   const rest = all.filter((g) => statusOf(g) === "pass");
   const started = all.filter((g) => statusOf(g) === "started");
+  const finished = all.filter((g) => statusOf(g) === "final");
   const early = all.filter((g) => statusOf(g) === "early");
   const days = groupByDay([...bets, ...early], (g) => g.ref?.kickoff, new Date());
   const isBet = (g: BoardGame) => statusOf(g) !== "early";
@@ -176,7 +250,9 @@ export function AtsWeek({ r }: { r: PicksReport }) {
             : "No cut has a big enough winning record yet, so nothing is a bet this week."}
         </p>
       </div>
-      {!r.boardUpdated.sam || !r.boardUpdated.david ? (
+      {!r.boardUpdated.sam && !r.boardUpdated.david ? (
+        <p className={s.notice}>{`Neither Sam nor David has posted ${r.week ? `Week ${r.week}` : "this week"} yet. Games appear here as soon as one does.`}</p>
+      ) : !r.boardUpdated.sam || !r.boardUpdated.david ? (
         <p className={s.notice}>{`${!r.boardUpdated.sam ? "Sam" : "David"} hasn't posted this week's board yet, so games are single-model for now.`}</p>
       ) : null}
       {bets.length || early.length ? (
@@ -197,14 +273,16 @@ export function AtsWeek({ r }: { r: PicksReport }) {
         </div>
       ) : (
         <p className={s.calm} data-first-pick>
-          {started.length
-            ? "No spread bets left this week. Games that have kicked off are below."
+          {started.length || finished.length
+            ? "No spread bets left this week. Games underway and finished are below."
+            : !r.boardUpdated.sam && !r.boardUpdated.david
+            ? "No games on the board yet."
             : "No spread bets this week. That's a normal outcome: nothing clears the rule at a price worth a stake."}
         </p>
       )}
       {started.length > 0 && (
         <details className={s.details}>
-          <summary>{`Kicked off (${started.length})`}</summary>
+          <summary>{`In progress (${started.length})`}</summary>
           <ul className={`${s.cards} ${s.cardsInset}`}>
             {started.map((g) => (
               <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
@@ -244,6 +322,7 @@ export function AtsWeek({ r }: { r: PicksReport }) {
           />
         </div>
       </details>
+      {finished.length > 0 && <Finished games={finished} r={r} />}
     </section>
   );
 }
