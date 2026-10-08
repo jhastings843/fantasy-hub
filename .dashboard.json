@@ -196,7 +196,8 @@
     "2026-10-05: Trade tool blind spot fixed (b5433b9, deployed): a room already ranked last could be emptied for free because its rank can't fall, so it offered Dart from the worst superflex QB room for Collins. Losing 20%+ of a last-place room now counts as deepening the hole; recommendations skip any idea that opens or deepens a hole; the analyzer caps those at Lean decline. Dart added to the dynasty keep list. 916 tests pass.",
     "2026-10-08: Pool entry on Picks redesigned as logo tiles (win bar, pool-share tick, upset chip), 4 cols desktop / 2 phone.",
     "2026-10-08: Week board grouped by day (today first); NFL Sun/Mon bets now held as early looks until the Sunday 9am brief (hold.ts), college unchanged.",
-    "2026-10-08: Stakes only on game day: daily 9am ET bets email (+ Pushover, token pending), Tuesday email is now an update with no stakes; Saturday update and Sunday brief picks removed. Astra reviewed twice, fixes applied."
+    "2026-10-08: Stakes only on game day: daily 9am ET bets email (+ Pushover, token pending), Tuesday email is now an update with no stakes; Saturday update and Sunday brief picks removed. Astra reviewed twice, fixes applied.",
+    "2026-10-08: John Harris tracked weekly (reader via Mac relay, tracker on college research view + Tuesday update, review files a proposal if he clears the bar); never used for bets."
   ],
   "tags": [
     "personal",
