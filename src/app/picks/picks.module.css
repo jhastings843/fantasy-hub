@@ -53,6 +53,7 @@
 .h1, .h2 { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; margin: 0; text-wrap: balance; line-height: 1; }
 .h1 { font-size: clamp(40px, 8vw, 64px); font-weight: 800; }
 .h2 { font-size: 30px; font-weight: 700; }
+.h3 { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; font-size: 20px; font-weight: 700; margin: 12px 0 0; line-height: 1.1; }
 .eyebrow { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
 .p { margin: 0; max-width: 68ch; color: var(--ink2); }
 .section { display: flex; flex-direction: column; gap: 16px; }

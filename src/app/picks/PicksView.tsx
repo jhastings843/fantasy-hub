@@ -2,12 +2,14 @@ import Link from "next/link";
 import {
   BREAK_EVEN,
   MIN_SAMPLE,
-  SU_BANDS,
   type BoardGame,
   type CutResult,
   type Record as Rec,
   type Tier,
-  matches,
+  cutResult,
+  marginBand,
+  marginLabel,
+  needsPem,
   suPick,
 } from "@/lib/picks/engine";
 import { SOURCES, getPicksReport, type PicksReport } from "@/lib/picks/report";
@@ -27,10 +29,11 @@ const units = (r: Rec) => `${r.units >= 0 ? "+" : "−"}${Math.abs(r.units).toFi
 const line = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
 const n = (r: Rec) => r.w + r.l;
 
-const TIER_ORDER: Tier[] = ["t1", "t2", "fav", "pass", "split", "one"];
+const TIER_ORDER: Tier[] = ["t1", "t2", "wait", "fav", "pass", "split", "one"];
 const TIER_LABEL: { [t in Tier]: string } = {
   t1: "Tier 1 · bet",
   t2: "Tier 2 · small",
+  wait: "Needs PEM",
   fav: "Pass · favorite",
   pass: "Pass",
   split: "Pass · split",
@@ -124,31 +127,38 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
   const board = r.board
     .slice()
     .sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier) || (b.read?.avgEdge ?? 0) - (a.read?.avgEdge ?? 0));
-  const plays = board.filter((g) => g.tier === "t1" || g.tier === "t2");
-  const rest = board.filter((g) => g.tier !== "t1" && g.tier !== "t2");
+  const tiered = (g: BoardGame) => g.tier === "t1" || g.tier === "t2";
+  const plays = board.filter((g) => tiered(g) && g.basis === "reference");
+  const researchOnly = board.filter((g) => tiered(g) && g.basis === "source");
+  const rest = board.filter((g) => !tiered(g));
   const count = (t: Tier) => board.filter((g) => g.tier === t).length;
 
   const suMethod = r.su.best?.id ?? "avg";
   const suList = r.board
     .flatMap((g) => {
-      const p = suPick(suMethod, g.sam, g.david);
+      const p = suPick(suMethod, g.sam, g.david, g.ref?.line);
       return p ? [{ g, ...p }] : [];
     })
     .sort((a, b) => b.margin - a.margin);
-  const bands = SU_BANDS[lg];
-  const band = (m: number) => (m >= bands.lock ? "lock" : m >= bands.solid ? "solid" : "toss");
+  const band = (m: number) => marginBand(lg, m);
+  const ref = r.reference;
+  const refAt = ref?.fetchedAt
+    ? new Date(ref.fetchedAt).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })
+    : null;
+  const pemNeeded = !!(st.rule && needsPem(st.rule.test)) || !!(st.second && needsPem(st.second.test));
 
   const firstT1 = board.find((g) => g.tier === "t1" && g.sam && g.david);
   const example = firstT1?.sam && firstT1.david
     ? {
-        vegas: firstT1.david.market,
+        vegas: firstT1.ref?.line ?? firstT1.david.market,
         sam: firstT1.sam.model,
         david: firstT1.david.model,
+        pem: firstT1.pem?.model,
         label: `${name(firstT1.away)} at ${name(firstT1.home)}`,
       }
     : null;
 
-  const live = r.live.filter((w) => n(w.t1) + n(w.t2) + w.su.w + w.su.l > 0);
+  const live = r.live ?? [];
   const liveT1 = live.reduce((t, w) => ({ w: t.w + w.t1.w, l: t.l + w.t1.l, p: t.p + w.t1.p }), { w: 0, l: 0, p: 0 });
 
   const byWeek = st.byWeek;
@@ -158,7 +168,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
   const sam = st.baselines.find((b) => b.id === "sam")!.record;
   const david = st.baselines.find((b) => b.id === "david")!.record;
 
-  const groups = [...new Set(st.cuts.map((c) => c.group))];
+  const groups = [...new Set(st.cuts.filter((c) => c.group !== "Research").map((c) => c.group))];
 
   return (
     <main className={s.page}>
@@ -209,13 +219,18 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           {st.rule ? (
             <div className={s.rule}>
               <div>
-                <div className={s.eyebrow}>The rule right now</div>
+                <div className={s.eyebrow}>The rule right now · chosen on the source-line backtest</div>
                 <h2 className={s.h2}>{st.rule.label}</h2>
                 <p className={s.p}>
-                  Picked automatically: of every cut with at least {MIN_SAMPLE} graded games, this one has the best worst
-                  case (the low end of its 90% likely range, {Math.round(st.rule.record.lo * 100)}%). Shared picks are graded
-                  at the worse of the two sites&apos; lines.
-                  {st.second ? ` Tier 2 is the runner-up: ${st.second.label.toLowerCase()} (${rec(st.second.record)}).` : ""}
+                  {`Picked automatically from history: of the cuts with at least ${MIN_SAMPLE} decided games (pushes don't count) and`}{" "}
+                   a winning rate past break-even, this one has the highest low end of its 90% range (
+                  {Math.round(st.rule.record.lo * 100)}%). That range is a statistical estimate from a small sample, not a
+                  floor. The backtest judges each model at its own site&apos;s line and grades shared picks at the worse of
+                  the two; this week&apos;s board judges every model at one current line.
+                  {st.second
+                    ? ` Tier 2: ${st.second.label.toLowerCase()}, judged only on the ${n(st.second.record)} decided games it adds outside Tier 1 (${rec(st.second.record)}; the whole cut is ${rec(st.second.fullRecord)}).`
+                    : " No Tier 2: no other cut wins on the games Tier 1 leaves."}
+                  {live.length ? " The record of what was actually sent is further down, kept apart from this." : ""}
                 </p>
               </div>
               <div className={`${s.big} ${s.num}`}>
@@ -263,9 +278,13 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
             <h2 className={s.h2}>{r.week ? `Week ${r.week} board` : "This week's board"}</h2>
           </div>
           <p className={s.p}>
-            {count("t1")} Tier 1, {count("t2")} Tier 2, {board.length - count("t1") - count("t2")} passes. &quot;Play&quot; uses
-            the worse of the two sites&apos; lines. Re-check the live number before betting; if it has moved, run it through
-            the checker below.
+            {plays.filter((g) => g.tier === "t1").length} Tier 1 and {plays.filter((g) => g.tier === "t2").length} Tier 2
+            plays. Every model is judged at one current line per game
+            {ref?.source ? ` (${ref.source}, read ${refAt} ET; ${ref.priced} of ${ref.games} games priced)` : ""}, so
+            &quot;agree&quot; means agree at a number you can get. Re-check it before betting; if it has moved, run it
+            through the checker below.
+            {ref?.problem ? ` ${ref.problem}` : ""}
+            {count("wait") ? ` ${count("wait")} game${count("wait") === 1 ? "" : "s"} can't be decided until PEM's card is on file.` : ""}
             {!r.boardUpdated.sam || !r.boardUpdated.david
               ? ` ${!r.boardUpdated.sam ? "Sam" : "David"} hasn't posted this week's board yet, so every game is single-model for now.`
               : ""}
@@ -276,6 +295,19 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
             <div className={s.tile}>
               <div className={s.tileK}>No games fit the rule or the runner-up this week.</div>
             </div>
+          )}
+          {researchOnly.length > 0 && (
+            <details className={s.details}>
+              <summary>
+                {researchOnly.length} research signal{researchOnly.length === 1 ? "" : "s"}: fit at the sites&apos; own lines, no
+                current quote
+              </summary>
+              <p className={`${s.p} ${s.thin}`}>
+                No current line was available for these, so each model is judged at its own site&apos;s number, the way the
+                backtest is. Not a recommendation until a current quote confirms it.
+              </p>
+              <BoardTable games={researchOnly} name={name} withPem={lg === "cfb"} />
+            </details>
           )}
           {rest.length > 0 && (
             <details className={s.details}>
@@ -294,7 +326,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
             Ranked for a confidence pool, most sure first. Picks follow the best straight-up method so far:{" "}
             <b>{r.su.best?.label.toLowerCase() ?? "average of both models"}</b>
             {r.su.best ? ` (${r.su.best.w}-${r.su.best.l}, ${Math.round(r.su.best.pct * 100)}%)` : ""}. Confidence comes from
-            the projected margin.
+            the projected margin; the bands describe that margin and are not calibrated probabilities.
           </p>
           <div className={s.tiles}>
             {r.su.bands.map((b) => (
@@ -324,7 +356,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
                   <th>Pick</th>
                   <th>Over</th>
                   <th>Margin</th>
-                  <th>Confidence</th>
+                  <th>Margin band</th>
                   <th>Notes</th>
                 </tr>
               </thead>
@@ -333,7 +365,7 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
                   const b = band(margin);
                   const pick = side === "home" ? g.home : g.away;
                   const opp = side === "home" ? g.away : g.home;
-                  const mkt = g.david?.market ?? g.sam?.market ?? 0;
+                  const mkt = g.ref?.line ?? g.david?.market ?? g.sam?.market ?? 0;
                   const vegasDog = mkt !== 0 && (side === "home") !== mkt < 0;
                   const split = g.sam && g.david && Math.sign(g.sam.model) !== Math.sign(g.david.model);
                   return (
@@ -346,8 +378,8 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
                       <td>{name(opp)}</td>
                       <td className={s.num}>{margin.toFixed(1)}</td>
                       <td>
-                        <span className={`${s.tier} ${b === "lock" ? s.lock : b === "solid" ? s.solid : s.toss}`}>
-                          {b === "lock" ? "Lock" : b === "solid" ? "Solid" : "Toss-up"}
+                        <span className={`${s.tier} ${b === "wide" ? s.lock : b === "clear" ? s.solid : s.toss}`}>
+                          {marginLabel(lg, b)}
                         </span>
                       </td>
                       <td className={s.thin}>
@@ -415,11 +447,12 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           <section className={s.section}>
             <div>
               <div className={s.eyebrow}>Since the tab went live</div>
-              <h2 className={s.h2}>The plays as made</h2>
+              <h2 className={s.h2}>The plays as sent</h2>
             </div>
             <p className={s.p}>
-              Each week&apos;s board is frozen when the Wednesday email goes out and graded later at those lines. This is
-              the real record, separate from the backtest. Tier 1 so far: {rec(liveT1 as Rec)}.
+              Only what each Wednesday email actually showed, at the lines it showed, under the rule in force that week.
+              This is forward performance, separate from the backtest the rule was chosen on. Tier 1 so far:{" "}
+              {rec(liveT1 as Rec)}.
             </p>
             <div className={s.tw}>
               <table className={s.table}>
@@ -438,7 +471,16 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
                       <td className={s.num}>{w.week}</td>
                       <td>
                         {w.rule ?? "none"}
-                        {!w.frozen && <span className={s.dim}> (not frozen yet)</span>}
+                        {w.provenance === "recovered" && (
+                          <details className={s.thin}>
+                            <summary>Recovered from the delivered email, not recorded at send time</summary>
+                            <ul>
+                              {w.unverified.map((u) => (
+                                <li key={u}>{u}</li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
                       </td>
                       <td className={s.num}>{rec(w.t1)}</td>
                       <td className={s.num}>{rec(w.t2)}</td>
@@ -455,6 +497,8 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
         )}
 
         {r.clv && r.clv.matched > 0 && <ClvSection clv={r.clv} />}
+
+        {r.research?.length > 0 && <ResearchSection r={r} />}
 
         <section className={s.section}>
           <div>
@@ -491,8 +535,14 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           </div>
           <TierChecker
             rule={st.rule ? { label: st.rule.label, test: st.rule.test, record: rec(st.rule.record) } : null}
-            second={st.second ? { label: st.second.label, test: st.second.test, record: rec(st.second.record) } : null}
+            second={
+              st.second
+                ? { label: st.second.label, test: st.second.test, record: `${rec(st.second.record)} on games outside Tier 1` }
+                : null
+            }
             example={example}
+            pem={lg === "cfb"}
+            pemNeeded={pemNeeded}
           />
         </section>
 
@@ -691,8 +741,102 @@ function ClvSection({ clv }: { clv: PicksReport["clv"] }) {
   );
 }
 
+function ResearchSection({ r }: { r: PicksReport }) {
+  const sign = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}`;
+  const wk = (w: number[]) => (w.length ? (w.length > 1 ? `${w[0]}-${w[w.length - 1]}` : `${w[0]}`) : "none");
+  const helps = (x: PicksReport["research"][number]) =>
+    n(x.record) >= MIN_SAMPLE && n(x.excluded) >= 5 && x.record.pct > x.parent.record.pct + 0.03 && x.excluded.pct < BREAK_EVEN;
+  const pc = r.pemCompare;
+  return (
+    <section className={s.section}>
+      <div>
+        <div className={s.eyebrow}>Research only · never the rule</div>
+        <h2 className={s.h2}>Does being more specific help?</h2>
+      </div>
+      <p className={s.p}>
+        Each refinement next to the cut it narrows, and the record of the parent&apos;s games it leaves out. If the left-out
+        games won about as often, the narrower cut is the same signal on fewer games. Thresholds were fixed before grading:
+        underdog bands at {r.league === "nfl" ? "3 and 7" : "7 and 14"}, edge at {r.league === "nfl" ? "2" : "3"} points,
+        near-market agreement needing both models a point off. Source-line backtest, graded at −110.
+      </p>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>Refinement</th>
+              <th>W-L-P</th>
+              <th>Units</th>
+              <th>Weeks</th>
+              <th>vs close (n)</th>
+              <th>Parent</th>
+              <th>Left out</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.research.map((x) => (
+              <tr key={x.id}>
+                <td>
+                  {x.label}
+                  {n(x.record) < MIN_SAMPLE && <div className={s.thin}>{n(x.record)} decided: too few to read</div>}
+                  {helps(x) && <div className={s.thin}>Narrowing helps so far</div>}
+                </td>
+                <td className={`${s.num} ${s.nw}`}>
+                  {rec(x.record)}
+                  <div className={s.thin}>{n(x.record)} decided</div>
+                </td>
+                <td className={`${s.num} ${x.record.units >= 0 ? s.pos : s.neg}`}>{n(x.record) ? units(x.record) : "·"}</td>
+                <td className={s.num}>{wk(x.weeks)}</td>
+                <td className={`${s.num} ${s.nw}`}>{x.clv.n ? `${sign(x.clv.avg)} (${x.clv.n})` : "·"}</td>
+                <td className={s.num}>
+                  {rec(x.parent.record)}
+                  <div className={s.thin}>{x.parent.label}</div>
+                </td>
+                <td className={`${s.num} ${n(x.excluded) && x.excluded.pct > BREAK_EVEN ? s.pos : ""}`}>
+                  {n(x.excluded) + x.excluded.p ? rec(x.excluded) : "·"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pc && pc.games > 0 && (
+        <>
+          <h3 className={s.h3}>PEM on the same games</h3>
+          <p className={s.p}>
+            {`The ${pc.games} games all three models cover (Week${pc.weeks.length > 1 ? "s" : ""} ${wk(pc.weeks)}), every model`}{" "}
+            judged and graded at one line: the average of Sam&apos;s and David&apos;s posted numbers. Comparable row to row,
+            not to the backtest above.
+          </p>
+          <div className={s.tw}>
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>On these games</th>
+                  <th>W-L-P</th>
+                  <th>Units</th>
+                  <th>vs close (n)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pc.rows.map((x) => (
+                  <tr key={x.id}>
+                    <td>{x.label}</td>
+                    <td className={`${s.num} ${s.nw}`}>{n(x.record) + x.record.p ? rec(x.record) : "·"}</td>
+                    <td className={`${s.num} ${x.record.units >= 0 ? s.pos : s.neg}`}>{n(x.record) ? units(x.record) : "·"}</td>
+                    <td className={`${s.num} ${s.nw}`}>{x.clv.n ? `${sign(x.clv.avg)} (${x.clv.n})` : "·"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function matchesRule(g: PicksReport["graded"][number], rule: CutResult): boolean {
-  return matches(g.read, rule.test);
+  return cutResult(g, rule) !== undefined;
 }
 
 function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: string) => string; withPem: boolean }) {
@@ -707,6 +851,7 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
             <th>Game</th>
             <th>Play</th>
             <th>Avg edge</th>
+            <th>Line now (home)</th>
             <th>Sam: Vegas / model</th>
             <th>David: Vegas / model</th>
             {withPem && <th>PEM</th>}
@@ -719,9 +864,9 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
               g.sam && g.david && Math.abs(g.sam.market - g.david.market) >= 3
                 ? `The sites' Vegas lines differ by ${Math.abs(g.sam.market - g.david.market)} points. The line has likely moved; recheck it.`
                 : "";
-            const play = g.read?.agree && g.read.line !== undefined
-              ? `${name(g.read.side === "home" ? g.home : g.away)} ${line(g.read.line)}`
-              : g.tier === "split"
+            const play = g.side && g.homeLine !== undefined
+              ? `${name(g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine : -g.homeLine)}`
+              : g.tier === "split" || (g.tier === "wait" && !g.read?.agree)
                 ? `Sam: ${name(g.read!.samSide === "home" ? g.home : g.away)} · David: ${name(g.read!.davidSide === "home" ? g.home : g.away)}`
                 : g.play;
             return (
@@ -735,14 +880,23 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
                 <td className={`${s.play} ${g.tier === "t1" || g.tier === "t2" ? "" : s.dim}`}>
                   {play}
                   {g.pemPick && <div className={s.thin}>Sam and David split; PEM breaks it.</div>}
+                  {g.tier === "wait" && (
+                    <div className={s.thin}>
+                      {g.waitFor === "t1" ? "Tier 1" : "Tier 2"} if PEM agrees; PEM&apos;s line for this game isn&apos;t on file.
+                    </div>
+                  )}
+                  {g.basis === "source" && (g.tier === "t1" || g.tier === "t2") && (
+                    <div className={s.thin}>No current quote: judged at the sites&apos; own lines.</div>
+                  )}
                   {moved && <div className={s.thin} style={{ color: "var(--gold)" }}>{moved}</div>}
                 </td>
                 <td className={s.num}>{g.read?.agree ? g.read.avgEdge.toFixed(1) : "·"}</td>
+                <td className={`${s.num} ${s.nw}`}>{g.ref ? `${home} ${line(g.ref.line)}` : <span className={s.dim}>none</span>}</td>
                 <td className={`${s.num} ${s.nw} ${s.dim}`}>{ml(home, g.sam)}</td>
                 <td className={`${s.num} ${s.nw} ${s.dim}`}>{ml(home, g.david)}</td>
                 {withPem && (
                   <td className={`${s.num} ${s.nw} ${s.dim}`}>
-                    {g.pem ? `${home} ${line(g.pem.model)}${g.read?.pemSide ? ` · ${name(g.read.pemSide === "home" ? g.home : g.away)}` : ""}` : "·"}
+                    {g.pem ? `${home} ${line(g.pem.model)}${g.read?.pemSide ? ` · ${name(g.read.pemSide === "home" ? g.home : g.away)}` : ""}` : "missing"}
                   </td>
                 )}
               </tr>

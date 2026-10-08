@@ -14,25 +14,25 @@ import {
   weekOf,
 } from "./parse";
 import { pemWeeks } from "./pem";
-import { type ClvRow, clvTable, playsClv } from "./closing";
-import { closingLines } from "./closing-store";
+import { type ClvRow, clvTable, summarize } from "./closing";
+import { closingLines, currentLines } from "./closing-store";
+import { type IssuedWeek, gradeIssued, issuedClv, issuedGames } from "./issued";
+import { loadIssued } from "./issued-store";
+import { type PemCompareRow, type ResearchRow, pemCompare, researchRows } from "./research";
 import type { PemWeek } from "./pem-card";
 import {
   type BoardGame,
   type PemLine,
+  type RefLine,
   gradeGame,
   type GradedGame,
-  type Record,
-  type Result,
   type StrategyBoard,
   type SuRecord,
-  grade,
   join,
   key,
   matches,
   strategies,
   suRecords,
-  tally,
   tierBoard,
 } from "./engine";
 
@@ -45,10 +45,11 @@ import {
 //   history, and if either one starts trimming old games the backtest would
 //   quietly shrink. Merging into a store means it can only grow.
 //
-//   Each week's board as it stood when the Wednesday email went out. That is
-//   the line the plays were actually made at, and grading those frozen plays
-//   is the only honest record of the rule since it went live. Until the email
-//   freezes a week, the snapshot follows the live board.
+//   Each week's board as it last stood (research history). It follows the
+//   live board and is NOT the record of what was sent: that is the issued
+//   record (issued.ts), written once from the email's own selection. Two
+//   snapshots from before issued records existed (NFL Week 5, college Week 6)
+//   carry frozen: true; they are kept as they are and graded nowhere.
 
 export const SOURCES = {
   nfl: {
@@ -118,7 +119,13 @@ export interface FrozenPlay {
   homeLine?: number;
   play: string;
   suSide?: "home" | "away";
+  /** Legacy snapshots: "lock" | "solid" | "toss" from the models' average. */
   suConfidence?: string;
+  /** Newer snapshots: the selected straight-up method and its margin band. */
+  suMethod?: string;
+  suBand?: string;
+  basis?: BoardGame["basis"];
+  ref?: RefLine;
 }
 
 export interface Snapshot {
@@ -138,11 +145,14 @@ function toPlays(board: BoardGame[]): FrozenPlay[] {
     home: g.home,
     away: g.away,
     tier: g.tier,
-    side: g.read?.side,
-    homeLine: g.read?.side && g.read.line !== undefined ? (g.read.side === "home" ? g.read.line : -g.read.line) : undefined,
+    side: g.side,
+    homeLine: g.homeLine,
     play: g.play,
     suSide: g.su?.side,
-    suConfidence: g.su?.confidence,
+    suMethod: g.su?.method,
+    suBand: g.su?.band,
+    basis: g.basis,
+    ref: g.ref,
   }));
 }
 
@@ -158,61 +168,6 @@ async function saveSnapshot(league: League, season: number, week: number, board:
   }
 }
 
-/** Called by the email once it has gone out. */
-export async function freezeSnapshot(league: League, season: number, week: number): Promise<void> {
-  try {
-    const s = await redis.get<Snapshot>(snapKey(league, season, week));
-    if (s && !s.frozen) await redis.set(snapKey(league, season, week), { ...s, frozen: true, at: new Date().toISOString() });
-  } catch {
-    /* Next refresh keeps updating it; the week is graded at a later line. */
-  }
-}
-
-async function snapshots(league: League, season: number): Promise<Snapshot[]> {
-  try {
-    const weeks = (await redis.smembers(snapIndex(league, season))).map(Number).sort((a, b) => a - b);
-    const snaps = await Promise.all(weeks.map((w) => redis.get<Snapshot>(snapKey(league, season, w))));
-    return snaps.filter((s): s is Snapshot => !!s);
-  } catch {
-    return [];
-  }
-}
-
-export interface LiveWeek {
-  week: number;
-  frozen: boolean;
-  rule: string | null;
-  t1: Record;
-  t2: Record;
-  su: { w: number; l: number };
-  pending: number;
-}
-
-/** The plays as they were made, graded against what happened. */
-function liveRecord(snaps: Snapshot[], graded: Map<string, { home: number; away: number }>): LiveWeek[] {
-  return snaps.map((s) => {
-    const res = (tier: "t1" | "t2"): Result[] =>
-      s.plays.flatMap((p) => {
-        const f = graded.get(key({ week: s.week, home: p.home, away: p.away }));
-        return p.tier === tier && f && p.side && p.homeLine !== undefined ? [grade(f, p.homeLine, p.side)] : [];
-      });
-    let w = 0;
-    let l = 0;
-    let pending = 0;
-    for (const p of s.plays) {
-      const f = graded.get(key({ week: s.week, home: p.home, away: p.away }));
-      if (!f) {
-        if (p.tier === "t1" || p.tier === "t2") pending++;
-        continue;
-      }
-      if (!p.suSide || f.home === f.away) continue;
-      if ((p.suSide === "home") === f.home > f.away) w++;
-      else l++;
-    }
-    return { week: s.week, frozen: s.frozen, rule: s.rule, t1: tally(res("t1")), t2: tally(res("t2")), su: { w, l }, pending };
-  });
-}
-
 // ------------------------------------------------------------------ report
 
 export interface PicksReport {
@@ -226,7 +181,8 @@ export interface PicksReport {
   strategies: StrategyBoard;
   su: { methods: SuRecord[]; bands: SuRecord[]; best: SuRecord | null };
   board: BoardGame[];
-  live: LiveWeek[];
+  /** The issued record: what each Wednesday email actually sent, graded. */
+  live: IssuedWeek[];
   notes: string[];
   errors: string[];
   /** PEM weeks on file (college), and whether each checked out. */
@@ -235,6 +191,12 @@ export interface PicksReport {
   names: { [key: string]: string };
   /** Closing-line value: each model and the rule over the record, and the plays as sent. */
   clv: { models: ClvRow[]; plays: ClvRow[]; games: number; matched: number };
+  /** Research refinements next to their parents (never eligible to be the rule). */
+  research: ResearchRow[];
+  /** College: PEM's contribution on the games all three cover, one common line. */
+  pemCompare: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
+  /** Where this week's reference line came from, and how many board games have one. */
+  reference: { source: string | null; fetchedAt: string | null; priced: number; games: number; problem?: string };
 }
 
 function seasonNow(): number {
@@ -292,33 +254,50 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
   const davidLive = db.week === week ? db.rows : [];
   const dmap = new Map(davidLive.map((r) => [`${r.away}@${r.home}`, r]));
   const pemNow = (home: string, away: string) => (week ? pemLines.get(key({ week, home, away })) : undefined);
-  const rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine }[] = samLive.map((r) => {
-    const d = dmap.get(`${r.away}@${r.home}`);
-    dmap.delete(`${r.away}@${r.home}`);
-    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away) };
-  });
-  for (const d of dmap.values()) rows.push({ home: d.home, away: d.away, sam: undefined, david: d.line, pem: pemNow(d.home, d.away) });
-  const board = tierBoard(league, rows, s);
-
   const season = sb.season ?? db.season ?? seasonNow();
+
+  // One current quote per game, every model judged against it.
+  let refs = new Map<string, RefLine>();
+  let refProblem: string | undefined;
+  if (week) {
+    try {
+      refs = await currentLines(league, season, week);
+    } catch (e) {
+      refProblem = `Current lines unavailable (${e instanceof Error ? e.message : String(e)}); the board shows source-line research signals only.`;
+    }
+  }
+  const refNow = (home: string, away: string) => (week ? refs.get(key({ week, home, away })) : undefined);
+  const rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; ref?: RefLine }[] =
+    samLive.map((r) => {
+      const d = dmap.get(`${r.away}@${r.home}`);
+      dmap.delete(`${r.away}@${r.home}`);
+      return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), ref: refNow(r.home, r.away) };
+    });
+  for (const d of dmap.values()) {
+    rows.push({ home: d.home, away: d.away, sam: undefined, david: d.line, pem: pemNow(d.home, d.away), ref: refNow(d.home, d.away) });
+  }
+  const board = tierBoard(league, rows, s, su.best?.id ?? "avg");
   if (week && board.length) await saveSnapshot(league, season, week, board, s.rule?.label ?? null);
   const finals = new Map(j.graded.map((g) => [key(g), g.final]));
   // Games only one model graded still have a final, and frozen plays on them count.
   for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
-  const snaps = await snapshots(league, season);
-  const live = liveRecord(snaps, finals);
+  const issued = await loadIssued(league, season);
+  const live = gradeIssued(issued, finals);
 
-  // Closing lines for every graded game and every finished play as sent.
-  const made = snaps.flatMap((sn) => sn.plays.map((p) => ({ ...p, week: sn.week })));
-  const finished = made.filter((p) => finals.has(key(p)));
+  // Closing lines for every graded game and every finished issued pick.
+  const finished = issuedGames(issued).filter((p) => finals.has(key(p)));
   const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...finished]);
   const rule = s.rule;
+  const sent = issuedClv(issued, closes);
   const clv = {
     models: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
-    plays: playsClv(finished, closes),
+    plays: [summarize("t1", "Tier 1 as sent", sent.t1), summarize("t2", "Tier 2 as sent", sent.t2)],
     games: j.graded.length,
     matched: j.graded.filter((g) => closes.get(key(g))?.close != null).length,
   };
+  const research = researchRows(j.graded, s.cuts, closes);
+  const pemCmp = league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null;
+  const priced = board.filter((g) => g.basis === "reference");
 
   const notes = [...j.scoreMismatches.map((m) => `Final scores differ: ${m}. Sam's is used.`)];
   if (j.onlySam || j.onlyDavid) {
@@ -350,6 +329,15 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     pem: pem.map((w: PemWeek) => ({ week: w.week, verified: w.verified, games: w.rows.length, source: w.source })),
     names,
     clv,
+    research,
+    pemCompare: pemCmp,
+    reference: {
+      source: priced[0]?.ref?.source ?? null,
+      fetchedAt: priced[0]?.ref?.fetchedAt ?? null,
+      priced: priced.length,
+      games: board.length,
+      problem: refProblem,
+    },
     league,
     season,
     week,

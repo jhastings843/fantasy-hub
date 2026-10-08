@@ -1,15 +1,18 @@
 import "server-only";
 import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
-import { freezeSnapshot, refreshPicks } from "./report";
-import { picksSubject, renderPicksEmail } from "./email";
+import { refreshPicks } from "./report";
+import { buildPicksEmail } from "./email";
+import { toIssued } from "./issued";
+import { saveIssued } from "./issued-store";
 
 // The Wednesday picks email.
 //
 // Wednesday morning because both sites post their boards on Tuesday, and by
-// Wednesday the early line movement has mostly happened. Sending freezes the
-// week's board, so the live record grades the plays at the lines they were
-// sent at rather than wherever the number drifted to by Sunday.
+// Wednesday the early line movement has mostly happened. Sending writes the
+// issued record from the very selection the email rendered (plays, lines,
+// straight-up method, rule and its evidence), so the live record grades what
+// was sent, at the lines it was sent at.
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app";
 
@@ -37,8 +40,9 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
     return Response.json({ ok: true, skipped: true, reason: "One of the NFL boards isn't up for this week yet." });
   }
 
-  const html = renderPicksEmail({ nfl, cfb, appUrl: APP_URL(), generatedAt: new Date().toISOString() });
-  const subject = `${test ? "[Test] " : ""}${picksSubject(nfl, cfb)}`;
+  const email = buildPicksEmail({ nfl, cfb, appUrl: APP_URL(), generatedAt: new Date().toISOString() });
+  const html = email.html;
+  const subject = `${test ? "[Test] " : ""}${email.subject}`;
   if (dry) return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 
   const previous = await alreadySent("picks", season, week);
@@ -55,9 +59,19 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
   if (!result.sent) return Response.json({ ok: false, error: result.reason ?? "Not sent." }, { status: 500 });
 
   await recordSent("picks", season, week, { sentAt: new Date().toISOString(), subject, messageId: result.id });
+  const issued: string[] = [];
   if (!test) {
-    await freezeSnapshot("nfl", nfl.season, week);
-    if (cfb?.week) await freezeSnapshot("cfb", cfb.season, cfb.week);
+    // First record for a week wins; a resend does not rewrite what was issued.
+    const meta = { issuedAt: new Date().toISOString(), emailId: result.id, subject };
+    const save = async (label: string, rec: Parameters<typeof saveIssued>[0]) => {
+      try {
+        issued.push(`${label}: ${(await saveIssued(rec)) ? "recorded" : "already on file, kept"}`);
+      } catch (e) {
+        issued.push(`${label}: NOT RECORDED (${e instanceof Error ? e.message : String(e)})`);
+      }
+    };
+    if (email.selections.nfl) await save("NFL", toIssued(nfl, email.selections.nfl, meta));
+    if (cfb?.week && email.selections.cfb) await save("College", toIssued(cfb, email.selections.cfb, meta));
   }
-  return Response.json({ ok: true, sent: true, subject, week, season });
+  return Response.json({ ok: true, sent: true, subject, week, season, issued });
 }

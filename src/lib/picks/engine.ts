@@ -120,6 +120,8 @@ export interface CutTest {
   minModelGap?: number;
   /** Line from the picked team's side. */
   minLine?: number;
+  /** Line from the picked team's side, exclusive upper bound. */
+  maxLine?: number;
   minAbsLine?: number;
   maxAbsLine?: number;
   flip?: boolean;
@@ -134,8 +136,15 @@ export interface Cut {
   label: string;
   group: string;
   test: CutTest;
-  /** Eligible to become the rule. Baselines and slices by week are not. */
+  /** Eligible to become the rule. Baselines, slices by week and research cuts are not. */
   candidate: boolean;
+  /** For a research refinement: the broader cut it narrows. */
+  parent?: string;
+}
+
+/** The cut needs PEM's line to be decided at all. */
+export function needsPem(t: CutTest): boolean {
+  return !!t.pem || !!t.pemSplit;
 }
 
 export function matches(r: Read, t: CutTest): boolean {
@@ -154,6 +163,7 @@ export function matches(r: Read, t: CutTest): boolean {
   if (t.maxModelGap !== undefined && r.modelGap > t.maxModelGap) return false;
   if (t.minModelGap !== undefined && r.modelGap <= t.minModelGap) return false;
   if (t.minLine !== undefined && r.line < t.minLine) return false;
+  if (t.maxLine !== undefined && r.line >= t.maxLine) return false;
   if (t.minAbsLine !== undefined && Math.abs(r.line) < t.minAbsLine) return false;
   if (t.maxAbsLine !== undefined && Math.abs(r.line) >= t.maxAbsLine) return false;
   if (t.flip !== undefined && r.flip !== t.flip) return false;
@@ -167,6 +177,56 @@ const c = (id: string, label: string, group: string, test: CutTest, candidate = 
   test,
   candidate,
 });
+
+/** A research refinement: shown with its parent, never eligible to become the rule. */
+const research = (id: string, label: string, parent: string, test: CutTest): Cut => ({
+  id,
+  label,
+  group: "Research",
+  test,
+  candidate: false,
+  parent,
+});
+
+/**
+ * The research refinements, with thresholds fixed in advance (2026-10-07,
+ * before any of them was graded) rather than tuned to the record:
+ *   Underdog bands split at the key margins: NFL 3 and 7 (a field goal, a
+ *   touchdown), college 7 and 14 (one and two touchdowns; 14 is already the
+ *   college rule's line).
+ *   Edge size uses each league's existing smallest edge threshold (NFL 2,
+ *   college 3), once on the average edge and once requiring BOTH models.
+ *   Near-market agreement keeps the existing within-4 test and adds a
+ *   one-point minimum on both models, the smallest whole-point step.
+ *   College favorites laying 14+ are set against dogs getting 14+.
+ */
+export function researchCuts(league: "nfl" | "cfb"): Cut[] {
+  const e = league === "nfl" ? 2 : 3;
+  const bands =
+    league === "nfl"
+      ? [
+          research("dog-band-a", "Dog getting 3 or less", "dog", { side: "dog", maxLine: 3.5 }),
+          research("dog-band-b", "Dog getting 3.5 to 6.5", "dog", { side: "dog", minLine: 3.5, maxLine: 7 }),
+          research("dog-band-c", "Dog getting 7 or more", "dog", { side: "dog", minLine: 7 }),
+        ]
+      : [
+          research("dog-band-a", "Dog getting under 7", "dog", { side: "dog", maxLine: 7 }),
+          research("dog-band-b", "Dog getting 7 to 13.5", "dog", { side: "dog", minLine: 7, maxLine: 14 }),
+          research("dog-band-c", "Dog getting 14 or more", "dog", { side: "dog", minLine: 14 }),
+        ];
+  return [
+    ...(league === "cfb"
+      ? [
+          research("big-fav", "Favorite laying 14 or more", "any-14", { side: "fav", minAbsLine: 14 }),
+          research("big-dog", "Dog getting 14 or more", "any-14", { side: "dog", minAbsLine: 14 }),
+        ]
+      : []),
+    ...bands,
+    research(`avg-edge-${e}`, `Average edge ${e}+`, "agree", { minAvgEdge: e }),
+    research(`both-edge-${e}`, `Both models ${e}+ off the line`, `avg-edge-${e}`, { minBothEdge: e }),
+    research("near-min1", "Within 4 of Vegas, both at least 1 off", "near-vegas", { maxEachEdge: 4, minBothEdge: 1 }),
+  ];
+}
 
 /**
  * The cuts tested every week. College lines run far larger than NFL lines, so
@@ -205,6 +265,7 @@ export function cutsFor(league: "nfl" | "cfb", withPem = false): Cut[] {
           c("pem-split", "Sam and David split: PEM's side", "PEM, third model", { pemSplit: true }),
         ]
       : []),
+    ...researchCuts(league),
   ];
 }
 
@@ -289,7 +350,18 @@ function pemAlone(final: { home: number; away: number }, pem: PemLine, avgMarket
 export interface CutResult extends Cut {
   record: Record;
   games: number;
+  /** Weeks with at least one game in the cut. */
+  weeks: number[];
 }
+
+/** Tier 2: judged only on the games it adds outside Tier 1. */
+export interface SecondResult extends CutResult {
+  /** The cut's full record, including games Tier 1 already takes. Context only. */
+  fullRecord: Record;
+}
+
+/** Decided games (wins plus losses); pushes do not count toward a sample. */
+export const decided = (r: Record) => r.w + r.l;
 
 export interface StrategyBoard {
   cuts: CutResult[];
@@ -298,25 +370,61 @@ export interface StrategyBoard {
   byWeek: { week: number; record: Record }[];
   /** The cut in force, chosen by the low end of its 90% range. */
   rule: CutResult | null;
-  /** The next best cut that adds games the rule does not. */
-  second: CutResult | null;
+  /**
+   * Tier 2: the best other cut judged ONLY on the games it adds outside the
+   * rule. Its `record` is that additional sample; `fullRecord` is context.
+   */
+  second: SecondResult | null;
 }
 
-/** Ranking: the low end of the likely range, then sample size. */
+/** The result a cut gives one game, or undefined when the cut does not bet it. */
+export function cutResult(g: GradedGame, cut: Cut): Result | undefined {
+  if (cut.test.pemSplit) return matches(g.read, cut.test) ? g.pemSplitResult : undefined;
+  return g.read.agree && g.result && matches(g.read, cut.test) ? g.result : undefined;
+}
+
+/** Ranking: the low end of the likely range, then decided sample size. */
 function rank(a: CutResult, b: CutResult): number {
-  return b.record.lo - a.record.lo || b.games - a.games;
+  return b.record.lo - a.record.lo || decided(b.record) - decided(a.record);
+}
+
+/**
+ * Tier 2 is only ever asked to bet the games Tier 1 does not, so each other
+ * candidate is graded on exactly those games, and the same eligibility the
+ * rule faces (10+ decided games, a winning rate past break-even) applies to
+ * that additional sample. A runner-up whose overall record is mostly Tier 1's
+ * games does not get to borrow them. Nothing qualifying means no Tier 2.
+ */
+export function pickSecond(games: GradedGame[], rule: Cut, cuts: CutResult[]): SecondResult | null {
+  const extra = games.filter((g) => cutResult(g, rule) === undefined);
+  const options = cuts
+    .filter((x) => x.candidate && x.id !== rule.id)
+    .map((x): SecondResult => {
+      const hits = extra.filter((g) => cutResult(g, x) !== undefined);
+      return {
+        ...x,
+        fullRecord: x.record,
+        record: tally(hits.map((g) => cutResult(g, x) as Result)),
+        games: hits.length,
+        weeks: [...new Set(hits.map((g) => g.week))].sort((a, b) => a - b),
+      };
+    })
+    .filter((x) => decided(x.record) >= MIN_SAMPLE && x.record.pct > BREAK_EVEN)
+    .sort(rank);
+  return options[0] ?? null;
 }
 
 export function strategies(league: "nfl" | "cfb", games: GradedGame[]): StrategyBoard {
   const agreed = games.filter((g) => g.read.agree && g.result);
   const withPem = games.some((g) => g.pem);
   const cuts: CutResult[] = cutsFor(league, withPem).map((cut) => {
-    if (cut.test.pemSplit) {
-      const hits = games.filter((g) => matches(g.read, cut.test) && g.pemSplitResult);
-      return { ...cut, record: tally(hits.map((g) => g.pemSplitResult as Result)), games: hits.length };
-    }
-    const hits = agreed.filter((g) => matches(g.read, cut.test));
-    return { ...cut, record: tally(hits.map((g) => g.result as Result)), games: hits.length };
+    const hits = games.filter((g) => cutResult(g, cut) !== undefined);
+    return {
+      ...cut,
+      record: tally(hits.map((g) => cutResult(g, cut) as Result)),
+      games: hits.length,
+      weeks: [...new Set(hits.map((g) => g.week))].sort((a, b) => a - b),
+    };
   });
 
   const dogResults = games
@@ -334,14 +442,10 @@ export function strategies(league: "nfl" | "cfb", games: GradedGame[]): Strategy
   const split = games.filter((g) => !g.read.agree);
   const weeks = [...new Set(agreed.map((g) => g.week))].sort((a, b) => a - b);
 
-  const eligible = cuts.filter((x) => x.candidate && x.games >= MIN_SAMPLE && x.record.pct > BREAK_EVEN).sort(rank);
+  const qualifies = (r: Record) => decided(r) >= MIN_SAMPLE && r.pct > BREAK_EVEN;
+  const eligible = cuts.filter((x) => x.candidate && qualifies(x.record)).sort(rank);
   const rule = eligible[0] ?? null;
-  let second: CutResult | null = null;
-  if (rule) {
-    const inRule = new Set(games.filter((g) => matches(g.read, rule.test)).map(key));
-    second =
-      eligible.slice(1).find((x) => games.some((g) => matches(g.read, x.test) && !inRule.has(key(g)))) ?? null;
-  }
+  const second = rule ? pickSecond(games, rule, cuts) : null;
 
   return {
     cuts,
@@ -360,7 +464,17 @@ export const key = (g: { week: number; home: string; away: string }) => `${g.wee
 
 // --------------------------------------------------------------------- board
 
-export type Tier = "t1" | "t2" | "fav" | "pass" | "split" | "one";
+export type Tier = "t1" | "t2" | "wait" | "fav" | "pass" | "split" | "one";
+
+/** One current market number every model on a game is judged against. */
+export interface RefLine {
+  /** Home-side spread. */
+  line: number;
+  /** Where it came from, e.g. "DraftKings via ESPN". */
+  source: string;
+  /** When we read it (the feed carries no quote time of its own). */
+  fetchedAt: string;
+}
 
 export interface BoardGame {
   home: string;
@@ -371,82 +485,158 @@ export interface BoardGame {
   tier: Tier;
   /** "TB +8.5", or each model's side on a split. */
   play: string;
-  /** Straight-up call. */
+  /**
+   * "reference": every model judged at one current quote (`ref`); a play here
+   * is a current recommendation. "source": no current quote, so each model is
+   * judged at the number on its own site, the way the backtest is; a research
+   * signal only, never sent as a play.
+   */
+  basis: "reference" | "source";
+  ref?: RefLine;
+  /** Picked side and the home-side line it was picked at (plays only). */
+  side?: "home" | "away";
+  homeLine?: number;
+  /** Straight-up call, by the selected method. */
   su?: StraightUp;
   pem?: PemLine;
   /** The play is PEM's side of a Sam/David split. */
   pemPick?: boolean;
+  /** An input the rule needs that is not on file (tier "wait"). */
+  missing?: "PEM";
+  /** Which tier a "wait" game would be if the missing input agreed. */
+  waitFor?: "t1" | "t2";
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
 
+/**
+ * Both models (and PEM) against ONE number. Two models judged at their own
+ * sites' lines can both "back the road team" while disagreeing at the price
+ * actually available: Sam home -2 against his -3, David home -6 against his
+ * -7, and at home -5 Sam is on the road team and David on the home team.
+ */
+export function readAt(ref: number, sam: ModelLine, david: ModelLine, pem?: PemLine): Read {
+  return read(
+    { market: ref, model: sam.model },
+    { market: ref, model: david.model },
+    pem ? { model: pem.model, market: ref } : undefined,
+  );
+}
+
+/** The rule's test with its PEM condition dropped, to tell "PEM missing" from "PEM disagrees". */
+function withoutPem(t: CutTest): CutTest {
+  const rest = { ...t };
+  delete rest.pem;
+  delete rest.pemSplit;
+  return rest;
+}
+
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; ref?: RefLine }[],
   s: StrategyBoard,
+  suMethod = "avg",
 ): BoardGame[] {
   return rows.map((row) => {
-    const su = straightUp(row.sam, row.david, league);
+    const basis: BoardGame["basis"] = row.ref ? "reference" : "source";
+    const su = straightUp(row.sam, row.david, league, suMethod, row.ref?.line);
+    const team = (side: "home" | "away") => (side === "home" ? row.home : row.away);
     if (!row.sam || !row.david) {
       const only = row.sam ? "Sam" : "David";
       const m = (row.sam ?? row.david) as ModelLine;
-      const side = m.model < m.market ? row.home : row.away;
-      return { ...row, tier: "one", play: `${only} only: ${side}`, su };
+      const at = row.ref?.line ?? m.market;
+      return { ...row, basis, tier: "one", play: `${only} only: ${team(m.model < at ? "home" : "away")}`, su };
     }
-    const r = read(row.sam, row.david, row.pem);
+    const r = row.ref ? readAt(row.ref.line, row.sam, row.david, row.pem) : read(row.sam, row.david, row.pem);
+    const pemMissing = league === "cfb" && !row.pem;
+    // A rule that needs PEM, on a game PEM has not covered, is undecided, not a "no".
+    const waiting = (cut: CutResult | null): boolean =>
+      !!cut && pemMissing && needsPem(cut.test) &&
+      (cut.test.pemSplit ? !r.agree : matches(r, withoutPem(cut.test)));
+    const wait = (waitFor: "t1" | "t2", play: string): BoardGame => ({
+      ...row, basis, read: r, tier: "wait", missing: "PEM", waitFor, play, su,
+    });
+
     if (!r.agree || !r.side || r.line === undefined) {
-      const team = (side: "home" | "away") => (side === "home" ? row.home : row.away);
-      // A split PEM breaks, when breaking splits is a cut that is winning.
-      const pemTier: Tier | null =
+      const splitPlay = `Sam: ${team(r.samSide)} · David: ${team(r.davidSide)}`;
+      const pemTier: "t1" | "t2" | null =
         r.pemSide && s.rule?.test.pemSplit ? "t1" : r.pemSide && s.second?.test.pemSplit ? "t2" : null;
       if (pemTier && r.pemSide) {
+        // PEM's side, at the line it is graded at: the reference line when
+        // there is one, otherwise the source line of the model PEM sided with
+        // (the same number the backtest grades pem-split at).
         const m = r.pemSide === r.samSide ? row.sam : row.david;
-        const l = r.pemSide === "home" ? m.market : -m.market;
-        return { ...row, read: r, tier: pemTier, play: `${team(r.pemSide)} ${fmt(l)}`, su, pemPick: true };
+        const homeLine = row.ref ? row.ref.line : m.market;
+        const l = r.pemSide === "home" ? homeLine : -homeLine;
+        return {
+          ...row, basis, read: r, tier: pemTier, play: `${team(r.pemSide)} ${fmt(l)}`, su, pemPick: true,
+          side: r.pemSide, homeLine,
+        };
       }
-      return { ...row, read: r, tier: "split", play: `Sam: ${team(r.samSide)} · David: ${team(r.davidSide)}`, su };
+      if (waiting(s.rule)) return wait("t1", splitPlay);
+      if (waiting(s.second)) return wait("t2", splitPlay);
+      return { ...row, basis, read: r, tier: "split", play: splitPlay, su };
     }
-    const team = r.side === "home" ? row.home : row.away;
-    const play = `${team} ${fmt(r.line)}`;
-    let tier: Tier = r.dog ? "pass" : "fav";
-    if (s.rule && matches(r, s.rule.test)) tier = "t1";
-    else if (s.second && matches(r, s.second.test)) tier = "t2";
-    return { ...row, read: r, tier, play, su };
+    const play = `${team(r.side)} ${fmt(r.line)}`;
+    const homeLine = r.side === "home" ? r.line : -r.line;
+    const base = { ...row, basis, read: r, play, su, side: r.side, homeLine };
+    if (s.rule && matches(r, s.rule.test)) return { ...base, tier: "t1" };
+    if (waiting(s.rule)) return { ...wait("t1", play), side: r.side, homeLine };
+    if (s.second && matches(r, s.second.test)) return { ...base, tier: "t2" };
+    if (waiting(s.second)) return { ...wait("t2", play), side: r.side, homeLine };
+    return { ...base, tier: r.dog ? "pass" : "fav" };
   });
 }
 
 // --------------------------------------------------------------- straight up
 
-export type Confidence = "lock" | "solid" | "toss";
+/**
+ * Projected-margin bands. These describe how far apart the pick projects the
+ * two teams, nothing more: there is no probability calibration behind them.
+ */
+export type MarginBand = "wide" | "clear" | "close";
 
 export interface StraightUp {
-  /** "home" or "away", by the average of whatever models are present. */
   side: "home" | "away";
-  /** Projected margin of the picked team. */
+  /** Projected margin of the picked team, by the selected method. */
   margin: number;
-  confidence: Confidence;
+  band: MarginBand;
+  /** The method that made the call (avg, sam, david, vegas). */
+  method: string;
   /** Both models name the same winner. */
   agree: boolean;
-  /** The pick is the Vegas underdog. */
+  /** The pick is the market underdog. */
   upset: boolean;
 }
 
-/** Confidence bands, in points of average projected margin. */
-export const SU_BANDS = { nfl: { lock: 6, solid: 3 }, cfb: { lock: 14, solid: 7 } } as const;
+/** Band edges, in points of projected margin. */
+export const SU_BANDS = { nfl: { wide: 6, clear: 3 }, cfb: { wide: 14, clear: 7 } } as const;
 
-export function straightUp(sam?: ModelLine, david?: ModelLine, league: "nfl" | "cfb" = "nfl"): StraightUp | undefined {
-  const ms = [sam, david].filter((m): m is ModelLine => !!m);
-  if (!ms.length) return undefined;
-  const avg = ms.reduce((t, m) => t + m.model, 0) / ms.length;
-  const mkt = ms.reduce((t, m) => t + m.market, 0) / ms.length;
-  const side = avg < 0 ? "home" : avg > 0 ? "away" : mkt <= 0 ? "home" : "away";
-  const margin = Math.abs(avg);
+export function marginBand(league: "nfl" | "cfb", margin: number): MarginBand {
   const b = SU_BANDS[league];
-  const confidence: Confidence = margin >= b.lock ? "lock" : margin >= b.solid ? "solid" : "toss";
+  return margin >= b.wide ? "wide" : margin >= b.clear ? "clear" : "close";
+}
+
+/** "By 6+", "By 3 to 6", "By under 3". */
+export function marginLabel(league: "nfl" | "cfb", band: MarginBand): string {
+  const b = SU_BANDS[league];
+  return band === "wide" ? `By ${b.wide}+` : band === "clear" ? `By ${b.clear} to ${b.wide}` : `By under ${b.clear}`;
+}
+
+export function straightUp(
+  sam?: ModelLine,
+  david?: ModelLine,
+  league: "nfl" | "cfb" = "nfl",
+  method = "avg",
+  ref?: number,
+): StraightUp | undefined {
+  const p = suPick(method, sam, david, ref);
+  if (!p) return undefined;
+  const ms = [sam, david].filter((m): m is ModelLine => !!m);
+  const mkt = ref ?? ms.reduce((t, m) => t + m.market, 0) / ms.length;
   const agree = ms.length === 2 && Math.sign(ms[0].model) === Math.sign(ms[1].model) && ms[0].model !== 0;
-  const favHome = mkt < 0;
-  const upset = mkt !== 0 && (side === "home") !== favHome;
-  return { side, margin, confidence, agree, upset };
+  const upset = mkt !== 0 && (p.side === "home") !== mkt < 0;
+  return { side: p.side, margin: p.margin, band: marginBand(league, p.margin), method, agree, upset };
 }
 
 export interface SuRecord {
@@ -487,14 +677,13 @@ export function suRecords(league: "nfl" | "cfb", games: GradedGame[]): { methods
       return s === Math.sign(g.david.model) && s !== 0 && mkt !== 0 && s !== Math.sign(mkt) ? by(g.sam.model) : null;
     }),
   ];
-  const b = SU_BANDS[league];
   const avgOf = (g: GradedGame) => Math.abs((g.sam.model + g.david.model) / 2);
   const pickAvg = (g: GradedGame) => by((g.sam.model + g.david.model) / 2);
-  const bands = [
-    rec("lock", `Lock: ${b.lock}+ point projected margin`, (g) => (avgOf(g) >= b.lock ? pickAvg(g) : null)),
-    rec("solid", `Solid: ${b.solid} to ${b.lock}`, (g) => (avgOf(g) >= b.solid && avgOf(g) < b.lock ? pickAvg(g) : null)),
-    rec("toss", `Toss-up: under ${b.solid}`, (g) => (avgOf(g) < b.solid ? pickAvg(g) : null)),
-  ];
+  const bands = (["wide", "clear", "close"] as const).map((band) =>
+    rec(band, `${marginLabel(league, band)} (models' average margin)`, (g) =>
+      marginBand(league, avgOf(g)) === band ? pickAvg(g) : null,
+    ),
+  );
   // Methods that pick every game compete for "best"; partial ones are context.
   const full = methods.filter((m) => ["avg", "sam", "david", "vegas"].includes(m.id));
   const best = full.slice().sort((x, y) => y.pct - x.pct || (x.id === "avg" ? -1 : 1))[0] ?? null;
@@ -560,12 +749,14 @@ export function suPick(
   method: string,
   sam: ModelLine | undefined,
   david: ModelLine | undefined,
+  ref?: number,
 ): { side: "home" | "away"; margin: number } | null {
   const ms = [sam, david].filter((m): m is ModelLine => !!m);
   if (!ms.length) return null;
   const avg = (f: (m: ModelLine) => number) => ms.reduce((t, m) => t + f(m), 0) / ms.length;
   let x: number;
-  if (method === "vegas") x = avg((m) => m.market);
+  // The market favorite at the current quote when there is one.
+  if (method === "vegas") x = ref ?? avg((m) => m.market);
   else if (method === "sam" && sam) x = sam.model;
   else if (method === "david" && david) x = david.model;
   else x = avg((m) => m.model);

@@ -1,8 +1,8 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
 import type { League } from "./parse";
-import { key } from "./engine";
-import { type ClosingLine, parseScoreboard, parseSummary } from "./closing";
+import { key, type RefLine } from "./engine";
+import { type ClosingLine, parseCurrentOdds, parseScoreboard, parseSummary } from "./closing";
 
 // Closing lines for the Picks tab, from ESPN's public scoreboard and game
 // summaries (no key, no quota; the Survivor page already leans on the same
@@ -100,4 +100,17 @@ export async function closingLines(
     }),
   );
   return { closes, problems };
+}
+
+/**
+ * The current spread on every game of this week that has not kicked off, as
+ * the one reference line all models are judged against. Read fresh each
+ * build; ESPN's feed carries no quote time, so the read time is recorded.
+ */
+export async function currentLines(league: League, season: number, week: number): Promise<Map<string, RefLine>> {
+  const extra = league === "cfb" ? "&groups=80&limit=400" : "";
+  const data = await json<Parameters<typeof parseCurrentOdds>[2]>(
+    `${BASE}/${SPORT[league]}/scoreboard?week=${week}&seasontype=2&dates=${season}${extra}`,
+  );
+  return parseCurrentOdds(league, week, data, new Date().toISOString());
 }

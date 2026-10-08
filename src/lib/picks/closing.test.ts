@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { clvPoints, clvTable, parseScoreboard, parseSummary, playsClv, type ClosingLine } from "./closing";
+import { clvPoints, clvTable, parseCurrentOdds, parseScoreboard, parseSummary, type ClosingLine } from "./closing";
 import { gradeGame, key } from "./engine";
 
 const fx = (f: string) => JSON.parse(readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks", f), "utf8"));
@@ -85,16 +85,29 @@ describe("closing-line value", () => {
     expect(by.pem).toBeUndefined();
   });
 
-  it("grades the plays as sent, by tier", () => {
-    const rows = playsClv(
-      [
-        { week: 5, home: "CLE", away: "PIT", tier: "t1", side: "away", homeLine: -3 },
-        { week: 5, home: "KC", away: "LV", tier: "t2", side: "home", homeLine: -6.5 },
-        { week: 5, home: "NE", away: "NYJ", tier: "t1", side: "home", homeLine: 1 },
-      ],
-      closes,
-    );
-    expect(rows[0]).toMatchObject({ id: "t1", n: 1, avg: 1 });
-    expect(rows[1]).toMatchObject({ id: "t2", n: 1, avg: 0.5 });
+  it("grades a PEM split at the same line its result was graded at", () => {
+    // Sam home (model -9 vs his -6), David road (model -4 vs his -6.5), PEM home.
+    const g = gradeGame({
+      week: 5, home: "KC", away: "LV", final,
+      sam: { market: -6, model: -9 }, david: { market: -6.5, model: -4 }, pem: { model: -10, market: -6 },
+    });
+    const rows = clvTable([g], closes, { label: "PEM split", matches: () => true });
+    // PEM sided with Sam, so the line is Sam's -6, not the -6.25 average: -6 - (-7) = +1.
+    expect(rows.find((r) => r.id === "rule")).toMatchObject({ n: 1, avg: 1 });
+  });
+});
+
+describe("current reference lines", () => {
+  it("reads only games that have not kicked off", () => {
+    const data = JSON.parse(readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks/espn-scoreboard-nfl-w6-pre.json"), "utf8"));
+    const m = parseCurrentOdds("nfl", 6, data, "2026-10-08T01:13:00Z");
+    expect(m.get("6:SEA@DEN")).toEqual({ line: 1.5, source: "DraftKings via ESPN", fetchedAt: "2026-10-08T01:13:00Z" });
+    expect(m.get("6:HOU@JAX")?.line).toBe(-3);
+    // Once a game is under way or over, its number is a closing line: never used pregame.
+    data.events[0].status.type.state = "in";
+    data.events[1].status.type.state = "post";
+    const later = parseCurrentOdds("nfl", 6, data, "x");
+    expect(later.has("6:SEA@DEN")).toBe(false);
+    expect(later.has("6:HOU@JAX")).toBe(false);
   });
 });

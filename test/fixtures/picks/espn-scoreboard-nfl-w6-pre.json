@@ -1,0 +1,522 @@
+{
+ "events": [
+  {
+   "id": "401872995",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "DEN",
+        "location": "Denver"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "SEA",
+        "location": "Seattle"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 1.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872996",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "JAX",
+        "location": "Jacksonville"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "HOU",
+        "location": "Houston"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -3.0,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872999",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "ATL",
+        "location": "Atlanta"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "CHI",
+        "location": "Chicago"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 1.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872997",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "CLE",
+        "location": "Cleveland"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "BAL",
+        "location": "Baltimore"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 2.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873003",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "IND",
+        "location": "Indianapolis"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "TEN",
+        "location": "Tennessee"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -6.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873001",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "NE",
+        "location": "New England"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "NYJ",
+        "location": "New York"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -7.0,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873000",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "NYG",
+        "location": "New York"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "NO",
+        "location": "New Orleans"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 1.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401872998",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "PHI",
+        "location": "Philadelphia"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "CAR",
+        "location": "Carolina"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -2.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873002",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "TB",
+        "location": "Tampa Bay"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "PIT",
+        "location": "Pittsburgh"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 3.0,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873004",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "LAR",
+        "location": "Los Angeles"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "ARI",
+        "location": "Arizona"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -10.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873006",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "KC",
+        "location": "Kansas City"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "LAC",
+        "location": "Los Angeles"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -7.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873005",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "LV",
+        "location": "Las Vegas"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "BUF",
+        "location": "Buffalo"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 4.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873007",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "GB",
+        "location": "Green Bay"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "DAL",
+        "location": "Dallas"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": 2.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401873008",
+   "status": {
+    "type": {
+     "completed": false,
+     "state": "pre"
+    }
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "team": {
+        "abbreviation": "SF",
+        "location": "San Francisco"
+       }
+      },
+      {
+       "homeAway": "away",
+       "team": {
+        "abbreviation": "WSH",
+        "location": "Washington"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "spread": -7.5,
+       "provider": {
+        "name": "DraftKings"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

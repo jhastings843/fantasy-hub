@@ -12,7 +12,12 @@
 // (close - line taken). Positive means the bet was better than the close.
 
 import { teamKey, type League } from "./parse";
-import { key, type GradedGame } from "./engine";
+import { key, type GradedGame, type RefLine } from "./engine";
+
+/** The home-side line a PEM split pick is graded at: the line of the model PEM sided with. */
+export function pemSplitLine(g: GradedGame): number {
+  return g.read.pemSide === g.read.samSide ? g.sam.market : g.david.market;
+}
 
 export interface ClosingLine {
   week: number;
@@ -42,9 +47,38 @@ interface EspnTeam {
 interface EspnScoreboard {
   events?: Array<{
     id: string;
-    status?: { type?: { completed?: boolean } };
-    competitions?: Array<{ competitors?: Array<{ homeAway: string; team: EspnTeam }> }>;
+    status?: { type?: { completed?: boolean; state?: string } };
+    competitions?: Array<{
+      competitors?: Array<{ homeAway: string; team: EspnTeam }>;
+      odds?: Array<{ spread?: number; provider?: { name?: string } }>;
+    }>;
   }>;
+}
+
+/**
+ * Current spreads for games that have NOT started, keyed like the engine.
+ * Only "pre" games: once a game kicks off the number is a closing line, and a
+ * closing line must never feed a pregame pick.
+ */
+export function parseCurrentOdds(
+  league: League,
+  week: number,
+  data: EspnScoreboard,
+  fetchedAt: string,
+): Map<string, RefLine> {
+  const out = new Map<string, RefLine>();
+  const refs = parseScoreboard(league, data);
+  (data.events ?? []).forEach((e) => {
+    const o = e.competitions?.[0]?.odds?.[0];
+    const ref = refs.find((r) => r.id === e.id);
+    if (!ref || e.status?.type?.state !== "pre" || typeof o?.spread !== "number") return;
+    out.set(key({ week, home: ref.home, away: ref.away }), {
+      line: o.spread,
+      source: `${o.provider?.name ?? "Sportsbook"} via ESPN`,
+      fetchedAt,
+    });
+  });
+  return out;
 }
 
 /** Scoreboard events as team keys the picks engine can join on. */
@@ -151,8 +185,9 @@ export function clvTable(games: GradedGame[], closes: Map<string, ClosingLine>, 
       vs.agree.push(v);
       if (rule?.matches(g)) vs.rule.push(v);
     } else if (r.pemSide && rule?.matches(g)) {
-      // A "PEM breaks the split" rule backs PEM's side at the average market.
-      vs.rule.push(clvPoints(r.pemSide, r.avgMarket, c));
+      // A "PEM breaks the split" play is graded at the source line of the
+      // model PEM sided with (see gradeGame), so its CLV uses that line too.
+      vs.rule.push(clvPoints(r.pemSide, pemSplitLine(g), c));
     }
   }
   return [
@@ -162,25 +197,4 @@ export function clvTable(games: GradedGame[], closes: Map<string, ClosingLine>, 
     summarize("agree", "Both agree", vs.agree),
     ...(rule ? [{ ...summarize("rule", "The rule", vs.rule), note: rule.label }] : []),
   ];
-}
-
-export interface MadePlay {
-  week: number;
-  home: string;
-  away: string;
-  tier: string;
-  side?: "home" | "away";
-  homeLine?: number;
-}
-
-/** The plays as the Wednesday email made them, against the close. */
-export function playsClv(plays: MadePlay[], closes: Map<string, ClosingLine>): ClvRow[] {
-  const at = (tier: string) =>
-    plays.flatMap((p) => {
-      const c = closes.get(key(p))?.close;
-      return p.tier === tier && p.side && p.homeLine !== undefined && c !== null && c !== undefined
-        ? [clvPoints(p.side, p.homeLine, c)]
-        : [];
-    });
-  return [summarize("t1", "Tier 1 as sent", at("t1")), summarize("t2", "Tier 2 as sent", at("t2"))];
 }
