@@ -22,7 +22,7 @@ export function SuWeek({ r }: { r: PicksReport }) {
           {r.week ? `Week ${r.week} straight-up picks` : "Straight-up picks"}
         </h2>
         <p className={s.p}>
-          {`Ranked for a confidence pool, most sure first. Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l}, its best record)` : ""}. Pick'em only: no stake, and not counted in units. Bands describe the projected margin, not a probability.`}
+          {`${r.league === "nfl" ? "For the Weekly payout pool, use the entry above. This list is ranked" : "Ranked"} for a confidence pool, most sure first. Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l}, its best record)` : ""}. Pick'em only: no stake, and not counted in units. Bands describe the projected margin, not a probability.`}
         </p>
       </div>
       <ol className={s.cards} data-first-pick>

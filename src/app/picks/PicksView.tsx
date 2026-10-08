@@ -5,6 +5,7 @@ import { OUTSTANDING_CAP, WEEKLY_CAP } from "@/lib/picks/limits";
 import { AtsResearch, AtsResults, AtsWeek } from "./ats";
 import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWeek } from "./su-totals";
 import { LearningPanel } from "./learning";
+import { PoolCard } from "./pool";
 import { LEAGUE_NAME, MARKETS, VIEWS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
 import s from "./picks.module.css";
 
@@ -72,6 +73,7 @@ export default async function PicksView({ league, market, view }: { league: Leag
         {market === "ats" && view === "week" && <AtsWeek r={r} />}
         {market === "ats" && view === "results" && <AtsResults r={r} />}
         {market === "ats" && view === "research" && <AtsResearch r={r} />}
+        {market === "su" && view === "week" && league === "nfl" && <PoolCard />}
         {market === "su" && view === "week" && <SuWeek r={r} />}
         {market === "su" && view === "results" && <SuResults r={r} />}
         {market === "su" && view === "research" && <SuResearch r={r} />}
