@@ -75,8 +75,8 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 
 ## Next
 1. Done 2026-10-08: scheduler health checked in Redis (`picks:v2:ops`). `data` and `review` both succeed hourly with no recorded failures; QStash drives the pulse, the GitHub workflow is the slower backstop (runs every 3 to 7h, as documented in pulse.yml).
-2. Daily 9am bets emails from Oct 8 (first: Thu Oct 8, TB +8.5): check each send response says "confirmed sent", and Sat Oct 10 / Sun Oct 11 carry the weekend's bets. Tue Oct 13: first update-only Tuesday email (no stakes).
-3. Pushover: needs a NEW Pushover app token for Fantasy Hub plus Jack's user key in Vercel (PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY). Until set, emails send and pushes skip.
+2. Daily 9am bets emails: first sent Thu Oct 8 11:45am ET (TB +8.5, 1.5u, -105, record `picks:v1:nfl:issued:2026:w5:gthu`, status sent). Check each send response says "confirmed sent", and Sat Oct 10 / Sun Oct 11 carry the weekend's bets. Tue Oct 13: first update-only Tuesday email (no stakes).
+3. Pushover: set 2026-10-08 (Fantasy Hub's own app token + Jack's user key, Vercel production and .env.local); test push delivered. First real push: the next game-day email (Sat Oct 10). Thu Oct 8's TB email went out at 11:45am ET before the key was set, so it had no push.
 4. First Wednesday UI check (Oct 14) appears in the journal.
 5. After ~3 weeks of the pregame archive, the first hypotheses can clear the bar; until then expect "no change: kept p1" with reasons.
 
