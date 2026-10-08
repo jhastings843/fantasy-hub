@@ -3,7 +3,7 @@ import { runLockAlarm } from "@/lib/sunday/run";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET /api/lock-alarm - the 11:45 exception check.
+// GET /api/lock-alarm - the 12:15 exception check.
 //
 // Sends only when something is actually wrong, so a bare call on a healthy
 // Sunday answers "nothing is wrong" and sends nothing. That is the normal

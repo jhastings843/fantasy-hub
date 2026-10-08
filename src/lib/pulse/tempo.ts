@@ -122,9 +122,9 @@ export function etClock(now: Date): EtClock {
  *
  * `until` is only for the alarm and the Sunday lineup check. Every other send is due from its time until
  * the end of its day, because an email that missed 8am is still worth having
- * at noon. The alarm is the opposite: it exists for the 75 minutes before the
- * 1pm lock, and one arriving at 8pm about a slot nobody can change any more
- * is the exact noise it was built to avoid.
+ * at noon. The alarm starts alongside the 12:15 Sunday lineup check and can
+ * report new problems until 4pm; its own logic excludes already-locked slots.
+ * An evening alert about a slot nobody can change is not useful.
  */
 function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until?: number }[] {
   return [
@@ -154,9 +154,9 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
     // and Thursday is the second chance for a week one of them posts late.
     { id: "picks", day: WED, at: 9 * 60 },
     { id: "picks", day: THU, at: 9 * 60 },
-    // After the 11:30 inactive reports and well before the 13:00 lock. This one
+    // Alongside the 12:15 lineup check, 45 minutes before the 13:00 lock. This one
     // is allowed to send nothing at all, which is its normal outcome.
-    { id: "alarm", day: SUN, at: 11 * 60 + 45, until: 16 * 60 },
+    { id: "alarm", day: SUN, at: 12 * 60 + 15, until: 16 * 60 },
   ];
 }
 

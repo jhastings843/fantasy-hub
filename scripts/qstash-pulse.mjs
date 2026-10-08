@@ -9,7 +9,7 @@
 // fifteen minutes, and GitHub's scheduler delivered about seven a day
 // (measured 2026-09-14 to 09-17: 18 runs in 57 hours, median gap 197 minutes,
 // longest 330). Every run was green, so nothing flagged it. The hourly refresh
-// was really a three-hourly one and the Sunday 11:45 alarm window could go a
+// was really a three-hourly one and the Sunday 12:15 alarm window could go a
 // whole afternoon without a pulse. QStash fires on the minute. The GitHub
 // workflow stays as a backstop; the app's tier leases make a doubled call
 // harmless.

@@ -59,9 +59,9 @@ able to render an all-clear.
 | Wed 08:00 | Midweek: rankings moves, roster and waiver follow-ups | New |
 | Thu 08:00 | Survivor and lineups | Exists |
 | Sun 09:00 | Final check across every league and both pools | New |
-| Sun 11:45 | Exception only | New |
+| Sun 12:15 | Exception only | New |
 
-The Sunday 11:45 send stays silent unless at least one of these is true:
+The Sunday 12:15 send stays silent unless at least one of these is true:
 
 - a starting slot holds a player who is OUT, inactive or on bye
 - a starting slot is empty

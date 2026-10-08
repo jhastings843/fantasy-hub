@@ -152,8 +152,18 @@ describe("tempoFor, sends", () => {
     expect(nine).toContain("sunday");
     expect(nine).not.toContain("alarm");
 
-    const quarterTo = tempoFor(at("2026-09-13T15:45:00Z")).dueSends;
-    expect(quarterTo).toContain("alarm");
+    expect(tempoFor(at("2026-09-13T15:45:00Z")).dueSends).not.toContain("alarm");
+    expect(tempoFor(at("2026-09-13T16:14:59Z")).dueSends).not.toContain("alarm");
+    const twelveFifteen = tempoFor(at("2026-09-13T16:15:00Z")).dueSends;
+    expect(twelveFifteen).toContain("alarm");
+    expect(twelveFifteen).toContain("watch");
+  });
+
+  it("keeps the alarm and lineup check together after daylight saving ends", () => {
+    expect(tempoFor(at("2026-11-08T17:14:59Z")).dueSends).not.toContain("alarm");
+    const due = tempoFor(at("2026-11-08T17:15:00Z")).dueSends;
+    expect(due).toContain("alarm");
+    expect(due).toContain("watch");
   });
 
   it("stops the alarm once the afternoon games are under way", () => {

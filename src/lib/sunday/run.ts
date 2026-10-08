@@ -110,11 +110,11 @@ async function runSundayBriefLocked(options: RunOptions = {}): Promise<Response>
 }
 
 /**
- * The 11:45 check.
+ * The 12:15 check.
  *
  * Sends nothing when nothing is wrong, which is the normal Sunday, and records
  * the send only when it actually sends. A quiet week must not mark the alarm
- * as done, or a problem appearing at 11:50 would be swallowed by the log.
+ * as done, or a problem appearing at 12:20 would be swallowed by the log.
  */
 export function runLockAlarm(options: RunOptions = {}): Promise<Response> {
   if (options.dry) return runLockAlarmLocked(options);
@@ -154,7 +154,7 @@ async function runLockAlarmLocked(options: RunOptions = {}): Promise<Response> {
 
   // Only slots that can still be changed. A player whose game has kicked off
   // is not a decision any more, and telling Jack his 9:30am London starter is
-  // out at 11:45 is a notification with nothing on the other end of it.
+  // out at 12:15 is a notification with nothing on the other end of it.
   const slots: SlotAlarmInput[] = lineups.leagues.flatMap((league) =>
     league.error
       ? []

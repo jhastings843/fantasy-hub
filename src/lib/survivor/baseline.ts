@@ -6,7 +6,7 @@ import { redis } from "@/lib/redis/client";
 // The Sunday alarm's whole job is to say "this changed since you decided", and
 // a change needs a before. The before is the Thursday email: that is the last
 // time the app put a number in front of him, so it is the number he is
-// carrying around. Recorded when Thursday sends, read at 11:45 on Sunday, and
+// carrying around. Recorded when Thursday sends, read at 12:15 on Sunday, and
 // absent means no line-move alarm rather than a guess.
 
 const TTL = 60 * 60 * 24 * 7;

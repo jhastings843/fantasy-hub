@@ -21,7 +21,7 @@ export interface AlarmReason {
   text: string;
   /**
    * What the problem is about, stable across its wording. A receiver who is
-   * doubtful at 11:45 and out at 12:30 is one problem, not two; a second
+   * doubtful at 12:15 and out at 12:30 is one problem, not two; a second
    * starter ruled out at 12:30 is a new one.
    */
   key: string;

@@ -154,7 +154,7 @@ describe("alarm keys and what counts as new", () => {
       slots: [{ ...slot, status: "Out" }],
     });
     const sentKeys = [reasons[0].key];
-    // The 11:45 alarm went out about the pool. At 12:30 the receiver is ruled
+    // The 12:15 alarm went out about the pool. At 12:30 the receiver is ruled
     // out: that is new information, and the week's one email must not eat it.
     expect(unseenAlarms(reasons, sentKeys).map((r) => r.kind)).toEqual(["unavailable"]);
     expect(unseenAlarms(reasons, reasons.map((r) => r.key))).toEqual([]);
