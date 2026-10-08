@@ -78,7 +78,7 @@ const WHOLE: { [w: string]: string } = {
   bgsu: "bowling green", cmu: "central michigan", wmu: "western michigan", emu: "eastern michigan", niu: "northern illinois",
   pitt: "pittsburgh", usf: "south florida", ecu: "east carolina", fiu: "florida international", fau: "florida atlantic",
   sdsu: "san diego state", sjsu: "san jose state", nmsu: "new mexico state", odu: "old dominion", mtsu: "middle tennessee",
-  jmu: "james madison", umass: "massachusetts", "miami oh": "miami oh", "miami-oh": "miami oh", "ole miss": "ole miss",
+  jmu: "james madison", wku: "western kentucky", uconn: "uconn", ul: "louisiana", umass: "massachusetts", "miami oh": "miami oh", "miami-oh": "miami oh", "ole miss": "ole miss",
   "miss st": "mississippi state", "miss state": "mississippi state", "so miss": "southern miss", "ul monroe": "louisiana monroe", ulm: "louisiana monroe",
   "texas a&m": "texas a and m", "boston coll": "boston college", "j'ville st": "jacksonville state",
 };

@@ -35,11 +35,19 @@ describe("harrisReport", () => {
     expect(r.agreement.harrisAgrees).toEqual({ w: 1, l: 0, p: 0 });
     expect(r.agreement.harrisDisagrees).toEqual({ w: 1, l: 0, p: 0 });
     expect(r.agreement.meanGain).toBeLessThan(0); // skipping a winner costs
-    expect(r.clears).toEqual({ agreement: false, edge: false });
+    expect(r.clears).toEqual({ agreement: false, edge: false, picks: false });
     expect(harrisSummary(r)).toMatch(/^Harris tracker \(weeks 4\): posted picks 1-1, full sheet 1-1/);
   });
   it("an unverified week is ignored", () => {
     const r = harrisReport([{ ...w4, verified: false }], finals, []);
     expect(r.sheet.all).toEqual({ w: 0, l: 0, p: 0 });
+  });
+});
+
+describe("picks without a sheet", () => {
+  it("grade against that week's finished games", () => {
+    const w2: HarrisWeek = { season: 2026, week: 2, rows: [], picks: [{ tier: "gow", team: "Michigan", line: 5.5 }], verified: false, problems: [], source: "t", at: "t" };
+    const r = harrisReport([w2], new Map([["2:michigan@oklahoma", { home: 24, away: 21 }]]), []);
+    expect(r.picks.gow).toEqual({ w: 1, l: 0, p: 0 }); // Michigan +5.5, lost by 3: covers
   });
 });

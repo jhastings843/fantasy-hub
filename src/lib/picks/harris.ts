@@ -33,7 +33,8 @@ Copy numbers exactly as printed with their signs. Skip any block cut off at the 
 const keyFor = (season: number, week: number) => `picks:v1:cfb:harris:${season}:w${week}`;
 const indexKey = (season: number) => `picks:v1:cfb:harris:${season}:weeks`;
 const seenKey = (tweetId: string) => `picks:v1:cfb:harris:tweet:${tweetId}`;
-const PROPOSED = "picks:v2:harris:proposed";
+/** One proposal per question, ever (a person decides; the flag stops repeats). */
+const PROPOSED = (which: string) => `picks:v2:harris:proposed:${which}`;
 
 async function readImage(client: Anthropic, model: string, imageUrl: string): Promise<SheetRow[]> {
   const url = imageUrl.includes("?") ? imageUrl : `${imageUrl}?name=large`;
@@ -151,12 +152,17 @@ export async function harrisReview(now = new Date()): Promise<string> {
   const r = await harrisNow();
   if (!r) return "Harris tracker: college core unavailable.";
   const summary = harrisSummary(r);
-  const which = r.clears.agreement ? "agreement" : r.clears.edge ? "edge" : null;
-  if (which && (await redis.set(PROPOSED, now.toISOString(), { nx: true })) === "OK") {
+  const which = r.clears.agreement ? "agreement" : r.clears.picks ? "picks" : r.clears.edge ? "edge" : null;
+  if (which && (await redis.set(PROPOSED(which), now.toISOString(), { nx: true })) === "OK") {
     await redisStore.append({
       at: now.toISOString(),
       kind: "proposal",
-      title: which === "agreement" ? "Proposal: use Harris agreement as a college filter" : "Proposal: Harris's 3+ point edges as a college signal",
+      title:
+        which === "agreement"
+          ? "Proposal: use Harris agreement as a college filter"
+          : which === "picks"
+            ? "Proposal: Harris's posted picks as a college signal"
+            : "Proposal: Harris's 3+ point edges as a college signal",
       why: `${summary} A person decides whether to add it to the rule; nothing changes on its own.`,
       evidence: r,
     });

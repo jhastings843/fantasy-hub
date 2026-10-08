@@ -11,8 +11,10 @@
 //
 // The bar is the strategy review's (learning/model.ts CRITERIA): 30+
 // settled games over 3+ weeks and a one-sided paired t of 1.645 or more for
-// agreement; for his edge alone, his 3+ point sheet edges need 30+ decided
-// games over 3+ weeks with the 90% Wilson range's low end past 52.4%. A
+// agreement; for his edge alone (his 3+ point sheet edges, and separately
+// his posted picks at the lines he listed), 30+ decided games over 3+ weeks
+// with the 90% Wilson range's low end past 52.4%. Posted picks grade at his
+// contest lines, which are set early in the week. A
 // pass files a proposal for a person; it never changes a bet by itself.
 
 import { BREAK_EVEN, type GradedGame } from "./engine";
@@ -64,15 +66,16 @@ export interface HarrisReport {
     t: number;
   };
   /** Which question has cleared the bar, if any. */
-  clears: { agreement: boolean; edge: boolean };
+  /** agreement: helps Sam+David; edge: his 3+ pt sheet edges; picks: his posted picks at his lines. */
+  clears: { agreement: boolean; edge: boolean; picks: boolean };
   ungraded: { picks: number; rows: number };
 }
 
-/** A pick to its game and side on that week's sheet (or null). */
-function pickGame(p: HarrisPick, w: HarrisWeek): { key: string; side: "home" | "away" } | null {
+/** A pick to its game and side: on that week's sheet, else among that week's finished games. */
+function pickGame(p: HarrisPick, w: HarrisWeek, weekGames: { away: string; home: string }[]): { key: string; side: "home" | "away" } | null {
   const k = harrisKey(p.team);
   let best: { key: string; side: "home" | "away"; s: number } | null = null;
-  for (const r of w.rows) {
+  for (const r of w.rows.length ? [...w.rows, ...weekGames] : weekGames) {
     for (const side of ["home", "away"] as const) {
       const s = similarity(k, side === "home" ? r.home : r.away);
       if (s >= 0.75 && (!best || s > best.s)) best = { key: `${w.week}:${r.away}@${r.home}`, side, s };
@@ -91,6 +94,30 @@ export function harrisReport(weeks: HarrisWeek[], finals: Map<string, Final>, gr
   let sheetGames = 0;
   const rowAt = new Map<string, { model: number; week: number }>();
 
+  const gamesOf = (week: number) =>
+    [...finals.keys()].filter((k) => k.startsWith(`${week}:`)).map((k) => {
+      const [away, home] = k.slice(k.indexOf(":") + 1).split("@");
+      return { away, home };
+    });
+  const pickWeeks = new Set<number>();
+  for (const w of weeks) {
+    // Picks come from the post text, so a week without a readable sheet still grades them.
+    for (const p of w.picks) {
+      const g = pickGame(p, w, gamesOf(w.week));
+      const f = g ? finals.get(g.key) : undefined;
+      if (!g || !f) {
+        ungradedPicks++;
+        continue;
+      }
+      // His line is from his team's side; to home side it flips for an away pick.
+      const homeLine = g.side === "home" ? p.line : -p.line;
+      const hr = homeResult(f, homeLine);
+      const res = g.side === "home" ? hr : flip(hr);
+      add(picks[p.tier], res);
+      add(picks.all, res);
+      pickWeeks.add(w.week);
+    }
+  }
   for (const w of weeks.filter((x) => x.verified)) {
     for (const r of w.rows) {
       const k = `${w.week}:${r.away}@${r.home}`;
@@ -110,20 +137,6 @@ export function harrisReport(weeks: HarrisWeek[], finals: Map<string, Final>, gr
         add(edge3, res);
         edge3Weeks.add(w.week);
       }
-    }
-    for (const p of w.picks) {
-      const g = pickGame(p, w);
-      const f = g ? finals.get(g.key) : undefined;
-      if (!g || !f) {
-        ungradedPicks++;
-        continue;
-      }
-      // His line is from his team's side; to home side it flips for an away pick.
-      const homeLine = g.side === "home" ? p.line : -p.line;
-      const hr = homeResult(f, homeLine);
-      const res = g.side === "home" ? hr : flip(hr);
-      add(picks[p.tier], res);
-      add(picks.all, res);
     }
   }
 
@@ -152,6 +165,7 @@ export function harrisReport(weeks: HarrisWeek[], finals: Map<string, Final>, gr
   const sd = n > 1 ? Math.sqrt(gains.reduce((s, x) => s + (x - mean) ** 2, 0) / (n - 1)) : 0;
   const t = sd > 0 ? mean / (sd / Math.sqrt(n)) : 0;
   const decided3 = edge3.w + edge3.l;
+  const decidedPicks = picks.all.w + picks.all.l;
 
   return {
     weeks: weeks.map((w) => w.week).sort((a, b) => a - b),
@@ -161,6 +175,7 @@ export function harrisReport(weeks: HarrisWeek[], finals: Map<string, Final>, gr
     clears: {
       agreement: n >= CRITERIA.MIN_OPPORTUNITIES && aWeeks.size >= CRITERIA.MIN_WEEKS && t >= CRITERIA.MIN_T,
       edge: decided3 >= CRITERIA.MIN_OPPORTUNITIES && edge3Weeks.size >= CRITERIA.MIN_WEEKS && wilsonLow(edge3.w, decided3) > BREAK_EVEN,
+      picks: decidedPicks >= CRITERIA.MIN_OPPORTUNITIES && pickWeeks.size >= CRITERIA.MIN_WEEKS && wilsonLow(picks.all.w, decidedPicks) > BREAK_EVEN,
     },
     ungraded: { picks: ungradedPicks, rows: ungradedRows },
   };
@@ -177,6 +192,6 @@ export function harrisSummary(r: HarrisReport): string {
     a.games
       ? `With Sam and David agreeing (${a.games} games): ${recText(a.all)}; when he agrees ${recText(a.harrisAgrees)}, when he disagrees ${recText(a.harrisDisagrees)} (t ${a.t}).`
       : "No overlap with Sam and David's graded games yet.",
-    r.clears.agreement || r.clears.edge ? "Cleared the bar: proposal filed." : "Not used for bets.",
+    r.clears.agreement || r.clears.edge || r.clears.picks ? "Cleared the bar: proposal filed." : "Not used for bets.",
   ].join(" ");
 }

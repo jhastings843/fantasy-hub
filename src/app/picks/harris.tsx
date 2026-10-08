@@ -23,7 +23,7 @@ export async function HarrisCard() {
         <div className={s.eyebrow}>{`Tracked, not used · weeks ${r.weeks.join(", ")}`}</div>
         <h2 className={s.h2} id="harris">John Harris tracker</h2>
         <p className={s.p}>
-          {r.clears.agreement || r.clears.edge
+          {r.clears.agreement || r.clears.edge || r.clears.picks
             ? "He has cleared the bar: a proposal is in the strategy journal for a person to decide on."
             : "Graded every week. He joins the rule only if his agreement with Sam and David, or his own edge, clears the same bar any strategy change must."}
         </p>
