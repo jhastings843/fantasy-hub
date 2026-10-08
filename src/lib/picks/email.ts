@@ -1,6 +1,24 @@
 import { type BoardGame, type Record as Rec } from "./engine";
 import { type EmailSelection, selectForEmail } from "./issued";
 import type { UpdateDiff } from "./update";
+import { STAKE, DEFAULT_PRICE, fmtUnits } from "./units";
+
+const price = (p?: number) => (p === undefined ? `${DEFAULT_PRICE}` : p > 0 ? `+${p}` : `${p}`);
+
+/** "Thursday night", "Saturday", "Sunday", "Monday night": which slate a kickoff belongs to. */
+export function slateOf(kickoff?: string): { label: string; order: number } {
+  if (!kickoff) return { label: "Kickoff time not listed", order: 9e15 };
+  const d = new Date(kickoff);
+  const day = d.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" });
+  const hour = Number(d.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23" }));
+  const night = hour >= 17 && day !== "Saturday" && day !== "Sunday";
+  return { label: night ? `${day} night` : day, order: d.getTime() };
+}
+
+const when = (kickoff?: string) =>
+  kickoff
+    ? new Date(kickoff).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", minute: "2-digit" })
+    : "";
 import type { PicksReport } from "./report";
 import { PALETTE, card, emailPage, escapeHtml, generatedLine, label, paragraph, small } from "@/lib/email/shell";
 
@@ -12,21 +30,31 @@ const rec = (r: Rec) => `${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`;
 const line = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
+/** The bet card: every bet, grouped by slate in kickoff order, with stake and price. */
 function playRows(r: PicksReport, games: BoardGame[]): string {
   const name = (k: string) => r.names[k] ?? k;
-  return games
+  const sorted = games.slice().sort((a, b) => slateOf(a.ref?.kickoff).order - slateOf(b.ref?.kickoff).order);
+  let last = "";
+  return sorted
     .map((g) => {
       const team = g.side === "home" ? g.home : g.away;
       const opp = g.side === "home" ? g.away : g.home;
       const lineFor = g.side === "home" ? g.homeLine! : -g.homeLine!;
+      const slate = slateOf(g.ref?.kickoff).label;
+      const head =
+        slate !== last
+          ? `<tr><td colspan="3" style="padding:12px 0 4px;font:600 10px/1.3 ${FONT};letter-spacing:.08em;text-transform:uppercase;color:${PALETTE.muted};">${escapeHtml(slate)}</td></tr>`
+          : "";
+      last = slate;
+      const p = g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice;
       const chip =
         g.tier === "t1"
-          ? `<span style="background:${PALETTE.accent};color:#fff;border-radius:4px;padding:2px 6px;font:600 10px/1.4 ${FONT};">TIER 1</span>`
-          : `<span style="background:${PALETTE.goodBg};color:${PALETTE.accent};border:1px solid ${PALETTE.goodBorder};border-radius:4px;padding:1px 6px;font:600 10px/1.4 ${FONT};">TIER 2</span>`;
-      return `<tr>
-  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};width:64px;">${chip}</td>
-  <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(`${name(team)} ${line(lineFor)}`)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">vs ${escapeHtml(name(opp))}</div></td>
-  <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${g.pemPick ? "PEM's side" : `edge ${g.read!.avgEdge.toFixed(1)}`}</td>
+          ? `<span style="background:${PALETTE.accent};color:#fff;border-radius:4px;padding:2px 6px;font:600 10px/1.4 ${FONT};">${STAKE.t1}U</span>`
+          : `<span style="background:${PALETTE.goodBg};color:${PALETTE.accent};border:1px solid ${PALETTE.goodBorder};border-radius:4px;padding:1px 6px;font:600 10px/1.4 ${FONT};">${STAKE.t2}U</span>`;
+      return `${head}<tr>
+  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};width:52px;">${chip}</td>
+  <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(`${name(team)} ${line(lineFor)} (${price(p)})`)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">vs ${escapeHtml(name(opp))}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
+  <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${g.tier === "t1" ? "Tier 1" : "Tier 2"}${g.pemPick ? " · PEM" : ""}</td>
 </tr>`;
     })
     .join("");
@@ -63,13 +91,23 @@ function totalsBlock(r: PicksReport, sel: EmailSelection): string {
     .map(
       (g) => `<tr>
   <td style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(g.play!)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${name(g.away)} at ${name(g.home)}`)}</div></td>
-  <td align="right" style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">models ${g.sam!.toFixed(1)} / ${g.david!.toFixed(1)}</td>
+  <td align="right" style="padding:6px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${STAKE.total}u · ${price(g.side === "over" ? g.ref?.overPrice : g.ref?.underPrice)}</td>
 </tr>`,
     )
     .join("");
   return `<div style="padding-top:16px;">${label("Totals")}</div>
 ${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.record)} in the archive.`)}
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
+}
+
+/** The season's unit total for this sport, from bets that went out with a stake. */
+function unitsLine(r: PicksReport): string {
+  const u = r.units?.total;
+  if (!u || !u.bets) return small("Bets carry stakes from this card on: Tier 1 is 1 unit, Tier 2 half a unit.", PALETTE.body);
+  const rec = `${u.w}-${u.l}${u.p ? `-${u.p}` : ""}`;
+  return `<div style="font:600 15px/1.4 ${FONT};color:${u.units >= 0 ? PALETTE.good : PALETTE.bad};padding-bottom:2px;">${escapeHtml(
+    `Season: ${fmtUnits(u.units)} on ${rec}${u.risked ? `, ${Math.round(u.roi * 100)}% return` : ""}`,
+  )}</div>${u.pending ? small(`${u.pending} bet${u.pending === 1 ? "" : "s"} still to settle.`) : ""}`;
 }
 
 /** Last week as sent, once its games are graded. */
@@ -103,6 +141,7 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
   ].filter(Boolean);
   const su = r.su.best ? `Straight up follows ${r.su.best.label.toLowerCase()} (${r.su.best.w}-${r.su.best.l}).` : "";
   return card(`${label(`${league} · Week ${r.week ?? "?"}`)}
+${unitsLine(r)}
 ${lastWeekLine(r)}
 ${paragraph(ruleLine)}
 ${
@@ -125,7 +164,8 @@ export interface PicksEmail {
   selections: { nfl: EmailSelection | null; cfb: EmailSelection | null };
 }
 
-const LIMITS = { nfl: { plays: 12, su: 16 }, cfb: { plays: 10, su: 15 } } as const;
+// Every bet goes in the email: a bet only on the page is not a bet anyone was given.
+const LIMITS = { nfl: { plays: 99, su: 16 }, cfb: { plays: 99, su: 15 } } as const;
 
 export function buildPicksEmail(input: {
   nfl: PicksReport | null;
@@ -154,7 +194,7 @@ export function buildPicksEmail(input: {
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Units are to win: a 1u bet at -110 risks 1.1u to win 1u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))} Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
@@ -185,10 +225,12 @@ export function updateBlock(r: PicksReport, d: UpdateDiff): string {
           row(
             `${team(g.side!, g)} ${line(at(g.side!, g.homeLine!))}`,
             `vs ${opp(g.side!, g)}${d.pageOnly.includes(`${d.week}:${g.away}@${g.home}`) ? " · was on the page Tuesday, not in the email" : ""}`,
-            g.tier === "t1" ? "Tier 1" : "Tier 2",
+            `${g.tier === "t1" ? STAKE.t1 : STAKE.t2}u · ${price(g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice)}`,
           ),
         ),
-        ...d.addedTotals.map((g) => row(g.play!, `${name(g.away)} at ${name(g.home)}`, "Total")),
+        ...d.addedTotals.map((g) =>
+          row(g.play!, `${name(g.away)} at ${name(g.home)}`, `${STAKE.total}u · ${price(g.side === "over" ? g.ref?.overPrice : g.ref?.underPrice)}`),
+        ),
       ].join(""),
     )}`);
   }

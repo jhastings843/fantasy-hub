@@ -205,9 +205,10 @@ describe("issued totals", () => {
     const sel = selectForEmail(report, 5, 5);
     expect(sel.totals.map((g) => g.home)).toEqual(["H"]);
     const rec = toIssued(report, sel, { issuedAt: "t", subject: "s" });
-    expect(rec.totals).toEqual([
-      { home: "H", away: "A", side: "over", line: 45, play: "Over 45", source: "DraftKings via ESPN", fetchedAt: "t", shownInEmail: true },
-    ]);
+    expect(rec.totals).toHaveLength(1);
+    expect(rec.totals![0]).toMatchObject({
+      home: "H", away: "A", side: "over", line: 45, play: "Over 45", source: "DraftKings via ESPN", fetchedAt: "t", shownInEmail: true, units: 1,
+    });
     expect(rec.totalsRule?.id).toBe("t-over");
     const [w] = gradeIssued([rec], new Map([["6:A@H", { home: 24, away: 24 }]]));
     expect([w.totals.w, w.totals.l]).toEqual([1, 0]);

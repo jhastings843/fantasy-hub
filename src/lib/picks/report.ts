@@ -17,6 +17,8 @@ import { pemWeeks } from "./pem";
 import { type ClvRow, clvTable, summarize } from "./closing";
 import { closingLines, currentLines } from "./closing-store";
 import { type IssuedWeek, gradeIssued, issuedClv, issuedGames } from "./issued";
+import { type UnitReport, unitReport } from "./units";
+import { firstSends } from "./update";
 import { loadIssued } from "./issued-store";
 import { type PemCompareRow, type ResearchRow, pemCompare, researchRows } from "./research";
 import { type TotalsBacktest, type TotalsBoardGame, type TotalsSeen, TOTALS_EDGE, totalsBacktest, totalsBoard } from "./totals";
@@ -233,6 +235,8 @@ export interface PicksReport {
   totals: { backtest: TotalsBacktest; board: TotalsBoardGame[]; edge: number; newlyArchived: number; archived: number };
   /** When each source's board for this week was first seen here (ISO). */
   posted: { [source: string]: string };
+  /** The bets the emails gave, with stakes: units +/- for this sport. */
+  units: UnitReport;
 }
 
 function seasonNow(): number {
@@ -322,7 +326,17 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     away: r.away,
     sam: samLive.find((x) => x.home === r.home && x.away === r.away)?.modelTotal,
     david: davidLive.find((x) => x.home === r.home && x.away === r.away)?.modelTotal,
-    ref: r.ref?.total !== undefined ? { total: r.ref.total, source: r.ref.source, fetchedAt: r.ref.fetchedAt } : undefined,
+    ref:
+      r.ref?.total !== undefined
+        ? {
+            total: r.ref.total,
+            source: r.ref.source,
+            fetchedAt: r.ref.fetchedAt,
+            overPrice: r.ref.overPrice,
+            underPrice: r.ref.underPrice,
+            kickoff: r.ref.kickoff,
+          }
+        : undefined,
   }));
   let newlyArchived = 0;
   if (week) {
@@ -411,6 +425,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     pemCompare: pemCmp,
     totals,
     posted,
+    units: unitReport(firstSends(issued), finals),
     reference: {
       source: priced[0]?.ref?.source ?? null,
       fetchedAt: priced[0]?.ref?.fetchedAt ?? null,

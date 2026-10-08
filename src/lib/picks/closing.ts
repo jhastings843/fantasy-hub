@@ -56,10 +56,17 @@ interface EspnCompetitor {
 interface EspnScoreboard {
   events?: Array<{
     id: string;
+    date?: string;
     status?: { type?: { completed?: boolean; state?: string } };
     competitions?: Array<{
       competitors?: EspnCompetitor[];
-      odds?: Array<{ spread?: number; overUnder?: number; provider?: { name?: string } }>;
+      odds?: Array<{
+        spread?: number;
+        overUnder?: number;
+        provider?: { name?: string };
+        pointSpread?: { home?: Leg; away?: Leg };
+        total?: { over?: Leg; under?: Leg };
+      }>;
     }>;
   }>;
 }
@@ -81,9 +88,22 @@ export function parseCurrentOdds(
     const o = e.competitions?.[0]?.odds?.[0];
     const ref = refs.find((r) => r.id === e.id);
     if (!ref || e.status?.type?.state !== "pre" || typeof o?.spread !== "number") return;
+    // Before kickoff ESPN's "close" leg is the current quote, with its price.
+    const price = (leg?: Leg) => {
+      const n = Number(String(leg?.close?.odds ?? "").replace("+", ""));
+      return Number.isFinite(n) && n !== 0 ? n : undefined;
+    };
+    const prices = {
+      homePrice: price(o.pointSpread?.home),
+      awayPrice: price(o.pointSpread?.away),
+      overPrice: price(o.total?.over),
+      underPrice: price(o.total?.under),
+    };
     out.set(key({ week, home: ref.home, away: ref.away }), {
       line: o.spread,
       ...(typeof o.overUnder === "number" ? { total: o.overUnder } : {}),
+      ...Object.fromEntries(Object.entries(prices).filter(([, v]) => v !== undefined)),
+      ...(e.date ? { kickoff: e.date } : {}),
       source: `${o.provider?.name ?? "Sportsbook"} via ESPN`,
       fetchedAt,
     });
@@ -119,8 +139,8 @@ function num(raw: unknown): number | null {
 }
 
 interface Leg {
-  open?: { line?: string };
-  close?: { line?: string };
+  open?: { line?: string; odds?: string };
+  close?: { line?: string; odds?: string };
 }
 interface EspnSummary {
   pickcenter?: Array<{

@@ -507,6 +507,13 @@ export interface RefLine {
   line: number;
   /** The game total from the same quote, when there is one. */
   total?: number;
+  /** American prices on each side of the spread and total, from the same quote. */
+  homePrice?: number;
+  awayPrice?: number;
+  overPrice?: number;
+  underPrice?: number;
+  /** Scheduled kickoff (ISO). */
+  kickoff?: string;
   /** Where it came from, e.g. "DraftKings via ESPN". */
   source: string;
   /** When we read it (the feed carries no quote time of its own). */

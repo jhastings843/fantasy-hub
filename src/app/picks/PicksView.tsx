@@ -32,8 +32,8 @@ const n = (r: Rec) => r.w + r.l;
 
 const TIER_ORDER: Tier[] = ["t1", "t2", "wait", "fav", "pass", "split", "one"];
 const TIER_LABEL: { [t in Tier]: string } = {
-  t1: "Tier 1 · bet",
-  t2: "Tier 2 · small",
+  t1: "Tier 1 · 1u",
+  t2: "Tier 2 · 0.5u",
   wait: "Needs PEM",
   fav: "Pass · favorite",
   pass: "Pass",
@@ -458,6 +458,8 @@ function Report({ r, subnav, stale, at }: { r: PicksReport; subnav: React.ReactN
           </div>
         </section>
 
+        <UnitsSection r={r} />
+
         {live.length > 0 && (
           <section className={s.section}>
             <div>
@@ -758,6 +760,78 @@ function ClvSection({ clv }: { clv: PicksReport["clv"] }) {
   );
 }
 
+function UnitsSection({ r }: { r: PicksReport }) {
+  const u = r.units;
+  if (!u) return null;
+  const sign = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
+  const lrec = (l: { w: number; l: number; p: number }) => `${l.w}-${l.l}${l.p ? `-${l.p}` : ""}`;
+  const t = u.total;
+  const tile = (title: string, l: typeof t) => (
+    <div className={`${s.tile} ${l.w + l.l ? (l.units >= 0 ? s.good : s.bad) : ""}`}>
+      <div className={`${s.tileV} ${s.num}`}>{l.w + l.l + l.p ? sign(l.units) : "none yet"}</div>
+      <div className={s.tileK}>
+        {title}
+        {l.bets ? ` · ${lrec(l)}${l.pending ? `, ${l.pending} pending` : ""}` : ""}
+      </div>
+    </div>
+  );
+  return (
+    <section className={s.section} id="units">
+      <div>
+        <div className={s.eyebrow}>The bets the emails gave</div>
+        <h2 className={s.h2}>Units</h2>
+      </div>
+      <p className={s.p}>
+        {`Tier 1 is 1 unit, Tier 2 half a unit, a totals play 1 unit. Units are to win (a 1u bet at -110 risks 1.1u) and each bet is graded at the price it was sent with. Each game counts once, at the line it was first sent.${u.unstaked ? ` ${u.unstaked} earlier plays went out before stakes existed; they're in the win-loss record below but not in units.` : ""}`}
+      </p>
+      <div className={s.rule}>
+        <div>
+          <div className={s.eyebrow}>{LEAGUE_NAME[r.league]} season</div>
+          <h2 className={s.h2}>{t.bets ? `${lrec(t)}${t.pending ? ` · ${t.pending} pending` : ""}` : "No staked bets yet"}</h2>
+        </div>
+        <div className={`${s.big} ${s.num} ${t.units >= 0 ? s.pos : s.neg}`}>
+          {t.w + t.l + t.p ? sign(t.units) : "0.0u"}
+          <small>{t.risked ? `${Math.round(t.roi * 100)}% return on ${t.risked.toFixed(1)}u risked` : "first bets settle this week"}</small>
+        </div>
+      </div>
+      <div className={s.tiles}>
+        {tile("Tier 1", u.byTier.t1)}
+        {tile("Tier 2", u.byTier.t2)}
+        {tile("Totals", u.byTier.totals)}
+        {tile("Tuesday card", u.bySlot.tue)}
+        {tile(r.league === "cfb" ? "Saturday additions" : "Sunday additions", r.league === "cfb" ? u.bySlot.sat : u.bySlot.sun)}
+      </div>
+      {u.byWeek.length > 0 && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Week</th>
+                <th>Bets</th>
+                <th>Record</th>
+                <th>Units</th>
+              </tr>
+            </thead>
+            <tbody>
+              {u.byWeek.map(({ week, ledger }) => (
+                <tr key={week}>
+                  <td className={s.num}>{week}</td>
+                  <td className={s.num}>{ledger.bets}</td>
+                  <td className={s.num}>
+                    {lrec(ledger)}
+                    {ledger.pending ? <span className={s.dim}> · {ledger.pending} pending</span> : null}
+                  </td>
+                  <td className={`${s.num} ${ledger.units >= 0 ? s.pos : s.neg}`}>{ledger.w + ledger.l + ledger.p ? sign(ledger.units) : "·"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TotalsSection({ r }: { r: PicksReport }) {
   const t = r.totals;
   const name = (k: string) => r.names[k] ?? k;
@@ -967,13 +1041,13 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
       <table className={s.table}>
         <thead>
           <tr>
+            <th>Pick at line now</th>
             <th>Tier</th>
             <th>Game</th>
             <th>Line now (home)</th>
             <th>Sam model</th>
             <th>David model</th>
             {withPem && <th>PEM model</th>}
-            <th>Pick at line now</th>
             <th>Avg edge</th>
           </tr>
         </thead>
@@ -987,6 +1061,18 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
                 : g.play;
             return (
               <tr key={`${g.away}@${g.home}`}>
+                <td className={`${s.play} ${g.tier === "t1" || g.tier === "t2" ? "" : s.dim}`}>
+                  {play}
+                  {g.pemPick && <div className={s.thin}>Sam and David split; PEM breaks it.</div>}
+                  {g.tier === "wait" && (
+                    <div className={s.thin}>
+                      {g.waitFor === "t1" ? "Tier 1" : "Tier 2"} if PEM agrees; PEM&apos;s line for this game isn&apos;t on file.
+                    </div>
+                  )}
+                  {g.basis === "source" && (g.tier === "t1" || g.tier === "t2") && (
+                    <div className={s.thin}>No current quote: judged at the sites&apos; own lines.</div>
+                  )}
+                </td>
                 <td>
                   <TierChip t={g.tier} />
                 </td>
@@ -1001,18 +1087,6 @@ function BoardTable({ games, name, withPem }: { games: BoardGame[]; name: (k: st
                     {g.pem ? `${home} ${line(g.pem.model)}${g.read?.pemSide ? ` · ${name(g.read.pemSide === "home" ? g.home : g.away)}` : ""}` : "missing"}
                   </td>
                 )}
-                <td className={`${s.play} ${g.tier === "t1" || g.tier === "t2" ? "" : s.dim}`}>
-                  {play}
-                  {g.pemPick && <div className={s.thin}>Sam and David split; PEM breaks it.</div>}
-                  {g.tier === "wait" && (
-                    <div className={s.thin}>
-                      {g.waitFor === "t1" ? "Tier 1" : "Tier 2"} if PEM agrees; PEM&apos;s line for this game isn&apos;t on file.
-                    </div>
-                  )}
-                  {g.basis === "source" && (g.tier === "t1" || g.tier === "t2") && (
-                    <div className={s.thin}>No current quote: judged at the sites&apos; own lines.</div>
-                  )}
-                </td>
                 <td className={s.num}>{g.read?.agree ? g.read.avgEdge.toFixed(1) : "·"}</td>
               </tr>
             );

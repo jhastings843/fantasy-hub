@@ -179,7 +179,7 @@ export interface TotalsBoardGame {
   sam?: number;
   david?: number;
   /** The one current total every model is judged at. */
-  ref?: { total: number; source: string; fetchedAt: string };
+  ref?: TotalsRef;
   read?: TotalsRead;
   /** "t1" only when a totals rule qualifies; otherwise lean, split, one model or no line. */
   tier: "t1" | "lean" | "split" | "one" | "noline";
@@ -189,8 +189,17 @@ export interface TotalsBoardGame {
   line?: number;
 }
 
+export interface TotalsRef {
+  total: number;
+  source: string;
+  fetchedAt: string;
+  overPrice?: number;
+  underPrice?: number;
+  kickoff?: string;
+}
+
 export function totalsBoard(
-  rows: { home: string; away: string; sam?: number; david?: number; ref?: { total: number; source: string; fetchedAt: string } }[],
+  rows: { home: string; away: string; sam?: number; david?: number; ref?: TotalsRef }[],
   rule: TotalsCut | null,
 ): TotalsBoardGame[] {
   return rows.map((row) => {

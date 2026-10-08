@@ -27,6 +27,7 @@ import type { League } from "./parse";
 import type { PicksReport } from "./report";
 import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
 import { type Slot, type UpdateDiff, firstSends } from "./update";
+import { STAKE } from "./units";
 
 /** Bump when the tiering logic changes, so a record says which logic issued it. */
 export const RULE_VERSION = "2026-10-08 reference-line agreement, Tier 2 on added games";
@@ -45,6 +46,11 @@ export interface IssuedPlay {
   pemPick?: boolean;
   /** In the email itself, or only on the page ("plus N more"). */
   shownInEmail: boolean;
+  /** Stake in units, to win. Absent on plays sent before units existed. */
+  units?: number;
+  /** American price on the quote it was sent with. */
+  price?: number;
+  kickoff?: string;
 }
 
 export interface IssuedSu {
@@ -67,6 +73,9 @@ export interface IssuedTotal {
   source: string;
   fetchedAt: string;
   shownInEmail: boolean;
+  units?: number;
+  price?: number;
+  kickoff?: string;
 }
 
 export interface IssuedCut {
@@ -176,6 +185,9 @@ export function toIssued(
       ref: g.ref,
       pemPick: g.pemPick,
       shownInEmail: i < sel.shownPlays,
+      units: STAKE[g.tier as "t1" | "t2"],
+      price: g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice,
+      kickoff: g.ref?.kickoff,
     })),
     su: sel.su.map((x, i) => ({
       home: x.g.home,
@@ -194,6 +206,9 @@ export function toIssued(
       source: g.ref!.source,
       fetchedAt: g.ref!.fetchedAt,
       shownInEmail: i < sel.shownTotals,
+      units: STAKE.total,
+      price: g.side === "over" ? g.ref!.overPrice : g.ref!.underPrice,
+      kickoff: g.ref!.kickoff,
     })),
     totalsRule: r.totals?.backtest.rule
       ? { id: r.totals.backtest.rule.id, label: r.totals.backtest.rule.label, test: r.totals.backtest.rule.test, evidence: r.totals.backtest.rule.record }
