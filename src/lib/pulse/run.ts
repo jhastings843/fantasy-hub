@@ -26,6 +26,7 @@ import { archiveTracker } from "@/lib/picks/tracker";
 import { runPicksEmail, runPicksSaturday } from "@/lib/picks/run";
 import { runPicksData } from "@/lib/picks/report";
 import { tracked } from "@/lib/picks/ops";
+import { reviewIfDue } from "@/lib/picks/learning/run";
 import { weekOf } from "@/lib/picks/parse";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
@@ -365,6 +366,9 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "lineups", work: () => refreshLineups() },
         { name: "waivers", work: () => refreshWaivers() },
         { name: "picks-data", work: () => picksData(60) },
+        // Weekly strategy review (Tue 6am ET slot) with catch-up after 15+
+        // newly settled games; most hours this is a cheap "not due".
+        { name: "picks-review", work: () => tracked("review", 60, () => reviewIfDue()) },
         { name: "tracker", work: () => archiveTracker() },
       ];
     case "overnight":

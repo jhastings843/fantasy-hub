@@ -1,0 +1,29 @@
+name: Picks UI check
+
+# Weekly usability check of the live Picks tab, recorded in the learning
+# journal. Report only: it never edits the layout. Layout changes go through
+# a reviewed session with these same checks, and are reverted by git revert.
+
+on:
+  schedule:
+    # Wednesday 14:00 UTC (10am ET), after Tuesday's card.
+    - cron: "0 14 * * 3"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install a browser for the check
+        run: |
+          npm i --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Check the live page
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/picks-ui-check.mjs https://fantasy-hub-tan.vercel.app
