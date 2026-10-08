@@ -97,10 +97,9 @@ export interface ReviewResult {
 /** Next Tuesday, first hourly pulse (7am ET; 11:00 UTC in EDT), well before the 5:30pm card. */
 export function nextReviewAt(now: Date): string {
   const d = new Date(now);
-  const day = d.getUTCDay();
-  const add = (2 - day + 7) % 7 || 7;
-  d.setUTCDate(d.getUTCDate() + add);
   d.setUTCHours(11, 0, 0, 0);
+  // The next Tuesday 11:00 UTC strictly after now (today's, if it is still ahead).
+  while (d.getUTCDay() !== 2 || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString();
 }
 
@@ -136,7 +135,9 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   // Rollback check on the policy in force, before anything new.
   let rolledBack: ReviewResult["rolledBack"];
   if (prev?.previousPolicyId && prev.activatedAt && active.id !== prev.previousPolicyId) {
-    const before = (await store.version(prev.previousPolicyId)) ?? BASELINE_POLICY;
+    const stored = await store.version(prev.previousPolicyId);
+    const before = stored ?? BASELINE_POLICY;
+    const missingNote = stored ? "" : ` (previous version ${prev.previousPolicyId} not on file; would return to the baseline ${BASELINE_POLICY.id})`;
     const since = opps.filter((o) => o.first.at >= prev.activatedAt!);
     let c: Comparison | null = null;
     const newCut = active.atsCandidates.find((id) => !before.atsCandidates.includes(id));
@@ -144,20 +145,22 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
       const h = hs.find((y) => y.id === prev.activatedFrom);
       if (h?.definition.kind === "ats-cut") {
         const d = h.definition;
-        c = compare(since.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) })));
+        const own = since.filter((o) => o.league === h.league);
+        c = compare(own.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) })));
       }
     } else if (JSON.stringify(active.staking) !== JSON.stringify(before.staking)) {
       const recent = bets.filter((b) => b.at >= prev.activatedAt!);
       c = compare(
         recent.map((b) => ({
           o: { week: b.week, first: { at: b.at }, final: { home: 0, away: 0 } } as never,
-          ch: { bet: true, units: payout(b.result, b.units, b.price), risked: b.units },
+          ch: { bet: true, units: payout(b.result, stakeFor(b.p, b.price, active.staking), b.price), risked: stakeFor(b.p, b.price, active.staking) },
           inc: { bet: true, units: payout(b.result, stakeFor(b.p, b.price, before.staking), b.price), risked: stakeFor(b.p, b.price, before.staking) },
         })),
       );
     }
     const fails = validate({ policy: active, replay: await x.replay(active), historyBefore, historyAfter: historyBefore });
-    const why = shouldRollBack(c, fails);
+    const reason = shouldRollBack(c, fails);
+    const why = reason ? `${reason}${missingNote}` : null;
     if (why) {
       rolledBack = { from: active.id, to: before.id, why };
       await write({ at, kind: "rollback", title: `Rolled back ${active.id} to ${before.id}`, why, policyBefore: active.id, policyAfter: before.id, evidence: c });
@@ -184,8 +187,8 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     .sort((a, b) => b.t - a.t);
   if (promos.length && !rolledBack) {
     const h = hs.find((y) => y.id === promos[0].y.id)!;
-    const n = Number((active.id.match(/\d+/) ?? ["1"])[0]) + 1;
-    const next = applyPromotion(active, h, `p${n}`, at);
+    // Ids are unique by time, so a rollback can never lead to a reused id.
+    const next = applyPromotion(active, h, `p${at.replace(/[-:]/g, "").slice(0, 13)}`, at);
     const historyAfter = await x.history();
     const fails = validate({ policy: next, replay: await x.replay(next), historyBefore, historyAfter });
     if (fails.length) {

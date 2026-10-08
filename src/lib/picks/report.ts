@@ -24,6 +24,7 @@ import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
 import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom } from "./compose";
 import { loadActivePolicy } from "./policy-store";
+import { activatedFor } from "./report-scope";
 import { archiveForecasts } from "./forecasts";
 import {
   type BoardGame,
@@ -255,7 +256,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     }),
   };
   const policy = await loadActivePolicy();
-  const s = strategies(league, j.graded, { activated: policy.atsCandidates });
+  const s = strategies(league, j.graded, { activated: activatedFor(league, policy.atsCandidates) });
   const su = suRecords(league, j.graded);
 
   // The week on the board is whichever site has moved on; a site still

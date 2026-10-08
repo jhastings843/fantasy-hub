@@ -65,8 +65,11 @@ describe("rehearsal: ingest -> settle -> evaluate -> decide -> validate -> activ
     const r1 = await runReview(store, inputs(good, "2026-11-11T10:00:00Z"));
     const d = r1.decisions.find((x) => x.id === "nfl:ats:dog-band-a")!;
     expect(d.verdict).toBe("promote");
-    expect(r1.activated).toEqual({ from: "p1", to: "p2", hypothesis: "nfl:ats:dog-band-a" });
-    expect((await store.active()).atsCandidates).toEqual(["dog-band-a"]);
+    expect(r1.activated).toMatchObject({ from: "p1", hypothesis: "nfl:ats:dog-band-a" });
+    const p2 = r1.activated!.to;
+    expect(p2).toMatch(/^p2026/);
+    // League-scoped: NFL's dog-band-a, not college's (a different cut under the same id).
+    expect((await store.active()).atsCandidates).toEqual(["nfl:dog-band-a"]);
     expect(r1.journal.find((j) => j.kind === "activate")?.rollbackTarget).toBe("p1");
     // Old versions stay frozen.
     expect((await store.version("p1"))).toEqual(BASELINE_POLICY);
@@ -74,8 +77,9 @@ describe("rehearsal: ingest -> settle -> evaluate -> decide -> validate -> activ
     // After activation the refinement falls apart: small dogs lose, big dogs cover.
     const bad = [10, 11].map((w, k) => weekOf(w, `2026-11-${17 + 7 * k}T21:00:00Z`, () => false, () => true));
     const r2 = await runReview(store, inputs([...good, ...bad], "2026-12-01T10:00:00Z"));
-    expect(r2.rolledBack?.to).toBe("p1");
+    expect(r2.rolledBack).toMatchObject({ from: p2, to: "p1" });
     expect((await store.active()).id).toBe("p1");
+    expect((await store.version(p2))?.atsCandidates).toEqual(["nfl:dog-band-a"]);
     expect(store.dump().journal.map((j) => j.kind)).toEqual(expect.arrayContaining(["register", "activate", "rollback", "review"]));
   });
 
@@ -113,6 +117,32 @@ describe("bounded proposals", () => {
     const again = propose([...hs, ...first], evals, "2026-11-08T00:00:00Z");
     const tests = [...hs, ...first, ...again].filter((h) => h.league === "nfl" && h.definition.kind === "ats-cut").map((h) => JSON.stringify((h.definition as { test: unknown }).test) + (h.definition as { parentId: string }).parentId);
     expect(new Set(tests).size).toBe(tests.length);
+  });
+});
+
+describe("review fixes from the independent review", () => {
+  it("scopes activated cuts to their league", async () => {
+    const { activatedFor } = await import("../report-scope");
+    expect(activatedFor("cfb", ["nfl:dog-band-a", "cfb:big-dog"])).toEqual(["big-dog"]);
+    expect(activatedFor("nfl", ["nfl:dog-band-a", "cfb:big-dog"])).toEqual(["dog-band-a"]);
+  });
+  it("schedules the next review for today's Tuesday slot when it is still ahead", async () => {
+    const { nextReviewAt } = await import("./review");
+    expect(nextReviewAt(new Date("2026-10-13T09:00:00Z"))).toBe("2026-10-13T11:00:00.000Z");
+    expect(nextReviewAt(new Date("2026-10-13T12:00:00Z"))).toBe("2026-10-20T11:00:00.000Z");
+  });
+  it("needs calibration before ANY policy that risks more, flat included", async () => {
+    const { decide } = await import("./model");
+    const h = seedHypotheses("2026-10-09T00:00:00Z").find((x) => x.id === "both:stake:flat1")!;
+    const comparison = { n: 60, weeks: [1, 2, 3, 4], meanDiff: 0.3, t: 3, challenger: { bets: 60, units: 9, risked: 60, roi: 0.15, clv: null, clvN: 0, drawdown: 2 }, incumbent: { bets: 60, units: 3, risked: 40, roi: 0.07, clv: null, clvN: 0, drawdown: 2 } };
+    const d = decide(h, { id: h.id, comparison }, { calibration: { n: 10, meanP: 0.55, winRate: 0.5, brier: 0.25, calibrated: false }, active: BASELINE_POLICY });
+    expect(d.verdict).toBe("retain");
+    expect(d.why).toMatch(/calibrated/);
+  });
+  it("ignores snapshots with no kickoff (can't prove they were pregame)", async () => {
+    const { opportunities } = await import("./model");
+    const snap = { at: "2026-10-13T21:00:00Z", week: 6, home: "H", away: "A", sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, ref: { line: 3, source: "s", fetchedAt: "t", homePrice: -110, awayPrice: -110 } };
+    expect(opportunities("nfl", [snap], new Map(), new Map())).toEqual([]);
   });
 });
 

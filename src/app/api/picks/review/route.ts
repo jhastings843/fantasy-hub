@@ -8,9 +8,10 @@ export const maxDuration = 60;
 // GET  /api/picks/review         run it for real (the pulse normally does this)
 // POST /api/picks/review         record a UI check result in the journal: { title, why, evidence }
 
+/** Fails closed: with no secret configured, nobody can run or write. */
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  return !secret || request.headers.get("authorization") === `Bearer ${secret}`;
+  return !!secret && request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: Request) {

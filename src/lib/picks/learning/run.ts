@@ -1,5 +1,8 @@
 import "server-only";
 import { getPicksCore, getQuotes } from "../report";
+import { activatedFor } from "../report-scope";
+import { strategies } from "../engine";
+import { redis } from "@/lib/redis/client";
 import { loadForecasts } from "../forecasts";
 import { loadIssued } from "../issued-store";
 import { compose, exposureFrom } from "../compose";
@@ -28,8 +31,13 @@ async function gather(now: Date): Promise<ReviewInputs> {
   const finals = cores.map((c) => ({ league: c.league, map: new Map(c.core?.finals ?? []) }));
   const closes = cores.map((c) => ({ league: c.league, map: new Map((c.core?.closes ?? []).map(([k, v]) => [k, v.close] as const)) }));
   const ruleTest = Object.fromEntries(cores.map((c) => [c.league, c.core?.strategies.rule?.test])) as ReviewInputs["ruleTest"];
-  const history = async () =>
-    JSON.stringify(issued.map((i) => [i.league, unitReport(firstSends(confirmed(i.records)), finals.find((f) => f.league === i.league)!.map).total]));
+  // Re-read from Redis each time, so before/after are independent reads.
+  const history = async () => {
+    const fresh = await Promise.all(LEAGUES.map(async (l) => ({ league: l, records: await loadIssued(l, season) })));
+    return JSON.stringify(fresh.map((i) => [i.league, unitReport(firstSends(confirmed(i.records)), finals.find((f) => f.league === i.league)!.map).total]));
+  };
+  const settled = new Set<string>(((await redis.hkeys(`picks:v2:settled:${season}`).catch(() => [])) as string[]).map(String));
+  for (const f of finals) for (const k of f.map.keys()) settled.add(`${f.league}:${k}`);
   const replay = async (policy: PicksPolicy) =>
     Promise.all(
       cores.flatMap(({ league, core }) => {
@@ -38,8 +46,11 @@ async function gather(now: Date): Promise<ReviewInputs> {
           (async () => {
             const quotes = await getQuotes(league, core.season, core.week);
             const recs = issued.find((i) => i.league === league)!.records;
-            const ex = exposureFrom(league, core.week, issued, new Set());
-            const r = compose({ core, quotes, issued: recs, exposure: ex, policy });
+            const ex = exposureFrom(league, core.week, issued, settled);
+            // Rebuild the rules under the candidate policy, so a newly
+            // activated cut is actually exercised by the replay.
+            const replayCore = { ...core, strategies: strategies(league, core.graded, { activated: activatedFor(league, policy.atsCandidates) }) };
+            const r = compose({ core: replayCore, quotes, issued: recs, exposure: ex, policy });
             const stakes = [...r.board.map((g) => g.stake ?? 0), ...r.totals.board.map((g) => g.stake ?? 0)].filter((x) => x > 0);
             const unpriced = r.board.filter((g) => (g.stake ?? 0) > 0 && g.priceSource !== "quoted").length;
             return { league, stakes, weeklyRoom: Math.max(0, WEEKLY_CAP - ex.weekly), unpricedStakes: unpriced };
@@ -60,16 +71,32 @@ export async function runStrategyReview(opts: { dryRun?: boolean; reason?: strin
  * scheduled time has passed, or when 15+ matched games have settled since
  * the last review.
  */
+const BACKOFF = "picks:v2:learning:backoff";
+const CATCHUP_CHECK = "picks:v2:learning:catchup-checked";
+
 export async function reviewIfDue(now = new Date()): Promise<string> {
+  // A review that failed waits before trying again, rather than every hour.
+  const until = await redis.get<string>(BACKOFF).catch(() => null);
+  if (until && now.toISOString() < until) return `backing off after a failed review until ${until}`;
   const state = await redisStore.state();
   const due = !state || now.toISOString() >= state.nextReviewAt;
   let newlySettled = 0;
   if (!due && state) {
+    // The catch-up count needs a full gather, so it runs at most every 6 hours.
+    const ok = (await redis.set(CATCHUP_CHECK, now.toISOString(), { nx: true, ex: 6 * 3600 }).catch(() => null)) === "OK";
+    if (!ok) return `not due (next ${state.nextReviewAt})`;
     const x = await gather(now);
     const opps = x.forecasts.flatMap((f) => opportunities(f.league, f.snaps, x.finals.find((m) => m.league === f.league)!.map, new Map()));
     newlySettled = opps.filter((o) => o.final).length - state.settledOpportunities;
   }
   if (!due && newlySettled < 15) return `not due (next ${state?.nextReviewAt}; ${newlySettled} newly settled)`;
-  const r = await runStrategyReview({ reason: due ? "scheduled" : `catch-up: ${newlySettled} newly settled`, now });
-  return r.state.lastOutcome;
+  try {
+    const r = await runStrategyReview({ reason: due ? "scheduled" : `catch-up: ${newlySettled} newly settled`, now });
+    return r.state.lastOutcome;
+  } catch (e) {
+    const next = new Date(now.getTime() + 6 * 3600 * 1000).toISOString();
+    await redis.set(BACKOFF, next, { ex: 6 * 3600 }).catch(() => {});
+    await redisStore.append({ at: now.toISOString(), kind: "ops", title: "Review failed; retrying in 6 hours", why: e instanceof Error ? e.message : String(e) }).catch(() => {});
+    throw e;
+  }
 }

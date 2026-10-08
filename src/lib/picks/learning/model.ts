@@ -126,8 +126,10 @@ export interface Opportunity {
   close?: number | null;
 }
 
+// A snapshot counts only with a known kickoff it precedes: no kickoff, no
+// proof it was pregame.
 const actionable = (s: ForecastSnapshot) =>
-  !!s.sam && !!s.david && !!s.ref && s.ref.homePrice !== undefined && s.ref.awayPrice !== undefined && (!s.ref.kickoff || s.at < s.ref.kickoff);
+  !!s.sam && !!s.david && !!s.ref && s.ref.homePrice !== undefined && s.ref.awayPrice !== undefined && !!s.ref.kickoff && s.at < s.ref.kickoff;
 
 export function opportunities(
   league: League,
@@ -225,12 +227,14 @@ export function compare(pairs: { o: Opportunity; ch: Scored; inc: Scored }[]): C
   const d = used.map((p) => p.ch.units - p.inc.units);
   const mean = d.length ? d.reduce((a, b) => a + b, 0) / d.length : 0;
   const sd = d.length > 1 ? Math.sqrt(d.reduce((t, x) => t + (x - mean) ** 2, 0) / (d.length - 1)) : 0;
-  const t = sd > 0 ? mean / (sd / Math.sqrt(d.length)) : mean > 0 ? Infinity : mean < 0 ? -Infinity : 0;
+  // Capped so a zero-variance sample stays a finite, storable number.
+  const raw = sd > 0 ? mean / (sd / Math.sqrt(d.length)) : mean > 0 ? 99 : mean < 0 ? -99 : 0;
+  const t = Math.max(-99, Math.min(99, raw));
   return {
     n: used.length,
     weeks: [...new Set(used.map((p) => p.o.week))].sort((a, b) => a - b),
     meanDiff: round(mean),
-    t: Number.isFinite(t) ? round(t) : t,
+    t: round(t),
     challenger: summarize(used.map((p) => p.ch)),
     incumbent: summarize(used.map((p) => p.inc)),
   };
@@ -325,7 +329,7 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
     case "parlay": {
       const t = x.ruleTest[h.league as League];
       if (!t) return { id: h.id, note: "no rule in force" };
-      // Shadow: pair rule bets in kickoff order within a week; 1u parlay vs
+      // Shadow: pair rule bets in first-snapshot order within a week; 1u parlay vs
       // 0.5u on each leg (same risk). Payout is the product of the quoted
       // leg prices, an estimate of what a book would actually pay.
       const pairs: { o: Opportunity; ch: Scored; inc: Scored }[] = [];
@@ -371,11 +375,14 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       return { id: h.id, note: `${d.method}: ${a.right}/${a.n} right, ${a.points} pool points; ${d.vs}: ${b.right}/${b.n}, ${b.points} points` };
     }
     case "stake-policy": {
+      // Both sides replayed the same way (policy stake, limits not
+      // re-applied), so the comparison is symmetric.
       const bets = x.issued.filter((b) => b.at >= h.registeredAt);
       const pairs = bets.map((b) => {
         const o = { league: b.league, week: b.week, key: b.key, first: { at: b.at } as ForecastSnapshot, final: { home: 0, away: 0 } } as Opportunity;
         const ch = stakeFor(b.p, b.price, d.staking);
-        return { o, ch: { bet: ch > 0, units: payout(b.result, ch, b.price), risked: ch }, inc: { bet: true, units: payout(b.result, b.units, b.price), risked: b.units } };
+        const inc = stakeFor(b.p, b.price, x.active.staking);
+        return { o, ch: { bet: ch > 0, units: payout(b.result, ch, b.price), risked: ch }, inc: { bet: inc > 0, units: payout(b.result, inc, b.price), risked: inc } };
       });
       return { id: h.id, comparison: compare(pairs), note: `stake replay on ${bets.length} settled issued bets (limits not re-applied)` };
     }
@@ -412,8 +419,8 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
     return { id: h.id, verdict: "retain", why: `drawdown ${c.challenger.drawdown}u vs ${c.incumbent.drawdown}u` };
   }
   if (h.definition.kind === "stake-policy") {
-    const s = h.definition.staking;
-    const sizesUp = s.kind === "kelly" && s.kellyScale > ctx.active.staking.kellyScale;
+    // Sizing up, by any route (more Kelly, or a flat stake bigger on average), needs calibration.
+    const sizesUp = c.challenger.risked > c.incumbent.risked;
     if (sizesUp && !ctx.calibration.calibrated) {
       return { id: h.id, verdict: "retain", why: `would size up, but the stored probabilities aren't shown calibrated (n=${ctx.calibration.n}, mean p ${ctx.calibration.meanP} vs win rate ${ctx.calibration.winRate})` };
     }
@@ -425,7 +432,9 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
 export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, at: string): PicksPolicy {
   const d = h.definition;
   if (d.kind === "ats-cut") {
-    return { ...active, id, createdAt: at, atsCandidates: [...new Set([...active.atsCandidates, d.cutId])], summary: `${active.summary} + candidate cut ${d.label}` };
+    // League-scoped: the same research id can mean different cuts per league.
+    const scoped = `${h.league}:${d.cutId}`;
+    return { ...active, id, createdAt: at, atsCandidates: [...new Set([...active.atsCandidates, scoped])], summary: `${active.summary} + ${h.league.toUpperCase()} candidate cut ${d.label}` };
   }
   if (d.kind === "stake-policy") {
     return { ...active, id, createdAt: at, staking: { ...d.staking }, summary: `${d.label}; ${active.atsCandidates.length ? `candidates: ${active.atsCandidates.join(", ")}` : "built-in cuts only"}; parlays off` };

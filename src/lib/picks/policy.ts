@@ -27,7 +27,7 @@ export interface PicksPolicy {
    * us. A parlay policy runs in shadow until single-bet calibration holds.
    */
   parlays: { enabled: false };
-  /** Research cuts the review has activated as candidates for the ATS rule (by cut id). */
+  /** Research cuts the review has activated as ATS rule candidates, league-scoped ("nfl:dog-band-a"). */
   atsCandidates: string[];
 }
 
