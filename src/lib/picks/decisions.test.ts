@@ -229,3 +229,38 @@ describe("research cuts", () => {
     expect(c.parent.id).toBe("dog");
   });
 });
+
+describe("research promotion", () => {
+  /** Home dog at +line, both models on the home team. */
+  const dogAt = (week: number, i: number, lineNum: number, covers: boolean) =>
+    g(week, i, { market: lineNum, model: lineNum - 2 }, { market: lineNum, model: lineNum - 3 }, covers ? { home: 21, away: 20 } : { home: 3, away: 30 });
+
+  it("ignores a research cut's record from before it was added", () => {
+    // Dogs of 7+ go 10-0 in Week 3, before the cut existed, and 0-2 since.
+    const games = [
+      ...Array.from({ length: 10 }, (_, i) => dogAt(3, i, 8, true)),
+      ...Array.from({ length: 2 }, (_, i) => dogAt(5, i, 8, false)),
+    ];
+    const c = strategies("nfl", games).cuts.find((x) => x.id === "dog-band-c")!;
+    expect([c.record.w, c.record.l]).toEqual([10, 2]);
+    expect([c.forward!.w, c.forward!.l]).toEqual([0, 2]);
+    expect(c.promoted).toBe(false);
+  });
+
+  it("promotes a research cut that beats its parent on games since it was added", () => {
+    // Since Week 5: dogs of 3 or less 11-0, dogs of 7+ 1-4. Parent "dog" 12-4.
+    const games = [
+      ...Array.from({ length: 11 }, (_, i) => dogAt(5, i, 3, true)),
+      ...Array.from({ length: 1 }, (_, i) => dogAt(6, i, 8, true)),
+      ...Array.from({ length: 4 }, (_, i) => dogAt(6, 10 + i, 8, false)),
+    ];
+    const st = strategies("nfl", games);
+    const a = st.cuts.find((x) => x.id === "dog-band-a")!;
+    expect([a.forward!.w, a.forward!.l]).toEqual([11, 0]);
+    expect([a.parentForward!.w, a.parentForward!.l]).toEqual([12, 4]);
+    expect(a.promoted).toBe(true);
+    // Narrowing that does not beat the parent is not promoted.
+    expect(st.cuts.find((x) => x.id === "dog-band-c")!.promoted).toBe(false);
+  });
+});
+

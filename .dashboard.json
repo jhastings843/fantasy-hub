@@ -76,6 +76,7 @@
   ],
   "last_worked": "2026-10-08",
   "notes": [
+    "2026-10-08: board shows line now + model lines only; research cuts can earn the rule on forward games (from NFL W5 / college W6) by beating their parent; ranking stays Wilson low end.",
     "2026-10-08: picks email schedule moved to Tue evening + Sat college update + Sun brief NFL block, based on 2026 kickoff data, board posting times and line movement; posting-time log added.",
     "2026-10-08: Picks totals: model totals from projected scores, forward agreement archive, Sam-alone history, totals rule/email/issued plumbing; ESPN finals fallback for grading.",
     "2026-10-08: Picks decision-quality pass: one reference line, PEM missing != disagree, Tier 2 on added games only, issued records (W5 recovered), research cuts with parent/left-out records, margin bands replace 'Lock'.",

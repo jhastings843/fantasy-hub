@@ -363,7 +363,7 @@ export async function buildPicksReport(league: League): Promise<PicksReport> {
     games: j.graded.length,
     matched: j.graded.filter((g) => closes.get(key(g))?.close != null).length,
   };
-  const research = researchRows(j.graded, s.cuts, closes);
+  const research = researchRows(j.graded, s.cuts, closes, league);
   const pemCmp = league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null;
   const priced = board.filter((g) => g.basis === "reference");
   const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));

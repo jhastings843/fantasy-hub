@@ -200,6 +200,14 @@ const research = (id: string, label: string, parent: string, test: CutTest): Cut
  *   one-point minimum on both models, the smallest whole-point step.
  *   College favorites laying 14+ are set against dogs getting 14+.
  */
+/**
+ * The first week a research cut's results count toward promotion: the first
+ * week not yet graded when the cuts were written (2026-10-08). Their record
+ * before this was seen while choosing them, so it cannot be used to promote
+ * them.
+ */
+export const RESEARCH_FROM = { nfl: 5, cfb: 6 } as const;
+
 export function researchCuts(league: "nfl" | "cfb"): Cut[] {
   const e = league === "nfl" ? 2 : 3;
   const bands =
@@ -352,6 +360,14 @@ export interface CutResult extends Cut {
   games: number;
   /** Weeks with at least one game in the cut. */
   weeks: number[];
+  /** Research cuts: the record from RESEARCH_FROM on, which alone can promote them. */
+  forward?: Record;
+  /** The parent's record over the same forward weeks. */
+  parentForward?: Record;
+  /** A research cut that has earned candidacy on forward games. */
+  promoted?: boolean;
+  /** For a promoted cut: only games from this week on count for it. */
+  fromWeek?: number;
 }
 
 /** Tier 2: judged only on the games it adds outside Tier 1. */
@@ -400,7 +416,8 @@ export function pickSecond(games: GradedGame[], rule: Cut, cuts: CutResult[]): S
   const options = cuts
     .filter((x) => x.candidate && x.id !== rule.id)
     .map((x): SecondResult => {
-      const hits = extra.filter((g) => cutResult(g, x) !== undefined);
+      // A promoted research cut only ever counts its forward games.
+      const hits = extra.filter((g) => cutResult(g, x) !== undefined && (x.fromWeek === undefined || g.week >= x.fromWeek));
       return {
         ...x,
         fullRecord: x.record,
@@ -443,9 +460,27 @@ export function strategies(league: "nfl" | "cfb", games: GradedGame[]): Strategy
   const weeks = [...new Set(agreed.map((g) => g.week))].sort((a, b) => a - b);
 
   const qualifies = (r: Record) => decided(r) >= MIN_SAMPLE && r.pct > BREAK_EVEN;
-  const eligible = cuts.filter((x) => x.candidate && qualifies(x.record)).sort(rank);
+
+  // Research cuts earn candidacy only on games after they were written: 10+
+  // decided forward games, past break-even, and better than their parent over
+  // the same forward weeks. A promoted cut competes on that forward record.
+  const from = RESEARCH_FROM[league];
+  const fwd = (cut: Cut) => tally(games.filter((g) => g.week >= from).flatMap((g) => cutResult(g, cut) ?? []));
+  const byId = new Map(cuts.map((c) => [c.id, c]));
+  for (const c of cuts) {
+    if (c.group !== "Research" || !c.parent || !byId.has(c.parent)) continue;
+    c.forward = fwd(c);
+    c.parentForward = fwd(byId.get(c.parent)!);
+    c.promoted = qualifies(c.forward) && c.forward.pct > c.parentForward.pct;
+  }
+  const promoted: CutResult[] = cuts
+    .filter((c) => c.promoted)
+    .map((c) => ({ ...c, record: c.forward!, candidate: true, fromWeek: from }));
+
+  const pool = [...cuts.filter((x) => x.candidate), ...promoted];
+  const eligible = pool.filter((x) => qualifies(x.record)).sort(rank);
   const rule = eligible[0] ?? null;
-  const second = rule ? pickSecond(games, rule, cuts) : null;
+  const second = rule ? pickSecond(games, rule, pool) : null;
 
   return {
     cuts,
