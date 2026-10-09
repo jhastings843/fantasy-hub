@@ -77,8 +77,9 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-08",
+  "last_worked": "2026-10-09",
   "notes": [
+    "2026-10-09: League page shows real chopped-league standings (all-play record, chop week, margin over chop) instead of Sleeper 0-0.",
     "2026-10-08: Picks grade games the day they end (ESPN finals), Tuesday 4am ET week turnover, Finished section on all three week views; fixed in-progress games reading as pregame after ESPN drops their odds.",
     "2026-10-09: Picks audit in 3 stages: correctness (allocator, quotes, issuance, update rechecks), layout (mobile 12.8k->2.5k px, picks first), learning loop (frozen criteria, matched forward evidence, one activation per review, rollback). Independent review found 7 stage-1 issues, all fixed with tests.",
     "2026-10-08: staking moved to 0.25u-5u (quarter Kelly, shrunk records, real prices, 15u weekly cap) with value-gated 2-leg parlays; units now risked.",
