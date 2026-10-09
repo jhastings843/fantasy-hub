@@ -54,6 +54,11 @@ export default async function PicksView({ league, market, view }: { league: Leag
           </div>
           <h1 className={s.h1}>Picks</h1>
           <RiskStrip r={r} coreStale={fresh?.stale ?? false} coreAt={fresh?.at ?? r.generatedAt} />
+          {r.board.length > 0 && (
+            <p className={`${s.progress} ${s.num}`}>
+              {`${r.board.filter((g) => g.final).length}/${r.board.length} games have completed`}
+            </p>
+          )}
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
           <nav className={s.tabs} aria-label="Market">
             {MARKETS.map((m) => (
