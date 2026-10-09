@@ -39,6 +39,13 @@ import {
   withCurrent,
 } from "@/lib/history/grades";
 import { after } from "next/server";
+import { seasonResults } from "@/lib/guillotine/league-state";
+import type { WeekResult } from "@/lib/guillotine/results";
+import {
+  allPlayRecord,
+  guillotineStandings,
+  type GuillotineRow,
+} from "@/lib/guillotine/standings";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +69,41 @@ function record(r: SleeperRoster): string {
   const l = s.losses ?? 0;
   const t = s.ties ?? 0;
   return t > 0 ? `${w}-${l}-${t}` : `${w}-${l}`;
+}
+
+// One line under a guillotine team: where it finished in its last live week
+// and how far clear of the chop, or the week it went.
+function ChopLine({ row }: { row: GuillotineRow }) {
+  const last = row.last;
+  if (row.choppedWeek !== null) {
+    return (
+      <span className="text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+        Chopped wk {row.choppedWeek}
+        {last ? (
+          <span className="font-normal text-zinc-500 dark:text-zinc-400">
+            {" "}({last.score.toFixed(1)})
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+  if (!last) return null;
+  const ord = (n: number) =>
+    `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+  return (
+    <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+      Wk {last.week}: {last.score.toFixed(1)}, {ord(last.rank)} of {last.teams}
+      <span
+        className={
+          last.rank >= last.teams - 2
+            ? " font-semibold text-amber-600 dark:text-amber-400"
+            : " font-semibold text-emerald-600 dark:text-emerald-400"
+        }
+      >
+        {" "}+{last.margin.toFixed(1)}
+      </span>
+    </span>
+  );
 }
 
 function statusBadge(
@@ -157,7 +199,11 @@ export default async function LeaguePage({
   const scoredWeeks = Number(league.settings?.last_scored_leg ?? 0) || 0;
   const medianGame = league.settings?.league_average_match === 1;
 
-  const [rosters, users, players, fcValues, grades, gradeHistory, lastMatchups] =
+  // A guillotine league has no head-to-head games, so Sleeper leaves every
+  // record at 0-0. Its table is rebuilt from the weekly scores instead.
+  const isGuillotine = profile.type === "guillotine";
+
+  const [rosters, users, players, fcValues, grades, gradeHistory, lastMatchups, weekResults] =
     await Promise.all([
       getLeagueRosters(leagueId),
       getLeagueUsers(leagueId),
@@ -174,7 +220,23 @@ export default async function LeaguePage({
       scoredWeeks >= 1
         ? getLeagueMatchups(leagueId, scoredWeeks).catch((): SleeperMatchup[] => [])
         : Promise.resolve<SleeperMatchup[]>([]),
+      isGuillotine && scoredWeeks >= 1
+        ? seasonResults(leagueId, scoredWeeks)
+        : Promise.resolve<WeekResult[]>([]),
     ]);
+
+  const chopTable = isGuillotine
+    ? guillotineStandings(
+        weekResults,
+        rosters.map((r) => r.roster_id),
+        new Set(rosters.filter((r) => (r.players ?? []).length === 0).map((r) => r.roster_id)),
+      )
+    : [];
+  const chopRows = new Map<number, GuillotineRow>(chopTable.map((g) => [g.rosterId, g]));
+  function recordFor(r: SleeperRoster): string {
+    const g = chopRows.get(r.roster_id);
+    return g ? allPlayRecord(g) : record(r);
+  }
 
   // Last week, per roster: what they scored and whether they beat the team
   // they were paired with. The median game, where the league runs one, is
@@ -214,7 +276,11 @@ export default async function LeaguePage({
     );
   }
 
+  const chopOrder = new Map(chopTable.map((g, i) => [g.rosterId, i]));
   const standings = [...rosters].sort((a, b) => {
+    if (isGuillotine) {
+      return (chopOrder.get(a.roster_id) ?? 99) - (chopOrder.get(b.roster_id) ?? 99);
+    }
     const aw = a.settings?.wins ?? 0;
     const bw = b.settings?.wins ?? 0;
     if (aw !== bw) return bw - aw;
@@ -317,7 +383,7 @@ export default async function LeaguePage({
             </p>
             {myRoster && (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {record(myRoster)} · {totalFpts(myRoster).toFixed(2)} PF ·{" "}
+                {recordFor(myRoster)}{isGuillotine ? " all-play" : ""} · {totalFpts(myRoster).toFixed(2)} PF ·{" "}
                 {teamValue(myRoster).toLocaleString()} value
               </p>
             )}
@@ -615,6 +681,9 @@ export default async function LeaguePage({
             {scoredWeeks >= 1 ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Through week {scoredWeeks}
+                {isGuillotine
+                  ? ". Record is all-play: a win for every live team you outscored each week"
+                  : ""}
                 {medianGame ? ", two results a week: your matchup and the league median" : ""}
               </p>
             ) : null}
@@ -649,13 +718,17 @@ export default async function LeaguePage({
                   </div>
                   <div className="flex shrink-0 flex-col items-end">
                     <span className="text-sm font-medium tabular-nums">
-                      {record(r)}
+                      {recordFor(r)}
                     </span>
                     <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {teamValue(r).toLocaleString()} val
+                      {isGuillotine && (r.players ?? []).length === 0
+                        ? "roster released"
+                        : `${teamValue(r).toLocaleString()} val`}
                       {totalFpts(r) > 0 ? ` · ${totalFpts(r).toFixed(0)} PF` : ""}
                     </span>
-                    {lastWeek.has(r.roster_id) ? (
+                    {chopRows.has(r.roster_id) ? (
+                      <ChopLine row={chopRows.get(r.roster_id)!} />
+                    ) : lastWeek.has(r.roster_id) ? (
                       <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
                         Wk {scoredWeeks}: {lastWeek.get(r.roster_id)!.points.toFixed(1)}
                         {lastWeek.get(r.roster_id)!.beat === null ? "" : (
