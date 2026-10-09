@@ -85,7 +85,10 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
                   {(() => {
                     if (!poolShares || f.home === f.away) return null;
                     const winner = f.home > f.away ? x.g.home : x.g.away;
-                    const share = poolShares.shares[POOL_CANON[winner.toUpperCase()] ?? winner.toUpperCase()];
+                    const loser = winner === x.g.home ? x.g.away : x.g.home;
+                    const shareOf = (t: string) => poolShares.shares[POOL_CANON[t.toUpperCase()] ?? t.toUpperCase()];
+                    // A team nobody picked isn't in the counts: its share is what the other side left.
+                    const share = shareOf(winner) ?? (shareOf(loser) !== undefined ? 1 - shareOf(loser)! : undefined);
                     return share === undefined ? null : (
                       <div className={s.thin}>{`${Math.round(share * 100)}% of the pool had ${name(winner)}`}</div>
                     );
