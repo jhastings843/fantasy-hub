@@ -4,6 +4,7 @@ import { cutResult } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import { groupByDay } from "@/lib/picks/days";
 import { kelly } from "@/lib/picks/staking";
+import { Fragment } from "react";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
@@ -186,7 +187,145 @@ function FinishedRow({ g, r }: { g: BoardGame; r: PicksReport }) {
           </span>
         ))}
       </div>
+      <FinishedDetails g={g} r={r} />
     </li>
+  );
+}
+
+const round1 = (x: number) => Math.round(x * 10) / 10;
+/** Units won or lost on a settled bet at American odds (risk = units). */
+const payout = (res: Res, u: number, p = -110) => (res === "W" ? (p > 0 ? (u * p) / 100 : (u * 100) / -p) : res === "L" ? -u : 0);
+
+/** The "why" for a finished game: what each model had, the cuts it fell in, the line move and the rest. */
+function FinishedDetails({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const name = (k: string) => r.names[k] ?? k;
+  const f = g.final!;
+  const res = g.results ?? {};
+  const margin = f.home - f.away; // home side, positive = home won
+  const team = (side: "home" | "away") => name(side === "home" ? g.home : g.away);
+  const winner = margin === 0 ? null : margin > 0 ? g.home : g.away;
+  // A home-side line as "Team -x": the projected winner and by how much.
+  const proj = (homeLine: number) => (homeLine === 0 ? "even" : `${name(homeLine < 0 ? g.home : g.away)} by ${round1(Math.abs(homeLine))}`);
+  const models = [
+    { who: "Sam", m: g.sam?.model, at: g.sam?.market, res: res.sam },
+    { who: "David", m: g.david?.model, at: g.david?.market, res: res.david },
+    ...(r.league === "cfb" ? [{ who: "PEM", m: g.pem?.model, at: g.pem?.market ?? g.read?.avgMarket, res: res.pem }] : []),
+  ].filter((x): x is { who: string; m: number; at: number | undefined; res: Res | undefined } => x.m !== undefined);
+  // Miss = how far the projected margin was from the real one.
+  const miss = (m: number) => Math.abs(-m - margin);
+  const closest = models.length > 1 ? models.reduce((a, b) => (miss(b.m) < miss(a.m) ? b : a)) : null;
+  const cuts = (g.cuts ?? []).map((id) => r.strategies.cuts.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c);
+  const ruleId = r.strategies.rule?.id;
+  const secondId = r.strategies.second?.id;
+  cuts.sort((a, b) => Number(b.id === ruleId) - Number(a.id === ruleId) || Number(b.id === secondId) - Number(a.id === secondId) || b.record.pct - a.record.pct);
+  const close = g.close?.close ?? null;
+  const open = g.close?.open ?? null;
+  // Points better (+) than the close for the side taken at homeLine.
+  const clv = (side: "home" | "away", homeLine: number) => (close === null ? null : round1(side === "home" ? homeLine - close : close - homeLine));
+  const taken = g.issued ?? (g.side && g.homeLine !== undefined ? { side: g.side, homeLine: g.homeLine } : null);
+  const pts = f.home + f.away;
+  const suRight = g.su && winner ? (g.su.side === "home" ? g.home : g.away) === winner : null;
+  return (
+    <details className={s.why}>
+      <summary>Details</summary>
+      <dl className={s.kv}>
+        <dt>Final</dt>
+        <dd>{winner ? `${name(winner)} by ${Math.abs(margin)}` : "Tie"}</dd>
+        {models.map((x) => (
+          <Fragment key={x.who}>
+            <dt>{x.who}</dt>
+            <dd>
+              <span className={s.num}>{proj(x.m)}</span>
+              {x.at !== undefined && <span className={s.muted}>{` vs ${name(g.home)} ${line(x.at)}`}</span>}
+              {x.res && (
+                <>
+                  {" · "}
+                  {x.m !== x.at && x.at !== undefined ? `took ${team(x.m < x.at ? "home" : "away")} ` : ""}
+                  <b className={RES_CLASS[x.res]}>{x.res}</b>
+                </>
+              )}
+              <span className={s.muted}>{` · off by ${round1(miss(x.m))}`}</span>
+            </dd>
+          </Fragment>
+        ))}
+        {closest && (
+          <>
+            <dt>Closest</dt>
+            <dd>{`${closest.who}, ${round1(miss(closest.m))} pts from the real margin`}</dd>
+          </>
+        )}
+        <dt>Board call</dt>
+        <dd>
+          <TierChip t={g.tier} /> {g.side ? pickText(g, name) : g.read && !g.read.agree ? "Sam and David split" : g.play}
+          {g.read?.agree ? <span className={s.muted}>{` · avg edge ${g.read.avgEdge.toFixed(1)}, models ${g.read.modelGap.toFixed(1)} apart`}</span> : null}
+        </dd>
+        <dt>Cuts</dt>
+        <dd>
+          {cuts.length ? (
+            <ul className={s.finCuts}>
+              {cuts.map((c) => (
+                <li key={c.id}>
+                  {c.id === ruleId ? <b>Rule: </b> : c.id === secondId ? <b>Tier 2: </b> : null}
+                  {c.label}
+                  <span className={`${s.num} ${s.muted}`}>{` · ${rec(c.record)} (${pct(c.record)})`}</span>
+                </li>
+              ))}
+            </ul>
+          ) : g.read && !g.read.agree ? (
+            "None: cuts need Sam and David on the same side."
+          ) : (
+            "None"
+          )}
+        </dd>
+        {(open !== null || close !== null) && (
+          <>
+            <dt>Line move</dt>
+            <dd className={s.num}>
+              {`${name(g.home)} ${open !== null ? line(open) : "?"} open → ${close !== null ? line(close) : "?"} close`}
+              {taken && clv(taken.side, taken.homeLine) !== null && (
+                <span className={clv(taken.side, taken.homeLine)! > 0 ? s.pos : clv(taken.side, taken.homeLine)! < 0 ? s.neg : s.muted}>
+                  {` · call ${clv(taken.side, taken.homeLine)! > 0 ? "+" : ""}${clv(taken.side, taken.homeLine)} vs close`}
+                </span>
+              )}
+            </dd>
+          </>
+        )}
+        {g.issued && res.issued && (
+          <>
+            <dt>Sent</dt>
+            <dd className={s.num}>
+              {`${g.issued.units}u at ${price(g.issued.price)} → `}
+              <b className={RES_CLASS[res.issued]}>{units(payout(res.issued, g.issued.units, g.issued.price))}</b>
+            </dd>
+          </>
+        )}
+        {g.su && (
+          <>
+            <dt>Straight up</dt>
+            <dd>
+              {`${team(g.su.side)} to win`}
+              {suRight !== null && <b className={suRight ? s.resW : s.resL}>{suRight ? " · right" : " · wrong"}</b>}
+              {g.su.upset ? <span className={s.muted}> · upset call</span> : null}
+            </dd>
+          </>
+        )}
+        <dt>Total</dt>
+        <dd className={s.num}>
+          {`${pts} scored`}
+          <span className={s.muted}>
+            {[
+              g.samTotal !== undefined ? `Sam ${round1(g.samTotal)}` : null,
+              g.davidTotal !== undefined ? `David ${round1(g.davidTotal)}` : null,
+              g.close?.totalClose != null ? `close ${g.close.totalClose}` : null,
+            ]
+              .filter(Boolean)
+              .map((x) => ` · ${x}`)
+              .join("")}
+          </span>
+        </dd>
+      </dl>
+      <p className={s.thin}>Cut records include this game. Each model is graded at its own site&apos;s line.</p>
+    </details>
   );
 }
 

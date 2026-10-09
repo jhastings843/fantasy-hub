@@ -544,6 +544,13 @@ export interface BoardGame {
   /** Finished: the final score, and each pick's result at its own line (finished.ts). */
   final?: { home: number; away: number };
   results?: { pick?: Result; issued?: Result; sam?: Result; david?: Result; pem?: Result };
+  /** Finished: DraftKings open and close (ESPN), when on file. */
+  close?: { open: number | null; close: number | null; totalOpen: number | null; totalClose: number | null };
+  /** Finished: ids of the strategy cuts the game fell in (agreed games only). */
+  cuts?: string[];
+  /** Each model's projected total, when posted. */
+  samTotal?: number;
+  davidTotal?: number;
 }
 
 const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);

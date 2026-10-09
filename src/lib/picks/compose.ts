@@ -29,6 +29,7 @@ import {
   type StrategyBoard,
   type SuRecord,
   key,
+  matches,
   tierBoard,
 } from "./engine";
 
@@ -190,6 +191,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     ],
     exposure,
   );
+  const closesAll = new Map(core.closes);
   const board: BoardGame[] = wanted.map((g) => {
     const out: BoardGame = {
       ...g,
@@ -197,7 +199,15 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
       ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
     };
     const final = coreFinals.get(gk(g));
-    return final ? { ...out, final, results: finishedResults(out, final) } : out;
+    if (!final) return out;
+    const c = closesAll.get(gk(g));
+    return {
+      ...out,
+      final,
+      results: finishedResults(out, final),
+      cuts: out.read ? s.cuts.filter((cut) => matches(out.read!, cut.test)).map((cut) => cut.id) : [],
+      ...(c ? { close: { open: c.open, close: c.close, totalOpen: c.totalOpen, totalClose: c.totalClose } } : {}),
+    };
   });
   const totalsBoardOut: TotalsBoardGame[] = tWanted.map((g) => ({
     ...g,
