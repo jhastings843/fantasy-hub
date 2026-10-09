@@ -43,7 +43,7 @@ export function kelly(p: number, price: number): number {
 
 const quarter = (x: number) => Math.round(x * 4) / 4;
 
-/** Units the policy wants to risk, 0 when the price leaves no bet worth a quarter unit. */
+/** Units the policy wants to risk, 0 when the price sizes it under MIN_STAKE. */
 export function stakeFor(p: number, price: number, policy: StakingPolicy = BASELINE_POLICY.staking): number {
   if (kelly(p, price) <= 0) return 0;
   const raw = policy.kind === "flat" ? policy.flatUnits : policy.kellyScale * kelly(p, price) * 100;

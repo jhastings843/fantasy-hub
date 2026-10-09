@@ -12,8 +12,11 @@
 // everything issued and not yet settled, across both sports, is capped
 // together; it only binds when last week's bets are still open.
 
-/** Smallest bet. Under this the price has eaten the edge: not a bet. */
-export const MIN_STAKE = 0.25;
+/**
+ * Smallest bet. A play sized under this is not a bet (a cutoff, never a
+ * round-up: small sizes mean thin edges). 1u by Jack's call, 2026-10-09.
+ */
+export const MIN_STAKE = 1;
 /** Largest single bet. */
 export const MAX_STAKE = 5;
 /** Most risked on one game across every bet that touches it (spread, total, any slot). */

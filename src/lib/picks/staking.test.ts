@@ -6,31 +6,35 @@ describe("sizing", () => {
     expect(shrunk(14, 2)).toBeCloseTo(0.5517, 3);
     expect(shrunk(14, 6)).toBeCloseTo(0.5333, 3);
   });
-  it("stakes a quarter Kelly at the price, in quarter units from 0.25 to 5", () => {
+  it("stakes a quarter Kelly at the price, in quarter units from 1 to 5", () => {
     const p = shrunk(14, 2);
     expect(stakeFor(p, -110)).toBe(1.5);
     expect(stakeFor(p, -105)).toBe(2);
     expect(stakeFor(p, 102)).toBe(2.75);
-    expect(stakeFor(p, -118)).toBe(0.5);
+    // 0.57u at -118 is under the 1u minimum: not a bet (a cutoff, not a round-up).
+    expect(stakeFor(p, -118)).toBe(0);
     // 14-6 at -118: the price eats the edge.
     expect(stakeFor(shrunk(14, 6), -118)).toBe(0);
     // A long, strong record caps at 5u.
     expect(stakeFor(shrunk(300, 150), 100)).toBe(5);
     expect(kelly(0.5, -110)).toBeLessThan(0);
   });
-  it("says the worst price that still earns a quarter unit", () => {
-    expect(worstPrice(shrunk(14, 6))).toBe(-112);
+  it("says the worst price that still earns the 1u minimum", () => {
+    expect(worstPrice(shrunk(14, 6))).toBe(-105);
+    expect(worstPrice(shrunk(14, 2))).toBe(-114);
   });
 });
 
 describe("parlays", () => {
   const leg = (id: string, p: number, price = -110) => ({ id, game: id, p, price });
   it("sends a two-leg parlay only when the pair clears a 10% estimated edge", () => {
-    const strong = shrunk(14, 2);
+    // 14-2 legs clear 10% (10.9%) but an eighth Kelly is 0.5u, under the 1u minimum.
+    const thin = shrunk(14, 2);
+    expect(pickParlays([leg("a", thin), leg("b", thin)])).toEqual([]);
+    const strong = shrunk(20, 2);
     const [pr] = pickParlays([leg("a", strong), leg("b", strong)]);
-    expect(pr.edge).toBeCloseTo(0.109, 2);
-    // An eighth Kelly: 0.5u.
-    expect(pr.units).toBe(0.5);
+    expect(pr.edge).toBeCloseTo(0.2, 2);
+    expect(pr.units).toBe(1);
     expect(american(pr.decimal)).toBe("+264");
     const weak = shrunk(14, 6);
     expect(pickParlays([leg("a", weak), leg("b", weak)])).toEqual([]);

@@ -20,7 +20,7 @@
 // it. Comparisons are paired, on matched opportunities: the same games, the
 // same quotes, the same prices.
 
-import { MAX_KELLY_SCALE, MIN_PRIOR_GAMES } from "../limits";
+import { MAX_KELLY_SCALE, MAX_STAKE, MIN_PRIOR_GAMES, MIN_STAKE } from "../limits";
 import { BASELINE_POLICY, envelopeViolations, type PicksPolicy, type StakingPolicy } from "../policy";
 import { type CutTest, type Result, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
@@ -461,7 +461,7 @@ export function validate(v: ValidationInput): string[] {
   for (const r of v.replay) {
     const sum = r.stakes.reduce((a, b) => a + b, 0);
     if (sum > r.weeklyRoom + 1e-9) fails.push(`${r.league}: replay stakes ${sum}u exceed the ${r.weeklyRoom}u room`);
-    if (r.stakes.some((x) => x > 5 || (x > 0 && x < 0.25))) fails.push(`${r.league}: a replay stake is outside 0.25-5u`);
+    if (r.stakes.some((x) => x > MAX_STAKE || (x > 0 && x < MIN_STAKE))) fails.push(`${r.league}: a replay stake is outside ${MIN_STAKE}-${MAX_STAKE}u`);
     if (r.unpricedStakes) fails.push(`${r.league}: a replay staked a game with no quoted price`);
   }
   if (v.historyBefore !== v.historyAfter) fails.push("re-grading issued history changed under the new policy");

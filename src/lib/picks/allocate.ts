@@ -60,7 +60,7 @@ export function allocate(cands: Candidate[], ex: Exposure): Allocation {
     .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
   const deferred: { id: string; reason: string }[] = cands
     .filter((c) => c.want < MIN_STAKE)
-    .map((c) => ({ id: c.id, reason: "price leaves under a quarter unit" }));
+    .map((c) => ({ id: c.id, reason: "sizes under the 1u minimum" }));
 
   // Per-game room first: a game already carrying exposure gets less.
   const gameLeft = new Map<string, number>();

@@ -151,7 +151,7 @@ export interface EmailSelection {
   /** Over/under plays under a qualifying totals rule, biggest edge first. */
   totals: TotalsBoardGame[];
   shownTotals: number;
-  /** Tier 1/2 games whose quoted price leaves less than a quarter-unit bet, or with no quoted price. */
+  /** Tier 1/2 games whose quoted price sizes under the 1u minimum, or with no quoted price. */
   pricedOut: BoardGame[];
   /** Tier 1/2 games worth a bet that the weekly or per-game limits left out. */
   overBudget: BoardGame[];

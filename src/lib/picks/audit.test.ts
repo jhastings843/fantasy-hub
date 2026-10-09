@@ -38,7 +38,7 @@ const sumStakes = (r: ReturnType<typeof compose>) =>
 
 describe("protected envelope", () => {
   it("is pinned: an automated cycle cannot change these without this test failing", () => {
-    expect(ENVELOPE).toEqual({ MIN_STAKE: 0.25, MAX_STAKE: 5, PER_GAME_CAP: 5, WEEKLY_CAP: 30, OUTSTANDING_CAP: 30, MAX_KELLY_SCALE: 0.25, MIN_PRIOR_GAMES: 100, PARLAY_MAX: 1 });
+    expect(ENVELOPE).toEqual({ MIN_STAKE: 1, MAX_STAKE: 5, PER_GAME_CAP: 5, WEEKLY_CAP: 30, OUTSTANDING_CAP: 30, MAX_KELLY_SCALE: 0.25, MIN_PRIOR_GAMES: 100, PARLAY_MAX: 1 });
   });
   it("rejects policies outside it", () => {
     expect(envelopeViolations(BASELINE_POLICY)).toEqual([]);
@@ -221,10 +221,18 @@ describe("independent review findings 6 and 7", () => {
       rule: null, second: null, suMethod: { id: "avg", label: "a" }, su: [], unverified: [],
       plays: [{ home: "H0", away: "A0", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1.5 }],
     };
-    const ex = { weekly: WEEKLY_CAP - 0.25, outstanding: 0, perGame: new Map([["6:A0@H0", 1.5]]) };
+    const ex = { weekly: WEEKLY_CAP - 1, outstanding: 0, perGame: new Map([["6:A0@H0", 1.5]]) };
     const r = compose({ core: core(rows), quotes, issued: [issued], exposure: ex, now: NOW });
     expect(r.board.find((g) => g.home === "H0")!.issued?.units).toBe(1.5);
-    expect(r.board.find((g) => g.home === "H1")!.stake).toBe(0.25);
+    expect(r.board.find((g) => g.home === "H1")!.stake).toBe(1);
+  });
+  it("a play sizing under the 1u minimum is not a bet, never rounded up", () => {
+    const rows = [dogRow(0)];
+    // 14-2 at -118 sizes 0.57u by quarter Kelly: under the minimum, so no stake.
+    const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: [quote(0, { homePrice: -118, awayPrice: -118 })] };
+    const g = compose({ core: core(rows), quotes, issued: [], exposure: noExposure, now: NOW }).board[0];
+    expect(g.tier === "t1" || g.tier === "t2").toBe(true);
+    expect(g.stake ?? 0).toBe(0);
   });
   it("finding 7: an older record's kickoff inside its quote still counts as kicked off", () => {
     const legacy: IssuedRecord = {

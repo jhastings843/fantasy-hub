@@ -80,6 +80,7 @@
   ],
   "last_worked": "2026-10-09",
   "notes": [
+    "2026-10-09: minimum bet is now 1u as a cutoff (plays sizing under 1u are not bets); this week that removed 7 small bets, mostly college.",
     "2026-10-09: 'N/M games have completed' header line; pool share on the winner for finished NFL games; Research shows only each market's own hypotheses.",
     "2026-10-09: weekly cap is now 30u shared across NFL and college (cross-sport held plays compete by edge); Details panel on finished games; removed 'Why no bet yet' and the kicked-off warning.",
     "2026-10-09: League page shows real chopped-league standings (all-play record, chop week, margin over chop) instead of Sleeper 0-0.",

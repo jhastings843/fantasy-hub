@@ -69,14 +69,14 @@ describe("unit ledger", () => {
 
 describe("stakes on issued bets", () => {
   it("records the sized stake and the price on the side that was bet", () => {
-    const ref = { line: 3, source: "DraftKings via ESPN", fetchedAt: "t", homePrice: -118, awayPrice: -102, kickoff: "2026-10-15T00:15:00Z" };
+    const ref = { line: 3, source: "DraftKings via ESPN", fetchedAt: "t", homePrice: -110, awayPrice: -110, kickoff: "2026-10-15T00:15:00Z" };
     const board = stakeBoard(tierBoard("nfl", [{ home: "H", away: "A", sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, ref }], {
       rule: { id: "dog", label: "dog", test: { side: "dog" }, record: {} }, second: null,
     } as unknown as StrategyBoard), { t1: { w: 14, l: 2 } }, 6).board;
     const r = { league: "nfl", season: 2026, week: 6, board, strategies: { rule: null, second: null }, su: { best: null } } as unknown as PicksReport;
     const rec = toIssued(r, selectForEmail(r, 99, 0), { issuedAt: "t", subject: "s" });
-    // 14-2 reads as 55.2%; quarter Kelly at -118 is 0.57u, rounded to 0.5u.
-    expect(rec.plays[0]).toMatchObject({ units: 0.5, price: -118, kickoff: "2026-10-15T00:15:00Z" });
+    // 14-2 reads as 55.2%; quarter Kelly at -110 is 1.5u.
+    expect(rec.plays[0]).toMatchObject({ units: 1.5, price: -110, kickoff: "2026-10-15T00:15:00Z" });
   });
 });
 

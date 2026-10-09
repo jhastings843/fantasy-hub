@@ -179,7 +179,7 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
       : "",
     sel.waiting ? `${sel.waiting} ${sel.waiting === 1 ? "game is" : "games are"} waiting on PEM's card.` : "",
     sel.pricedOut.length
-      ? `Priced out (fits the rule, but the quoted price leaves under a quarter unit, or there is no quoted price): ${sel.pricedOut
+      ? `Priced out (fits the rule, but the quoted price sizes it under the 1u minimum, or there is no quoted price): ${sel.pricedOut
           .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)} ${g.price !== undefined ? price(g.price) : "(no price)"}`)
           .join(", ")}.`
       : "",
@@ -275,7 +275,7 @@ export function buildPicksEmail(input: {
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 30u per week across both sports (split however the edges fall), 30u open at once. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
+    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. Stakes run 1u to 5u (anything sizing under 1u is not a bet), with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 30u per week across both sports (split however the edges fall), 30u open at once. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };

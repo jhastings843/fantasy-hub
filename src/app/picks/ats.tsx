@@ -118,7 +118,7 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           {st === "priced" && (
             <>
               <dt>Why no bet</dt>
-              <dd>{g.priceSource === "missing" ? "No quoted price, so no stake." : "At this price the estimated edge is under a quarter unit."}</dd>
+              <dd>{g.priceSource === "missing" ? "No quoted price, so no stake." : "At this price the estimated edge sizes under the 1u minimum."}</dd>
             </>
           )}
           {st === "budget" && (

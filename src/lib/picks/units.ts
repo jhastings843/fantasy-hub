@@ -1,6 +1,6 @@
 // Units: the running +/- per sport for the bets the emails gave. Pure.
 //
-// Stakes come from staking.ts (0.25u to 5u, quarter Kelly on each tier's
+// Stakes come from staking.ts (1u to 5u, quarter Kelly on each tier's
 // record pulled toward 50%; parlays 0.25u to 1u). A unit here is RISKED: a
 // 2u bet at -110 risks 2u to win 1.82u. Each bet is graded at the price on
 // the quote it was sent with (DraftKings via ESPN); a bet sent without a
