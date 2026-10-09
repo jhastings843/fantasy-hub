@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPicksReport, SOURCES, type PicksReport } from "@/lib/picks/report";
 import type { League } from "@/lib/picks/parse";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "@/lib/picks/limits";
+import { getPoolShares } from "@/lib/picks/pool-store";
 import { AtsResearch, AtsResults, AtsWeek } from "./ats";
 import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWeek } from "./su-totals";
 import { LearningPanel } from "./learning";
@@ -19,6 +20,9 @@ export default async function PicksView({ league, market, view }: { league: Leag
   const fresh = await getPicksReport(league).catch(() => null);
   const r = fresh?.value ?? null;
   const other: League = league === "nfl" ? "cfb" : "nfl";
+  // The pool's pick shares, for "how much of the pool was on the winner" on finished games.
+  const poolShares =
+    r?.week && league === "nfl" && market === "su" && view === "week" ? ((await getPoolShares(r.week).catch(() => null))?.value ?? null) : null;
 
   const sportNav = (
     <nav className={s.subnav} aria-label="Sport">
@@ -81,13 +85,13 @@ export default async function PicksView({ league, market, view }: { league: Leag
         {market === "ats" && view === "research" && <AtsResearch r={r} />}
         {market === "ats" && view === "research" && league === "cfb" && <HarrisCard />}
         {market === "su" && view === "week" && league === "nfl" && <PoolCard />}
-        {market === "su" && view === "week" && <SuWeek r={r} />}
+        {market === "su" && view === "week" && <SuWeek r={r} poolShares={poolShares} />}
         {market === "su" && view === "results" && <SuResults r={r} />}
         {market === "su" && view === "research" && <SuResearch r={r} />}
         {market === "ou" && view === "week" && <TotalsWeek r={r} />}
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
-        {view === "research" && <LearningPanel league={league} />}
+        {view === "research" && <LearningPanel league={league} market={market} />}
 
         <footer className={s.footer}>
           <span>

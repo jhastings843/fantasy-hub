@@ -41,7 +41,7 @@ async function json<T>(url: string): Promise<T> {
 
 /** Sleeper and ESPN spell a few teams differently. */
 const CANON: { [abbr: string]: string } = { WSH: "WAS", LA: "LAR", JAC: "JAX" };
-const canon = (t: string) => CANON[t.toUpperCase()] ?? t.toUpperCase();
+export const canon = (t: string) => CANON[t.toUpperCase()] ?? t.toUpperCase();
 
 /**
  * The field's real picks for a week: per entry, { picks: { gameId: { team } } }.
@@ -136,6 +136,24 @@ export function getPoolView() {
     ttlSeconds: 15 * 60,
     fetcher: buildPoolView,
     isComplete: (v) => !!v && v.games.length > 0,
+    empty: null,
+  });
+}
+
+/**
+ * The pool's pick share for every team this week, games played included, so
+ * a finished game can show how much of the pool was on the winner. Real picks
+ * only (null when Sleeper won't show them). Fifteen minutes fresh.
+ */
+export function getPoolShares(week: number) {
+  return cachedWithFallback<{ entries: number; shares: Record<string, number> } | null>({
+    key: `picks:v2:pool:${POOL.leagueId}:shares:w${week}`,
+    ttlSeconds: 15 * 60,
+    fetcher: async () => {
+      const f = await fieldPicks(week);
+      return f ? { entries: f.entries, shares: Object.fromEntries(f.teamShare) } : null;
+    },
+    isComplete: (v) => !!v && v.entries > 0,
     empty: null,
   });
 }

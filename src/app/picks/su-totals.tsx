@@ -6,7 +6,10 @@ import s from "./picks.module.css";
 
 // ------------------------------------------------------------- straight up
 
-export function SuWeek({ r }: { r: PicksReport }) {
+// Sleeper and ESPN spell a few teams differently (pool-store.ts canon).
+const POOL_CANON: { [abbr: string]: string } = { WSH: "WAS", LA: "LAR", JAC: "JAX" };
+
+export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entries: number; shares: Record<string, number> } | null }) {
   const name = (k: string) => r.names[k] ?? k;
   const method = r.su.best?.id ?? "avg";
   const list = r.board
@@ -79,6 +82,14 @@ export function SuWeek({ r }: { r: PicksReport }) {
                     <span className={s.finPick}>{`${name(x.side === "home" ? x.g.home : x.g.away)} to win`}</span>
                     <span className={`${s.resChip} ${res === "W" ? s.resW : res === "L" ? s.resL : s.resP}`}>{res}</span>
                   </div>
+                  {(() => {
+                    if (!poolShares || f.home === f.away) return null;
+                    const winner = f.home > f.away ? x.g.home : x.g.away;
+                    const share = poolShares.shares[POOL_CANON[winner.toUpperCase()] ?? winner.toUpperCase()];
+                    return share === undefined ? null : (
+                      <div className={s.thin}>{`${Math.round(share * 100)}% of the pool had ${name(winner)}`}</div>
+                    );
+                  })()}
                 </li>
               );
             })}

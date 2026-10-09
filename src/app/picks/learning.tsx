@@ -1,7 +1,8 @@
 import type { League } from "@/lib/picks/parse";
 import { redisStore } from "@/lib/picks/learning/store";
 import { loadOps } from "@/lib/picks/ops";
-import { whenEt } from "./ui";
+import Link from "next/link";
+import { type Market, href, whenEt } from "./ui";
 import s from "./picks.module.css";
 
 // Strategy review status: last reviewed, what changed and why, next review,
@@ -9,14 +10,30 @@ import s from "./picks.module.css";
 
 const VERDICT: { [k: string]: string } = { promote: "Promoted", retain: "Collecting", reject: "Rejected", report: "Report only" };
 
-export async function LearningPanel({ league }: { league: League }) {
+/** Which market a hypothesis belongs to, by its id (learning/model.ts). Staking, timing, parlays and PEM are about the spread bets. */
+function marketOf(id: string): Market {
+  if (id.includes(":su:")) return "su";
+  if (id.includes(":ou:")) return "ou";
+  return "ats";
+}
+
+const EMPTY: { [k in Market]: string } = {
+  ats: "",
+  su: "No straight-up hypotheses are registered yet.",
+  ou: "No totals hypotheses yet: totals are tracking only until a cut has 10+ decided games and a winning rate.",
+};
+
+export async function LearningPanel({ league, market }: { league: League; market: Market }) {
   const [state, journal, ops, active] = await Promise.all([
     redisStore.state().catch(() => null),
     redisStore.journal(12).catch(() => []),
     loadOps().catch(() => ({})),
     redisStore.active(),
   ]);
-  const mine = (state?.decisions ?? []).filter((d) => d.id.startsWith(`${league}:`) || d.id.startsWith("both:"));
+  const mine = (state?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && marketOf(d.id) === market);
+  // The review status, journal and scheduler health are shared by every
+  // market, so they show once, under Spreads; the others list their own hypotheses.
+  const full = market === "ats";
   const health = Object.entries(ops);
   return (
     <section className={s.section} aria-labelledby="learning">
@@ -28,6 +45,8 @@ export async function LearningPanel({ league }: { league: League }) {
           fixed bar. It can never raise a limit, change grading, or rewrite what was sent.
         </p>
       </div>
+      {full && (
+        <>
       <dl className={s.strip} aria-label="Review status">
         <div>
           <dt>Last reviewed</dt>
@@ -60,6 +79,8 @@ export async function LearningPanel({ league }: { league: League }) {
             : "Probability check: no settled issued bets with a stored estimate yet, so the estimates are unproven and stakes can't size up."}
         </p>
       )}
+        </>
+      )}
       {mine.length > 0 && (
         <details className={s.details}>
           <summary>{`Hypotheses being tested (${mine.length})`}</summary>
@@ -73,6 +94,8 @@ export async function LearningPanel({ league }: { league: League }) {
           </ul>
         </details>
       )}
+      {full ? (
+        <>
       <details className={s.details}>
         <summary>{`Learning journal (latest ${journal.length})`}</summary>
         <ul className={`${s.journal} ${s.cardsInset}`}>
@@ -100,6 +123,14 @@ export async function LearningPanel({ league }: { league: League }) {
           ))}
         </ul>
       </details>
+        </>
+      ) : (
+        <p className={s.thin}>
+          {mine.length === 0 ? `${EMPTY[market]} ` : ""}
+          The review status, learning journal and scheduler health are under{" "}
+          <Link href={href(league, "ats", "research")}>Spreads research</Link>.
+        </p>
+      )}
     </section>
   );
 }
