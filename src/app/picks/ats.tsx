@@ -5,6 +5,7 @@ import type { PicksReport } from "@/lib/picks/report";
 import { groupByDay } from "@/lib/picks/days";
 import { kelly } from "@/lib/picks/staking";
 import { Fragment } from "react";
+import { WEEKLY_CAP } from "@/lib/picks/limits";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
@@ -120,16 +121,10 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
               <dd>{g.priceSource === "missing" ? "No quoted price, so no stake." : "At this price the estimated edge is under a quarter unit."}</dd>
             </>
           )}
-          {st === "early" && (
-            <>
-              <dt>Why no bet yet</dt>
-              <dd>{`Held until 9am on game day (${kickoffEt(g.held)}), when it goes out by email and push if it still fits at that morning's line and price. About ${g.stake}u is set aside for it at today's number.`}</dd>
-            </>
-          )}
           {st === "budget" && (
             <>
               <dt>Why no bet</dt>
-              <dd>{`Worth ${g.want}u, but this week's budget is used by higher-priority bets.`}</dd>
+              <dd>{`Worth ${g.want}u, but this week's ${WEEKLY_CAP}u budget (both sports) is used by higher-priority bets.`}</dd>
             </>
           )}
           {st === "noquote" && (
@@ -497,7 +492,7 @@ export function AtsResults({ r }: { r: PicksReport }) {
         </div>
         <div className={s.tile}>
           <div className={`${s.tileV} ${s.num}`}>{`${r.allocation.exposure.weekly}u`}</div>
-          <div className={s.tileK}>{`Issued this week · ${r.allocation.exposure.outstanding}u open across sports`}</div>
+          <div className={s.tileK}>{`Issued this week, both sports · ${r.allocation.exposure.outstanding}u open`}</div>
         </div>
       </div>
       {u.unstaked > 0 && <p className={s.thin}>{`${u.unstaked} earlier plays went out before stakes existed: in the win-loss record below, not in units.`}</p>}

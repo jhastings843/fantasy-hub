@@ -106,8 +106,16 @@ function RiskStrip({ r, coreStale, coreAt }: { r: PicksReport; coreStale: boolea
   return (
     <dl className={s.strip} aria-label="Risk and freshness">
       <div>
-        <dt>{`This week (${WEEKLY_CAP}u)`}</dt>
-        <dd className={s.num}>{a.exposure.weekly ? `${a.exposure.weekly}u issued + ${a.used}u on board` : `${a.used}u on board`}</dd>
+        <dt>{`This week, both sports (${WEEKLY_CAP}u)`}</dt>
+        <dd className={s.num}>
+          {[
+            a.exposure.weekly ? `${a.exposure.weekly}u issued` : null,
+            `${a.used}u on board`,
+            a.rivalHeld ? `${a.rivalHeld}u held for ${LEAGUE_NAME[r.league === "nfl" ? "cfb" : "nfl"]}` : null,
+          ]
+            .filter(Boolean)
+            .join(" + ")}
+        </dd>
       </div>
       <div>
         <dt>Open, both sports</dt>
@@ -135,7 +143,6 @@ function Warnings({ r, coreStale }: { r: PicksReport; coreStale: boolean }) {
     r.reference.stale ? "Lines are stale: shown for reference, not offered as bets until they refresh." : "",
     r.reference.problem ?? "",
     coreStale ? "Showing the last good copy of the model boards: one of the sites didn't load on the latest try." : "",
-    r.reference.started ? `${r.reference.started} game${r.reference.started === 1 ? " has" : "s have"} kicked off and ${r.reference.started === 1 ? "is" : "are"} no longer actionable.` : "",
     ...r.errors.map((e) => `Couldn't read ${e}`),
   ].filter(Boolean);
   if (!items.length) return null;

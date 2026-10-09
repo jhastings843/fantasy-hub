@@ -12,7 +12,7 @@ import { finishedResults } from "./finished";
 import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
 import { summarize, type ClvRow } from "./closing";
-import { allocate, type Allocation, type Exposure } from "./allocate";
+import { allocate, type Allocation, type Candidate, type Exposure } from "./allocate";
 import { BASELINE_POLICY, type PicksPolicy } from "./policy";
 import { type IssuedRecord, type IssuedWeek, confirmed, gradeIssued, issuedClv } from "./issued";
 import { type UnitReport, unitReport } from "./units";
@@ -100,7 +100,11 @@ export interface PicksReport extends Omit<PicksCore, "rows" | "finals" | "closes
   totals: { backtest: TotalsBacktest; board: TotalsBoardGame[]; edge: number; archived: number };
   units: UnitReport;
   /** What the limits did to this week's wants. */
-  allocation: Pick<Allocation, "room" | "used" | "deferred"> & { exposure: Omit<Exposure, "perGame"> };
+  allocation: Pick<Allocation, "room" | "used" | "deferred"> & {
+    /** Units of the shared weekly budget set aside for the other sport's held plays. */
+    rivalHeld: number;
+    exposure: Omit<Exposure, "perGame">;
+  };
   policy: { id: string; summary: string };
   composedAt: string;
 }
@@ -113,9 +117,15 @@ export interface ComposeInput {
   exposure: Exposure;
   policy?: PicksPolicy;
   now?: Date;
+  /**
+   * The other sport's plays held for a later game day (heldCandidates). They
+   * compete for the shared weekly budget by edge, so this sport can't take
+   * room a stronger held play needs; their stakes are not part of this board.
+   */
+  rivals?: Candidate[];
 }
 
-export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLICY, now = new Date() }: ComposeInput): PicksReport {
+export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLICY, now = new Date(), rivals = [] }: ComposeInput): PicksReport {
   const nowMs = now.getTime();
   const ageMin = quotes.fetchedAt ? (nowMs - new Date(quotes.fetchedAt).getTime()) / 60000 : Infinity;
   const stale = quotes.fetchedAt !== null && ageMin > QUOTE_MAX_AGE_MIN;
@@ -188,9 +198,12 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
           ? [{ id: `ou:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
+      ...rivals,
     ],
     exposure,
   );
+  const rivalIds = new Set(rivals.map((c) => c.id));
+  const rivalHeld = [...alloc.stakes].reduce((t, [id, u]) => t + (rivalIds.has(id) ? u : 0), 0);
   const closesAll = new Map(core.closes);
   const board: BoardGame[] = wanted.map((g) => {
     const out: BoardGame = {
@@ -250,8 +263,9 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     units: unitReport(firstSends(confirmed(issued)), finals),
     allocation: {
       room: alloc.room,
-      used: alloc.used,
-      deferred: alloc.deferred,
+      used: alloc.used - rivalHeld,
+      rivalHeld,
+      deferred: alloc.deferred.filter((d) => !rivalIds.has(d.id)),
       exposure: { weekly: exposure.weekly, outstanding: exposure.outstanding, reserved: exposure.reserved },
     },
     policy: { id: policy.id, summary: policy.summary },
@@ -260,10 +274,14 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
 }
 
 /**
- * What is already on the books: this sport's issued stakes this week (every
- * slot), everything issued and unsettled across both sports, and per game.
+ * What is already on the books: both sports' issued stakes this calendar week
+ * (every slot), everything issued and unsettled across both sports, and this
+ * sport's per game.
  * Only bets the emails showed, with a stake, count.
  */
+/** College week numbers run one ahead of the NFL's in the same calendar week. */
+const WEEK_OFFSET: { [k in League]: number } = { nfl: 0, cfb: 1 };
+
 export function exposureFrom(
   league: League,
   week: number | null,
@@ -282,12 +300,25 @@ export function exposureFrom(
       for (const b of bets) {
         const k = key({ week: rec.week, home: b.home, away: b.away });
         if (!settled.has(`${lg}:${k}`)) outstanding += b.units;
-        if (lg === league && rec.week === week) {
-          weekly += b.units;
-          perGame.set(k, (perGame.get(k) ?? 0) + b.units);
-        }
+        // One weekly budget for both sports. College weeks run one ahead of
+        // the NFL's in the same calendar week (parse.ts weekOf).
+        if (week !== null && rec.week === week + WEEK_OFFSET[lg] - WEEK_OFFSET[league]) weekly += b.units;
+        if (lg === league && rec.week === week) perGame.set(k, (perGame.get(k) ?? 0) + b.units);
       }
     }
   }
   return { weekly, outstanding, perGame };
+}
+
+/**
+ * A report's plays held for a later game day, as allocation candidates for
+ * the other sport's board (ids and games namespaced so they never collide).
+ */
+export function heldCandidates(league: League, r: PicksReport): Candidate[] {
+  const k = (g: { home: string; away: string }) => `${league}:${g.away}@${g.home}`;
+  const one = (kind: string, g: { home: string; away: string; held?: string; want?: number; p?: number; price?: number; issued?: unknown }): Candidate[] =>
+    g.held && !g.issued && g.want && g.p !== undefined && g.price !== undefined
+      ? [{ id: `rival:${kind}:${k(g)}`, game: `rival:${k(g)}`, want: g.want, priority: kelly(g.p, g.price) }]
+      : [];
+  return [...r.board.flatMap((g) => one("ats", g)), ...r.totals.board.flatMap((g) => one("ou", g as Parameters<typeof one>[1]))];
 }

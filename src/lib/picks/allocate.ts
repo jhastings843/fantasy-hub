@@ -6,7 +6,7 @@
 // allocator fits them, in priority order, inside whatever room the protected
 // envelope leaves after what has already been issued:
 //
-//   room = min(WEEKLY_CAP - this sport's issued this week,
+//   room = min(WEEKLY_CAP - both sports' issued this week,
 //              OUTSTANDING_CAP - everything issued and unsettled - reserved)
 //
 // and per game, PER_GAME_CAP less what is already on that game. When the
@@ -29,7 +29,7 @@ export interface Candidate {
 }
 
 export interface Exposure {
-  /** This sport, this week, already issued (all slots). */
+  /** Both sports, this calendar week, already issued (all slots). */
   weekly: number;
   /** Both sports, issued and not yet settled. */
   outstanding: number;

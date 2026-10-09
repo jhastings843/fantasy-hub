@@ -22,7 +22,8 @@ import { pemCompare, researchRows } from "./research";
 import { TOTALS_EDGE, type TotalsSeen, totalsBacktest } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
-import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom } from "./compose";
+import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom, heldCandidates } from "./compose";
+import type { Candidate } from "./allocate";
 import { loadActivePolicy } from "./policy-store";
 import { activatedFor } from "./report-scope";
 import { archiveForecasts } from "./forecasts";
@@ -440,8 +441,22 @@ export async function getPicksReport(
     exposureProblem = `Couldn't read what has already been issued (${e instanceof Error ? e.message : String(e)}), so no new stakes this read.`;
     exposure = { weekly: WEEKLY_CAP, outstanding: OUTSTANDING_CAP, perGame: new Map<string, number>(), reserved: 0 };
   }
-  const value = compose({ core: c, quotes: exposureProblem ? { ...quotes, problem: [quotes.problem, exposureProblem].filter(Boolean).join(" ") } : quotes, issued: issuedHere, exposure, policy });
+  const rivals = await heldRivals(league === "nfl" ? "cfb" : "nfl", policy).catch(() => []);
+  const value = compose({ core: c, quotes: exposureProblem ? { ...quotes, problem: [quotes.problem, exposureProblem].filter(Boolean).join(" ") } : quotes, issued: issuedHere, exposure, policy, rivals });
   return { value, stale: core.stale, at: core.at };
+}
+
+/**
+ * The other sport's plays held for a later game day, so both sports share
+ * the weekly budget by edge. Reads only cached data (core and quotes) and
+ * never composes rivals of its own, so the two boards can't recurse.
+ */
+async function heldRivals(other: League, policy: Awaited<ReturnType<typeof loadActivePolicy>>): Promise<Candidate[]> {
+  const core = (await getPicksCore(other)).value;
+  if (!core?.week) return [];
+  const [quotes, issued] = await Promise.all([getQuotes(other, core.season, core.week), loadIssuedStrict(other, core.season)]);
+  const r = compose({ core, quotes, issued, exposure: { weekly: 0, outstanding: 0, perGame: new Map() }, policy });
+  return heldCandidates(other, r);
 }
 
 /** Drops the core cache, re-reads the quotes, and rebuilds. The send paths call this. */

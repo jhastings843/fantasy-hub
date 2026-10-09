@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { allocate } from "./allocate";
 import { ENVELOPE, MIN_STAKE, OUTSTANDING_CAP, PER_GAME_CAP, WEEKLY_CAP } from "./limits";
 import { BASELINE_POLICY, envelopeViolations } from "./policy";
-import { compose, exposureFrom, type PicksCore } from "./compose";
+import { compose, exposureFrom, heldCandidates, type PicksCore } from "./compose";
 import { gradeGame, strategies, suRecords, type GradedGame } from "./engine";
 import { diffUpdate, updateMatters } from "./update";
 import type { IssuedRecord } from "./issued";
@@ -38,7 +38,7 @@ const sumStakes = (r: ReturnType<typeof compose>) =>
 
 describe("protected envelope", () => {
   it("is pinned: an automated cycle cannot change these without this test failing", () => {
-    expect(ENVELOPE).toEqual({ MIN_STAKE: 0.25, MAX_STAKE: 5, PER_GAME_CAP: 5, WEEKLY_CAP: 15, OUTSTANDING_CAP: 30, MAX_KELLY_SCALE: 0.25, MIN_PRIOR_GAMES: 100, PARLAY_MAX: 1 });
+    expect(ENVELOPE).toEqual({ MIN_STAKE: 0.25, MAX_STAKE: 5, PER_GAME_CAP: 5, WEEKLY_CAP: 30, OUTSTANDING_CAP: 30, MAX_KELLY_SCALE: 0.25, MIN_PRIOR_GAMES: 100, PARLAY_MAX: 1 });
   });
   it("rejects policies outside it", () => {
     expect(envelopeViolations(BASELINE_POLICY)).toEqual([]);
@@ -48,14 +48,14 @@ describe("protected envelope", () => {
 });
 
 describe("finding 1: the weekly cap holds with many qualifying games", () => {
-  it("61 games wanting 1.5u each never exceed the cap; the lowest priorities are deferred", () => {
-    const cands = Array.from({ length: 61 }, (_, i) => ({ id: `g${i}`, game: `g${i}`, want: 1.5, priority: 1 - i / 100 }));
+  it("150 games wanting 1.5u each never exceed the cap; the lowest priorities are deferred", () => {
+    const cands = Array.from({ length: 150 }, (_, i) => ({ id: `g${i}`, game: `g${i}`, want: 1.5, priority: 1 - i / 1000 }));
     const a = allocate(cands, noExposure);
     expect(a.used).toBeLessThanOrEqual(WEEKLY_CAP);
     expect([...a.stakes.values()].every((s) => s >= MIN_STAKE)).toBe(true);
     expect(a.stakes.has("g0")).toBe(true);
-    expect(a.stakes.has("g60")).toBe(false);
-    expect(a.deferred.some((d) => d.id === "g60")).toBe(true);
+    expect(a.stakes.has("g149")).toBe(false);
+    expect(a.deferred.some((d) => d.id === "g149")).toBe(true);
   });
   it("respects per-game, weekly-used, outstanding and reserved room", () => {
     const a = allocate(
@@ -66,7 +66,7 @@ describe("finding 1: the weekly cap holds with many qualifying games", () => {
       { weekly: 0, outstanding: 0, perGame: new Map([["x", 2]]) },
     );
     expect([...a.stakes.values()].reduce((t, s) => t + s, 0)).toBeLessThanOrEqual(PER_GAME_CAP - 2);
-    expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: 13, outstanding: 0, perGame: new Map() }).used).toBeLessThanOrEqual(2);
+    expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: WEEKLY_CAP - 2, outstanding: 0, perGame: new Map() }).used).toBeLessThanOrEqual(2);
     expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: 0, outstanding: OUTSTANDING_CAP - 1, perGame: new Map() }).used).toBeLessThanOrEqual(1);
     expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: 0, outstanding: 20, perGame: new Map(), reserved: 10 }).used).toBe(0);
   });
@@ -96,6 +96,43 @@ describe("finding 2: one allocation for spreads, totals and earlier sends", () =
     expect(ex.weekly).toBeCloseTo(sumStakes(tuesday), 5);
     const saturday = compose({ core: c, quotes, issued: [issued], exposure: ex, now: NOW });
     expect(ex.weekly + saturday.allocation.used).toBeLessThanOrEqual(WEEKLY_CAP);
+  });
+  it("one weekly budget for both sports: the other sport's bets this calendar week count", () => {
+    const rec = (league: "nfl" | "cfb", week: number, units: number): IssuedRecord => ({
+      league, season: 2026, week, issuedAt: "t", provenance: "issued", status: "sent", subject: "s", ruleVersion: "v", rule: null, second: null,
+      suMethod: { id: "avg", label: "a" }, su: [], unverified: [],
+      plays: [{ home: "X", away: `Y${week}`, tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units }],
+    });
+    // NFL Week 6 shares its calendar week with college Week 7, not college Week 6.
+    const issued = [
+      { league: "nfl" as const, records: [rec("nfl", 6, 5)] },
+      { league: "cfb" as const, records: [rec("cfb", 7, 20), rec("cfb", 6, 4)] },
+    ];
+    expect(exposureFrom("nfl", 6, issued, new Set()).weekly).toBe(25);
+    expect(exposureFrom("cfb", 7, issued, new Set()).weekly).toBe(25);
+    // Per game stays this sport's own.
+    expect([...exposureFrom("nfl", 6, issued, new Set()).perGame.keys()]).toEqual(["6:Y6@X"]);
+    // 20u college + 5u NFL already out: an NFL game-day addition gets the last 5u, not 0.
+    expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], exposureFrom("nfl", 6, issued, new Set(["cfb:6:Y6@X"]))).used).toBe(5);
+  });
+  it("the other sport's held plays compete for the shared budget by edge", () => {
+    const sunQuotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i, { kickoff: SUN })) };
+    const held = compose({ core: c, quotes: sunQuotes, issued: [], exposure: noExposure, now: NOW });
+    const rivals = heldCandidates("cfb", held);
+    expect(rivals.length).toBeGreaterThan(0);
+    expect(rivals.every((x) => x.id.startsWith("rival:") && x.game.startsWith("rival:cfb:"))).toBe(true);
+    const alone = compose({ core: c, quotes, issued: [], exposure: noExposure, now: NOW });
+    const shared = compose({ core: c, quotes, issued: [], exposure: noExposure, now: NOW, rivals });
+    expect(shared.allocation.rivalHeld).toBeGreaterThan(0);
+    // The rivals' stakes are set aside, not shown as this board's.
+    expect(sumStakes(shared)).toBeCloseTo(shared.allocation.used, 5);
+    expect(shared.allocation.used + shared.allocation.rivalHeld).toBeLessThanOrEqual(WEEKLY_CAP);
+    expect(shared.allocation.used).toBeLessThan(alone.allocation.used);
+    expect(shared.allocation.deferred.every((d) => !d.id.startsWith("rival:"))).toBe(true);
+  });
+  it("only held, unissued plays with a price become rivals", () => {
+    const r = compose({ core: c, quotes, issued: [], exposure: noExposure, now: new Date("2026-10-16T13:30:00Z") }); // TNF game day, released
+    expect(heldCandidates("nfl", r)).toEqual([]);
   });
   it("settled bets stop counting as outstanding; pending intents still count", () => {
     const rec = (status: "pending" | "sent"): IssuedRecord => ({

@@ -275,7 +275,7 @@ export function buildPicksEmail(input: {
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 15u per sport per week (card plus game-day additions), 30u open across both sports. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
+    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. Stakes run 0.25u to 5u, with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 30u per week across both sports (split however the edges fall), 30u open at once. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
@@ -412,7 +412,7 @@ ${small(feedsLine(r))}`);
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line and price. Each is graded at the line and price shown; a better number elsewhere only helps. Stakes are a quarter-Kelly estimate from each rule's record, 1u = 1% of bankroll, risked. Limits: 5u per bet and per game, 15u per sport per week, 30u open across both sports. Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line and price. Each is graded at the line and price shown; a better number elsewhere only helps. Stakes are a quarter-Kelly estimate from each rule's record, 1u = 1% of bankroll, risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject };

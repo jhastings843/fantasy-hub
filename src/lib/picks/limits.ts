@@ -5,12 +5,12 @@
 // limits.test.ts pins the values so a change here is a deliberate, reviewed
 // edit by a person, never a side effect of an automated cycle.
 //
-// Bankroll: one shared bankroll for both sports, 1u = 1% of it. Each sport
-// has its own weekly budget (the Tuesday card plus any game-day additions
-// that week), and everything issued and not yet settled, across both sports,
-// is capped together. 30u outstanding is exactly the two weekly budgets, so
-// the cross-sport cap never enlarges what the per-sport budgets allow; it
-// only binds when last week's bets are still open.
+// Bankroll: one shared bankroll for both sports, 1u = 1% of it. One weekly
+// budget covers both sports together (Jack's call, 2026-10-09): a week with
+// 20u of college value and 5u of NFL can bet all 25u. Plays held for a later
+// game day in either sport compete for it by edge (compose.ts, rivals). And
+// everything issued and not yet settled, across both sports, is capped
+// together; it only binds when last week's bets are still open.
 
 /** Smallest bet. Under this the price has eaten the edge: not a bet. */
 export const MIN_STAKE = 0.25;
@@ -18,8 +18,8 @@ export const MIN_STAKE = 0.25;
 export const MAX_STAKE = 5;
 /** Most risked on one game across every bet that touches it (spread, total, any slot). */
 export const PER_GAME_CAP = 5;
-/** Most risked per sport per week: the card plus game-day additions. */
-export const WEEKLY_CAP = 15;
+/** Most risked per week, both sports together: every game-day bet that calendar week. */
+export const WEEKLY_CAP = 30;
 /** Most risked and unsettled across both sports at once. */
 export const OUTSTANDING_CAP = 30;
 /** Staking may never be more aggressive than a quarter Kelly... */
