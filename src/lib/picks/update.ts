@@ -131,9 +131,10 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[], now = new Da
     const bettor = p.side === "home" ? 1 : -1;
     const sameSide = (g.tier === "t1" || g.tier === "t2") && g.side === p.side && g.homeLine !== undefined;
     // Still on means still worth a bet at today's number AND today's price:
-    // the policy still wants a stake (limits aside, since this bet is
-    // already part of the exposure).
-    if (sameSide && (g.want ?? 0) > 0) {
+    // it still passes the price gate (limits aside, since this bet is
+    // already part of the exposure). The gate, not the policy's size, so a
+    // sizing change can't turn a sent bet "off".
+    if (sameSide && (g.eligible ?? (g.want ?? 0) > 0)) {
       stillOn.push({ sent: p, nowLine: g.homeLine!, moved: Math.round((g.homeLine! - p.homeLine) * bettor * 10) / 10, nowPrice: g.price });
       continue;
     }
@@ -169,7 +170,7 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[], now = new Da
       continue;
     }
     const better = t.side === "over" ? t.line - g.ref.total : g.ref.total - t.line;
-    if (g.tier === "t1" && g.side === t.side && (g.want ?? 0) > 0) {
+    if (g.tier === "t1" && g.side === t.side && (g.eligible ?? (g.want ?? 0) > 0)) {
       totalsStillOn.push({ sent: t, nowLine: g.ref.total, moved: Math.round(better * 10) / 10, nowPrice: g.price });
     } else {
       totalsOff.push({

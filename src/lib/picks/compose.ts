@@ -18,7 +18,7 @@ import { type IssuedRecord, type IssuedWeek, confirmed, gradeIssued, issuedClv }
 import { type UnitReport, unitReport } from "./units";
 import { firstSends } from "./update";
 import { heldUntil } from "./hold";
-import { kelly, shrunk, stakeFor, wantStakes } from "./staking";
+import { kelly, shrunk, sizeAt, wantStakes } from "./staking";
 import type { PemCompareRow, ResearchRow } from "./research";
 import { type TotalsBacktest, type TotalsBoardGame, totalsBoard } from "./totals";
 import {
@@ -146,7 +146,9 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const withRefs = core.rows.map((r) => ({ ...r, ...refOf(r.home, r.away) }));
   const s = core.strategies;
   const tiered = tierBoard(core.league, withRefs, s, core.su.best?.id ?? "avg");
-  const wanted = wantStakes(tiered, { t1: s.rule?.record, t2: s.second?.record }, policy.staking);
+  const tierRec = (c: { record: { w: number; l: number }; activated?: boolean } | null) =>
+    c ? { w: c.record.w, l: c.record.l, activated: c.activated } : undefined;
+  const wanted = wantStakes(tiered, { t1: tierRec(s.rule), t2: tierRec(s.second) }, policy.staking);
 
   // Totals at the same quotes.
   const tb = core.totalsBacktest;
@@ -164,10 +166,9 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     tb.rule,
   ).map((g) => {
     if (g.tier !== "t1" || !tb.rule || !g.side || !g.ref) return g;
-    const p = shrunk(tb.rule.record.w, tb.rule.record.l, policy.staking.priorGames);
     const quoted = g.side === "over" ? g.ref.overPrice : g.ref.underPrice;
-    if (quoted === undefined) return { ...g, p, priceSource: "missing" as const, want: 0 };
-    return { ...g, p, price: quoted, priceSource: "quoted" as const, want: stakeFor(p, quoted, policy.staking) };
+    if (quoted === undefined) return { ...g, p: shrunk(tb.rule.record.w, tb.rule.record.l, policy.staking.priorGames), eligible: false, priceSource: "missing" as const, want: 0 };
+    return { ...g, ...sizeAt(tb.rule.record, quoted, policy.staking), price: quoted, priceSource: "quoted" as const };
   });
 
   // One allocation for spreads and totals together. Games already issued
@@ -203,12 +204,15 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     exposure,
   );
   const rivalIds = new Set(rivals.map((c) => c.id));
+  // Why a stake came out under its want: the limit that cut it, for the card.
+  const limitedBy = new Map([...alloc.deferred, ...alloc.reduced].map((d) => [d.id, d.reason]));
   const rivalHeld = [...alloc.stakes].reduce((t, [id, u]) => t + (rivalIds.has(id) ? u : 0), 0);
   const closesAll = new Map(core.closes);
   const board: BoardGame[] = wanted.map((g) => {
     const out: BoardGame = {
       ...g,
       stake: alloc.stakes.get(`ats:${gk(g)}`) ?? (g.want !== undefined ? 0 : undefined),
+      ...(limitedBy.has(`ats:${gk(g)}`) ? { limited: limitedBy.get(`ats:${gk(g)}`) } : {}),
       ...(issuedAts.has(gk(g)) ? { issued: issuedAts.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
     };
     const final = coreFinals.get(gk(g));
@@ -225,6 +229,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const totalsBoardOut: TotalsBoardGame[] = tWanted.map((g) => ({
     ...g,
     ...("want" in g && g.want !== undefined ? { stake: alloc.stakes.get(`ou:${gk(g)}`) ?? 0 } : {}),
+    ...(limitedBy.has(`ou:${gk(g)}`) ? { limited: limitedBy.get(`ou:${gk(g)}`) } : {}),
     ...(issuedOu.has(gk(g)) ? { issued: issuedOu.get(gk(g)) } : held(g) ? { held: held(g)! } : {}),
   }));
 

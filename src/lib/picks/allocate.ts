@@ -6,8 +6,13 @@
 // allocator fits them, in priority order, inside whatever room the protected
 // envelope leaves after what has already been issued:
 //
-//   room = min(WEEKLY_CAP - both sports' issued this week,
+//   room = min(WEEKLY_CAP - both sports' issued this week - reserved,
 //              OUTSTANDING_CAP - everything issued and unsettled - reserved)
+//
+// `reserved` is the other sport's stakes in the same send, not yet issued, so
+// it counts against both caps: on 2026-10-10 the weekly side ignored it, and a
+// week with settled bets (weekly above outstanding) let the two cards in one
+// send together pass 30u.
 //
 // and per game, PER_GAME_CAP less what is already on that game. When the
 // wanted total does not fit, every stake is scaled down by one factor and
@@ -44,6 +49,8 @@ export interface Allocation {
   stakes: Map<string, number>;
   /** Wanted a bet but did not get one, and why. */
   deferred: { id: string; reason: string }[];
+  /** Got a bet smaller than it wanted, and which limit cut it. */
+  reduced: { id: string; want: number; stake: number; reason: string }[];
   room: number;
   used: number;
 }
@@ -51,10 +58,14 @@ export interface Allocation {
 const floorQ = (x: number) => Math.floor(x * 4 + 1e-9) / 4;
 
 export function allocate(cands: Candidate[], ex: Exposure): Allocation {
-  const room = Math.max(
-    0,
-    Math.min(WEEKLY_CAP - ex.weekly, OUTSTANDING_CAP - ex.outstanding - (ex.reserved ?? 0)),
-  );
+  const reserved = ex.reserved ?? 0;
+  const weeklyRoom = WEEKLY_CAP - ex.weekly - reserved;
+  const openRoom = OUTSTANDING_CAP - ex.outstanding - reserved;
+  const room = Math.max(0, Math.min(weeklyRoom, openRoom));
+  // Named for whichever cap binds, so a card can say which one it hit.
+  const full = weeklyRoom <= openRoom
+    ? `this week's ${WEEKLY_CAP}u budget (both sports) is used by higher-edge bets`
+    : `the ${OUTSTANDING_CAP}u limit on open bets (both sports) is used by higher-edge bets`;
   const order = cands
     .filter((c) => c.want >= MIN_STAKE)
     .slice()
@@ -71,7 +82,8 @@ export function allocate(cands: Candidate[], ex: Exposure): Allocation {
     gameLeft.set(c.game, left - w);
     return { c, w };
   });
-  for (const x of wants) if (x.w < MIN_STAKE) deferred.push({ id: x.c.id, reason: "game already at its exposure limit" });
+  const gameFull = `this game is at its ${PER_GAME_CAP}u limit`;
+  for (const x of wants) if (x.w < MIN_STAKE) deferred.push({ id: x.c.id, reason: gameFull });
   const live = wants.filter((x) => x.w >= MIN_STAKE);
 
   // Scale everyone by one factor; if that puts any stake under a quarter
@@ -85,7 +97,7 @@ export function allocate(cands: Candidate[], ex: Exposure): Allocation {
     sized = pool.map((x) => ({ ...x, s: k < 1 ? floorQ(x.w * k) : x.w }));
     if (sized.every((x) => x.s >= MIN_STAKE)) break;
     const drop = pool.pop()!;
-    deferred.push({ id: drop.c.id, reason: "weekly budget full" });
+    deferred.push({ id: drop.c.id, reason: full });
     sized = [];
   }
   let used = sized.reduce((t, x) => t + x.s, 0);
@@ -93,7 +105,7 @@ export function allocate(cands: Candidate[], ex: Exposure): Allocation {
   while (used > room + 1e-9 && sized.length) {
     const drop = sized.pop()!;
     used -= drop.s;
-    deferred.push({ id: drop.c.id, reason: "weekly budget full" });
+    deferred.push({ id: drop.c.id, reason: full });
   }
   // Scaling rounds down and drops whole plays, so room can be left over
   // while a play that only wanted the minimum sits out. Give each dropped
@@ -105,5 +117,11 @@ export function allocate(cands: Candidate[], ex: Exposure): Allocation {
     used += MIN_STAKE;
     deferred.splice(deferred.findIndex((d) => d.id === x.c.id), 1);
   }
-  return { stakes, deferred, room, used: Math.round(used * 100) / 100 };
+  const reduced = live.flatMap((x) => {
+    const stake = stakes.get(x.c.id);
+    if (stake === undefined || stake >= x.c.want) return [];
+    // The game's own limit if that alone cut it; otherwise the shared room did.
+    return [{ id: x.c.id, want: x.c.want, stake, reason: stake === x.w ? gameFull : full }];
+  });
+  return { stakes, deferred, reduced, room, used: Math.round(used * 100) / 100 };
 }

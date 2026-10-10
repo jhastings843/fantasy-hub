@@ -3,9 +3,8 @@ import { needsPem, type BoardGame, type CutResult } from "@/lib/picks/engine";
 import { cutResult } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import { groupByDay } from "@/lib/picks/days";
-import { kelly } from "@/lib/picks/staking";
+import { decimal, kelly, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
-import { WEEKLY_CAP } from "@/lib/picks/limits";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
@@ -44,6 +43,23 @@ function pickText(g: BoardGame, name: (k: string) => string): string {
   if (g.read && (g.tier === "split" || g.tier === "wait"))
     return `Sam ${name(g.read.samSide === "home" ? g.home : g.away)} · David ${name(g.read.davidSide === "home" ? g.home : g.away)}`;
   return g.play;
+}
+
+/** Which stake this is: the standard size, or cut by a limit (and which one). */
+function stakeWhy(g: BoardGame, r: PicksReport): string {
+  if (g.limited && g.want !== undefined && (g.stake ?? 0) < g.want) return `Cut from ${g.want}u to ${g.stake}u: ${g.limited}.`;
+  const cut = g.tier === "t1" ? r.strategies.rule : g.tier === "t2" ? r.strategies.second : null;
+  if (cut?.activated) return "Held to 1u: this cut was activated by the strategy review, so a bigger stake waits on its results from here on.";
+  return `Standard stake for this tier at ${price(g.price)}. No limit cut it.`;
+}
+
+/** Why a qualifying pick is not a bet: no price, the price check, or a size under 1u. */
+function pricedWhy(g: BoardGame): string {
+  if (g.priceSource === "missing") return "No quoted price, so no stake.";
+  if (g.eligible) return "Passes the price check, but the current sizing policy puts it under 1u, and anything under 1u is not a bet.";
+  const worst = g.p !== undefined ? worstPrice(g.p) : null;
+  const need = worst === null ? "a plus-money price" : `${price(worst)} or better`;
+  return `At ${price(g.price)} the tier's estimated edge is too thin for a 1u bet. It would need ${need}.`;
 }
 
 /** One game as a card: the pick first, the reasons behind a disclosure. */
@@ -106,7 +122,13 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           {g.price !== undefined && g.p !== undefined && (
             <>
               <dt>Price</dt>
-              <dd className={s.num}>{`${price(g.price)} quoted · edge per unit ${(kelly(g.p, g.price) * 100).toFixed(1)}%`}</dd>
+              <dd className={s.num}>{`${price(g.price)} quoted · estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit`}</dd>
+            </>
+          )}
+          {(st === "bet" || st === "early") && (
+            <>
+              <dt>Stake</dt>
+              <dd>{stakeWhy(g, r)}</dd>
             </>
           )}
           {g.pemPick && (
@@ -118,13 +140,13 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           {st === "priced" && (
             <>
               <dt>Why no bet</dt>
-              <dd>{g.priceSource === "missing" ? "No quoted price, so no stake." : "At this price the estimated edge sizes under the 1u minimum."}</dd>
+              <dd>{pricedWhy(g)}</dd>
             </>
           )}
           {st === "budget" && (
             <>
               <dt>Why no bet</dt>
-              <dd>{`Worth ${g.want}u, but this week's ${WEEKLY_CAP}u budget (both sports) is used by higher-priority bets.`}</dd>
+              <dd>{`Worth ${g.want}u, but ${g.limited ?? "the limits leave no room"}.`}</dd>
             </>
           )}
           {st === "noquote" && (

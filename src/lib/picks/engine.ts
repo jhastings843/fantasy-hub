@@ -539,6 +539,10 @@ export interface BoardGame {
   stake?: number;
   /** Already issued this week (any send): what went out. Not allocated again. */
   issued?: { units: number; price?: number; homeLine: number; side: "home" | "away" };
+  /** Passes the bet/pass price gate (staking.ts ELIGIBILITY), whatever the policy sizes it at. */
+  eligible?: boolean;
+  /** Set when the limits gave less than `want` (or nothing): which limit, in words. */
+  limited?: string;
   /** Held until this time (ISO): an early look, not yet a bet (hold.ts). */
   held?: string;
   /** Finished: the final score, and each pick's result at its own line (finished.ts). */

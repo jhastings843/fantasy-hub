@@ -184,8 +184,8 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
           .join(", ")}.`
       : "",
     sel.overBudget.length
-      ? `Left out by the weekly limit (worth a bet, but this week's ${r.allocation.room}u budget is used): ${sel.overBudget
-          .map((g) => r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away))
+      ? `Left out by the limits (worth a bet, but no room left): ${sel.overBudget
+          .map((g) => `${r.names[g.side === "home" ? g.home : g.away] ?? (g.side === "home" ? g.home : g.away)}${g.limited ? ` (${g.limited})` : ""}`)
           .join(", ")}.`
       : "",
   ].filter(Boolean);

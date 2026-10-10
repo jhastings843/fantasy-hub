@@ -193,6 +193,10 @@ export interface TotalsBoardGame {
   want?: number;
   stake?: number;
   issued?: { units: number; price?: number; line: number; side: OU };
+  /** Passes the bet/pass price gate (staking.ts ELIGIBILITY), whatever the policy sizes it at. */
+  eligible?: boolean;
+  /** Set when the limits gave less than `want` (or nothing): which limit, in words. */
+  limited?: string;
   /** Held until this time (ISO): an early look, not yet a bet (hold.ts). */
   held?: string;
 }

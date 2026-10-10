@@ -72,6 +72,39 @@ describe("finding 1: the weekly cap holds with many qualifying games", () => {
   });
 });
 
+describe("reserved units count against the weekly cap too", () => {
+  it("NFL's same-send stakes shrink college's weekly room, not only the open-bets room", () => {
+    // 20u issued this week, 10u of it already settled; NFL's card in the same
+    // send reserves 8u. Weekly room is 30 - 20 - 8 = 2u. Before the fix only
+    // the open-bets side saw the 8u (30 - 10 - 8 = 12u), so college could
+    // take 10u and the week end at 38u.
+    const ex = { weekly: 20, outstanding: 10, perGame: new Map<string, number>(), reserved: 8 };
+    const cands = Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, game: `c${i}`, want: 2, priority: 1 - i / 10 }));
+    const a = allocate(cands, ex);
+    expect(a.room).toBe(2);
+    expect(ex.weekly + ex.reserved + a.used).toBeLessThanOrEqual(WEEKLY_CAP);
+  });
+  it("names the cap that binds when a play is left out or cut", () => {
+    // 3u of room for 4u of wants: both scaled to 1.5u by the weekly budget.
+    const scaled = allocate([{ id: "a", game: "a", want: 2, priority: 2 }, { id: "b", game: "b", want: 2, priority: 1 }], { weekly: 27, outstanding: 0, perGame: new Map() });
+    expect(scaled.reduced.map((x) => [x.id, x.stake])).toEqual([["a", 1.5], ["b", 1.5]]);
+    expect(scaled.reduced.every((x) => x.reason.includes("week"))).toBe(true);
+    // 2.5u of room for 2u + 1u: the 1u play scales under the minimum and sits out.
+    const dropped = allocate([{ id: "a", game: "a", want: 2, priority: 2 }, { id: "b", game: "b", want: 1, priority: 1 }], { weekly: 27.5, outstanding: 0, perGame: new Map() });
+    expect(dropped.stakes.get("a")).toBe(2);
+    expect(dropped.deferred).toEqual([{ id: "b", reason: expect.stringContaining("week") }]);
+    const open = allocate([{ id: "a", game: "a", want: 2, priority: 1 }, { id: "b", game: "b", want: 2, priority: 0 }], { weekly: 0, outstanding: 29, perGame: new Map() });
+    expect(open.deferred.map((d) => d.reason)).toEqual([expect.stringContaining("open bets")]);
+    const game = allocate([{ id: "a", game: "x", want: 3, priority: 1 }], { weekly: 0, outstanding: 0, perGame: new Map([["x", 3]]) });
+    expect(game.reduced).toEqual([{ id: "a", want: 3, stake: 2, reason: expect.stringContaining("game") }]);
+  });
+  it("a full-size stake carries no limit note", () => {
+    const a = allocate([{ id: "a", game: "a", want: 2, priority: 1 }], noExposure);
+    expect(a.reduced).toEqual([]);
+    expect(a.deferred).toEqual([]);
+  });
+});
+
 describe("leftover room after scaling goes to the best dropped plays", () => {
   it("Oct 10 card: three 1u plays scaled under the minimum, the best one comes back at 1u", () => {
     // 22 wants totalling 34.25u into 28u of room (the live Week 6 board).

@@ -52,9 +52,12 @@ export function runPicksEmail(options: PicksEmailOptions = {}): Promise<Response
 
 async function runLocked({ dry = false, resend = false, test = false }: PicksEmailOptions): Promise<Response> {
   // NFL first; college is allocated with NFL's card already reserved, so the
-  // two cards together stay inside the cross-sport outstanding cap.
+  // two cards together stay inside the cross-sport caps. Held NFL plays are
+  // left out: college already sees them as rivals (heldCandidates), and
+  // reserving them too would count the same units twice.
   const nfl = await refreshPicks("nfl").catch(() => null);
-  const nflCard = (nfl?.board ?? []).reduce((t, g) => t + (g.stake ?? 0), 0) + (nfl?.totals.board ?? []).reduce((t, g) => t + (g.stake ?? 0), 0);
+  const released = (g: { stake?: number; held?: string }) => (g.held ? 0 : (g.stake ?? 0));
+  const nflCard = (nfl?.board ?? []).reduce((t, g) => t + released(g), 0) + (nfl?.totals.board ?? []).reduce((t, g) => t + released(g), 0);
   const cfb = await refreshPicks("cfb", { reserved: nflCard }).catch(() => null);
   const week = nfl?.week ?? null;
   const season = String(nfl?.season ?? cfb?.season ?? "");

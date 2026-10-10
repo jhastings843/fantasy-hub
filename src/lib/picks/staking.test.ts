@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { american, decimal, kelly, pickParlays, shrunk, stakeFor, wantStakes, worstPrice } from "./staking";
+import { american, decimal, eligibleAt, kelly, pickParlays, shrunk, sizeAt, stakeFor, wantStakes, worstPrice } from "./staking";
 
 describe("sizing", () => {
   it("pulls a record toward 50% as if it had gone 50-50 over 100 games", () => {
@@ -62,5 +62,45 @@ describe("wants", () => {
     const flat = { kind: "flat" as const, kellyScale: 0.25, priorGames: 100, flatUnits: 1 };
     expect(stakeFor(shrunk(14, 2), -110, flat)).toBe(1);
     expect(stakeFor(shrunk(10, 12), -110, flat)).toBe(0);
+  });
+});
+
+describe("bet/pass is decided apart from sizing", () => {
+  const flat = { kind: "flat" as const, kellyScale: 0.25, priorGames: 100, flatUnits: 1 };
+  const eighth = { kind: "kelly" as const, kellyScale: 0.125, priorGames: 100, flatUnits: 1 };
+  // The live college Tier 1 on 2026-10-10: 28-14, read as 54.9%.
+  const t1 = { w: 28, l: 14 };
+
+  it("the baseline policy bets exactly what it did before the split", () => {
+    for (const rec of [t1, { w: 14, l: 2 }, { w: 8, l: 6 }, { w: 300, l: 150 }]) {
+      for (let price = -125; price <= 110; price += 1) {
+        if (price > -100 && price < 100) continue;
+        const was = stakeFor(shrunk(rec.w, rec.l), price);
+        expect(sizeAt(rec, price).want).toBe(was);
+        expect(eligibleAt(rec, price)).toBe(was > 0);
+      }
+    }
+  });
+  it("flat 1u sizes only eligible picks: a priced-out pick stays a pass", () => {
+    // -115: positive estimated edge, but quarter Kelly sizes it under 1u.
+    expect(kelly(shrunk(28, 14), -115)).toBeGreaterThan(0);
+    expect(sizeAt(t1, -115, flat)).toMatchObject({ eligible: false, want: 0 });
+    // The same pick at -110 is eligible, and flat gives it 1u, not 1.25u.
+    expect(sizeAt(t1, -110, flat)).toMatchObject({ eligible: true, want: 1 });
+    expect(sizeAt(t1, -110).want).toBe(1.25);
+  });
+  it("a smaller policy can size an eligible pick under 1u: still eligible, not rounded up", () => {
+    expect(sizeAt(t1, -110, eighth)).toMatchObject({ eligible: true, want: 0 });
+  });
+  it("a review-activated cut bets at most 1u, whatever its record says", () => {
+    expect(sizeAt({ ...t1, activated: true }, 105).want).toBe(1);
+    expect(sizeAt(t1, 105).want).toBe(3);
+    expect(sizeAt({ ...t1, activated: true }, -115).want).toBe(0);
+  });
+  it("wantStakes marks eligibility on the board", () => {
+    const g = (price: number) => ({ tier: "t1", basis: "reference", side: "home" as const, ref: { homePrice: price } });
+    const [a, b] = wantStakes([g(-110), g(-115)], { t1 }, flat);
+    expect(a).toMatchObject({ eligible: true, want: 1, price: -110 });
+    expect(b).toMatchObject({ eligible: false, want: 0, price: -115 });
   });
 });

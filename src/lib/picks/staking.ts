@@ -9,10 +9,24 @@
 // the strategy review can measure its forward calibration before trusting it
 // further.
 //
-// Kelly policy: the policy's fraction of the Kelly bet at the QUOTED price,
-// 1u = 1% of bankroll, rounded to the quarter unit, at most MAX_STAKE. Flat
-// policy: the same units on every bet with a positive estimated edge. No
-// quoted price, no stake: an assumed -110 is never presented as an offer.
+// Two questions, answered separately (2026-10-10):
+//
+//   1. Is it a bet? A qualifying pick is ELIGIBLE when the baseline quarter
+//      Kelly on its record, at the quoted price, sizes at 1u or more. That gate
+//      is fixed here, not taken from the active policy, so a sizing change can
+//      never quietly turn priced-out picks into bets (a flat 1u policy would
+//      otherwise bet every positive estimated edge) or the reverse.
+//   2. How big? Only eligible picks are sized, by the active policy. Kelly:
+//      the policy's fraction of the Kelly bet at the QUOTED price, 1u = 1% of
+//      bankroll, rounded to the quarter unit, at most MAX_STAKE. Flat: the
+//      same units on every eligible pick. A size under MIN_STAKE is a pass
+//      (a cutoff, never a round-up).
+//
+// A research cut the strategy review activated is sized at MIN_STAKE: the
+// record that got it chosen is the record that would size it, so a bigger
+// stake waits on forward results, the same as any larger stake.
+//
+// No quoted price, no stake: an assumed -110 is never presented as an offer.
 //
 // Parlays: pickParlays() stays for the shadow parlay policy only. A product
 // of uncalibrated leg estimates times a computed payout (DraftKings' real
@@ -49,6 +63,31 @@ export function stakeFor(p: number, price: number, policy: StakingPolicy = BASEL
   const raw = policy.kind === "flat" ? policy.flatUnits : policy.kellyScale * kelly(p, price) * 100;
   if (raw < MIN_STAKE) return 0;
   return Math.min(MAX_STAKE, Math.max(MIN_STAKE, quarter(raw)));
+}
+
+/** The bet/pass gate: the baseline policy, whatever policy is active. */
+export const ELIGIBILITY: StakingPolicy = BASELINE_POLICY.staking;
+
+/** Whether a pick on this record is worth a bet at this price at all (question 1). */
+export function eligibleAt(rec: { w: number; l: number }, price: number): boolean {
+  return stakeFor(shrunk(rec.w, rec.l, ELIGIBILITY.priorGames), price, ELIGIBILITY) > 0;
+}
+
+/**
+ * A qualifying pick's estimate, eligibility and wanted stake at a quoted
+ * price. `p` is the active policy's estimate (stored on every bet); `want` is
+ * 0 for an ineligible pick, and for an eligible one the policy sizes under
+ * MIN_STAKE. `activated` caps a review-activated cut at MIN_STAKE.
+ */
+export function sizeAt(
+  rec: { w: number; l: number; activated?: boolean },
+  price: number,
+  policy: StakingPolicy = BASELINE_POLICY.staking,
+): { p: number; eligible: boolean; want: number } {
+  const p = shrunk(rec.w, rec.l, policy.priorGames);
+  const eligible = eligibleAt(rec, price);
+  const sized = eligible ? stakeFor(p, price, policy) : 0;
+  return { p, eligible, want: rec.activated ? Math.min(sized, MIN_STAKE) : sized };
 }
 
 /** The worst American price at which this probability still earns a minimum stake. */
@@ -118,6 +157,8 @@ export type PriceSource = "quoted" | "missing";
 
 export interface Wanted {
   p?: number;
+  /** Passes the bet/pass gate at the quoted price (ELIGIBILITY), whatever it is sized at. */
+  eligible?: boolean;
   price?: number;
   priceSource?: PriceSource;
   /** What the policy wants before limits; the allocator decides `stake`. */
@@ -125,19 +166,21 @@ export interface Wanted {
   stake?: number;
 }
 
+/** A tier's record, flagged when its cut was activated by the strategy review. */
+export type TierRecord = { w: number; l: number; activated?: boolean };
+
 /**
  * The stake each Tier 1/2 game at a reference line WANTS under the policy.
  * The allocator turns wants into stakes; nothing here knows the limits.
  */
 export function wantStakes<
   G extends { tier: string; basis?: string; side?: "home" | "away"; ref?: { homePrice?: number; awayPrice?: number } },
->(board: G[], records: { t1?: { w: number; l: number }; t2?: { w: number; l: number } }, policy: StakingPolicy = BASELINE_POLICY.staking): (G & Wanted)[] {
+>(board: G[], records: { t1?: TierRecord; t2?: TierRecord }, policy: StakingPolicy = BASELINE_POLICY.staking): (G & Wanted)[] {
   return board.map((g): G & Wanted => {
     const rec = g.tier === "t1" ? records.t1 : g.tier === "t2" ? records.t2 : undefined;
     if (!rec || g.basis !== "reference" || !g.side) return g;
-    const p = shrunk(rec.w, rec.l, policy.priorGames);
     const quoted = g.side === "home" ? g.ref?.homePrice : g.ref?.awayPrice;
-    if (quoted === undefined) return { ...g, p, priceSource: "missing", want: 0 };
-    return { ...g, p, price: quoted, priceSource: "quoted", want: stakeFor(p, quoted, policy) };
+    if (quoted === undefined) return { ...g, p: shrunk(rec.w, rec.l, policy.priorGames), eligible: false, priceSource: "missing", want: 0 };
+    return { ...g, ...sizeAt(rec, quoted, policy), price: quoted, priceSource: "quoted" };
   });
 }
