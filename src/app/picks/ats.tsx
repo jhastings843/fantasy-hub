@@ -542,11 +542,17 @@ export function AtsResults({ r }: { r: PicksReport }) {
           const settled = wk?.bets.filter((b) => b.result) ?? [];
           const staked = settled.filter((b) => !b.unstaked);
           const early = settled.filter((b) => b.unstaked);
+          // The heading counts staked bets only, so it matches the list and the units.
+          const tierRec = (t: "t1" | "t2") => {
+            const rs = staked.filter((b) => b.kind === "spread" && b.tier === t).map((b) => b.result);
+            return { w: rs.filter((x) => x === "W").length, l: rs.filter((x) => x === "L").length, p: rs.filter((x) => x === "P").length };
+          };
+          const earlyRec = { w: early.filter((b) => b.result === "W").length, l: early.filter((b) => b.result === "L").length, p: early.filter((b) => b.result === "P").length };
           return (
             <details key={w.week} className={s.betWeek} open={i === 0}>
               <summary>
                 <span className={s.betWeekName}>{`Week ${w.week}`}</span>
-                <span className={`${s.num} ${s.betWeekRec}`}>{`T1 ${rec(w.t1)} · T2 ${rec(w.t2)}`}</span>
+                <span className={`${s.num} ${s.betWeekRec}`}>{`T1 ${rec(tierRec("t1"))} · T2 ${rec(tierRec("t2"))}`}</span>
                 <span className={`${s.num} ${s.betWeekNet} ${lw && lw.units < 0 ? s.neg : s.pos}`}>
                   {lw && lw.w + lw.l + lw.p ? units(lw.units) : "·"}
                 </span>
@@ -555,30 +561,30 @@ export function AtsResults({ r }: { r: PicksReport }) {
                 <p className={s.thin}>
                   {[
                     staked.length ? `${staked.length} settled bet${staked.length === 1 ? "" : "s"}, ${amt(lw!.risked)} risked` : "No settled staked bets",
-                    early.length ? `${early.length} from the first email, sent before stakes existed: in the record, not in units` : "",
+                    early.length ? `first email, before stakes: ${rec(earlyRec)}, not counted here` : "",
                     w.pending ? `${w.pending} pending, listed once final` : "",
                     w.provenance === "recovered" ? "recovered from the email" : "",
                   ].filter(Boolean).join(" · ")}
                 </p>
-                {settled.length ? (
+                {staked.length ? (
                   <ul className={s.betList}>
-                    {settled.map((b, j) => (
+                    {staked.map((b, j) => (
                       <li key={j} className={s.betRow}>
                         <span className={`${s.tier} ${b.tier === "t1" ? s.t1 : b.tier === "t2" ? s.t2 : s.tPass}`}>
                           {b.kind === "spread" ? (b.tier === "t1" ? "Tier 1" : "Tier 2") : b.kind === "total" ? "Total" : "Parlay"}
                         </span>
                         <span className={s.betPick}>{betText(b, (k) => r.names[k] ?? k)}</span>
                         <span className={`${s.num} ${s.betStake}`}>
-                          {b.unstaked ? "no stake" : `${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
+                          {`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
                         </span>
                         <span className={`${s.num} ${s.betNet} ${RES_CLASS[b.result!]}`}>
-                          {b.unstaked ? b.result : `${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}
+                          {`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className={s.thin}>Nothing settled yet.</p>
+                  <p className={s.thin}>No staked bets settled yet.</p>
                 )}
               </div>
             </details>
