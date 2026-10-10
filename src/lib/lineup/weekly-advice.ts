@@ -293,6 +293,29 @@ export function adviseLineup(input: {
     }
   });
 
+  // A starter who stays in the lineup keeps his own seat when the solver only
+  // moved him to another slot of the same name.
+  //
+  // With two FLEX slots the solver can seat a staying player in the other FLEX
+  // and put the newcomer in his. On 2026-10-10 Dah Dynasty read "Start Dohnte
+  // Meyers instead of George Kittle ... Colston Loveland comes out of FLEX,
+  // with George Kittle moving in": Kittle never left, Loveland was simply
+  // benched. Identical slots are interchangeable, so swapping them back costs
+  // nothing and makes each row a plain swap of the man actually coming out.
+  for (let pass = 0, swapped = true; swapped && pass < slots.length; pass++) {
+    swapped = false;
+    for (const [i, p] of [...assigned.entries()]) {
+      const j = currentStarters.indexOf(p.playerId);
+      if (j < 0 || j >= slots.length || j === i || slots[j] !== slots[i]) continue;
+      const there = assigned.get(j);
+      if (there?.locked || assigned.get(i) !== p) continue;
+      assigned.set(j, p);
+      if (there) assigned.set(i, there);
+      else assigned.delete(i);
+      swapped = true;
+    }
+  }
+
   // What counts as a change is a player entering the lineup, not a player
   // moving between slots.
   //

@@ -226,6 +226,39 @@ describe("adviseLineup", () => {
     expect(superflex?.reason).not.toContain("rbOut");
   });
 
+  it("reports a plain swap when the leaver sits in the other FLEX", () => {
+    // Dah Dynasty, 2026-10-10. Kittle (FLEX 55) and Loveland (FLEX 76) were in
+    // the two FLEX slots; Meyers (FLEX 58) should replace Loveland. The solver
+    // seated Kittle in Loveland's FLEX and Meyers in Kittle's, and the email
+    // read as though Kittle were being benched and moved at once.
+    const twoFlex = [
+      player({ playerId: "qb1", position: "QB", positionalRank: 3 }),
+      player({ playerId: "rb1", position: "RB", positionalRank: 8, flexRank: 20 }),
+      player({ playerId: "rb2", position: "RB", positionalRank: 18, flexRank: 40 }),
+      player({ playerId: "wrA", position: "WR", positionalRank: 10, flexRank: 25 }),
+      player({ playerId: "wrB", position: "WR", positionalRank: 20, flexRank: 45 }),
+      player({ playerId: "te1", position: "TE", positionalRank: 5, flexRank: 50 }),
+      player({ playerId: "kittle", position: "TE", positionalRank: 7, flexRank: 55 }),
+      player({ playerId: "loveland", position: "TE", positionalRank: 11, flexRank: 76 }),
+      player({ playerId: "meyers", position: "WR", positionalRank: 28, flexRank: 58 }),
+    ];
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster: twoFlex,
+      // Loveland in the first FLEX, Kittle in the second: the solver's own
+      // ordering would put Kittle first.
+      currentStarters: ["qb1", "rb1", "rb2", "wrA", "wrB", "te1", "loveland", "kittle"],
+    });
+
+    expect(a.changes).toHaveLength(1);
+    const flex = a.changes[0];
+    expect(flex.recommended?.playerId).toBe("meyers");
+    expect(flex.current?.playerId).toBe("loveland");
+    expect(flex.reason).toContain("over loveland");
+    expect(flex.reason).not.toContain("comes out of");
+    expect(flex.reason).not.toContain("kittle");
+  });
+
   it("says which slot a leaver is coming out of when it is not this one", () => {
     // Dah Chopped, week 3. A receiver entering the WR slot really was replacing
     // a tight end, because the tight end was the only man leaving, but the row
