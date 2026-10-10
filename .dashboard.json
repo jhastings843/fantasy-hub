@@ -214,7 +214,8 @@
     "2026-10-08: Stakes only on game day: daily 9am ET bets email (+ Pushover, token pending), Tuesday email is now an update with no stakes; Saturday update and Sunday brief picks removed. Astra reviewed twice, fixes applied.",
     "2026-10-08: John Harris tracked weekly (reader via Mac relay, tracker on college research view + Tuesday update, review files a proposal if he clears the bar); never used for bets.",
     "2026-10-10: Picks allocator now hands leftover room to the best dropped plays at 1u; weekly cap stays 30u.",
-    "2026-10-10: Picks: quarter-point lines (Sam's -10.75) now round to the worse bettable half point for display and grading; Results weeks expand to each bet with stake, price, result, net units. Uncommitted pending Jack's OK."
+    "2026-10-10: Picks: quarter-point lines (Sam's -10.75) now round to the worse bettable half point for display and grading; Results weeks expand to each bet with stake, price, result, net units. Uncommitted pending Jack's OK.",
+    "2026-10-10: Results week list shows settled bets only; no-stake plays from the first college email (Oct 7) listed as 'no stake' so the list matches the week's W-L. Deployed."
   ],
   "tags": [
     "personal",
