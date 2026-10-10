@@ -89,3 +89,23 @@ describe("slates", () => {
     expect(slateOf("2026-10-17T16:00:00Z").label).toBe("Saturday");
   });
 });
+
+describe("bets by week", () => {
+  const rec: IssuedRecord = {
+    ...base, slot: "tue",
+    plays: [
+      { home: "H1", away: "A1", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: true, units: 1, price: -110 },
+      { home: "H2", away: "A2", tier: "t2", side: "away", homeLine: -3, play: "", basis: "reference", shownInEmail: true, units: 0.5, price: -120 },
+      { home: "H3", away: "A3", tier: "t1", side: "home", homeLine: 3, play: "", basis: "reference", shownInEmail: false, units: 1, price: -110 },
+    ],
+  };
+  const u = unitReport([rec], new Map([["6:A1@H1", { home: 20, away: 21 }]]));
+  it("lists each staked bet the email showed, with its result and net", () => {
+    const bets = u.byWeek[0].bets;
+    expect(bets).toHaveLength(2);
+    expect(bets[0]).toMatchObject({ kind: "spread", tier: "t1", units: 1, price: -110, result: "W" });
+    expect(bets[0].net).toBeCloseTo(0.909, 2);
+    expect(bets[1]).toMatchObject({ units: 0.5, result: undefined, net: undefined });
+    expect(bets[1].legs[0]).toEqual({ home: "H2", away: "A2", side: "away", line: -3 });
+  });
+});

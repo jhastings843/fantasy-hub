@@ -213,7 +213,8 @@
     "2026-10-08: Week board grouped by day (today first); NFL Sun/Mon bets now held as early looks until the Sunday 9am brief (hold.ts), college unchanged.",
     "2026-10-08: Stakes only on game day: daily 9am ET bets email (+ Pushover, token pending), Tuesday email is now an update with no stakes; Saturday update and Sunday brief picks removed. Astra reviewed twice, fixes applied.",
     "2026-10-08: John Harris tracked weekly (reader via Mac relay, tracker on college research view + Tuesday update, review files a proposal if he clears the bar); never used for bets.",
-    "2026-10-10: Picks allocator now hands leftover room to the best dropped plays at 1u; weekly cap stays 30u."
+    "2026-10-10: Picks allocator now hands leftover room to the best dropped plays at 1u; weekly cap stays 30u.",
+    "2026-10-10: Picks: quarter-point lines (Sam's -10.75) now round to the worse bettable half point for display and grading; Results weeks expand to each bet with stake, price, result, net units. Uncommitted pending Jack's OK."
   ],
   "tags": [
     "personal",

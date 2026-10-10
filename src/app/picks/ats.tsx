@@ -1,7 +1,8 @@
 // Spreads (ATS): this week's bets, results, research.
 import { needsPem, type BoardGame, type CutResult } from "@/lib/picks/engine";
-import { cutResult } from "@/lib/picks/engine";
+import { bettable, cutResult } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
+import type { BetRow } from "@/lib/picks/units";
 import { groupByDay } from "@/lib/picks/days";
 import { decimal, kelly, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
@@ -254,7 +255,7 @@ function FinishedDetails({ g, r }: { g: BoardGame; r: PicksReport }) {
             <dt>{x.who}</dt>
             <dd>
               <span className={s.num}>{proj(x.m)}</span>
-              {x.at !== undefined && <span className={s.muted}>{` vs ${name(g.home)} ${line(x.at)}`}</span>}
+              {x.at !== undefined && <span className={s.muted}>{` vs ${name(g.home)} ${line(bettable(x.at, x.m < x.at ? "home" : "away"))}`}</span>}
               {x.res && (
                 <>
                   {" · "}
@@ -484,6 +485,18 @@ export function AtsWeek({ r }: { r: PicksReport }) {
   );
 }
 
+/** Units with up to two decimals: 0.5u, 1u, 1.25u. */
+const amt = (x: number) => `${Number(x.toFixed(2))}u`;
+
+/** "BYU -11", "Over 47.5 (Iowa State at BYU)", or a parlay's legs joined. */
+function betText(b: BetRow, name: (k: string) => string): string {
+  const leg = (l: BetRow["legs"][number]) =>
+    l.side === "over" || l.side === "under"
+      ? `${l.side === "over" ? "Over" : "Under"} ${l.line} (${name(l.away)} at ${name(l.home)})`
+      : `${name(l.side === "home" ? l.home : l.away)} ${line(bettable(l.side === "home" ? l.line : -l.line, "home"))}`;
+  return b.legs.map(leg).join(" + ");
+}
+
 export function AtsResults({ r }: { r: PicksReport }) {
   const u = r.units;
   const t1 = u.byTier.t1;
@@ -519,44 +532,54 @@ export function AtsResults({ r }: { r: PicksReport }) {
         </div>
       </div>
       {u.unstaked > 0 && <p className={s.thin}>{`${u.unstaked} earlier plays went out before stakes existed: in the win-loss record below, not in units.`}</p>}
-      <div className={s.tw}>
-        <table className={s.table}>
-          <caption className={s.caption}>As sent, by week (each game once, at the line first sent)</caption>
-          <thead>
-            <tr>
-              <th>Week</th>
-              <th>Tier 1</th>
-              <th>Tier 2</th>
-              <th>Units</th>
-            </tr>
-          </thead>
-          <tbody>
-            {r.live.length === 0 && (
-              <tr>
-                <td colSpan={4} className={s.dim}>
-                  Nothing sent yet.
-                </td>
-              </tr>
-            )}
-            {r.live.map((w) => {
-              const lw = u.byWeek.find((x) => x.week === w.week)?.ledger;
-              return (
-                <tr key={w.week}>
-                  <td className={s.num}>
-                    {w.week}
-                    {w.provenance === "recovered" && <div className={s.thin}>recovered from the email</div>}
-                  </td>
-                  <td className={s.num}>{rec(w.t1)}</td>
-                  <td className={s.num}>{rec(w.t2)}</td>
-                  <td className={`${s.num} ${lw && lw.units < 0 ? s.neg : s.pos}`}>
-                    {lw && lw.w + lw.l + lw.p ? units(lw.units) : "·"}
-                    {w.pending ? <span className={s.dim}>{` · ${w.pending} pending`}</span> : null}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className={s.betWeeks}>
+        <h3 className={s.caption}>As sent, by week (each game once, at the line first sent)</h3>
+        {r.live.length === 0 && <p className={s.dim}>Nothing sent yet.</p>}
+        {[...r.live].reverse().map((w, i) => {
+          const wk = u.byWeek.find((x) => x.week === w.week);
+          const lw = wk?.ledger;
+          return (
+            <details key={w.week} className={s.betWeek} open={i === 0}>
+              <summary>
+                <span className={s.betWeekName}>{`Week ${w.week}`}</span>
+                <span className={`${s.num} ${s.betWeekRec}`}>{`T1 ${rec(w.t1)} · T2 ${rec(w.t2)}`}</span>
+                <span className={`${s.num} ${s.betWeekNet} ${lw && lw.units < 0 ? s.neg : s.pos}`}>
+                  {lw && lw.w + lw.l + lw.p ? units(lw.units) : "·"}
+                </span>
+              </summary>
+              <div className={s.betWeekBody}>
+                <p className={s.thin}>
+                  {[
+                    lw ? `${lw.bets} bet${lw.bets === 1 ? "" : "s"}` : "No staked bets",
+                    lw ? `${amt(lw.risked)} risked on settled bets` : "",
+                    w.pending ? `${w.pending} pending` : "",
+                    w.provenance === "recovered" ? "recovered from the email" : "",
+                  ].filter(Boolean).join(" · ")}
+                </p>
+                {wk?.bets.length ? (
+                  <ul className={s.betList}>
+                    {wk.bets.map((b, j) => (
+                      <li key={j} className={s.betRow}>
+                        <span className={`${s.tier} ${b.tier === "t1" ? s.t1 : b.tier === "t2" ? s.t2 : s.tPass}`}>
+                          {b.kind === "spread" ? (b.tier === "t1" ? "Tier 1" : "Tier 2") : b.kind === "total" ? "Total" : "Parlay"}
+                        </span>
+                        <span className={s.betPick}>{betText(b, (k) => r.names[k] ?? k)}</span>
+                        <span className={`${s.num} ${s.betStake}`}>
+                          {`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
+                        </span>
+                        <span className={`${s.num} ${s.betNet} ${b.result ? RES_CLASS[b.result] : s.muted}`}>
+                          {b.result ? `${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}` : "pending"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={s.thin}>Sent before stakes existed: counted in the record, not in units.</p>
+                )}
+              </div>
+            </details>
+          );
+        })}
       </div>
       <div className={s.tw}>
         <table className={s.table}>

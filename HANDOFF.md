@@ -2,6 +2,10 @@
 
 Latest session: an audit-driven pass on Picks in three stages (branch `picks-audit`, merged to main). Stage 1 fixed decision and accounting gaps (one exposure allocator, live quotes, durable issuance). Stage 2 rebuilt the page as sport > market > view with current picks first. Stage 3 added a bounded, scheduled strategy review with validation and rollback. An independent review (Astra) of stage 1 found seven issues; all are fixed with regression tests. This file describes what is implemented now; it replaces the earlier, partly contradictory notes on research promotion and the email schedule.
 
+## Quarter lines + Results bet list (2026-10-10, uncommitted)
+- Sam's site prints blended "Vegas lines" like BYU -10.75. `bettable()` in engine.ts rounds them to the half point worse for the side taken (home -10.75 = -11, road +10.75 = +10.5). Applied inside `grade()` (every grade path) and to the shared pick's line in `read()`; Details shows the rounded per-model line. Quarter lines can now push.
+- `unitReport().byWeek[]` now carries `bets: BetRow[]` (spread, total, parlay; stake, price, result, net). Results view: the "As sent, by week" table became expandable week cards, newest open.
+
 ## Sizing audit (2026-10-10, commit 19d9ed3)
 - Cap bug fixed: `reserved` (the other sport's same-send stakes) now reduces WEEKLY room too, not only open-bets room. Before, a week with settled bets (weekly above outstanding) let NFL + college in one send pass 30u (e.g. weekly 20, open 10, reserved 8: college got 10u, week ended at 38u). The Tuesday card now reserves only released NFL stakes; held ones already compete as rivals, so reserving them double counted.
 - Bet/pass is now separate from sizing (`staking.ts`): `eligibleAt` = baseline quarter Kelly sizes 1u+ at the quoted price (fixed, whatever policy is active); `sizeAt` sizes only eligible picks under the active policy. Flat 1u can no longer turn priced-out picks into bets; a smaller policy that sizes an eligible pick under 1u passes it (cutoff) but the card says so. p1 stakes are unchanged (tested at every price -125..+110).

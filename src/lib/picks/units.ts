@@ -75,13 +75,29 @@ function finish(l: Ledger): Ledger {
   return { ...l, units: Math.round(l.units * 100) / 100, risked: Math.round(l.risked * 100) / 100, roi: l.risked ? l.units / l.risked : 0 };
 }
 
+/** One staked bet as sent, for the week's list on the Results view. */
+export interface BetRow {
+  kind: "spread" | "total" | "parlay";
+  tier?: "t1" | "t2";
+  /** Team keys; for a parlay, one entry per leg. */
+  legs: { home: string; away: string; side: "home" | "away" | "over" | "under"; line: number }[];
+  units: number;
+  /** American price; absent on a parlay (it pays `decimal`). */
+  price?: number;
+  decimal?: number;
+  /** Undefined until the game (or every leg) is final. */
+  result?: Result;
+  /** Net units once settled. */
+  net?: number;
+}
+
 export interface UnitReport {
   total: Ledger;
   byTier: { t1: Ledger; t2: Ledger; totals: Ledger; parlays: Ledger };
   /** Tuesday's card against game-day additions: are late bets worth it? */
   /** By send: the old Tuesday/Saturday/Sunday slots, and "day" for every daily game-day email. */
   bySlot: { [s in "tue" | "sat" | "sun" | "day"]: Ledger };
-  byWeek: { week: number; ledger: Ledger }[];
+  byWeek: { week: number; ledger: Ledger; bets: BetRow[] }[];
   /** Plays sent before units existed: in the W-L record, not here. */
   unstaked: number;
 }
@@ -95,11 +111,14 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
   const byTier = { t1: empty(), t2: empty(), totals: empty(), parlays: empty() };
   const bySlot = { tue: empty(), sat: empty(), sun: empty(), day: empty() };
   const weeks = new Map<number, Ledger>();
+  const betsByWeek = new Map<number, BetRow[]>();
   let unstaked = 0;
   for (const rec of records) {
     const slot = slotBucket(rec.slot);
     const wk = weeks.get(rec.week) ?? empty();
     weeks.set(rec.week, wk);
+    const bets = betsByWeek.get(rec.week) ?? [];
+    betsByWeek.set(rec.week, bets);
     const settle = (result: Result | undefined, units: number, price: number, tier: Ledger) => {
       for (const l of [total, tier, bySlot[slot], wk]) add(l, result, units, price);
     };
@@ -110,12 +129,24 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
         continue;
       }
       const f = finals.get(key({ week: rec.week, home: p.home, away: p.away }));
-      settle(f ? grade(f, p.homeLine, p.side) : undefined, p.units, p.price ?? DEFAULT_PRICE, byTier[p.tier]);
+      const result = f ? grade(f, p.homeLine, p.side) : undefined;
+      const price = p.price ?? DEFAULT_PRICE;
+      settle(result, p.units, price, byTier[p.tier]);
+      bets.push({
+        kind: "spread", tier: p.tier, legs: [{ home: p.home, away: p.away, side: p.side, line: p.homeLine }],
+        units: p.units, price, result, net: result && payout(result, p.units, price),
+      });
     }
     for (const t of rec.totals ?? []) {
       if (!t.shownInEmail || t.units === undefined) continue;
       const f = finals.get(key({ week: rec.week, home: t.home, away: t.away }));
-      settle(f ? gradeTotal(f.home + f.away, t.line, t.side) : undefined, t.units, t.price ?? DEFAULT_PRICE, byTier.totals);
+      const result = f ? gradeTotal(f.home + f.away, t.line, t.side) : undefined;
+      const price = t.price ?? DEFAULT_PRICE;
+      settle(result, t.units, price, byTier.totals);
+      bets.push({
+        kind: "total", legs: [{ home: t.home, away: t.away, side: t.side, line: t.line }],
+        units: t.units, price, result, net: result && payout(result, t.units, price),
+      });
     }
     for (const pr of rec.parlays ?? []) {
       if (!pr.shownInEmail) continue;
@@ -126,13 +157,19 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
       // A parlay settles once every leg has (or one leg has lost).
       const lost = legs.some((x) => x?.result === "L");
       const done = lost || legs.every((x) => x);
+      const net = done ? parlayPayout(legs.filter((x): x is { result: Result; price: number } => !!x), pr.units) : undefined;
+      bets.push({
+        kind: "parlay", legs: pr.legs.map((leg) => ({ home: leg.home, away: leg.away, side: leg.side, line: leg.homeLine })),
+        units: pr.units, decimal: pr.decimal, net,
+        result: net === undefined ? undefined : net > 0 ? "W" : net < 0 ? "L" : "P",
+      });
       for (const l of [total, byTier.parlays, bySlot[slot], wk]) {
         l.bets++;
         if (!done) {
           l.pending++;
           continue;
         }
-        const net = parlayPayout(legs.filter((x): x is { result: Result; price: number } => !!x), pr.units);
+        if (net === undefined) continue;
         if (net > 0) l.w++;
         else if (net < 0) l.l++;
         else l.p++;
@@ -145,7 +182,7 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
     total: finish(total),
     byTier: { t1: finish(byTier.t1), t2: finish(byTier.t2), totals: finish(byTier.totals), parlays: finish(byTier.parlays) },
     bySlot: { tue: finish(bySlot.tue), sat: finish(bySlot.sat), sun: finish(bySlot.sun), day: finish(bySlot.day) },
-    byWeek: [...weeks].filter(([, l]) => l.bets).sort((a, b) => a[0] - b[0]).map(([week, l]) => ({ week, ledger: finish(l) })),
+    byWeek: [...weeks].filter(([, l]) => l.bets).sort((a, b) => a[0] - b[0]).map(([week, l]) => ({ week, ledger: finish(l), bets: betsByWeek.get(week) ?? [] })),
     unstaked,
   };
 }

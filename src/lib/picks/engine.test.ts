@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parseDavidBoard, parseSamBoard, parseSamRecord, parseSheetWeek, weekOf } from "./parse";
-import { join, strategies, suRecords, tierBoard } from "./engine";
+import { bettable, grade, join, read, strategies, suRecords, tierBoard } from "./engine";
 
 const fx = (f: string) => readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks", f), "utf8");
 const rec = (r: { w: number; l: number; p: number }) => `${r.w}-${r.l}-${r.p}`;
@@ -65,5 +65,29 @@ describe("college backtest", () => {
     const david = [1, 2, 3, 4, 5].flatMap((w) => parseSheetWeek("cfb", w, fx(`ds-cfb-week${w}.csv`)));
     const j = join(sam, david);
     expect(j.graded.length).toBeGreaterThan(80);
+  });
+});
+
+describe("quarter-point lines", () => {
+  it("rounds to the worse bettable half point for the side taken", () => {
+    expect(bettable(-10.75, "home")).toBe(-11);
+    expect(bettable(-10.75, "away")).toBe(-10.5);
+    expect(bettable(3.25, "home")).toBe(3);
+    expect(bettable(3.25, "away")).toBe(3.5);
+    expect(bettable(-10.5, "home")).toBe(-10.5);
+    expect(bettable(-7, "away")).toBe(-7);
+  });
+
+  it("grades at the bettable number, so a quarter line can push", () => {
+    // BYU -10.75 is BYU -11 at a book; winning by 11 is a push, not a win.
+    expect(grade({ home: 24, away: 13 }, -10.75, "home")).toBe("P");
+    expect(grade({ home: 24, away: 10 }, -10.75, "home")).toBe("W");
+    // The road side of -10.75 is +10.5: losing by 11 is a loss.
+    expect(grade({ home: 24, away: 13 }, -10.75, "away")).toBe("L");
+  });
+
+  it("shows the shared pick at the bettable number", () => {
+    const r = read({ market: -10.75, model: -11.2 }, { market: -10.5, model: -15 });
+    expect(r.line).toBe(-11);
   });
 });

@@ -90,14 +90,26 @@ export function read(sam: ModelLine, david: ModelLine, pem?: PemLine): Read {
   if (!agree) return { ...base };
   const home = samSide === "home";
   // Home bettor wants the larger home number, road bettor the smaller.
-  const worst = home ? Math.min(sam.market, david.market) : Math.max(sam.market, david.market);
+  const worst = bettable(home ? Math.min(sam.market, david.market) : Math.max(sam.market, david.market), samSide);
   const line = home ? worst : -worst;
   return { ...base, side: samSide, line, dog: line > 0 };
 }
 
+/**
+ * The number a book would actually offer. Sam's site prints blended lines like
+ * -10.75 that no book posts; those round to the half point that is worse for
+ * the side taken (home -10.75 is -11, road +10.75 is +10.5), so a record never
+ * claims a hook nobody could bet and a quarter line can still push.
+ */
+export function bettable(homeLine: number, side: "home" | "away"): number {
+  const h = homeLine * 2;
+  if (Number.isInteger(h)) return homeLine;
+  return (side === "home" ? Math.floor(h) : Math.ceil(h)) / 2;
+}
+
 /** ATS result of backing one side at a home-side line. */
 export function grade(final: { home: number; away: number }, homeLine: number, side: "home" | "away"): Result {
-  const v = final.home - final.away + homeLine;
+  const v = final.home - final.away + bettable(homeLine, side);
   const s = side === "home" ? v : -v;
   return s > 0 ? "W" : s < 0 ? "L" : "P";
 }
