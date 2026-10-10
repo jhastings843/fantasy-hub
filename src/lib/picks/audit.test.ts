@@ -72,6 +72,31 @@ describe("finding 1: the weekly cap holds with many qualifying games", () => {
   });
 });
 
+describe("leftover room after scaling goes to the best dropped plays", () => {
+  it("Oct 10 card: three 1u plays scaled under the minimum, the best one comes back at 1u", () => {
+    // 22 wants totalling 34.25u into 28u of room (the live Week 6 board).
+    const wants = [2.75, 2, 2, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.25, 1.25, 1, 1, 1];
+    const cands = wants.map((want, i) => ({ id: `g${i}`, game: `g${i}`, want, priority: 1 - i / 100 }));
+    const a = allocate(cands, { weekly: 2, outstanding: 0, perGame: new Map() });
+    expect(a.used).toBeLessThanOrEqual(a.room);
+    expect(a.stakes.get("g19")).toBe(MIN_STAKE);
+    expect(a.stakes.has("g20")).toBe(false);
+    expect(a.deferred.map((d) => d.id).sort()).toEqual(["g20", "g21"]);
+    expect(a.room - a.used).toBeLessThan(MIN_STAKE);
+  });
+  it("a restored play still respects its game's limit", () => {
+    const a = allocate(
+      [
+        { id: "big", game: "x", want: 4.5, priority: 2 },
+        { id: "other", game: "x", want: 1, priority: 1 },
+      ],
+      { weekly: WEEKLY_CAP - 4, outstanding: 0, perGame: new Map() },
+    );
+    expect(a.used).toBeLessThanOrEqual(4);
+    expect([...a.stakes.values()].reduce((t, s) => t + s, 0)).toBeLessThanOrEqual(PER_GAME_CAP);
+  });
+});
+
 describe("finding 2: one allocation for spreads, totals and earlier sends", () => {
   const rows = Array.from({ length: 12 }, (_, i) => dogRow(i));
   const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i)) };

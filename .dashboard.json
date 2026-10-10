@@ -7,8 +7,8 @@
   "next_steps": [
     "SHARED WEEKLY BUDGET (2026-10-09): 30u per week across both sports (was 15u per sport); held plays of either sport compete by edge for it. Watch the Sat 10/10 and Sun 10/11 9am emails: college Saturday stakes should leave room shown as 'held for NFL' for Sunday's stronger plays. Finished games also have a Details panel (models, cuts, line move, CLV).",
     "SAME-DAY GRADING (2026-10-08): every board game is graded from its ESPN final the day it ends and feeds the backtest and strategy review; week view turns over Tue 4am ET even if models haven't posted; Finished section at the bottom of Spreads/Straight up/Totals. Check Tue 10/13 morning that NFL Week 6 / college Week 7 show with the 'neither has posted' notice, and that Saturday's college finals appear within ~45 min of each game ending.",
-    "PICKS AUDIT (2026-10-09, merged from branch picks-audit): shared exposure allocator (15u/sport/week incl. game-day additions, 30u open across sports, 5u/game), live quotes in the live tier, kickoff expiry, durable intent->send->confirm issuance, sport>market>view page with picks first, and a bounded scheduled strategy review (Tue 7am + catch-up) with pinned criteria, validation and rollback. Check Research > Strategy review > Scheduler health after deploy; first staked sends Sat 10/10, Sun 10/11, Tue 10/13.",
-    "PICKS STAKING (2026-10-08): 0.25u-5u by quarter Kelly on each tier's record shrunk toward 50% at the real price; 15u weekly cap per sport; 2-leg parlays only at 10%+ est. edge (0.25-1u). Units are risked. First staked bets: Sat 10/10 college update, Sun 10/11 NFL block, Tue 10/13 card.",
+    "PICKS AUDIT (2026-10-09, merged from branch picks-audit): shared exposure allocator (30u/week shared across both sports incl. game-day additions, 30u open across sports, 5u/game), live quotes in the live tier, kickoff expiry, durable intent->send->confirm issuance, sport>market>view page with picks first, and a bounded scheduled strategy review (Tue 7am + catch-up) with pinned criteria, validation and rollback. Check Research > Strategy review > Scheduler health after deploy; first weekend staked sends are the 9am daily emails Sat 10/10 and Sun 10/11.",
+    "PICKS STAKING (updated 2026-10-09): 1u-5u by quarter Kelly on each tier's record shrunk toward 50% at the quoted price (under 1u is not a bet); 5u per game; 30u weekly cap shared across NFL and college; parlays off the card (shadow only). Units are risked. Stakes go out only in the 9am daily email on each game's own day.",
     "PICKS EMAIL SCHEDULE (2026-10-08): Tuesday card from 5:30pm ET once all four boards are up (Wed/Thu 9am fallbacks); Saturday 9:30am college update (only if something's new/off); NFL update inside the Sunday 9am brief. First runs: Sat 10/10, Sun 10/11, Tue 10/13.",
     "PICKS (decision-quality pass 2026-10-08): board/checker/email judge every model at one current DraftKings line (ESPN); Tier 2 judged only on games it adds (NFL now has none); live record = issued records of what each email actually sent (Week 5 recovered from the delivered email). Wed 10/14: check the send response says issued 'recorded' for both leagues. Then totals. Details in HANDOFF.md.",
     "TOTALS (built 2026-10-08): over/under at one current total; Sam-alone history vs opening total; two-model agreement archives forward (15 NFL + 55 college games saved). Tracking only until a cut has 10+ decided games and wins. Results grade automatically, with ESPN finals as a fallback.",
@@ -78,7 +78,7 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-09",
+  "last_worked": "2026-10-10",
   "notes": [
     "2026-10-09: minimum bet is now 1u as a cutoff (plays sizing under 1u are not bets); this week that removed 7 small bets, mostly college.",
     "2026-10-09: 'N/M games have completed' header line; pool share on the winner for finished NFL games; Research shows only each market's own hypotheses.",
@@ -204,7 +204,8 @@
     "2026-10-08: Pool entry on Picks redesigned as logo tiles (win bar, pool-share tick, upset chip), 4 cols desktop / 2 phone.",
     "2026-10-08: Week board grouped by day (today first); NFL Sun/Mon bets now held as early looks until the Sunday 9am brief (hold.ts), college unchanged.",
     "2026-10-08: Stakes only on game day: daily 9am ET bets email (+ Pushover, token pending), Tuesday email is now an update with no stakes; Saturday update and Sunday brief picks removed. Astra reviewed twice, fixes applied.",
-    "2026-10-08: John Harris tracked weekly (reader via Mac relay, tracker on college research view + Tuesday update, review files a proposal if he clears the bar); never used for bets."
+    "2026-10-08: John Harris tracked weekly (reader via Mac relay, tracker on college research view + Tuesday update, review files a proposal if he clears the bar); never used for bets.",
+    "2026-10-10: Picks allocator now hands leftover room to the best dropped plays at 1u; weekly cap stays 30u."
   ],
   "tags": [
     "personal",

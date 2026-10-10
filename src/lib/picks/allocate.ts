@@ -13,7 +13,8 @@
 // wanted total does not fit, every stake is scaled down by one factor and
 // rounded DOWN to the quarter unit; if that leaves any stake under
 // MIN_STAKE, the lowest-priority play is deferred and the rest rescaled,
-// until every stake is worth placing. The result can never exceed the room:
+// until every stake is worth placing. Room left over after rounding goes to
+// the best dropped plays at MIN_STAKE. The result can never exceed the room:
 // the cap holds even with 61 qualifying games, and the best of them are bet.
 
 import { MAX_STAKE, MIN_STAKE, OUTSTANDING_CAP, PER_GAME_CAP, WEEKLY_CAP } from "./limits";
@@ -94,5 +95,15 @@ export function allocate(cands: Candidate[], ex: Exposure): Allocation {
     used -= drop.s;
     deferred.push({ id: drop.c.id, reason: "weekly budget full" });
   }
-  return { stakes: new Map(sized.map((x) => [x.c.id, x.s])), deferred, room, used: Math.round(used * 100) / 100 };
+  // Scaling rounds down and drops whole plays, so room can be left over
+  // while a play that only wanted the minimum sits out. Give each dropped
+  // play the minimum, best first, while the room (and its game) still fit it.
+  const stakes = new Map(sized.map((x) => [x.c.id, x.s]));
+  for (const x of live.filter((x) => !stakes.has(x.c.id))) {
+    if (room - used < MIN_STAKE - 1e-9) break;
+    stakes.set(x.c.id, MIN_STAKE);
+    used += MIN_STAKE;
+    deferred.splice(deferred.findIndex((d) => d.id === x.c.id), 1);
+  }
+  return { stakes, deferred, room, used: Math.round(used * 100) / 100 };
 }
