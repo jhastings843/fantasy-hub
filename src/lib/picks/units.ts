@@ -81,7 +81,10 @@ export interface BetRow {
   tier?: "t1" | "t2";
   /** Team keys; for a parlay, one entry per leg. */
   legs: { home: string; away: string; side: "home" | "away" | "over" | "under"; line: number }[];
+  /** Units risked; 0 on a play sent before stakes existed (`unstaked`). */
   units: number;
+  /** In the win-loss record but not in units. */
+  unstaked?: boolean;
   /** American price; absent on a parlay (it pays `decimal`). */
   price?: number;
   decimal?: number;
@@ -124,11 +127,15 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
     };
     for (const p of rec.plays) {
       if (!p.shownInEmail) continue;
+      const f = finals.get(key({ week: rec.week, home: p.home, away: p.away }));
       if (p.units === undefined) {
         unstaked++;
+        bets.push({
+          kind: "spread", tier: p.tier, legs: [{ home: p.home, away: p.away, side: p.side, line: p.homeLine }],
+          units: 0, unstaked: true, result: f ? grade(f, p.homeLine, p.side) : undefined,
+        });
         continue;
       }
-      const f = finals.get(key({ week: rec.week, home: p.home, away: p.away }));
       const result = f ? grade(f, p.homeLine, p.side) : undefined;
       const price = p.price ?? DEFAULT_PRICE;
       settle(result, p.units, price, byTier[p.tier]);
@@ -182,7 +189,7 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
     total: finish(total),
     byTier: { t1: finish(byTier.t1), t2: finish(byTier.t2), totals: finish(byTier.totals), parlays: finish(byTier.parlays) },
     bySlot: { tue: finish(bySlot.tue), sat: finish(bySlot.sat), sun: finish(bySlot.sun), day: finish(bySlot.day) },
-    byWeek: [...weeks].filter(([, l]) => l.bets).sort((a, b) => a[0] - b[0]).map(([week, l]) => ({ week, ledger: finish(l), bets: betsByWeek.get(week) ?? [] })),
+    byWeek: [...weeks].filter(([week, l]) => l.bets || betsByWeek.get(week)?.length).sort((a, b) => a[0] - b[0]).map(([week, l]) => ({ week, ledger: finish(l), bets: betsByWeek.get(week) ?? [] })),
     unstaked,
   };
 }

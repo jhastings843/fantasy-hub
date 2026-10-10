@@ -63,7 +63,9 @@ describe("unit ledger", () => {
     expect(u.byTier.t2.units).toBeCloseTo(-0.5, 2);
     expect(u.bySlot.tue).toMatchObject({ bets: 3, w: 1, l: 1, pending: 1 });
     expect(u.bySlot.sat.units).toBeCloseTo(-1, 2);
-    expect(u.byWeek.map((x) => x.week)).toEqual([6]);
+    // Week 5 is listed for its unstaked plays, with an empty ledger.
+    expect(u.byWeek.map((x) => x.week)).toEqual([5, 6]);
+    expect(u.byWeek[0].ledger.bets).toBe(0);
   });
 });
 
@@ -107,5 +109,19 @@ describe("bets by week", () => {
     expect(bets[0].net).toBeCloseTo(0.909, 2);
     expect(bets[1]).toMatchObject({ units: 0.5, result: undefined, net: undefined });
     expect(bets[1].legs[0]).toEqual({ home: "H2", away: "A2", side: "away", line: -3 });
+  });
+});
+
+describe("unstaked plays in the week list", () => {
+  const rec: IssuedRecord = {
+    ...base,
+    plays: [{ home: "H9", away: "A9", tier: "t1", side: "away", homeLine: -34.5, play: "", basis: "source", shownInEmail: true }],
+  };
+  const u = unitReport([rec], new Map([["6:A9@H9", { home: 45, away: 14 }]]));
+  it("lists them graded but with no stake and no units", () => {
+    expect(u.byWeek[0].bets).toHaveLength(1);
+    expect(u.byWeek[0].bets[0]).toMatchObject({ unstaked: true, units: 0, result: "W" });
+    expect(u.byWeek[0].bets[0].net).toBeUndefined();
+    expect(u.byWeek[0].ledger).toMatchObject({ bets: 0, units: 0 });
   });
 });

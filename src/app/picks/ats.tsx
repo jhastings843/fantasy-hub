@@ -540,6 +540,8 @@ export function AtsResults({ r }: { r: PicksReport }) {
           const lw = wk?.ledger;
           // Only settled bets: a pending one's stake and line can still change.
           const settled = wk?.bets.filter((b) => b.result) ?? [];
+          const staked = settled.filter((b) => !b.unstaked);
+          const early = settled.filter((b) => b.unstaked);
           return (
             <details key={w.week} className={s.betWeek} open={i === 0}>
               <summary>
@@ -552,8 +554,8 @@ export function AtsResults({ r }: { r: PicksReport }) {
               <div className={s.betWeekBody}>
                 <p className={s.thin}>
                   {[
-                    lw ? `${settled.length} settled bet${settled.length === 1 ? "" : "s"}` : "No staked bets",
-                    settled.length ? `${amt(lw!.risked)} risked` : "",
+                    staked.length ? `${staked.length} settled bet${staked.length === 1 ? "" : "s"}, ${amt(lw!.risked)} risked` : "No settled staked bets",
+                    early.length ? `${early.length} from the first email, sent before stakes existed: in the record, not in units` : "",
                     w.pending ? `${w.pending} pending, listed once final` : "",
                     w.provenance === "recovered" ? "recovered from the email" : "",
                   ].filter(Boolean).join(" · ")}
@@ -567,16 +569,16 @@ export function AtsResults({ r }: { r: PicksReport }) {
                         </span>
                         <span className={s.betPick}>{betText(b, (k) => r.names[k] ?? k)}</span>
                         <span className={`${s.num} ${s.betStake}`}>
-                          {`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
+                          {b.unstaked ? "no stake" : `${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
                         </span>
                         <span className={`${s.num} ${s.betNet} ${RES_CLASS[b.result!]}`}>
-                          {`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}
+                          {b.unstaked ? b.result : `${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  !wk?.bets.length && <p className={s.thin}>Sent before stakes existed: counted in the record, not in units.</p>
+                  <p className={s.thin}>Nothing settled yet.</p>
                 )}
               </div>
             </details>
