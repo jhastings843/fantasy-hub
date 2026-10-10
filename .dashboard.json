@@ -82,6 +82,10 @@
   "notes": [
     {
       "date": "2026-10-10",
+      "note": "Picks sizing audit: weekly cap now counts same-send reservations (could exceed 30u), bet/pass gate separated from sizing, cards explain stake or pass. Commit 19d9ed3."
+    },
+    {
+      "date": "2026-10-10",
       "note": "Lineup email: with two FLEX slots a staying starter now keeps his own seat, so a change reads as a plain swap (Meyers over Loveland) instead of a confusing shuffle through Kittle. Commit c626356."
     },
     "2026-10-09: minimum bet is now 1u as a cutoff (plays sizing under 1u are not bets); this week that removed 7 small bets, mostly college.",
