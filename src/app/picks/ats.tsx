@@ -538,6 +538,8 @@ export function AtsResults({ r }: { r: PicksReport }) {
         {[...r.live].reverse().map((w, i) => {
           const wk = u.byWeek.find((x) => x.week === w.week);
           const lw = wk?.ledger;
+          // Only settled bets: a pending one's stake and line can still change.
+          const settled = wk?.bets.filter((b) => b.result) ?? [];
           return (
             <details key={w.week} className={s.betWeek} open={i === 0}>
               <summary>
@@ -550,15 +552,15 @@ export function AtsResults({ r }: { r: PicksReport }) {
               <div className={s.betWeekBody}>
                 <p className={s.thin}>
                   {[
-                    lw ? `${lw.bets} bet${lw.bets === 1 ? "" : "s"}` : "No staked bets",
-                    lw ? `${amt(lw.risked)} risked on settled bets` : "",
-                    w.pending ? `${w.pending} pending` : "",
+                    lw ? `${settled.length} settled bet${settled.length === 1 ? "" : "s"}` : "No staked bets",
+                    settled.length ? `${amt(lw!.risked)} risked` : "",
+                    w.pending ? `${w.pending} pending, listed once final` : "",
                     w.provenance === "recovered" ? "recovered from the email" : "",
                   ].filter(Boolean).join(" · ")}
                 </p>
-                {wk?.bets.length ? (
+                {settled.length ? (
                   <ul className={s.betList}>
-                    {wk.bets.map((b, j) => (
+                    {settled.map((b, j) => (
                       <li key={j} className={s.betRow}>
                         <span className={`${s.tier} ${b.tier === "t1" ? s.t1 : b.tier === "t2" ? s.t2 : s.tPass}`}>
                           {b.kind === "spread" ? (b.tier === "t1" ? "Tier 1" : "Tier 2") : b.kind === "total" ? "Total" : "Parlay"}
@@ -567,14 +569,14 @@ export function AtsResults({ r }: { r: PicksReport }) {
                         <span className={`${s.num} ${s.betStake}`}>
                           {`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
                         </span>
-                        <span className={`${s.num} ${s.betNet} ${b.result ? RES_CLASS[b.result] : s.muted}`}>
-                          {b.result ? `${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}` : "pending"}
+                        <span className={`${s.num} ${s.betNet} ${RES_CLASS[b.result!]}`}>
+                          {`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className={s.thin}>Sent before stakes existed: counted in the record, not in units.</p>
+                  !wk?.bets.length && <p className={s.thin}>Sent before stakes existed: counted in the record, not in units.</p>
                 )}
               </div>
             </details>
