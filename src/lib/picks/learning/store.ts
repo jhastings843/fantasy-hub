@@ -1,6 +1,6 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { BASELINE_POLICY, envelopeViolations, type PicksPolicy } from "../policy";
+import { CODE_POLICIES, envelopeViolations, type PicksPolicy } from "../policy";
 import { ACTIVE_POLICY_KEY, loadActivePolicy } from "../policy-store";
 import type { Hypothesis } from "./model";
 import type { JournalEntry, LearningStore, ReviewState } from "./review";
@@ -40,7 +40,7 @@ export const redisStore: LearningStore = {
     return loadActivePolicy();
   },
   async version(id: string) {
-    if (id === BASELINE_POLICY.id) return BASELINE_POLICY;
+    if (CODE_POLICIES[id]) return CODE_POLICIES[id];
     return (await redis.hget<PicksPolicy>(VERSIONS, id)) ?? null;
   },
   async putVersion(p: PicksPolicy) {

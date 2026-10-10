@@ -3,11 +3,11 @@ import { BASELINE_POLICY, type PicksPolicy } from "../policy";
 import type { Hypothesis } from "./model";
 import type { JournalEntry, LearningStore, ReviewState } from "./review";
 
-export function memoryStore(): LearningStore & { dump(): { hypotheses: Hypothesis[]; journal: JournalEntry[]; versions: PicksPolicy[] } } {
+export function memoryStore(initial: PicksPolicy = BASELINE_POLICY): LearningStore & { dump(): { hypotheses: Hypothesis[]; journal: JournalEntry[]; versions: PicksPolicy[] } } {
   const hyps = new Map<string, Hypothesis>();
   const journal: JournalEntry[] = [];
-  const versions = new Map<string, PicksPolicy>([[BASELINE_POLICY.id, BASELINE_POLICY]]);
-  let active: PicksPolicy = BASELINE_POLICY;
+  const versions = new Map<string, PicksPolicy>([[BASELINE_POLICY.id, BASELINE_POLICY], [initial.id, initial]]);
+  let active: PicksPolicy = initial;
   let state: ReviewState | null = null;
   return {
     async hypotheses() { return [...hyps.values()]; },

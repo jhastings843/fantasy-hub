@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { allocate } from "./allocate";
 import { ENVELOPE, MIN_STAKE, OUTSTANDING_CAP, PER_GAME_CAP, WEEKLY_CAP } from "./limits";
-import { BASELINE_POLICY, envelopeViolations } from "./policy";
+import { BASELINE_POLICY, FLAT_POLICY, envelopeViolations } from "./policy";
 import { compose, exposureFrom, heldCandidates, type PicksCore } from "./compose";
 import { gradeGame, strategies, suRecords, type GradedGame } from "./engine";
 import { diffUpdate, updateMatters } from "./update";
@@ -69,6 +69,24 @@ describe("finding 1: the weekly cap holds with many qualifying games", () => {
     expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: WEEKLY_CAP - 2, outstanding: 0, perGame: new Map() }).used).toBeLessThanOrEqual(2);
     expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: 0, outstanding: OUTSTANDING_CAP - 1, perGame: new Map() }).used).toBeLessThanOrEqual(1);
     expect(allocate([{ id: "a", game: "a", want: 5, priority: 1 }], { weekly: 0, outstanding: 20, perGame: new Map(), reserved: 10 }).used).toBe(0);
+  });
+});
+
+describe("flat 1u bets the same picks quarter Kelly does", () => {
+  it("only the sizes change: same games staked, each at 1u", () => {
+    const rows = Array.from({ length: 6 }, (_, i) => dogRow(i));
+    // Prices from priced-out (-125) to plus money: the gate decides, not the policy.
+    const prices = [-125, -115, -110, -105, 100, 110];
+    const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i, { awayPrice: prices[i], homePrice: prices[i] })) };
+    const kellyR = compose({ core: core(rows), quotes, issued: [], exposure: noExposure, now: NOW });
+    const flatR = compose({ core: core(rows), quotes, issued: [], exposure: noExposure, now: NOW, policy: FLAT_POLICY });
+    const staked = (r: ReturnType<typeof compose>) => r.board.filter((g) => g.stake).map((g) => g.home);
+    expect(staked(flatR)).toEqual(staked(kellyR));
+    expect(staked(flatR).length).toBeGreaterThan(0);
+    expect(staked(flatR).length).toBeLessThan(rows.length);
+    expect(flatR.board.filter((g) => g.stake).every((g) => g.stake === 1)).toBe(true);
+    expect(kellyR.board.some((g) => (g.stake ?? 0) > 1)).toBe(true);
+    expect(flatR.policy.staking?.kind).toBe("flat");
   });
 });
 

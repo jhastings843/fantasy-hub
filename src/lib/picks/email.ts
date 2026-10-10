@@ -36,6 +36,15 @@ const rec = (r: Rec) => `${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`;
 const line = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
+/** How stakes are sized under the policy in force, for the footnote. */
+function sizingNote(r: PicksReport | null): string {
+  const gate = "A pick is a bet only if a quarter-Kelly bet on its rule's record, pulled toward 50% (as if it had already gone 50-50 over 100 games), comes to 1u or more at the price shown.";
+  if (r?.policy?.staking?.kind === "flat") {
+    return `${gate} Every such bet is ${r.policy.staking.flatUnits}u, with 1u = 1% of bankroll. Larger quarter-Kelly stakes are tracked in shadow and come back only if forward results and calibration support them.`;
+  }
+  return `${gate} Stakes run 1u to 5u at that quarter-Kelly size (anything under 1u is not a bet), with 1u = 1% of bankroll.`;
+}
+
 /** The bet card: every bet, grouped by slate in kickoff order, with stake and price. */
 function playRows(r: PicksReport, games: BoardGame[]): string {
   const name = (k: string) => r.names[k] ?? k;
@@ -225,7 +234,7 @@ function learningCard(journal: JournalEntry[], now: Date, harris?: string): stri
   if (!journal.length) return card(`${label("What the app learned")}${paragraph("No strategy review on file yet.", PALETTE.muted)}${harrisLine}`);
   const recent = journal.filter((e) => now.getTime() - new Date(e.at).getTime() < 7 * 86400000);
   const review = journal.find((e) => e.kind === "review");
-  const changes = recent.filter((e) => ["activate", "rollback", "retain", "reject", "proposal", "ops"].includes(e.kind));
+  const changes = recent.filter((e) => ["activate", "rollback", "retain", "reject", "retire", "proposal", "ops"].includes(e.kind));
   const clip = (s: string, n = 260) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
   const rows = changes
     .slice(0, 6)
@@ -275,7 +284,7 @@ export function buildPicksEmail(input: {
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. Stakes run 1u to 5u (anything sizing under 1u is not a bet), with 1u = 1% of bankroll: a quarter-Kelly bet on each rule's record pulled toward 50% (as if it had already gone 50-50 over 100 games), at the price shown. Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 30u per week across both sports (split however the edges fall), 30u open at once. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
+    footnote: `<div>No stakes in this email. Bets go out at 9am ET on each game day, at that morning's line and price, by email and push. ${sizingNote(nfl ?? cfb)} Units are risked: a 2u bet risks 2u. Each bet is graded at the price shown (DraftKings when sent); a better number elsewhere only helps. Win chances are estimates from each rule's record, not proven calibration. Limits: 5u per bet and per game, 30u per week across both sports (split however the edges fall), 30u open at once. No parlays until single-bet estimates prove calibrated. Every model is judged against one current line per game. ${escapeHtml([asOf(nfl), asOf(cfb)].filter(Boolean).join(" "))}</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject, selections };
@@ -412,7 +421,7 @@ ${small(feedsLine(r))}`);
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line and price. Each is graded at the line and price shown; a better number elsewhere only helps. Stakes are a quarter-Kelly estimate from each rule's record, 1u = 1% of bankroll, risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line and price. Each is graded at the line and price shown; a better number elsewhere only helps. ${sizingNote(input.leagues[0]?.r ?? null)} Units are risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject };

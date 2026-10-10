@@ -40,6 +40,30 @@ export const BASELINE_POLICY: PicksPolicy = {
   atsCandidates: [],
 };
 
+/**
+ * Live sizing from 2026-10-10 (Jack's call): flat 1u on every eligible pick.
+ * Which picks are eligible is still the p1 quarter-Kelly price gate
+ * (staking.ts ELIGIBILITY), so this changes stake sizes only, never which
+ * picks are bets. The tier records behind Kelly's sizes are not shown
+ * calibrated, so p1's larger stakes run in shadow (learning: the quarter-Kelly
+ * challenger) and come back only through the review's calibration gate.
+ * p1 stays frozen as the gate and as a version a card may have been sent under.
+ */
+export const FLAT_POLICY: PicksPolicy = {
+  id: "p2",
+  summary: "Flat 1u on every pick that passes the quarter-Kelly price gate; quarter Kelly runs in shadow; parlays off; built-in cuts only.",
+  createdAt: "2026-10-10T17:00:00Z",
+  staking: { kind: "flat", kellyScale: 0.25, priorGames: 100, flatUnits: 1 },
+  parlays: { enabled: false },
+  atsCandidates: [],
+};
+
+/** The policy in force when the review has not activated another. */
+export const DEFAULT_POLICY: PicksPolicy = FLAT_POLICY;
+
+/** Policies defined in code, by id, so a stored pointer or a rollback can always find them. */
+export const CODE_POLICIES: { [id: string]: PicksPolicy } = { [BASELINE_POLICY.id]: BASELINE_POLICY, [FLAT_POLICY.id]: FLAT_POLICY };
+
 /** What a policy may not do, however good its evidence. */
 export function envelopeViolations(p: PicksPolicy): string[] {
   const out: string[] = [];

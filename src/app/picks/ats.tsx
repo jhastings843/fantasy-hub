@@ -50,7 +50,8 @@ function stakeWhy(g: BoardGame, r: PicksReport): string {
   if (g.limited && g.want !== undefined && (g.stake ?? 0) < g.want) return `Cut from ${g.want}u to ${g.stake}u: ${g.limited}.`;
   const cut = g.tier === "t1" ? r.strategies.rule : g.tier === "t2" ? r.strategies.second : null;
   if (cut?.activated) return "Held to 1u: this cut was activated by the strategy review, so a bigger stake waits on its results from here on.";
-  return `Standard stake for this tier at ${price(g.price)}. No limit cut it.`;
+  if (r.policy?.staking?.kind === "flat") return `Flat ${r.policy.staking.flatUnits}u: every pick that passes the price check bets the same, while quarter Kelly is tracked in shadow. No limit cut it.`;
+  return `Standard quarter-Kelly stake for this tier at ${price(g.price)}. No limit cut it.`;
 }
 
 /** Why a qualifying pick is not a bet: no price, the price check, or a size under 1u. */

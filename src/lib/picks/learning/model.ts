@@ -111,6 +111,34 @@ export function seedHypotheses(registeredAt: string): Hypothesis[] {
   return out;
 }
 
+/**
+ * Hypotheses added after launch. The review registers any that are missing,
+ * at that review's time, so their sample starts then and never includes
+ * games already seen.
+ */
+export function laterHypotheses(registeredAt: string): Hypothesis[] {
+  return [
+    {
+      id: "both:stake:kelly025",
+      kind: "stake-policy",
+      league: "both",
+      definition: { kind: "stake-policy", label: "Quarter Kelly (the p1 sizing) on the same eligible picks", staking: { ...BASELINE_POLICY.staking } },
+      actionable: true,
+      registeredAt,
+      status: "collecting",
+      origin: "Jack, 2026-10-10: live sizing went flat 1u; quarter Kelly runs in shadow and needs forward results plus calibration to come back",
+    },
+  ];
+}
+
+const sameStaking = (a: StakingPolicy, b: StakingPolicy) =>
+  a.kind === b.kind && (a.kind === "flat" ? a.flatUnits === b.flatUnits : a.kellyScale === b.kellyScale && a.priorGames === b.priorGames);
+
+/** A staking challenger identical to the live sizing tests nothing: it is the incumbent. */
+export function isIncumbentStaking(h: Hypothesis, active: PicksPolicy): boolean {
+  return h.definition.kind === "stake-policy" && sameStaking(h.definition.staking, active.staking);
+}
+
 // ------------------------------------------------------------ opportunities
 
 /** One game, as known before kickoff: its first actionable snapshot and its last. */

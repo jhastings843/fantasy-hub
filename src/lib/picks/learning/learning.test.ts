@@ -3,7 +3,8 @@ import { CRITERIA, seedHypotheses, validate } from "./model";
 import { runReview, type ReviewInputs } from "./review";
 import { memoryStore } from "./memory-store";
 import type { ForecastSnapshot } from "../forecasts";
-import { BASELINE_POLICY } from "../policy";
+import { BASELINE_POLICY, DEFAULT_POLICY, FLAT_POLICY, envelopeViolations } from "../policy";
+import { ELIGIBILITY } from "../staking";
 
 describe("protected acceptance criteria", () => {
   it("are pinned: the review cannot weaken its own test", () => {
@@ -146,3 +147,32 @@ describe("review fixes from the independent review", () => {
   });
 });
 
+describe("live sizing is flat 1u, quarter Kelly in shadow (2026-10-10)", () => {
+  it("the default is flat 1u inside the envelope, and the bet/pass gate is still p1's quarter Kelly", () => {
+    expect(DEFAULT_POLICY).toBe(FLAT_POLICY);
+    expect(FLAT_POLICY.staking).toMatchObject({ kind: "flat", flatUnits: 1 });
+    expect(envelopeViolations(FLAT_POLICY)).toEqual([]);
+    expect(ELIGIBILITY).toEqual(BASELINE_POLICY.staking);
+    expect(ELIGIBILITY).toMatchObject({ kind: "kelly", kellyScale: 0.25 });
+  });
+  it("the review registers quarter Kelly as a challenger from now and retires flat 1u as the incumbent", async () => {
+    const store = memoryStore(FLAT_POLICY);
+    await runReview(store, inputs([], "2026-10-09T10:00:00Z"));
+    const r = await runReview(store, inputs([], "2026-10-13T11:00:00Z"));
+    const hs = store.dump().hypotheses;
+    expect(hs.find((h) => h.id === "both:stake:kelly025")).toMatchObject({ status: "collecting", registeredAt: expect.any(String) });
+    expect(hs.find((h) => h.id === "both:stake:flat1")?.status).toBe("retired");
+    expect(r.state.activePolicyId).toBe("p2");
+    // Registered once, not again on the next review.
+    const again = await runReview(store, inputs([], "2026-10-20T11:00:00Z"));
+    expect(again.registered).not.toContain("both:stake:kelly025");
+  });
+  it("Kelly can't come back on a strong comparison alone: it risks more, so it needs calibration", async () => {
+    const { decide, laterHypotheses } = await import("./model");
+    const h = laterHypotheses("2026-10-13T11:00:00Z")[0];
+    const comparison = { n: 60, weeks: [7, 8, 9, 10], meanDiff: 0.3, t: 3, challenger: { bets: 60, units: 12, risked: 90, roi: 0.13, clv: null, clvN: 0, drawdown: 3 }, incumbent: { bets: 60, units: 4, risked: 60, roi: 0.07, clv: null, clvN: 0, drawdown: 3 } };
+    const d = decide(h, { id: h.id, comparison }, { calibration: { n: 60, meanP: 0.55, winRate: 0.48, brier: 0.25, calibrated: false }, active: FLAT_POLICY });
+    expect(d.verdict).toBe("retain");
+    expect(d.why).toMatch(/calibrated/);
+  });
+});

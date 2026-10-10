@@ -1,10 +1,11 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { BASELINE_POLICY, envelopeViolations, type PicksPolicy } from "./policy";
+import { DEFAULT_POLICY, envelopeViolations, type PicksPolicy } from "./policy";
 
 // The active policy, written only by the strategy review (learning/) after
 // its validation passes. Anything that fails the envelope check on load is
-// ignored in favour of the baseline, so a bad write can never loosen limits.
+// ignored in favour of the default (flat 1u, policy.ts), so a bad write can
+// never loosen limits.
 
 export const ACTIVE_POLICY_KEY = "picks:v2:policy:active";
 
@@ -15,5 +16,5 @@ export async function loadActivePolicy(): Promise<PicksPolicy> {
   } catch {
     /* fall through */
   }
-  return BASELINE_POLICY;
+  return DEFAULT_POLICY;
 }

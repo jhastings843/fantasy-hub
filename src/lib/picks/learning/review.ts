@@ -6,7 +6,7 @@ import type { League } from "../parse";
 import type { CutTest } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
 import type { IssuedRecord } from "../issued";
-import { BASELINE_POLICY, type PicksPolicy } from "../policy";
+import { DEFAULT_POLICY, type PicksPolicy } from "../policy";
 import {
   CRITERIA,
   type Comparison,
@@ -18,7 +18,9 @@ import {
   compare,
   decide,
   evaluate,
+  isIncumbentStaking,
   issuedBets,
+  laterHypotheses,
   opportunities,
   propose,
   scoreCut,
@@ -32,7 +34,7 @@ import { stakeFor } from "../staking";
 
 export interface JournalEntry {
   at: string;
-  kind: "review" | "register" | "activate" | "retain" | "reject" | "rollback" | "proposal" | "ui" | "ops";
+  kind: "review" | "register" | "activate" | "retain" | "reject" | "retire" | "rollback" | "proposal" | "ui" | "ops";
   title: string;
   why: string;
   policyBefore?: string;
@@ -121,6 +123,14 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     await write({ at, kind: "register", title: `Registered ${hs.length} hypotheses`, why: "Launch set: each research refinement vs its parent, the flat-risk and eighth-Kelly staking challengers, and report-only questions (timing, parlays, straight-up method, PEM). Their samples start now." });
   }
 
+  // Hypotheses added after launch, registered now so their sample starts now.
+  for (const h of laterHypotheses(at).filter((y) => !hs.some((z) => z.id === y.id))) {
+    if (!opts.dryRun) await store.putHypothesis(h);
+    hs = [...hs, h];
+    registered.push(h.id);
+    await write({ at, kind: "register", title: `Registered ${h.id}`, why: h.origin });
+  }
+
   // Settle and score.
   const opps = x.forecasts.flatMap((f) =>
     opportunities(f.league, f.snaps, x.finals.find((m) => m.league === f.league)?.map ?? new Map(), x.closes.find((m) => m.league === f.league)?.map ?? new Map()),
@@ -136,8 +146,10 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   let rolledBack: ReviewResult["rolledBack"];
   if (prev?.previousPolicyId && prev.activatedAt && active.id !== prev.previousPolicyId) {
     const stored = await store.version(prev.previousPolicyId);
-    const before = stored ?? BASELINE_POLICY;
-    const missingNote = stored ? "" : ` (previous version ${prev.previousPolicyId} not on file; would return to the baseline ${BASELINE_POLICY.id})`;
+    // A missing version falls back to the default (flat 1u), never to p1's
+    // larger stakes: those come back only through the calibration gate.
+    const before = stored ?? DEFAULT_POLICY;
+    const missingNote = stored ? "" : ` (previous version ${prev.previousPolicyId} not on file; would return to the default ${DEFAULT_POLICY.id})`;
     const since = opps.filter((o) => o.first.at >= prev.activatedAt!);
     let c: Comparison | null = null;
     const newCut = active.atsCandidates.find((id) => !before.atsCandidates.includes(id));
@@ -167,6 +179,15 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
       if (!opts.dryRun) await store.setActive(before);
       active = before;
     }
+  }
+
+  // A staking challenger that matches the live sizing is the incumbent now
+  // (flat 1u became live on 2026-10-10): retire it rather than compare it
+  // with itself.
+  for (const h of hs.filter((y) => y.status === "collecting" && isIncumbentStaking(y, active))) {
+    if (!opts.dryRun) await store.putHypothesis({ ...h, status: "retired" });
+    hs = hs.map((y) => (y.id === h.id ? { ...y, status: "retired" as const } : y));
+    await write({ at, kind: "retire", title: `Retired ${h.id}`, why: `${active.id} already sizes this way; it is the incumbent, not a challenger.` });
   }
 
   // Evaluate and decide.

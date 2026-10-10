@@ -105,7 +105,7 @@ export interface PicksReport extends Omit<PicksCore, "rows" | "finals" | "closes
     rivalHeld: number;
     exposure: Omit<Exposure, "perGame">;
   };
-  policy: { id: string; summary: string };
+  policy: { id: string; summary: string; staking?: PicksPolicy["staking"] };
   composedAt: string;
 }
 
@@ -273,7 +273,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
       deferred: alloc.deferred.filter((d) => !rivalIds.has(d.id)),
       exposure: { weekly: exposure.weekly, outstanding: exposure.outstanding, reserved: exposure.reserved },
     },
-    policy: { id: policy.id, summary: policy.summary },
+    policy: { id: policy.id, summary: policy.summary, staking: policy.staking },
     composedAt: now.toISOString(),
   };
 }
