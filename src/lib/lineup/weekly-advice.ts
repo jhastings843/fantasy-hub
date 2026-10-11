@@ -82,6 +82,15 @@ export interface SlotAdvice {
   changed: boolean;
   /** The next best player who could have taken this slot and did not. */
   alternative: AdvicePlayer | null;
+  /**
+   * The starter this change actually benches. Not always `current`: when the
+   * slot's occupant only shifts to another slot, the man going to the bench is
+   * somebody else. On 2026-10-11 the email read "Start Kendrick Bourne instead
+   * of Josh Downs" when Downs was staying and Chris Bell was the one benched.
+   */
+  benched?: AdvicePlayer | null;
+  /** When `current` stays in the lineup but changes slot, the slot he moves to. */
+  currentMovesTo?: string | null;
   reason: string;
 }
 
@@ -432,6 +441,11 @@ export function adviseLineup(input: {
     // dropped is somebody else, and naming the wrong one reads as nonsense.
     const displaced = changed ? (displacedBy.get(index) ?? null) : current;
 
+    const movesTo =
+      changed && current && startingAfter.has(current.playerId)
+        ? slots[[...assigned.entries()].find(([, p]) => p.playerId === current.playerId)![0]]
+        : null;
+
     return {
       slot,
       index,
@@ -439,6 +453,8 @@ export function adviseLineup(input: {
       recommended,
       changed,
       alternative,
+      benched: changed ? displaced : null,
+      currentMovesTo: movesTo,
       reason: reasonFor(slot, displaced, recommended, alternative, changed, vacated(displaced, index)),
     };
   });

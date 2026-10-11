@@ -259,6 +259,32 @@ describe("adviseLineup", () => {
     expect(flex.reason).not.toContain("kittle");
   });
 
+  it("names the starter actually benched when the slot's occupant only moves", () => {
+    // Dah Dynasty, 2026-10-11. Downs (FLEX 52) sat in FLEX, Bell (FLEX 107) in
+    // WR. Bourne (FLEX 94) should replace Bell, with Downs sliding to WR. The
+    // email read "Start Kendrick Bourne instead of Josh Downs".
+    const roster = [
+      player({ playerId: "qb1", position: "QB", positionalRank: 9 }),
+      player({ playerId: "rb1", position: "RB", positionalRank: 8, flexRank: 20 }),
+      player({ playerId: "rb2", position: "RB", positionalRank: 18, flexRank: 40 }),
+      player({ playerId: "wrA", position: "WR", positionalRank: 6, flexRank: 12 }),
+      player({ playerId: "bell", position: "WR", positionalRank: 52, flexRank: 107 }),
+      player({ playerId: "te1", position: "TE", positionalRank: 5, flexRank: 50 }),
+      player({ playerId: "downs", position: "WR", positionalRank: 24, flexRank: 52 }),
+      player({ playerId: "bourne", position: "WR", positionalRank: 46, flexRank: 94 }),
+      player({ playerId: "rb3", position: "RB", positionalRank: 25, flexRank: 60 }),
+    ];
+    const a = adviseLineup({
+      rosterPositions: SLOTS.chopped,
+      roster,
+      currentStarters: ["qb1", "rb1", "rb2", "wrA", "bell", "te1", "downs", "rb3"],
+    });
+    const row = a.changes.find((c) => c.recommended?.playerId === "bourne");
+    expect(row?.current?.playerId).toBe("downs");
+    expect(row?.benched?.playerId).toBe("bell");
+    expect(row?.currentMovesTo).toBe("WR");
+  });
+
   it("says which slot a leaver is coming out of when it is not this one", () => {
     // Dah Chopped, week 3. A receiver entering the WR slot really was replacing
     // a tight end, because the tight end was the only man leaving, but the row

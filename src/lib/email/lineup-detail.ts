@@ -19,19 +19,34 @@ export function playerContext(player: AdvicePlayer | null): string {
 }
 
 export function changeDetail(slot: SlotAdvice): string {
+  const benched = slot.benched ?? slot.current;
   const action = !slot.recommended
     ? `No eligible replacement${slot.current ? ` for ${slot.current.name}` : ""}`
-    : slot.current
-      ? `Start ${slot.recommended.name} instead of ${slot.current.name}`
+    : benched
+      ? `Start ${slot.recommended.name}, bench ${benched.name}`
       : `Fill ${slot.slot}: ${slot.recommended.name}`;
+  // Who sits down is the line that matters. When the slot's own occupant is
+  // staying in and only changing slot, say that separately so his name is not
+  // read as the one coming out.
+  const shuffle = slot.current && slot.currentMovesTo && slot.current.playerId !== benched?.playerId
+    ? small(`${slot.current.name} stays in, moving from ${slot.slot} to ${slot.currentMovesTo}.`, PALETTE.body)
+    : "";
   return `<div style="padding:14px 0;border-top:1px solid ${PALETTE.hairline}">
 <div style="font-size:14px;font-weight:600;color:${PALETTE.ink}">${escapeHtml(slot.slot)} · ${escapeHtml(action)}</div>
-${slot.recommended ? small(playerContext(slot.recommended), PALETTE.body) : ""}
-${slot.current ? small(`Currently set: ${slot.current.name} · ${playerContext(slot.current)}`) : ""}
-${small(`Why: ${slot.reason}`, PALETTE.body)}
-${slot.alternative && slot.alternative.playerId !== slot.current?.playerId && slot.alternative.playerId !== slot.recommended?.playerId
-    ? small(`Next option: ${slot.alternative.name} · ${playerContext(slot.alternative)}`) : ""}
+${slot.recommended ? small(`In: ${slot.recommended.name} · ${playerContext(slot.recommended)}`, PALETTE.body) : ""}
+${benched ? small(`Out: ${benched.name} · ${playerContext(benched)}`) : ""}
+${shuffle}
+${nextOption(slot, benched)}
 </div>`;
+}
+
+/** Skipped when it is the player just benched, or a non-QB for a superflex he fills with a QB. */
+function nextOption(slot: SlotAdvice, benched: SlotAdvice["current"]): string {
+  const alt = slot.alternative;
+  if (!alt) return "";
+  if ([slot.current?.playerId, slot.recommended?.playerId, benched?.playerId].includes(alt.playerId)) return "";
+  if (slot.slot === "SUPER_FLEX" && alt.position !== "QB") return "";
+  return small(`Next option: ${alt.name} · ${playerContext(alt)}`);
 }
 
 export function confirmedDetails(slots: SlotAdvice[]): string {
