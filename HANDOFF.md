@@ -1,5 +1,8 @@
 # Handoff (2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## Lineup email wording (2026-10-11, 5091a0a)
+- Change rows read "Start X, bench Y". `SlotAdvice.benched` is the starter actually leaving (from displacedBy), `currentMovesTo` is the slot the old occupant slides to. The old "instead of <slot occupant>" named Josh Downs when Chris Bell was benched. The "Why:" line is gone from email rows; In/Out lines replace it.
+
 Latest session: an audit-driven pass on Picks in three stages (branch `picks-audit`, merged to main). Stage 1 fixed decision and accounting gaps (one exposure allocator, live quotes, durable issuance). Stage 2 rebuilt the page as sport > market > view with current picks first. Stage 3 added a bounded, scheduled strategy review with validation and rollback. An independent review (Astra) of stage 1 found seven issues; all are fixed with regression tests. This file describes what is implemented now; it replaces the earlier, partly contradictory notes on research promotion and the email schedule.
 
 ## Quarter lines + Results bet list (2026-10-10, deployed f861ae4)

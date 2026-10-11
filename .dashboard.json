@@ -78,8 +78,9 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-10",
+  "last_worked": "2026-10-11",
   "notes": [
+    "2026-10-11: Lineup emails now say \"Start X, bench Y\" naming the starter actually benched (was naming the slot occupant who only moved).",
     {
       "date": "2026-10-10",
       "note": "Picks sizing audit: weekly cap now counts same-send reservations (could exceed 30u), bet/pass gate separated from sizing, cards explain stake or pass. Commit 19d9ed3."
