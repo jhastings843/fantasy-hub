@@ -81,6 +81,7 @@
   ],
   "last_worked": "2026-10-12",
   "notes": [
+    "2026-10-12: Harris and PEM sheet reads moved to Haiku 5.5 (98% rows pass vs 14% on 4.5, quarter the cost); committed fc1c31a, not pushed. Survivor board read still on 4.5, untested.",
     "2026-10-12: Picks sizing comparison now replays each staking policy through the real allocator over recorded 9am decisions (limits, held rivals, settlement as known then); old no-limits estimate is display-only; flat 1u stays live. Needs deploy to start recording.",
     "2026-10-11: Lineup emails now say \"Start X, bench Y\" naming the starter actually benched (was naming the slot occupant who only moved).",
     {
