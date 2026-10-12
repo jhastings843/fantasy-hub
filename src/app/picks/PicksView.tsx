@@ -24,7 +24,7 @@ export default async function PicksView({ league, market, view }: { league: Leag
   const poolShares =
     r?.week && league === "nfl" && market === "su" && view === "week" ? ((await getPoolShares(r.week).catch(() => null))?.value ?? null) : null;
   // The Sleeper pool entry, graded in the background (Results only).
-  const poolTrack = league === "nfl" && market === "su" && view === "results" ? await getPoolTrack().catch(() => null) : null;
+  const poolTrack = league === "nfl" && market === "su" && view === "results" ? ((await getPoolTrack().catch(() => null))?.value ?? null) : null;
 
   const sportNav = (
     <nav className={s.subnav} aria-label="Sport">

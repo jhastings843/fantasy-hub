@@ -4,7 +4,7 @@ import { cachedWithFallback } from "@/lib/redis/cached";
 import { getSeasonGames } from "@/lib/survivor/odds";
 import { getLegPicks } from "@/lib/survivor/sleeper-pool";
 import { SEASON } from "@/lib/survivor/report";
-import { entryRecords, estimatedPublicHome, gradeEntries, type EntryWeek, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
+import { entryRecords, estimatedPublicHome, gradeTeams, type EntryWeek, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
 
 // Jack's Sleeper "Weekly payout" pick'em: straight up, no spread, no
 // confidence points, a winner each week (ties go to a tiebreaker). Its
@@ -183,35 +183,90 @@ export async function getPoolEntry(week: number): Promise<Record<string, EntryPi
   return ((await redis.hgetall<Record<string, EntryPick>>(ENTRY_KEY(week))) ?? {}) as Record<string, EntryPick>;
 }
 
+export interface PoolWeek {
+  week: number;
+  /** Jack's real picks from Sleeper, graded from finals. */
+  you: EntryWeek | null;
+  /** The app's entry, as saved before each kickoff (from Oct 12). */
+  entry: EntryWeek | null;
+  /** The pool's top score once Sleeper has scored the week. */
+  poolBest: number | null;
+  /** Jack's place that week (1 = won), once scored. */
+  rank: number | null;
+}
+
 export interface PoolTrack {
-  weeks: (EntryWeek & { poolBest: number | null })[];
-  w: number;
-  l: number;
+  weeks: PoolWeek[];
+  you: { w: number; l: number };
+  entry: { w: number; l: number };
+}
+
+type PoolRoster = { roster_id?: number; owner_id?: string | null; metadata?: { points_by_leg?: Record<string, number> } };
+
+/** Jack's roster in the pool, found from SLEEPER_USERNAME. */
+async function myRosterId(rosters: PoolRoster[]): Promise<string | null> {
+  const username = process.env.SLEEPER_USERNAME;
+  if (!username) return null;
+  const user = await json<{ user_id?: string }>(`https://api.sleeper.app/v1/user/${username}`).catch(() => null);
+  const mine = rosters.find((r) => user?.user_id && r.owner_id === user.user_id);
+  return mine?.roster_id != null ? String(mine.roster_id) : null;
+}
+
+async function buildPoolTrack(): Promise<PoolTrack> {
+  const season = await getSeasonGames(SEASON);
+  const weeks = [...new Set(season.games.filter((g) => g.completed).map((g) => g.week))].sort((a, b) => a - b);
+  const rosters = await json<PoolRoster[]>(`${BASE}/${POOL.leagueId}/rosters`).catch(() => [] as PoolRoster[]);
+  const me = await myRosterId(rosters);
+
+  const yours = new Map<number, Set<string>>();
+  const entries = new Map<number, Set<string>>();
+  await Promise.all(
+    weeks.map(async (w) => {
+      const e = await getPoolEntry(w).catch(() => ({}) as Record<string, EntryPick>);
+      if (Object.keys(e).length) entries.set(w, new Set(Object.values(e).map((p) => p.team)));
+      if (!me) return;
+      const res = await getLegPicks(POOL.leagueId, `v1:regular:${w}`, true).catch(() => null);
+      const picks = res?.ok ? (res.data?.[me] as { picks?: Record<string, { team?: string }> } | undefined)?.picks : undefined;
+      const teams = Object.values(picks ?? {}).flatMap((p) => (p?.team ? [canon(p.team)] : []));
+      if (teams.length) yours.set(w, new Set(teams));
+    }),
+  );
+  const you = new Map(gradeTeams(yours, season.games, canon).map((x) => [x.week, x]));
+  const entry = new Map(gradeTeams(entries, season.games, canon).map((x) => [x.week, x]));
+
+  const scored = (week: number) =>
+    rosters.flatMap((r) => {
+      const v = r.metadata?.points_by_leg?.[`v1:regular:${week}`];
+      return typeof v === "number" ? [{ id: String(r.roster_id), v }] : [];
+    });
+  const out: PoolWeek[] = weeks
+    .filter((w) => you.has(w) || entry.has(w))
+    .map((w) => {
+      const pts = scored(w);
+      const mine = pts.find((p) => p.id === me);
+      return {
+        week: w,
+        you: you.get(w) ?? null,
+        entry: entry.get(w) ?? null,
+        poolBest: pts.length ? Math.max(...pts.map((p) => p.v)) : null,
+        rank: mine ? 1 + pts.filter((p) => p.v > mine.v).length : null,
+      };
+    });
+  const sum = (k: "you" | "entry") => out.reduce((t, x) => ({ w: t.w + (x[k]?.w ?? 0), l: t.l + (x[k]?.l ?? 0) }), { w: 0, l: 0 });
+  return { weeks: out, you: sum("you"), entry: sum("entry") };
 }
 
 /**
- * Background check on the pool strategy: the saved entry graded each week,
- * beside the pool's winning score that week (Sleeper's points per leg).
- * Weeks before the entry was saved (Week 6 on) have nothing to grade.
+ * Background check on the pool strategy: Jack's real picks and the app's
+ * saved entry, graded each week, beside the pool's winning score. Fifteen
+ * minutes fresh.
  */
-export async function getPoolTrack(): Promise<PoolTrack> {
-  const season = await getSeasonGames(SEASON);
-  const weeks = [...new Set(season.games.filter((g) => g.completed).map((g) => g.week))];
-  const byWeek = new Map<number, Record<string, EntryPick>>();
-  await Promise.all(
-    weeks.map(async (w) => {
-      const e = await getPoolEntry(w);
-      if (Object.keys(e).length) byWeek.set(w, e);
-    }),
-  );
-  const graded = gradeEntries(byWeek, season.games, canon);
-  const rosters = graded.length
-    ? await json<{ metadata?: { points_by_leg?: Record<string, number> } }[]>(`${BASE}/${POOL.leagueId}/rosters`).catch(() => [])
-    : [];
-  const best = (week: number) => {
-    const pts = rosters.map((r) => r.metadata?.points_by_leg?.[`v1:regular:${week}`]).filter((x): x is number => typeof x === "number");
-    return pts.length ? Math.max(...pts) : null;
-  };
-  const out = graded.map((g) => ({ ...g, poolBest: best(g.week) }));
-  return { weeks: out, w: out.reduce((t, x) => t + x.w, 0), l: out.reduce((t, x) => t + x.l, 0) };
+export function getPoolTrack() {
+  return cachedWithFallback<PoolTrack | null>({
+    key: `picks:v2:pool:${POOL.leagueId}:track`,
+    ttlSeconds: 15 * 60,
+    fetcher: buildPoolTrack,
+    isComplete: (v) => !!v,
+    empty: null,
+  });
 }

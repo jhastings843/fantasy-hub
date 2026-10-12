@@ -150,26 +150,29 @@ export function SuResults({ r, poolTrack }: { r: PicksReport; poolTrack?: PoolTr
           <table className={s.table}>
             <caption className={s.caption}>
               {poolTrack?.weeks.length
-                ? `Weekly payout pool entry, graded in the background: ${poolTrack.w}-${poolTrack.l}`
-                : "Weekly payout pool entry: saved before each kickoff since Oct 12, nothing graded yet"}
+                ? `Weekly payout pool: your picks ${poolTrack.you.w}-${poolTrack.you.l}${poolTrack.entry.w + poolTrack.entry.l ? `, app entry ${poolTrack.entry.w}-${poolTrack.entry.l}` : ""}`
+                : "Weekly payout pool: nothing graded yet"}
             </caption>
             <thead>
               <tr>
                 <th>Week</th>
+                <th>You</th>
                 <th>Entry</th>
-                <th>Pool winner</th>
+                <th>Pool best</th>
               </tr>
             </thead>
             <tbody>
               {(poolTrack?.weeks ?? []).map((w) => (
                 <tr key={w.week}>
                   <td className={s.num}>{w.week}</td>
-                  <td className={s.num}>{w.graded < w.played ? `${w.w}-${w.l} (${w.graded} of ${w.played} saved)` : `${w.w}-${w.l}`}</td>
-                  <td className={s.num}>{w.poolBest ?? "not posted"}</td>
+                  <td className={s.num}>{w.you ? `${w.you.w}-${w.you.l}${w.rank ? ` (#${w.rank})` : ""}` : "none"}</td>
+                  <td className={s.num}>{w.entry ? (w.entry.graded < w.entry.played ? `${w.entry.w}-${w.entry.l} (${w.entry.graded} of ${w.entry.played})` : `${w.entry.w}-${w.entry.l}`) : "not saved"}</td>
+                  <td className={s.num}>{w.poolBest ?? "not scored"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <p className={s.thin}>Your picks come from Sleeper. The entry is what this page suggested, saved before each kickoff (from Oct 12). Place is shown once Sleeper scores the week.</p>
         </div>
       )}
     </section>

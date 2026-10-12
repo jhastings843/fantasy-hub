@@ -184,18 +184,19 @@ export interface EntryWeek {
   week: number;
   w: number;
   l: number;
-  /** Games the entry picked that have finished. */
+  /** Picked games that have finished. */
   graded: number;
-  /** Finished games that week with a winner, saved or not. */
+  /** Finished games that week with a winner, picked or not. */
   played: number;
 }
 
 /**
- * The saved entry graded against finals, per week. Ties (no winner) and games
- * with no saved pick are left out. Pure.
+ * Picks graded against finals, per week. Each week's picks are the teams
+ * picked to win (a team plays once a week), in Sleeper's spelling. Ties and
+ * unpicked games are left out of W-L. Pure.
  */
-export function gradeEntries(
-  byWeek: Map<number, Record<string, EntryPick>>,
+export function gradeTeams(
+  byWeek: Map<number, Set<string>>,
   games: { week: number; home: string; away: string; completed: boolean; homeScore: number | null; awayScore: number | null }[],
   canon: (t: string) => string,
 ): EntryWeek[] {
@@ -208,10 +209,11 @@ export function gradeEntries(
       for (const g of games) {
         if (g.week !== week || !g.completed || g.homeScore == null || g.awayScore == null || g.homeScore === g.awayScore) continue;
         played++;
-        const p = picks[`${canon(g.away)}@${canon(g.home)}`];
-        if (!p) continue;
-        const winner = canon(g.homeScore > g.awayScore ? g.home : g.away);
-        if (p.team === winner) w++;
+        const home = canon(g.home);
+        const away = canon(g.away);
+        if (!picks.has(home) && !picks.has(away)) continue;
+        const winner = g.homeScore > g.awayScore ? home : away;
+        if (picks.has(winner)) w++;
         else l++;
       }
       return { week, w, l, graded: w + l, played };

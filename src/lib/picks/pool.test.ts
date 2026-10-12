@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryRecords, estimatedPublicHome, gradeEntries, optimizePool, type PoolGame } from "./pool";
+import { entryRecords, estimatedPublicHome, gradeTeams, optimizePool, type PoolGame } from "./pool";
 
 const game = (i: number, pHome: number, publicHome = estimatedPublicHome(pHome)): PoolGame => ({ key: `g${i}`, home: `H${i}`, away: `A${i}`, pHome, publicHome });
 
@@ -73,12 +73,10 @@ describe("entryRecords", () => {
   });
 });
 
-describe("gradeEntries", () => {
-  it("grades saved picks on finished games only, skipping ties and unsaved games", () => {
+describe("gradeTeams", () => {
+  it("grades picked teams on finished games only, skipping ties and unpicked games", () => {
     const id = (x: string) => x;
-    const picks = new Map([
-      [6, { "CLE@NYJ": { team: "NYJ", at: "" }, "PIT@IND": { team: "IND", at: "" }, "DAL@TB": { team: "TB", at: "" } }],
-    ]);
+    const picks = new Map([[6, new Set(["NYJ", "IND", "TB"])]]);
     const games = [
       { week: 6, home: "NYJ", away: "CLE", completed: true, homeScore: 17, awayScore: 12 },
       { week: 6, home: "IND", away: "PIT", completed: true, homeScore: 20, awayScore: 24 },
@@ -86,6 +84,6 @@ describe("gradeEntries", () => {
       { week: 6, home: "KC", away: "LV", completed: true, homeScore: 30, awayScore: 10 },
       { week: 6, home: "SF", away: "SEA", completed: true, homeScore: 20, awayScore: 20 },
     ];
-    expect(gradeEntries(picks, games, id)).toEqual([{ week: 6, w: 1, l: 1, graded: 2, played: 3 }]);
+    expect(gradeTeams(picks, games, id)).toEqual([{ week: 6, w: 1, l: 1, graded: 2, played: 3 }]);
   });
 });
