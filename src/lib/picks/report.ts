@@ -22,10 +22,10 @@ import { pemCompare, researchRows } from "./research";
 import { TOTALS_EDGE, type TotalsSeen, totalsBacktest } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
-import { type PicksCore, type PicksReport, type Quotes, compose, exposureFrom, heldCandidates } from "./compose";
-import type { Candidate } from "./allocate";
+import { type PicksCore, type PicksReport, type Quotes, type SizedCandidate, compose, exposureFrom, heldCandidates } from "./compose";
 import { loadActivePolicy } from "./policy-store";
 import { activatedFor } from "./report-scope";
+import { recentKeys } from "./learning/replay";
 import { archiveForecasts } from "./forecasts";
 import { boardWeek, carryStarted, gradeFinished } from "./finished";
 import {
@@ -427,6 +427,7 @@ export async function getPicksReport(
   let issuedHere: Awaited<ReturnType<typeof loadIssued>> = [];
   let exposure;
   let exposureProblem: string | undefined;
+  let settledUsed: string[] = [];
   try {
     const [nfl, cfb, settled] = await Promise.all([
       loadIssuedStrict("nfl", c.season),
@@ -437,12 +438,17 @@ export async function getPicksReport(
     for (const [k] of c.finals) settledSet.add(`${league}:${k}`);
     issuedHere = league === "nfl" ? nfl : cfb;
     exposure = { ...exposureFrom(league, c.week, [{ league: "nfl", records: nfl }, { league: "cfb", records: cfb }], settledSet), reserved: opts.reserved ?? 0 };
+    // Recorded with a send's decision (learning/replay.ts): every issued game's
+    // status (a short list, so a bet that was never settled stays open in the
+    // replay however old), plus recent finals for games only a replay bets.
+    const issuedKeys = new Set([...issuedGames(nfl).map((g) => `nfl:${key(g)}`), ...issuedGames(cfb).map((g) => `cfb:${key(g)}`)]);
+    settledUsed = [...new Set([...recentKeys([...settledSet], c.week), ...[...settledSet].filter((k) => issuedKeys.has(k))])].sort();
   } catch (e) {
     exposureProblem = `Couldn't read what has already been issued (${e instanceof Error ? e.message : String(e)}), so no new stakes this read.`;
     exposure = { weekly: WEEKLY_CAP, outstanding: OUTSTANDING_CAP, perGame: new Map<string, number>(), reserved: 0 };
   }
   const rivals = await heldRivals(league === "nfl" ? "cfb" : "nfl", policy).catch(() => []);
-  const value = compose({ core: c, quotes: exposureProblem ? { ...quotes, problem: [quotes.problem, exposureProblem].filter(Boolean).join(" ") } : quotes, issued: issuedHere, exposure, policy, rivals });
+  const value = compose({ core: c, quotes: exposureProblem ? { ...quotes, problem: [quotes.problem, exposureProblem].filter(Boolean).join(" ") } : quotes, issued: issuedHere, exposure, policy, rivals, settled: settledUsed });
   return { value, stale: core.stale, at: core.at };
 }
 
@@ -451,7 +457,7 @@ export async function getPicksReport(
  * the weekly budget by edge. Reads only cached data (core and quotes) and
  * never composes rivals of its own, so the two boards can't recurse.
  */
-async function heldRivals(other: League, policy: Awaited<ReturnType<typeof loadActivePolicy>>): Promise<Candidate[]> {
+async function heldRivals(other: League, policy: Awaited<ReturnType<typeof loadActivePolicy>>): Promise<SizedCandidate[]> {
   const core = (await getPicksCore(other)).value;
   if (!core?.week) return [];
   const [quotes, issued] = await Promise.all([getQuotes(other, core.season, core.week), loadIssuedStrict(other, core.season)]);

@@ -9,6 +9,7 @@ import { gradeGame, strategies, suRecords, type GradedGame } from "./engine";
 import { diffUpdate, updateMatters } from "./update";
 import type { IssuedRecord } from "./issued";
 import { totalsCuts } from "./totals";
+import { replay, reproductionGaps, toDecision } from "./learning/replay";
 
 const game = (i: number, covers: boolean): GradedGame =>
   gradeGame({ week: 3, home: `HH${i}`, away: `AA${i}`, sam: { market: 3, model: 1 }, david: { market: 3, model: 0 }, final: covers ? { home: 21, away: 20 } : { home: 3, away: 30 } });
@@ -205,6 +206,34 @@ describe("finding 2: one allocation for spreads, totals and earlier sends", () =
     expect(shared.allocation.used + shared.allocation.rivalHeld).toBeLessThanOrEqual(WEEKLY_CAP);
     expect(shared.allocation.used).toBeLessThan(alone.allocation.used);
     expect(shared.allocation.deferred.every((d) => !d.id.startsWith("rival:"))).toBe(true);
+  });
+  it("a recorded decision replays exactly: the live sizing reproduces itself, and Kelly matches compose run under Kelly", () => {
+    const sunQuotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i, { kickoff: SUN })) };
+    const rivalsUnder = (policy: typeof FLAT_POLICY) => heldCandidates("cfb", compose({ core: c, quotes: sunQuotes, issued: [], exposure: noExposure, now: NOW, policy }));
+    const ex = { weekly: 2, outstanding: 4, perGame: new Map([["6:A0@H0", 2]]), reserved: 1 };
+    const live = compose({ core: c, quotes, issued: [], exposure: ex, now: NOW, policy: FLAT_POLICY, rivals: rivalsUnder(FLAT_POLICY), settled: ["nfl:5:X@Y"] });
+    const d = toDecision(live, { at: "2026-10-13T21:30:00Z", sendKey: "s", order: 0, finalsKnown: [], onSendDate: () => true })!;
+    expect(d.candidates.some((x) => x.rival)).toBe(true);
+    expect(d.candidates.some((x) => x.kind === "ou")).toBe(true);
+    expect(reproductionGaps([d])).toEqual([]);
+    const kelly = compose({ core: c, quotes, issued: [], exposure: ex, now: NOW, policy: BASELINE_POLICY, rivals: rivalsUnder(BASELINE_POLICY) });
+    expect(Object.fromEntries(replay([d], () => BASELINE_POLICY.staking)[0].stakes)).toEqual(kelly.sizing.live);
+    expect(kelly.sizing.live).not.toEqual(live.sizing.live);
+  });
+  it("held rivals the live policy sizes under 1u are recorded for the replay but never reach the live allocator", () => {
+    const sunQuotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i, { kickoff: SUN })) };
+    const EIGHTH = { ...BASELINE_POLICY, id: "p8", staking: { ...BASELINE_POLICY.staking, kellyScale: 0.125 } };
+    const rivals = heldCandidates("cfb", compose({ core: c, quotes: sunQuotes, issued: [], exposure: noExposure, now: NOW, policy: EIGHTH }));
+    expect(rivals.length).toBeGreaterThan(0);
+    const zero = rivals.filter((x) => x.want === 0);
+    expect(zero.length).toBeGreaterThan(0);
+    expect(rivals.every((x) => !!x.info)).toBe(true);
+    const r = compose({ core: c, quotes, issued: [], exposure: noExposure, now: NOW, policy: EIGHTH, rivals });
+    expect(r.sizing.candidates.filter((x) => x.rival)).toHaveLength(rivals.length);
+    // Recorded, but the live allocator never saw them (not even as deferred).
+    expect(zero.every((x) => !(x.id in r.sizing.live) && !r.allocation.deferred.some((d) => d.id === x.id))).toBe(true);
+    const d = toDecision(r, { at: "2026-10-13T21:30:00Z", sendKey: "s", order: 0, finalsKnown: [], onSendDate: () => true })!;
+    expect(reproductionGaps([d])).toEqual([]);
   });
   it("only held, unissued plays with a price become rivals", () => {
     const r = compose({ core: c, quotes, issued: [], exposure: noExposure, now: new Date("2026-10-16T13:30:00Z") }); // TNF game day, released

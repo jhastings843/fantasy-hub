@@ -26,11 +26,14 @@ import {
   scoreCut,
   seedHypotheses,
   shouldRollBack,
+  sizingComparison,
+  type SizingInputs,
+  type SizingView,
+  type Summary,
   validate,
   type ValidationInput,
 } from "./model";
-import { payout } from "../units";
-import { stakeFor } from "../staking";
+import type { DecisionRecord } from "./replay";
 
 export interface JournalEntry {
   at: string;
@@ -56,6 +59,23 @@ export interface ReviewState {
   /** Every hypothesis's verdict at the last review, for the page. */
   decisions?: { id: string; label: string; verdict: string; why: string }[];
   calibration?: { n: number; meanP: number; winRate: number; brier: number };
+  /** Each sizing challenger, replayed through the limits against the live sizing (the page's sizing block). */
+  sizing?: SizingState[];
+}
+
+export interface SizingState {
+  id: string;
+  label: string;
+  verdict: string;
+  /** Why it can't switch yet (or why it would). */
+  why: string;
+  n: number;
+  weeks: number;
+  t: number | null;
+  tNeeded: number | null;
+  challenger: Summary | null;
+  incumbent: Summary | null;
+  view: SizingView;
 }
 
 export interface LearningStore {
@@ -84,6 +104,10 @@ export interface ReviewInputs {
   replay(policy: PicksPolicy): Promise<ValidationInput["replay"]>;
   /** A stable summary of issued-history grading, to prove a policy change rewrites nothing. */
   history(): Promise<string>;
+  /** Recorded game-day send decisions, both sports (decisions-store.ts). */
+  decisions?: DecisionRecord[];
+  /** Send keys of mornings that reached a decision (day markers). */
+  decisionDays?: string[];
 }
 
 export interface ReviewResult {
@@ -141,6 +165,8 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   let active = await store.active();
   const prev = await store.state();
   const historyBefore = await x.history();
+  const sizing: SizingInputs = { decisions: x.decisions ?? [], days: x.decisionDays, issued: x.issued, finals: x.finals };
+  let rollbackNote = "";
 
   // Rollback check on the policy in force, before anything new.
   let rolledBack: ReviewResult["rolledBack"];
@@ -161,14 +187,12 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
         c = compare(own.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) })));
       }
     } else if (JSON.stringify(active.staking) !== JSON.stringify(before.staking)) {
-      const recent = bets.filter((b) => b.at >= prev.activatedAt!);
-      c = compare(
-        recent.map((b) => ({
-          o: { week: b.week, first: { at: b.at }, final: { home: 0, away: 0 } } as never,
-          ch: { bet: true, units: payout(b.result, stakeFor(b.p, b.price, active.staking), b.price), risked: stakeFor(b.p, b.price, active.staking) },
-          inc: { bet: true, units: payout(b.result, stakeFor(b.p, b.price, before.staking), b.price), risked: stakeFor(b.p, b.price, before.staking) },
-        })),
-      );
+      // The same replay as promotion: what each sizing would actually have
+      // bet through the limits since activation. Rollback keeps the plain
+      // MIN_T bar on the weekly t (easier to size back down than up).
+      const r = sizingComparison(sizing, active.staking, before.staking, prev.activatedAt);
+      c = r.comparison ?? null;
+      if (!c) rollbackNote = ` Sizing rollback check: no complete recorded sends since ${prev.activatedAt.slice(0, 10)}${r.view.restartedAfter ? ` (restarting after ${r.view.restartedAfter})` : ""}.`;
     }
     const fails = validate({ policy: active, replay: await x.replay(active), historyBefore, historyAfter: historyBefore });
     const reason = shouldRollBack(c, fails);
@@ -192,7 +216,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
 
   // Evaluate and decide.
   const collecting = hs.filter((h) => h.status === "collecting");
-  const evaluations = collecting.map((h) => evaluate(h, { opps, issued: bets, active, ruleTest: x.ruleTest }));
+  const evaluations = collecting.map((h) => evaluate(h, { opps, issued: bets, active, ruleTest: x.ruleTest, sizing }));
   const decisions = collecting.map((h, i) => decide(h, evaluations[i], { calibration: cal, active }));
   for (const d of decisions.filter((y) => y.verdict === "reject")) {
     const h = hs.find((y) => y.id === d.id)!;
@@ -245,8 +269,8 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     : rolledBack
       ? rolledBack.why
       : retained.length
-        ? `${retained.length} hypotheses still collecting (closest: ${retained.map((d) => d.why).sort()[0]}). Settled matched games so far: ${settled}. Calibration: ${cal.n} settled issued bets, mean estimate ${cal.meanP}, win rate ${cal.winRate}.`
-        : "nothing collecting met the criteria";
+        ? `${retained.length} hypotheses still collecting (closest: ${retained.map((d) => d.why).sort()[0]}). Settled matched games so far: ${settled}. Calibration: ${cal.n} settled issued bets, mean estimate ${cal.meanP}, win rate ${cal.winRate}.${rollbackNote}`
+        : `nothing collecting met the criteria${rollbackNote}`;
   const state: ReviewState = {
     lastReviewAt: at,
     lastOutcome: outcome,
@@ -261,6 +285,24 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
       return { id: d.id, label: "label" in h.definition ? h.definition.label : d.id, verdict: d.verdict, why: d.why };
     }),
     calibration: { n: cal.n, meanP: cal.meanP, winRate: cal.winRate, brier: cal.brier },
+    sizing: collecting.flatMap((h, i): SizingState[] => {
+      const e = evaluations[i];
+      if (h.definition.kind !== "stake-policy" || !e.sizing) return [];
+      const c = e.comparison;
+      return [{
+        id: h.id,
+        label: h.definition.label,
+        verdict: decisions[i].verdict,
+        why: decisions[i].why,
+        n: c?.n ?? 0,
+        weeks: c?.weeks.length ?? 0,
+        t: c ? c.t : null,
+        tNeeded: c?.tNeeded ?? null,
+        challenger: c?.challenger ?? null,
+        incumbent: c?.incumbent ?? null,
+        view: e.sizing,
+      }];
+    }),
   };
   await write({ at, kind: "review", title: `Review (${opts.reason ?? "scheduled"}): ${outcome}`, why, policyAfter: active.id });
   if (!opts.dryRun) await store.setState(state);

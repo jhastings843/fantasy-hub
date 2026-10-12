@@ -3,6 +3,8 @@ import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
 import { etClock } from "@/lib/pulse/tempo";
 import { refreshPicks } from "./report";
+import { saveDecisions } from "./decisions-store";
+import { type DecisionRecord, toDecision } from "./learning/replay";
 import { buildPicksEmail, buildTodayEmail, todayPush, type TodayLeague } from "./email";
 import { toIssued, toIssuedUpdate } from "./issued";
 import { loadIssued } from "./issued-store";
@@ -117,6 +119,27 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
 
 // ------------------------------------------------------------- today's bets
 
+/**
+ * Each composed sport's decision for this send, NFL first (college saw NFL's
+ * stakes as reserved). Built from the reports already in hand: no extra reads
+ * before the send.
+ */
+function decisionsFor(leagues: TodayLeague[], meta: { at: string; sendKey: string; date: string }): DecisionRecord[] {
+  const finalsKnown = leagues.flatMap(({ r }) => r.sizing.finals);
+  return leagues.flatMap(({ r }, order) => {
+    const d = toDecision(r, { ...meta, order, finalsKnown, onSendDate: (k) => !!k && etDate(new Date(k)) === meta.date });
+    return d ? [d] : [];
+  });
+}
+
+/** The decision write (with the day marker), bounded so it can never hold up a ready email. Resolves true when saved. */
+function saveDecisionsBounded(ds: DecisionRecord[], day: { season: number; sendKey: string; at: string }, ms = 4000): Promise<boolean> {
+  return Promise.race([
+    saveDecisions(ds, day).then(() => true, () => false),
+    new Promise<boolean>((done) => setTimeout(() => done(false), ms)),
+  ]);
+}
+
 /** Season and NFL week for a moment, by the calendar (the sent log keys on the NFL week). */
 function nflWeekNow(now = new Date()): { season: string; week: number } {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(now);
@@ -217,14 +240,28 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   const matters = leagues.some(({ diff: d }) => d.added.length || d.addedTotals.length || d.off.length || d.totalsOff.length);
   const email = buildTodayEmail({ date, leagues, appUrl, generatedAt: now.toISOString() });
   if (dry) return new Response(email.html, { headers: { "content-type": "text/html; charset=utf-8" } });
+  // What each sport decided over, for the sizing replay: recorded on quiet
+  // days too, since a different sizing might have fit a bet the limits refused.
+  const decisions = test ? [] : decisionsFor(leagues, { at: now.toISOString(), sendKey: idem, date });
+  const dayMark = { season: leagues[0]?.r.season ?? Number(season), sendKey: idem, at: now.toISOString() };
   if (!matters) {
-    if (!test) await recordSent(id, season, day, { sentAt: now.toISOString(), subject: `no bets today, not sent${notReady.length ? ` (${notReady.join(", ")})` : ""}` });
+    if (!test) {
+      // Nothing is waiting on a quiet day, so its decision is required: a
+      // missing one would be an undetectable hole in the sizing replay. Retry
+      // on the next pulse rather than mark the day handled.
+      if (!(await saveDecisionsBounded(decisions, dayMark))) return Response.json({ ok: true, skipped: true, reason: "No bets today, but couldn't record today's sizing decision; retrying next pulse." });
+      await recordSent(id, season, day, { sentAt: now.toISOString(), subject: `no bets today, not sent${notReady.length ? ` (${notReady.join(", ")})` : ""}` });
+    }
     return Response.json({ ok: true, skipped: true, reason: "No bets today and nothing sent is off." });
   }
 
   const subject = `${test ? "[Test] " : ""}${email.subject}`;
   const meta = { issuedAt: now.toISOString(), subject };
   const records = test ? [] : leagues.filter((l) => l.diff.added.length || l.diff.addedTotals.length).map((l) => toIssuedUpdate(l.r, l.diff, slot, meta));
+  // Before the send, so a retry from the claimed intent keeps this decision.
+  // Bounded, and a failure costs the replay this day (the staked record has
+  // no decision, so the sample restarts after it), never the bets.
+  if (!test) await saveDecisionsBounded(decisions, dayMark);
   const out = await issueAndSend({
     logId,
     season,

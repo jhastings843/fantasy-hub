@@ -6,6 +6,7 @@ import { strategies } from "../engine";
 import { redis } from "@/lib/redis/client";
 import { loadForecasts } from "../forecasts";
 import { loadIssued } from "../issued-store";
+import { loadDecisions } from "../decisions-store";
 import { compose, exposureFrom } from "../compose";
 import { unitReport } from "../units";
 import { confirmed } from "../issued";
@@ -25,9 +26,10 @@ const LEAGUES: League[] = ["nfl", "cfb"];
 async function gather(now: Date): Promise<ReviewInputs> {
   const cores = await Promise.all(LEAGUES.map(async (l) => ({ league: l, core: (await getPicksCore(l)).value })));
   const season = cores.find((c) => c.core)?.core?.season ?? now.getUTCFullYear();
-  const [forecasts, issued] = await Promise.all([
+  const [forecasts, issued, decided] = await Promise.all([
     Promise.all(LEAGUES.map(async (l) => ({ league: l, snaps: await loadForecasts(l, season) }))),
     Promise.all(LEAGUES.map(async (l) => ({ league: l, records: await loadIssued(l, season) }))),
+    loadDecisions(season),
   ]);
   const finals = cores.map((c) => ({ league: c.league, map: new Map(c.core?.finals ?? []) }));
   const closes = cores.map((c) => ({ league: c.league, map: new Map((c.core?.closes ?? []).map(([k, v]) => [k, v.close] as const)) }));
@@ -59,7 +61,7 @@ async function gather(now: Date): Promise<ReviewInputs> {
         ];
       }),
     );
-  return { now, forecasts, finals, closes, issued, ruleTest, replay, history };
+  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days };
 }
 
 export async function runStrategyReview(opts: { dryRun?: boolean; reason?: string; now?: Date } = {}): Promise<ReviewResult> {

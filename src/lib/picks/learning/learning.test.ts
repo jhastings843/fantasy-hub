@@ -6,6 +6,9 @@ import type { ForecastSnapshot } from "../forecasts";
 import { BASELINE_POLICY, DEFAULT_POLICY, FLAT_POLICY, envelopeViolations } from "../policy";
 import { ELIGIBILITY } from "../staking";
 
+/** A complete replay behind a sizing comparison, so these tests reach the calibration gate. */
+const REPLAYED = { since: "2026-10-13T13:00:00Z", decisions: 20, gaps: 0, unsettled: 0, refused: { challenger: 0, incumbent: 0 }, cut: { challenger: 0, incumbent: 0 } };
+
 describe("protected acceptance criteria", () => {
   it("are pinned: the review cannot weaken its own test", () => {
     expect(CRITERIA).toEqual({
@@ -136,7 +139,7 @@ describe("review fixes from the independent review", () => {
     const { decide } = await import("./model");
     const h = seedHypotheses("2026-10-09T00:00:00Z").find((x) => x.id === "both:stake:flat1")!;
     const comparison = { n: 60, weeks: [1, 2, 3, 4], meanDiff: 0.3, t: 3, challenger: { bets: 60, units: 9, risked: 60, roi: 0.15, clv: null, clvN: 0, drawdown: 2 }, incumbent: { bets: 60, units: 3, risked: 40, roi: 0.07, clv: null, clvN: 0, drawdown: 2 } };
-    const d = decide(h, { id: h.id, comparison }, { calibration: { n: 10, meanP: 0.55, winRate: 0.5, brier: 0.25, calibrated: false }, active: BASELINE_POLICY });
+    const d = decide(h, { id: h.id, comparison, sizing: REPLAYED }, { calibration: { n: 10, meanP: 0.55, winRate: 0.5, brier: 0.25, calibrated: false }, active: BASELINE_POLICY });
     expect(d.verdict).toBe("retain");
     expect(d.why).toMatch(/calibrated/);
   });
@@ -171,7 +174,7 @@ describe("live sizing is flat 1u, quarter Kelly in shadow (2026-10-10)", () => {
     const { decide, laterHypotheses } = await import("./model");
     const h = laterHypotheses("2026-10-13T11:00:00Z")[0];
     const comparison = { n: 60, weeks: [7, 8, 9, 10], meanDiff: 0.3, t: 3, challenger: { bets: 60, units: 12, risked: 90, roi: 0.13, clv: null, clvN: 0, drawdown: 3 }, incumbent: { bets: 60, units: 4, risked: 60, roi: 0.07, clv: null, clvN: 0, drawdown: 3 } };
-    const d = decide(h, { id: h.id, comparison }, { calibration: { n: 60, meanP: 0.55, winRate: 0.48, brier: 0.25, calibrated: false }, active: FLAT_POLICY });
+    const d = decide(h, { id: h.id, comparison, sizing: REPLAYED }, { calibration: { n: 60, meanP: 0.55, winRate: 0.48, brier: 0.25, calibrated: false }, active: FLAT_POLICY });
     expect(d.verdict).toBe("retain");
     expect(d.why).toMatch(/calibrated/);
   });

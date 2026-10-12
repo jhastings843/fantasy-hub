@@ -29,6 +29,7 @@ import { clvPoints } from "../closing";
 import { decimal, stakeFor } from "../staking";
 import { payout } from "../units";
 import type { League } from "../parse";
+import { type DecisionRecord, type SizingEvidence, type SizingPair, sizingEvidence } from "./replay";
 
 // ----------------------------------------------------------------- criteria
 
@@ -209,6 +210,12 @@ export interface Comparison {
   /** Paired per-opportunity difference (challenger - incumbent) in units. */
   meanDiff: number;
   t: number;
+  /**
+   * The t a promotion needs, when stricter than CRITERIA.MIN_T: a sizing
+   * comparison's t is on weekly totals (bets in a week share one budget), so
+   * it needs the one-sided 95% value for that many weeks.
+   */
+  tNeeded?: number;
   challenger: Summary;
   incumbent: Summary;
 }
@@ -268,6 +275,43 @@ export function compare(pairs: { o: Opportunity; ch: Scored; inc: Scored }[]): C
   };
 }
 
+// One-sided 95% t by degrees of freedom; between rows, the smaller df (stricter).
+const T95: [number, number][] = [[1, 6.314], [2, 2.92], [3, 2.353], [4, 2.132], [5, 2.015], [6, 1.943], [7, 1.895], [8, 1.86], [9, 1.833], [10, 1.812], [12, 1.782], [15, 1.753], [20, 1.725], [30, 1.697], [60, 1.671], [120, 1.658]];
+export function t95(df: number): number {
+  if (df < 1) return Infinity;
+  let v = T95[0][1];
+  for (const [d, t] of T95) if (df >= d) v = t;
+  return Math.max(v, CRITERIA.MIN_T);
+}
+
+/**
+ * Sizing comparison on the replayed portfolios. Bets in one calendar week
+ * share the weekly budget (one policy's big stake is another's refused bet),
+ * so they are not independent: the paired t is on WEEKLY net-unit
+ * differences, and promotion needs the one-sided 95% t for that many weeks.
+ * n still counts settled opportunities where either policy bet.
+ */
+export function compareSizing(pairs: SizingPair[]): Comparison {
+  const used = pairs.slice().sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+  const byWeek = new Map<number, number>();
+  for (const p of used) byWeek.set(p.calWeek, (byWeek.get(p.calWeek) ?? 0) + p.ch.units - p.inc.units);
+  const d = [...byWeek.values()];
+  const mean = d.length ? d.reduce((a, b) => a + b, 0) / d.length : 0;
+  const sd = d.length > 1 ? Math.sqrt(d.reduce((t, x) => t + (x - mean) ** 2, 0) / (d.length - 1)) : 0;
+  const raw = sd > 0 ? mean / (sd / Math.sqrt(d.length)) : mean > 0 ? 99 : mean < 0 ? -99 : 0;
+  const side = (k: "ch" | "inc"): Scored[] => used.map((p) => ({ bet: p[k].stake > 0, units: p[k].units, risked: p[k].stake }));
+  const perBet = used.length ? used.reduce((t, p) => t + p.ch.units - p.inc.units, 0) / used.length : 0;
+  return {
+    n: used.length,
+    weeks: [...byWeek.keys()].sort((a, b) => a - b),
+    meanDiff: round(perBet),
+    t: round(Math.max(-99, Math.min(99, raw))),
+    tNeeded: t95(d.length - 1),
+    challenger: summarize(side("ch")),
+    incumbent: summarize(side("inc")),
+  };
+}
+
 /** Only games first seen after the hypothesis was registered count toward it. */
 export const after = (h: Hypothesis, opps: Opportunity[]) => opps.filter((o) => o.first.at >= h.registeredAt);
 
@@ -322,9 +366,29 @@ export function calibration(bets: IssuedBet[]): Calibration {
   };
 }
 
+/** What the page and the decision need to know about a sizing comparison. */
+export interface SizingView {
+  since: string | null;
+  /** Sends replayed in the usable sample. */
+  decisions: number;
+  /** The latest gap the sample restarted after, if any. */
+  restartedAfter?: string;
+  gaps: number;
+  unsettled: number;
+  pendingWeeks?: number[];
+  /** Wants more than the incumbent on at least one recorded bet. */
+  sizesUp?: boolean;
+  refused: SizingEvidence["refused"];
+  cut: SizingEvidence["cut"];
+  /** The pre-2026-10-12 estimate: issued bets re-sized, limits NOT re-applied. Display only. */
+  unconstrained?: { n: number; challenger: Summary; incumbent: Summary };
+}
+
 export interface Evaluation {
   id: string;
   comparison?: Comparison;
+  /** Stake-policy hypotheses: the replay behind `comparison`. */
+  sizing?: SizingView;
   /** Extra numbers a report-only hypothesis shows. */
   note?: string;
 }
@@ -335,6 +399,36 @@ export interface EvalInputs {
   active: PicksPolicy;
   /** The current rule's test per league, as the incumbent for timing/parlay/pem questions. */
   ruleTest: { nfl?: CutTest; cfb?: CutTest };
+  /** Recorded send decisions and what they need to be checked and scored (stake-policy hypotheses). */
+  sizing?: SizingInputs;
+}
+
+export interface SizingInputs {
+  decisions: DecisionRecord[];
+  /** Send keys whose morning reached a decision (day markers); a missing morning is a gap. */
+  days?: string[];
+  issued: { league: League; records: IssuedRecord[] }[];
+  finals: { league: League; map: Map<string, { home: number; away: number }> }[];
+}
+
+/** The replayed comparison of two sizings from `since`, and what the page shows about it. */
+export function sizingComparison(x: SizingInputs, challenger: StakingPolicy, incumbent: StakingPolicy, since: string): { comparison?: Comparison; view: SizingView } {
+  const ev = sizingEvidence(x.decisions, x.issued, x.finals, { challenger, incumbent, since, days: x.days });
+  const last = ev.gaps[ev.gaps.length - 1];
+  return {
+    comparison: ev.decisions ? compareSizing(ev.pairs) : undefined,
+    view: {
+      since: ev.since,
+      decisions: ev.decisions,
+      ...(last ? { restartedAfter: `${last.at.slice(0, 10)}: ${last.why}` } : {}),
+      gaps: ev.gaps.length,
+      unsettled: ev.unsettled,
+      pendingWeeks: ev.pendingWeeks,
+      sizesUp: ev.sizesUp,
+      refused: ev.refused,
+      cut: ev.cut,
+    },
+  };
 }
 
 export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
@@ -403,16 +497,26 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       return { id: h.id, note: `${d.method}: ${a.right}/${a.n} right, ${a.points} pool points; ${d.vs}: ${b.right}/${b.n}, ${b.points} points` };
     }
     case "stake-policy": {
-      // Both sides replayed the same way (policy stake, limits not
-      // re-applied), so the comparison is symmetric.
+      // The old estimate, kept for display only: settled issued bets
+      // re-sized, limits NOT re-applied, so it can't see what wouldn't fit.
       const bets = x.issued.filter((b) => b.at >= h.registeredAt);
-      const pairs = bets.map((b) => {
-        const o = { league: b.league, week: b.week, key: b.key, first: { at: b.at } as ForecastSnapshot, final: { home: 0, away: 0 } } as Opportunity;
-        const ch = stakeFor(b.p, b.price, d.staking);
-        const inc = stakeFor(b.p, b.price, x.active.staking);
-        return { o, ch: { bet: ch > 0, units: payout(b.result, ch, b.price), risked: ch }, inc: { bet: inc > 0, units: payout(b.result, inc, b.price), risked: inc } };
-      });
-      return { id: h.id, comparison: compare(pairs), note: `stake replay on ${bets.length} settled issued bets (limits not re-applied)` };
+      const old = compare(
+        bets.map((b) => {
+          const o = { league: b.league, week: b.week, key: b.key, first: { at: b.at } as ForecastSnapshot, final: { home: 0, away: 0 } } as Opportunity;
+          const ch = stakeFor(b.p, b.price, d.staking);
+          const inc = stakeFor(b.p, b.price, x.active.staking);
+          return { o, ch: { bet: ch > 0, units: payout(b.result, ch, b.price), risked: ch }, inc: { bet: inc > 0, units: payout(b.result, inc, b.price), risked: inc } };
+        }),
+      );
+      // The evidence: both sizings replayed through the allocator over every
+      // recorded send since registration.
+      const r = sizingComparison(x.sizing ?? { decisions: [], issued: [], finals: [] }, d.staking, x.active.staking, h.registeredAt);
+      return {
+        id: h.id,
+        comparison: r.comparison,
+        sizing: { ...r.view, ...(old.n ? { unconstrained: { n: old.n, challenger: old.challenger, incumbent: old.incumbent } } : {}) },
+        note: `replay of ${r.view.decisions} recorded sends through the limits`,
+      };
     }
   }
 }
@@ -432,13 +536,19 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
     return { id: h.id, verdict: "report", why: c ? `report only: n=${c.n}, mean difference ${c.meanDiff}u per game, t=${c.t}${e.note ? `; ${e.note}` : ""}` : e.note ?? "report only" };
   }
   const c = e.comparison;
+  if (h.definition.kind === "stake-policy" && (!c || !e.sizing?.decisions)) {
+    // No replay, no promotion: an estimate without the limits can't size anything up.
+    return { id: h.id, verdict: "retain", why: e.sizing?.restartedAfter ? `sample restarting after a gap (${e.sizing.restartedAfter}); no complete sends since` : "no sends recorded with their full candidate set and exposure yet, so the replay through the limits can't start" };
+  }
   if (!c) return { id: h.id, verdict: "retain", why: e.note ?? "nothing to compare yet" };
   const gaps: string[] = [];
   if (c.n < CRITERIA.MIN_OPPORTUNITIES) gaps.push(`${c.n} of ${CRITERIA.MIN_OPPORTUNITIES} settled matched games`);
   if (c.weeks.length < CRITERIA.MIN_WEEKS) gaps.push(`${c.weeks.length} of ${CRITERIA.MIN_WEEKS} weeks`);
   if (gaps.length) return { id: h.id, verdict: "retain", why: `insufficient evidence: ${gaps.join(", ")}` };
-  if (c.t < CRITERIA.MIN_T) {
-    return { id: h.id, verdict: c.t <= -CRITERIA.MIN_T ? "reject" : "retain", why: `not better on matched games: mean ${c.meanDiff}u, t=${c.t} (needs ${CRITERIA.MIN_T})` };
+  const need = Math.max(CRITERIA.MIN_T, c.tNeeded ?? 0);
+  if (c.t < need) {
+    const unit = c.tNeeded !== undefined ? ` (weekly t over ${c.weeks.length} weeks)` : "";
+    return { id: h.id, verdict: c.t <= -need ? "reject" : "retain", why: `not better on matched games: mean ${c.meanDiff}u, t=${c.t}${unit}, needs ${need}` };
   }
   if (c.challenger.clv !== null && c.incumbent.clv !== null && c.challenger.clv < c.incumbent.clv - CRITERIA.CLV_MARGIN) {
     return { id: h.id, verdict: "retain", why: `wins on results but trails on closing-line value (${c.challenger.clv} vs ${c.incumbent.clv})` };
@@ -448,7 +558,9 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
   }
   if (h.definition.kind === "stake-policy") {
     // Sizing up, by any route (more Kelly, or a flat stake bigger on average), needs calibration.
-    const sizesUp = c.challenger.risked > c.incumbent.risked;
+    // Per bet, not in total: under the caps a bigger-stake policy can risk
+    // less overall by being refused other bets.
+    const sizesUp = c.challenger.risked > c.incumbent.risked || !!e.sizing?.sizesUp;
     if (sizesUp && !ctx.calibration.calibrated) {
       return { id: h.id, verdict: "retain", why: `would size up, but the stored probabilities aren't shown calibrated (n=${ctx.calibration.n}, mean p ${ctx.calibration.meanP} vs win rate ${ctx.calibration.winRate})` };
     }

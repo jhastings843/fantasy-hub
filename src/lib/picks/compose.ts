@@ -19,6 +19,7 @@ import { type UnitReport, unitReport } from "./units";
 import { firstSends } from "./update";
 import { heldUntil } from "./hold";
 import { kelly, shrunk, sizeAt, wantStakes } from "./staking";
+import { type CandidateInfo, type DecisionRecord, type SizingCandidate, recentKeys } from "./learning/replay";
 import type { PemCompareRow, ResearchRow } from "./research";
 import { type TotalsBacktest, type TotalsBoardGame, totalsBoard } from "./totals";
 import {
@@ -106,8 +107,25 @@ export interface PicksReport extends Omit<PicksCore, "rows" | "finals" | "closes
     exposure: Omit<Exposure, "perGame">;
   };
   policy: { id: string; summary: string; staking?: PicksPolicy["staking"] };
+  /**
+   * What the allocator decided over, for the sizing replay (learning/replay.ts):
+   * every eligible, priced, not-yet-bet pick (held ones too) and the other
+   * sport's held rivals, with the exposure it saw and the stakes it set. A
+   * send records it as a decision; `issuable` is the send's to set.
+   */
+  sizing: {
+    candidates: Omit<SizingCandidate, "issuable">[];
+    exposure: DecisionRecord["exposure"];
+    live: { [id: string]: number };
+    settled: string[];
+    /** "league:key" of this sport's recent games final in the core. */
+    finals: string[];
+  };
   composedAt: string;
 }
+
+/** An allocator candidate with what the sizing replay needs to resize it. */
+export type SizedCandidate = Candidate & { info?: CandidateInfo };
 
 export interface ComposeInput {
   core: PicksCore;
@@ -122,10 +140,12 @@ export interface ComposeInput {
    * compete for the shared weekly budget by edge, so this sport can't take
    * room a stronger held play needs; their stakes are not part of this board.
    */
-  rivals?: Candidate[];
+  rivals?: SizedCandidate[];
+  /** "league:key" the exposure counted as settled (recorded with a send's decision). */
+  settled?: string[];
 }
 
-export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLICY, now = new Date(), rivals = [] }: ComposeInput): PicksReport {
+export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLICY, now = new Date(), rivals = [], settled = [] }: ComposeInput): PicksReport {
   const nowMs = now.getTime();
   const ageMin = quotes.fetchedAt ? (nowMs - new Date(quotes.fetchedAt).getTime()) / 60000 : Infinity;
   const stale = quotes.fetchedAt !== null && ageMin > QUOTE_MAX_AGE_MIN;
@@ -187,6 +207,24 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   // thinner earlier game can't take room a stronger later one needs. They are
   // never issued until released.
   const held = (g: { ref?: { kickoff?: string } }) => heldUntil(core.league, g.ref?.kickoff, now);
+  // For the sizing replay: every eligible, priced pick not already bet, with
+  // what a replay needs to resize it under another policy.
+  const own: SizedCandidate[] = week
+    ? [
+        ...wanted.flatMap((g) => {
+          const rec = g.tier === "t1" ? tierRec(s.rule) : g.tier === "t2" ? tierRec(s.second) : undefined;
+          return g.eligible && rec && g.p !== undefined && g.price !== undefined && g.side && g.homeLine !== undefined && !issuedAts.has(gk(g))
+            ? [{ id: `ats:${gk(g)}`, game: gk(g), want: g.want ?? 0, priority: 0, info: { league: core.league, week, key: gk(g), kind: "ats" as const, side: g.side, line: g.homeLine, price: g.price, rec, eligible: true, kickoff: g.ref?.kickoff, held: !!held(g) } }]
+            : [];
+        }),
+        ...tWanted.flatMap((g) =>
+          "eligible" in g && g.eligible && tb.rule && g.p !== undefined && g.price !== undefined && g.side && g.line !== undefined && !issuedOu.has(gk(g))
+            ? [{ id: `ou:${gk(g)}`, game: gk(g), want: g.want ?? 0, priority: 0, info: { league: core.league, week, key: gk(g), kind: "ou" as const, side: g.side, line: g.line, price: g.price, rec: { w: tb.rule.record.w, l: tb.rule.record.l }, eligible: true, kickoff: g.ref?.kickoff, held: !!held(g) } }]
+            : [],
+        ),
+      ]
+    : [];
+  // The allocator's input is unchanged by the record above.
   const alloc = allocate(
     [
       ...wanted.flatMap((g) =>
@@ -199,7 +237,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
           ? [{ id: `ou:${gk(g)}`, game: gk(g), want: g.want, priority: kelly(g.p, g.price) }]
           : [],
       ),
-      ...rivals,
+      ...rivals.filter((c) => c.want > 0).map(({ id, game, want, priority }) => ({ id, game, want, priority })),
     ],
     exposure,
   );
@@ -274,6 +312,16 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
       exposure: { weekly: exposure.weekly, outstanding: exposure.outstanding, reserved: exposure.reserved },
     },
     policy: { id: policy.id, summary: policy.summary, staking: policy.staking },
+    sizing: {
+      candidates: [
+        ...own.flatMap(({ id, game, info }) => (info ? [{ ...info, id, game, rival: false }] : [])),
+        ...rivals.flatMap(({ id, game, info }) => (info ? [{ ...info, id, game, rival: true }] : [])),
+      ],
+      exposure: { weekly: exposure.weekly, outstanding: exposure.outstanding, reserved: exposure.reserved ?? 0, perGame: [...exposure.perGame] },
+      live: Object.fromEntries(alloc.stakes),
+      settled,
+      finals: recentKeys(core.finals.map(([k]) => `${core.league}:${k}`), week),
+    },
     composedAt: now.toISOString(),
   };
 }
@@ -319,11 +367,28 @@ export function exposureFrom(
  * A report's plays held for a later game day, as allocation candidates for
  * the other sport's board (ids and games namespaced so they never collide).
  */
-export function heldCandidates(league: League, r: PicksReport): Candidate[] {
+export function heldCandidates(league: League, r: PicksReport): SizedCandidate[] {
   const k = (g: { home: string; away: string }) => `${league}:${g.away}@${g.home}`;
-  const one = (kind: string, g: { home: string; away: string; held?: string; want?: number; p?: number; price?: number; issued?: unknown }): Candidate[] =>
-    g.held && !g.issued && g.want && g.p !== undefined && g.price !== undefined
-      ? [{ id: `rival:${kind}:${k(g)}`, game: `rival:${k(g)}`, want: g.want, priority: kelly(g.p, g.price) }]
+  type G = { home: string; away: string; held?: string; want?: number; eligible?: boolean; p?: number; price?: number; issued?: unknown; side?: CandidateInfo["side"]; ref?: { kickoff?: string } };
+  const one = (kind: "ats" | "ou", g: G, line: number | undefined, rec: { w: number; l: number; activated?: boolean } | undefined): SizedCandidate[] =>
+    // Eligible held plays, including ones this policy sizes under 1u (recorded
+    // for the sizing replay; compose passes only the 1u+ ones to the allocator).
+    g.held && !g.issued && (g.want || g.eligible) && g.p !== undefined && g.price !== undefined
+      ? [{
+          id: `rival:${kind}:${k(g)}`,
+          game: `rival:${k(g)}`,
+          want: g.want ?? 0,
+          priority: kelly(g.p, g.price),
+          // Only when the replay can resize it faithfully; otherwise the decision records it as missing.
+          ...(r.week && rec && g.side && line !== undefined
+            ? { info: { league, week: r.week, key: key({ week: r.week, home: g.home, away: g.away }), kind, side: g.side, line, price: g.price, rec, eligible: true, kickoff: g.ref?.kickoff, held: true } }
+            : {}),
+        }]
       : [];
-  return [...r.board.flatMap((g) => one("ats", g)), ...r.totals.board.flatMap((g) => one("ou", g as Parameters<typeof one>[1]))];
+  const rec = (c: { record: { w: number; l: number }; activated?: boolean } | null) => (c ? { w: c.record.w, l: c.record.l, activated: c.activated } : undefined);
+  const totalsRec = r.totals.backtest.rule ? { w: r.totals.backtest.rule.record.w, l: r.totals.backtest.rule.record.l } : undefined;
+  return [
+    ...r.board.flatMap((g) => one("ats", g, g.homeLine, g.tier === "t1" ? rec(r.strategies.rule) : g.tier === "t2" ? rec(r.strategies.second) : undefined)),
+    ...r.totals.board.flatMap((g) => one("ou", g as G, g.line, totalsRec)),
+  ];
 }

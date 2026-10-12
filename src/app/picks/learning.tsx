@@ -1,5 +1,7 @@
 import type { League } from "@/lib/picks/parse";
 import { redisStore } from "@/lib/picks/learning/store";
+import type { SizingState } from "@/lib/picks/learning/review";
+import type { Summary } from "@/lib/picks/learning/model";
 import { loadOps } from "@/lib/picks/ops";
 import Link from "next/link";
 import { type Market, href, whenEt } from "./ui";
@@ -79,6 +81,7 @@ export async function LearningPanel({ league, market }: { league: League; market
             : "Probability check: no settled issued bets with a stored estimate yet, so the estimates are unproven and stakes can't size up."}
         </p>
       )}
+      <SizingBlock rows={state?.sizing} live={active.summary.split(";")[0]} next={state ? whenEt(state.nextReviewAt) : "the next pulse"} />
         </>
       )}
       {mine.length > 0 && (
@@ -132,5 +135,103 @@ export async function LearningPanel({ league, market }: { league: League; market
         </p>
       )}
     </section>
+  );
+}
+
+const signed = (x: number) => `${x > 0 ? "+" : ""}${x.toFixed(2)}u`;
+const pct = (x: number) => `${x > 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
+const tone = (x: number) => (x > 0 ? s.pos : x < 0 ? s.neg : undefined);
+
+/**
+ * Stake sizing: each challenger replayed through the real limits against the
+ * live sizing, the usable sample, and the one reason it can't switch yet.
+ * The old no-limits estimate is shown only as a labelled footnote.
+ */
+function SizingBlock({ rows, live, next }: { rows?: SizingState[]; live: string; next: string }) {
+  return (
+    <details className={s.details} open>
+      <summary>Stake sizing</summary>
+      <div className={s.cardsInset}>
+        <p className={s.thin}>
+          {`Live: ${live}. Challengers are replayed send by send through the same limits (weekly budget, open bets, per game, the other sport's held plays), using only what was known at each 9am decision. Bets a policy couldn't afford count as zero.`}
+        </p>
+        {!rows?.length && <p className={s.thin}>{`No sizing comparison yet. It starts with the review on ${next}.`}</p>}
+        {rows?.map((r) => (
+          <SizingCard key={r.id} r={r} next={next} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function SizingCard({ r, next }: { r: SizingState; next: string }) {
+  const rowsOf = (label: string, f: (x: Summary) => string, raw?: (x: Summary) => number) => (
+    <tr>
+      <td>{label}</td>
+      <td className={`${s.num} ${raw && r.challenger ? (tone(raw(r.challenger)) ?? "") : ""}`}>{r.challenger ? f(r.challenger) : "-"}</td>
+      <td className={`${s.num} ${raw && r.incumbent ? (tone(raw(r.incumbent)) ?? "") : ""}`}>{r.incumbent ? f(r.incumbent) : "-"}</td>
+    </tr>
+  );
+  const v = r.view;
+  const promotable = r.verdict === "promote";
+  return (
+    <div style={{ margin: "14px 0" }}>
+      <b>{r.label}</b> <span className={s.statusChip}>{promotable ? "Clears the bar" : r.verdict === "reject" ? "Rejected" : "Collecting"}</span>
+      <dl className={s.strip} aria-label="Sizing sample" style={{ marginTop: 8 }}>
+        <div>
+          <dt>Usable sample</dt>
+          <dd className={s.num}>{`${r.n} bets · ${r.weeks} wk`}</dd>
+        </div>
+        <div>
+          <dt>Since</dt>
+          <dd className={s.num}>{v.since ? whenEt(v.since) : "first recorded send"}</dd>
+        </div>
+        <div>
+          <dt>Weekly t</dt>
+          <dd className={s.num}>{r.t === null ? "-" : `${r.t} (needs ${r.tNeeded !== null && Number.isFinite(r.tNeeded) ? r.tNeeded : "2+ wk"})`}</dd>
+        </div>
+        <div>
+          <dt>Next review</dt>
+          <dd className={s.num}>{next}</dd>
+        </div>
+      </dl>
+      {r.challenger && r.incumbent && (
+        <table className={s.table} style={{ marginTop: 8 }}>
+          <thead>
+            <tr>
+              <th>After limits</th>
+              <th>Challenger</th>
+              <th>Live</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rowsOf("Net", (x) => signed(x.units), (x) => x.units)}
+            {rowsOf("Risked", (x) => `${x.risked.toFixed(2)}u`)}
+            {rowsOf("Return on risk", (x) => pct(x.roi), (x) => x.roi)}
+            {rowsOf("Max drawdown", (x) => `${x.drawdown.toFixed(2)}u`)}
+            {rowsOf("Bets placed", (x) => String(x.bets))}
+            <tr>
+              <td>Refused / cut by limits</td>
+              <td className={s.num}>{`${v.refused.challenger} / ${v.cut.challenger}`}</td>
+              <td className={s.num}>{`${v.refused.incumbent} / ${v.cut.incumbent}`}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+      <p className={s.p} style={{ marginTop: 8 }}>
+        <b>{promotable ? "Why it would switch: " : "Why it can't switch yet: "}</b>
+        {r.why}
+      </p>
+      {(v.unsettled > 0 || v.restartedAfter) && (
+        <p className={s.thin}>
+          {[v.unsettled ? `${v.unsettled} replayed bets still waiting on a final.` : "", v.restartedAfter ? `Sample restarted after a gap: ${v.restartedAfter}.` : ""].filter(Boolean).join(" ")}
+        </p>
+      )}
+      {v.unconstrained && (
+        <p className={s.thin}>
+          {`Old estimate, limits not applied (display only, never used to switch): ${signed(v.unconstrained.challenger.units)} vs ${signed(v.unconstrained.incumbent.units)} on ${v.unconstrained.n} sent bets.`}
+        </p>
+      )}
+    </div>
   );
 }
