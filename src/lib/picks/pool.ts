@@ -157,3 +157,64 @@ export function estimatedPublicHome(pHome: number, lean = 1.6): number {
   const z = Math.log(p / (1 - p)) * lean;
   return 1 / (1 + Math.exp(-z));
 }
+
+/** One game's pick in the pool entry, as last shown before kickoff. */
+export interface EntryPick {
+  team: string;
+  at: string;
+}
+
+/**
+ * The entry's pick per not-yet-started game, keyed "AWAY@HOME" in Sleeper's
+ * spelling (`canon`), ready to save. Each refresh overwrites only open games,
+ * so a game's saved pick is the one the page last showed before kickoff.
+ */
+export function entryRecords(
+  games: { home: string; away: string }[],
+  picks: ("home" | "away")[],
+  at: string,
+  canon: (t: string) => string,
+): Record<string, EntryPick> {
+  return Object.fromEntries(
+    games.map((g, i) => [`${canon(g.away)}@${canon(g.home)}`, { team: canon(picks[i] === "home" ? g.home : g.away), at }]),
+  );
+}
+
+export interface EntryWeek {
+  week: number;
+  w: number;
+  l: number;
+  /** Games the entry picked that have finished. */
+  graded: number;
+  /** Finished games that week with a winner, saved or not. */
+  played: number;
+}
+
+/**
+ * The saved entry graded against finals, per week. Ties (no winner) and games
+ * with no saved pick are left out. Pure.
+ */
+export function gradeEntries(
+  byWeek: Map<number, Record<string, EntryPick>>,
+  games: { week: number; home: string; away: string; completed: boolean; homeScore: number | null; awayScore: number | null }[],
+  canon: (t: string) => string,
+): EntryWeek[] {
+  return [...byWeek.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([week, picks]) => {
+      let w = 0;
+      let l = 0;
+      let played = 0;
+      for (const g of games) {
+        if (g.week !== week || !g.completed || g.homeScore == null || g.awayScore == null || g.homeScore === g.awayScore) continue;
+        played++;
+        const p = picks[`${canon(g.away)}@${canon(g.home)}`];
+        if (!p) continue;
+        const winner = canon(g.homeScore > g.awayScore ? g.home : g.away);
+        if (p.team === winner) w++;
+        else l++;
+      }
+      return { week, w, l, graded: w + l, played };
+    })
+    .filter((x) => x.graded > 0);
+}

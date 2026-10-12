@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getPicksReport, SOURCES, type PicksReport } from "@/lib/picks/report";
 import type { League } from "@/lib/picks/parse";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "@/lib/picks/limits";
-import { getPoolShares } from "@/lib/picks/pool-store";
+import { getPoolShares, getPoolTrack } from "@/lib/picks/pool-store";
 import { AtsResearch, AtsResults, AtsWeek } from "./ats";
 import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWeek } from "./su-totals";
 import { LearningPanel } from "./learning";
@@ -23,6 +23,8 @@ export default async function PicksView({ league, market, view }: { league: Leag
   // The pool's pick shares, for "how much of the pool was on the winner" on finished games.
   const poolShares =
     r?.week && league === "nfl" && market === "su" && view === "week" ? ((await getPoolShares(r.week).catch(() => null))?.value ?? null) : null;
+  // The Sleeper pool entry, graded in the background (Results only).
+  const poolTrack = league === "nfl" && market === "su" && view === "results" ? await getPoolTrack().catch(() => null) : null;
 
   const sportNav = (
     <nav className={s.subnav} aria-label="Sport">
@@ -86,7 +88,7 @@ export default async function PicksView({ league, market, view }: { league: Leag
         {market === "ats" && view === "research" && league === "cfb" && <HarrisCard />}
         {market === "su" && view === "week" && league === "nfl" && <PoolCard />}
         {market === "su" && view === "week" && <SuWeek r={r} poolShares={poolShares} />}
-        {market === "su" && view === "results" && <SuResults r={r} />}
+        {market === "su" && view === "results" && <SuResults r={r} poolTrack={poolTrack} />}
         {market === "su" && view === "research" && <SuResearch r={r} />}
         {market === "ou" && view === "week" && <TotalsWeek r={r} />}
         {market === "ou" && view === "results" && <TotalsResults r={r} />}

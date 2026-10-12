@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimatedPublicHome, optimizePool, type PoolGame } from "./pool";
+import { entryRecords, estimatedPublicHome, gradeEntries, optimizePool, type PoolGame } from "./pool";
 
 const game = (i: number, pHome: number, publicHome = estimatedPublicHome(pHome)): PoolGame => ({ key: `g${i}`, home: `H${i}`, away: `A${i}`, pHome, publicHome });
 
@@ -51,5 +51,41 @@ describe("pool math", () => {
   it("estimates the field leaning harder to favorites than the market", () => {
     expect(estimatedPublicHome(0.6)).toBeGreaterThan(0.6);
     expect(estimatedPublicHome(0.5)).toBeCloseTo(0.5);
+  });
+});
+
+describe("entryRecords", () => {
+  it("keys each game AWAY@HOME in Sleeper's spelling and names the picked team", () => {
+    const canon = (x: string) => ({ WSH: "WAS", LA: "LAR" })[x] ?? x;
+    const out = entryRecords(
+      [
+        { home: "NYJ", away: "CLE" },
+        { home: "WSH", away: "LA" },
+      ],
+      ["home", "away"],
+      "2026-10-11T16:50:00Z",
+      canon,
+    );
+    expect(out).toEqual({
+      "CLE@NYJ": { team: "NYJ", at: "2026-10-11T16:50:00Z" },
+      "LAR@WAS": { team: "LAR", at: "2026-10-11T16:50:00Z" },
+    });
+  });
+});
+
+describe("gradeEntries", () => {
+  it("grades saved picks on finished games only, skipping ties and unsaved games", () => {
+    const id = (x: string) => x;
+    const picks = new Map([
+      [6, { "CLE@NYJ": { team: "NYJ", at: "" }, "PIT@IND": { team: "IND", at: "" }, "DAL@TB": { team: "TB", at: "" } }],
+    ]);
+    const games = [
+      { week: 6, home: "NYJ", away: "CLE", completed: true, homeScore: 17, awayScore: 12 },
+      { week: 6, home: "IND", away: "PIT", completed: true, homeScore: 20, awayScore: 24 },
+      { week: 6, home: "TB", away: "DAL", completed: false, homeScore: null, awayScore: null },
+      { week: 6, home: "KC", away: "LV", completed: true, homeScore: 30, awayScore: 10 },
+      { week: 6, home: "SF", away: "SEA", completed: true, homeScore: 20, awayScore: 20 },
+    ];
+    expect(gradeEntries(picks, games, id)).toEqual([{ week: 6, w: 1, l: 1, graded: 2, played: 3 }]);
   });
 });

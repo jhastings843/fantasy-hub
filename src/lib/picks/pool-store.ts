@@ -1,9 +1,10 @@
 import "server-only";
+import { redis } from "@/lib/redis/client";
 import { cachedWithFallback } from "@/lib/redis/cached";
 import { getSeasonGames } from "@/lib/survivor/odds";
 import { getLegPicks } from "@/lib/survivor/sleeper-pool";
 import { SEASON } from "@/lib/survivor/report";
-import { estimatedPublicHome, optimizePool, type PoolGame, type PoolResult } from "./pool";
+import { entryRecords, estimatedPublicHome, gradeEntries, type EntryWeek, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
 
 // Jack's Sleeper "Weekly payout" pick'em: straight up, no spread, no
 // confidence points, a winner each week (ties go to a tiebreaker). Its
@@ -111,6 +112,8 @@ export async function buildPoolView(): Promise<PoolView | null> {
   // Who is actually playing: this week's pickers if visible and not fewer than last week's scorers.
   const n = Math.max(field?.entries ?? 0, entrants);
   const result = optimizePool(games, n);
+  const at = new Date().toISOString();
+  await saveEntry(week, entryRecords(games, result.picks, at, canon));
   const last = slate.slice().sort((a, b) => b.kickoff.localeCompare(a.kickoff))[0];
   return {
     week,
@@ -125,7 +128,7 @@ export async function buildPoolView(): Promise<PoolView | null> {
     result,
     tiebreaker: last?.overUnder != null ? { game: `${last.away} at ${last.home}`, total: Math.round(last.overUnder) } : null,
     started: slate.length - open.length,
-    at: new Date().toISOString(),
+    at,
   };
 }
 
@@ -156,4 +159,59 @@ export function getPoolShares(week: number) {
     isComplete: (v) => !!v && v.entries > 0,
     empty: null,
   });
+}
+
+/**
+ * The entry's pick per game, saved on every refresh until kickoff, so a
+ * finished game can be graded on what the entry said. Kept for a season.
+ */
+const ENTRY_KEY = (week: number) => `picks:v2:pool:${POOL.leagueId}:entry:w${week}`;
+
+async function saveEntry(week: number, picks: Record<string, EntryPick>): Promise<void> {
+  if (!Object.keys(picks).length) return;
+  try {
+    await redis.hset(ENTRY_KEY(week), picks);
+    await redis.expire(ENTRY_KEY(week), 200 * 24 * 3600);
+  } catch (e) {
+    // Grading the entry is a nice-to-have; the entry itself still shows.
+    console.warn(`[pool] entry save failed: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/** The saved entry picks for a week, keyed "AWAY@HOME" (Sleeper spelling). */
+export async function getPoolEntry(week: number): Promise<Record<string, EntryPick>> {
+  return ((await redis.hgetall<Record<string, EntryPick>>(ENTRY_KEY(week))) ?? {}) as Record<string, EntryPick>;
+}
+
+export interface PoolTrack {
+  weeks: (EntryWeek & { poolBest: number | null })[];
+  w: number;
+  l: number;
+}
+
+/**
+ * Background check on the pool strategy: the saved entry graded each week,
+ * beside the pool's winning score that week (Sleeper's points per leg).
+ * Weeks before the entry was saved (Week 6 on) have nothing to grade.
+ */
+export async function getPoolTrack(): Promise<PoolTrack> {
+  const season = await getSeasonGames(SEASON);
+  const weeks = [...new Set(season.games.filter((g) => g.completed).map((g) => g.week))];
+  const byWeek = new Map<number, Record<string, EntryPick>>();
+  await Promise.all(
+    weeks.map(async (w) => {
+      const e = await getPoolEntry(w);
+      if (Object.keys(e).length) byWeek.set(w, e);
+    }),
+  );
+  const graded = gradeEntries(byWeek, season.games, canon);
+  const rosters = graded.length
+    ? await json<{ metadata?: { points_by_leg?: Record<string, number> } }[]>(`${BASE}/${POOL.leagueId}/rosters`).catch(() => [])
+    : [];
+  const best = (week: number) => {
+    const pts = rosters.map((r) => r.metadata?.points_by_leg?.[`v1:regular:${week}`]).filter((x): x is number => typeof x === "number");
+    return pts.length ? Math.max(...pts) : null;
+  };
+  const out = graded.map((g) => ({ ...g, poolBest: best(g.week) }));
+  return { weeks: out, w: out.reduce((t, x) => t + x.w, 0), l: out.reduce((t, x) => t + x.l, 0) };
 }

@@ -28,6 +28,7 @@ import { runPicksData } from "@/lib/picks/report";
 import { tracked } from "@/lib/picks/ops";
 import { reviewIfDue } from "@/lib/picks/learning/run";
 import { weekOf } from "@/lib/picks/parse";
+import { buildPoolView } from "@/lib/picks/pool-store";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
 import { partialFailure } from "./outcome";
 
@@ -350,6 +351,15 @@ async function picksData(everyMinutes: number): Promise<string> {
 }
 
 
+/**
+ * Rebuild the Sleeper pool entry so its pick on each game is saved up to
+ * kickoff even when nobody opens the page; Straight up > Results grades it.
+ */
+async function savePoolEntry(): Promise<string> {
+  const v = await buildPoolView();
+  return v ? `Week ${v.week} entry saved for ${v.games.length} open games` : "no open pool games";
+}
+
 function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }[] {
   switch (tier) {
     case "live":
@@ -358,6 +368,7 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "jingles", work: () => refreshJingles(true) },
         { name: "lineups", work: () => refreshLineups(true) },
         { name: "picks-data", work: () => picksData(15) },
+        { name: "pool-entry", work: () => savePoolEntry() },
       ];
     case "hourly":
       return [
@@ -366,6 +377,7 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "lineups", work: () => refreshLineups() },
         { name: "waivers", work: () => refreshWaivers() },
         { name: "picks-data", work: () => picksData(60) },
+        { name: "pool-entry", work: () => savePoolEntry() },
         // Weekly strategy review (Tue 6am ET slot) with catch-up after 15+
         // newly settled games; most hours this is a cheap "not due".
         { name: "picks-review", work: () => tracked("review", 60, () => reviewIfDue()) },

@@ -1,6 +1,7 @@
 // Straight up (pick'em, not a wager) and totals: this week, results, research.
 import { marginBand, marginLabel, suPick } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
+import type { PoolTrack } from "@/lib/picks/pool-store";
 import { kickoffEt, n, price, rec, units } from "./ui";
 import s from "./picks.module.css";
 
@@ -103,7 +104,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
   );
 }
 
-export function SuResults({ r }: { r: PicksReport }) {
+export function SuResults({ r, poolTrack }: { r: PicksReport; poolTrack?: PoolTrack | null }) {
   const total = r.live.reduce((t, w) => ({ w: t.w + w.su.w, l: t.l + w.su.l }), { w: 0, l: 0 });
   return (
     <section className={s.section} aria-labelledby="su-results">
@@ -144,6 +145,33 @@ export function SuResults({ r }: { r: PicksReport }) {
           </tbody>
         </table>
       </div>
+      {r.league === "nfl" && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <caption className={s.caption}>
+              {poolTrack?.weeks.length
+                ? `Weekly payout pool entry, graded in the background: ${poolTrack.w}-${poolTrack.l}`
+                : "Weekly payout pool entry: saved before each kickoff since Oct 12, nothing graded yet"}
+            </caption>
+            <thead>
+              <tr>
+                <th>Week</th>
+                <th>Entry</th>
+                <th>Pool winner</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(poolTrack?.weeks ?? []).map((w) => (
+                <tr key={w.week}>
+                  <td className={s.num}>{w.week}</td>
+                  <td className={s.num}>{w.graded < w.played ? `${w.w}-${w.l} (${w.graded} of ${w.played} saved)` : `${w.w}-${w.l}`}</td>
+                  <td className={s.num}>{w.poolBest ?? "not posted"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
