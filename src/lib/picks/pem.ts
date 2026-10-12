@@ -16,7 +16,11 @@ import { type CardRow, type PemRow, type PemWeek, statedCount, toRows } from "./
 // large; any column that fails its arithmetic check is read again by Sonnet.
 // Roughly ten cents a week at most (estimate).
 
-const FAST = "claude-haiku-4-5-20251001";
+// Haiku 5.5 since 2026-10-12: on the six past Harris posts its rows passed the
+// arithmetic check 187 of 191 times against Haiku 4.5's 31 of 224, at about a
+// quarter of the cost. It thinks before answering, so it runs at low effort with
+// room in max_tokens for the thinking.
+const FAST = "claude-haiku-5-5";
 const CAREFUL = "claude-sonnet-5";
 
 const PROMPT = `This image is one column of a college football picks card from the "PEM" model.
@@ -62,7 +66,8 @@ async function tiles(imageUrl: string): Promise<Buffer[]> {
 async function readTile(client: Anthropic, model: string, tile: Buffer): Promise<CardRow[]> {
   const res = await client.messages.create({
     model,
-    max_tokens: 4000,
+    max_tokens: model === FAST ? 8000 : 4000,
+    ...(model === FAST ? { output_config: { effort: "low" as const } } : {}),
     system: "You transcribe sports tables exactly as printed and return only JSON.",
     messages: [
       {

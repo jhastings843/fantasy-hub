@@ -17,7 +17,11 @@ import { redisStore } from "./learning/store";
 // arithmetic (Average + Spread = Diff) sends that image to Sonnet. Rows that
 // still fail are left out and listed. A few cents a week (estimate).
 
-const FAST = "claude-haiku-4-5-20251001";
+// Haiku 5.5 since 2026-10-12: on the six past Harris posts its rows passed the
+// arithmetic check 187 of 191 times against Haiku 4.5's 31 of 224, at about a
+// quarter of the cost. It thinks before answering, so it runs at low effort with
+// room in max_tokens for the thinking.
+const FAST = "claude-haiku-5-5";
 const CAREFUL = "claude-sonnet-5";
 
 const PROMPT = `This image is part of a college football spreadsheet. Games come in blocks: a green header row (Game 1 | Team Score | Average | Open | ... | Spread | Spread | Diff | ... | Adj Diff | Notes ...), then the AWAY team's row, then the HOME team's row.
@@ -44,7 +48,8 @@ async function readImage(client: Anthropic, model: string, imageUrl: string): Pr
   const media = (res.headers.get("content-type") ?? "image/jpeg").includes("png") ? "image/png" : "image/jpeg";
   const out = await client.messages.create({
     model,
-    max_tokens: 6000,
+    max_tokens: model === FAST ? 10000 : 6000,
+    ...(model === FAST ? { output_config: { effort: "low" as const } } : {}),
     system: "You transcribe spreadsheet screenshots exactly as printed and return only JSON.",
     messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: media, data } }, { type: "text", text: PROMPT }] }],
   });
