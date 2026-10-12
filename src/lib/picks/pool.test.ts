@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { entryRecords, estimatedPublicHome, gradeTeams, optimizePool, type PoolGame } from "./pool";
+import { entryRecords, estimatedPublicHome, gradeTeams,
+  optimizeStandings, optimizePool, type PoolGame } from "./pool";
 
 const game = (i: number, pHome: number, publicHome = estimatedPublicHome(pHome)): PoolGame => ({ key: `g${i}`, home: `H${i}`, away: `A${i}`, pHome, publicHome });
 
@@ -85,5 +86,36 @@ describe("gradeTeams", () => {
       { week: 6, home: "SF", away: "SEA", completed: true, homeScore: 20, awayScore: 20 },
     ];
     expect(gradeTeams(picks, games, id)).toEqual([{ week: 6, w: 1, l: 1, graded: 2, played: 3 }]);
+  });
+});
+
+describe("optimizeStandings", () => {
+  const g = (pHome: number, extra: object = {}) => ({ key: "BUF@LAR", home: "LAR", away: "BUF", pHome, publicHome: 0.5, ...extra });
+
+  it("takes the favorite when one rival is tied and picked the underdog", () => {
+    const r = optimizeStandings([g(0.6)], 9, [{ base: 9, picks: ["away"] }], { trials: 4000 });
+    expect(r.picks).toEqual(["home"]);
+    expect(r.winChance).toBeCloseTo(0.6, 1);
+  });
+
+  it("must differ from the leader when one point behind", () => {
+    // Leader is 10 on the favorite; matching them can never win. The dog
+    // (30%) ties them at 10 and splits the tiebreaker: about 15%.
+    const r = optimizeStandings([g(0.7)], 9, [{ base: 10, picks: ["home"] }], { trials: 4000 });
+    expect(r.picks).toEqual(["away"]);
+    expect(r.chalkChance).toBe(0);
+    expect(r.winChance).toBeCloseTo(0.15, 1);
+  });
+
+  it("is already decided when two clear and one game left", () => {
+    const r = optimizeStandings([g(0.5)], 11, [{ base: 9, picks: ["home"] }], { trials: 1000 });
+    expect(r.winChance).toBe(1);
+  });
+
+  it("never flips a started game; it keeps Jack's locked pick", () => {
+    const games = [g(0.9, { locked: true, mine: "away" }), { ...g(0.6), key: "X@Y", home: "Y", away: "X" }];
+    const r = optimizeStandings(games, 5, [{ base: 5, picks: ["home", "home"] }], { trials: 4000 });
+    expect(r.picks[0]).toBe("away");
+    expect(r.upsets.map((u) => u.key)).not.toContain("BUF@LAR");
   });
 });

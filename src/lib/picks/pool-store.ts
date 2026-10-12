@@ -4,7 +4,7 @@ import { cachedWithFallback } from "@/lib/redis/cached";
 import { getSeasonGames } from "@/lib/survivor/odds";
 import { getLegPicks } from "@/lib/survivor/sleeper-pool";
 import { SEASON } from "@/lib/survivor/report";
-import { entryRecords, estimatedPublicHome, gradeTeams, type EntryWeek, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
+import { entryRecords, estimatedPublicHome, gradeTeams, optimizeStandings, type EntryWeek, type LiveGame, type Rival, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
 
 // Jack's Sleeper "Weekly payout" pick'em: straight up, no spread, no
 // confidence points, a winner each week (ties go to a tiebreaker). Its
@@ -31,6 +31,8 @@ export interface PoolView {
   result: PoolResult;
   tiebreaker: { game: string; total: number } | null;
   started: number;
+  /** Mid-week: the entry was solved from the real scores and picks so far. */
+  standings?: { mine: number; leader: number; rivals: number };
   at: string;
 }
 
@@ -49,14 +51,18 @@ export const canon = (t: string) => CANON[t.toUpperCase()] ?? t.toUpperCase();
  * Returns how many entries have picked, and each team's share of the picks
  * on its game (matched to our games by the team picked).
  */
-async function fieldPicks(week: number): Promise<{ entries: number; teamShare: Map<string, number>; note: string } | null> {
+async function fieldPicks(
+  week: number,
+): Promise<{ entries: number; teamShare: Map<string, number>; byEntry: Map<string, Set<string>>; note: string } | null> {
   const res = await getLegPicks(POOL.leagueId, `v1:regular:${week}`, true);
   if (!res.ok) return null;
   const perGame = new Map<string, Map<string, number>>();
+  const byEntry = new Map<string, Set<string>>();
   let entries = 0;
-  for (const e of Object.values(res.data ?? {})) {
+  for (const [id, e] of Object.entries(res.data ?? {})) {
     const picks = (e as { picks?: Record<string, { team?: string }> } | null)?.picks ?? {};
     const list = Object.entries(picks);
+    byEntry.set(id, new Set(list.flatMap(([, p]) => (p?.team ? [canon(p.team)] : []))));
     if (!list.length) continue;
     entries++;
     for (const [gameId, p] of list) {
@@ -72,7 +78,7 @@ async function fieldPicks(week: number): Promise<{ entries: number; teamShare: M
     const n = [...m.values()].reduce((a, b) => a + b, 0);
     for (const [team, c] of m) teamShare.set(team, c / n);
   }
-  return { entries, teamShare, note: `${entries} entries' real picks for this week` };
+  return { entries, teamShare, byEntry, note: `${entries} entries' real picks for this week` };
 }
 
 /**
@@ -111,7 +117,14 @@ export async function buildPoolView(): Promise<PoolView | null> {
     });
   // Who is actually playing: this week's pickers if visible and not fewer than last week's scorers.
   const n = Math.max(field?.entries ?? 0, entrants);
-  const result = optimizePool(games, n);
+  // Once a game has started, solve from the real board: everyone's correct
+  // picks so far and their actual picks on what's left. Otherwise the entry
+  // would re-solve the remaining games as if the week started from zero.
+  const live = slate.length > open.length && field ? await standingsInput(slate, games, field.byEntry, now) : null;
+  const solved = live ? optimizeStandings(live.games, live.myBase, live.rivals) : null;
+  const result = solved
+    ? { ...solved, picks: solved.picks.filter((_, i) => !live!.games[i].locked) }
+    : optimizePool(games, n);
   const at = new Date().toISOString();
   await saveEntry(week, entryRecords(games, result.picks, at, canon));
   const last = slate.slice().sort((a, b) => b.kickoff.localeCompare(a.kickoff))[0];
@@ -128,6 +141,7 @@ export async function buildPoolView(): Promise<PoolView | null> {
     result,
     tiebreaker: last?.overUnder != null ? { game: `${last.away} at ${last.home}`, total: Math.round(last.overUnder) } : null,
     started: slate.length - open.length,
+    ...(live ? { standings: { mine: live.myBase, leader: live.leader, rivals: live.rivals.length } } : {}),
     at,
   };
 }
@@ -269,4 +283,47 @@ export function getPoolTrack() {
     isComplete: (v) => !!v,
     empty: null,
   });
+}
+
+type SlateGame = Awaited<ReturnType<typeof getSeasonGames>>["games"][number];
+
+/**
+ * The mid-week board for `optimizeStandings`: games not yet final (started
+ * ones locked to Jack's pick), Jack's correct picks so far, and every other
+ * entry that has picked this week with its score and its picks. Null when
+ * Jack's entry can't be found (then the plain solver runs).
+ */
+async function standingsInput(slate: SlateGame[], open: PoolGame[], byEntry: Map<string, Set<string>>, now: number) {
+  const rosters = await json<PoolRoster[]>(`${BASE}/${POOL.leagueId}/rosters`).catch(() => [] as PoolRoster[]);
+  const me = await myRosterId(rosters);
+  if (!me) return null;
+  const mine = byEntry.get(me) ?? new Set<string>();
+  const done = slate.filter((g) => g.completed && g.homeScore != null && g.awayScore != null && g.homeScore !== g.awayScore);
+  const winners = new Set(done.map((g) => canon(g.homeScore! > g.awayScore! ? g.home : g.away)));
+  const score = (teams: Set<string>) => [...teams].filter((x) => winners.has(x)).length;
+  const openKeys = new Set(open.map((g) => g.key));
+  const inPlay = slate
+    .filter((g) => !g.completed && !openKeys.has(`${g.away}@${g.home}`) && new Date(g.kickoff).getTime() <= now)
+    .map((g) => ({ g, locked: true }));
+  const pickOf = (teams: Set<string>, home: string, away: string): "home" | "away" | null => (teams.has(canon(home)) ? "home" : teams.has(canon(away)) ? "away" : null);
+  const games: LiveGame[] = [
+    ...inPlay.map(({ g }) => ({
+      key: `${g.away}@${g.home}`,
+      home: g.home,
+      away: g.away,
+      pHome: g.homeWinProb,
+      publicHome: 0.5,
+      locked: true,
+      mine: pickOf(mine, g.home, g.away),
+    })),
+    ...open,
+  ];
+  const rivals: Rival[] = [...byEntry.entries()]
+    .filter(([id, teams]) => id !== me && teams.size > 0)
+    .map(([, teams]) => ({
+      base: score(teams),
+      picks: games.map((g) => pickOf(teams, g.home, g.away) ?? (g.locked ? "none" : null)),
+    }));
+  const myBase = score(mine);
+  return { games, myBase, rivals, leader: Math.max(myBase, ...rivals.map((r) => r.base)) };
 }

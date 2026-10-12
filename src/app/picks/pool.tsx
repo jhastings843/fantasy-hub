@@ -159,7 +159,7 @@ export async function PoolCard() {
         </div>
       </details>
       <p className={s.thin}>
-        {`Win chances: the market's no-vig moneyline odds (ESPN). Field: ${v.fieldNote}. Entrants: ${v.entrants} (${v.entrantsSource}). ${r.trials.toLocaleString()} simulated weeks; ties count as an even tiebreaker split.${v.started ? ` ${v.started} game${v.started === 1 ? " has" : "s have"} already started and ${v.started === 1 ? "isn't" : "aren't"} included.` : ""} Pick'em only: no stake, not in units.`}
+        {`Win chances: the market's no-vig moneyline odds (ESPN). Field: ${v.fieldNote}. Entrants: ${v.entrants} (${v.entrantsSource}). ${r.trials.toLocaleString()} simulated weeks; ties count as an even tiebreaker split.${v.standings ? ` Solved from the real board: you have ${v.standings.mine} correct, the leader ${v.standings.leader}, with ${v.standings.rivals} other entries' actual picks on the games left.` : v.started ? ` ${v.started} game${v.started === 1 ? " has" : "s have"} already started and ${v.started === 1 ? "isn't" : "aren't"} included.` : ""} Pick'em only: no stake, not in units.`}
       </p>
     </section>
   );

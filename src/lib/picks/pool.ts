@@ -146,6 +146,112 @@ export function optimizePool(games: PoolGame[], entrants: number, opts: { trials
   };
 }
 
+/** A game still to be decided this week. `mine` set = Jack's pick is locked (the game has started). */
+export interface LiveGame extends PoolGame {
+  locked?: boolean;
+  /** Jack's locked pick on a started game; null if he didn't pick it. */
+  mine?: "home" | "away" | null;
+}
+
+/** Another entry: correct picks so far, and its picks on the games still to be decided (null = not picked yet). */
+export interface Rival {
+  base: number;
+  /** null = not picked yet (drawn from the field share); "none" = can no longer pick (game started). */
+  picks: ("home" | "away" | "none" | null)[];
+}
+
+/**
+ * Mid-week version: the entry most likely to finish first given the scores
+ * already on the board and every rival's actual picks on the games left.
+ * Each trial draws the outcomes (and a rival's missing picks from the field
+ * share), giving the best rival total M and how many share it; our total S
+ * then wins outright above M and splits the tiebreaker evenly at M. Started
+ * games keep Jack's locked pick; only open games are searched. Pure.
+ */
+export function optimizeStandings(
+  games: LiveGame[],
+  myBase: number,
+  rivals: Rival[],
+  opts: { trials?: number; seed?: number } = {},
+): PoolResult {
+  const trials = opts.trials ?? 20000;
+  const G = games.length;
+  const rand = rng(opts.seed ?? 20261012);
+  const homeWon = new Uint8Array(trials * G);
+  const top = new Int32Array(trials);
+  const ties = new Int32Array(trials);
+  for (let t = 0; t < trials; t++) {
+    for (let g = 0; g < G; g++) homeWon[t * G + g] = rand() < games[g].pHome ? 1 : 0;
+    let M = -1;
+    let c = 0;
+    for (const r of rivals) {
+      let s = r.base;
+      for (let g = 0; g < G; g++) {
+        const p = r.picks[g];
+        if (p === "none") continue;
+        const home = p === null || p === undefined ? rand() < games[g].publicHome : p === "home";
+        if ((home ? 1 : 0) === homeWon[t * G + g]) s++;
+      }
+      if (s > M) {
+        M = s;
+        c = 1;
+      } else if (s === M) c++;
+    }
+    top[t] = M;
+    ties[t] = c;
+  }
+  const evalEntry = (picks: Int8Array /* 1 home, 0 away, -1 none */) => {
+    let sum = 0;
+    for (let t = 0; t < trials; t++) {
+      let S = myBase;
+      const o = t * G;
+      for (let g = 0; g < G; g++) if (picks[g] >= 0 && picks[g] === homeWon[o + g]) S++;
+      sum += S > top[t] ? 1 : S === top[t] ? 1 / (ties[t] + 1) : 0;
+    }
+    return sum / trials;
+  };
+  const chalk = new Int8Array(G);
+  for (let g = 0; g < G; g++) {
+    const gm = games[g];
+    chalk[g] = gm.locked ? (gm.mine === "home" ? 1 : gm.mine === "away" ? 0 : -1) : gm.pHome >= 0.5 ? 1 : 0;
+  }
+  const chalkChance = evalEntry(chalk);
+  const cur = chalk.slice();
+  let best = chalkChance;
+  for (let flips = 0; flips < MAX_FLIPS; flips++) {
+    let bestG = -1;
+    let bestV = best;
+    for (let g = 0; g < G; g++) {
+      if (games[g].locked || cur[g] !== chalk[g]) continue;
+      cur[g] ^= 1;
+      const v = evalEntry(cur);
+      cur[g] ^= 1;
+      if (v > bestV + 1e-4) {
+        bestV = v;
+        bestG = g;
+      }
+    }
+    if (bestG < 0) break;
+    cur[bestG] ^= 1;
+    best = bestV;
+  }
+  const exp = (p: Int8Array) => games.reduce((s, gm, g) => s + (p[g] === 1 ? gm.pHome : p[g] === 0 ? 1 - gm.pHome : 0), myBase);
+  return {
+    picks: Array.from(cur, (x) => (x === 1 ? "home" : "away") as "home" | "away"),
+    winChance: best,
+    chalkChance,
+    upsets: games.flatMap((gm, g) =>
+      !gm.locked && cur[g] !== chalk[g]
+        ? [{ key: gm.key, team: cur[g] ? gm.home : gm.away, pWin: cur[g] ? gm.pHome : 1 - gm.pHome, publicOn: cur[g] ? gm.publicHome : 1 - gm.publicHome }]
+        : [],
+    ),
+    expectedCorrect: Math.round(exp(cur) * 100) / 100,
+    chalkExpectedCorrect: Math.round(exp(chalk) * 100) / 100,
+    trials,
+    entrants: rivals.length + 1,
+  };
+}
+
 /**
  * The field's pick share when the real one isn't known: people back the
  * favorite more heavily than its win chance (a common pattern in pick'em
