@@ -23,6 +23,14 @@ import { snapshotFrom } from "./roster-diff";
 import { projectRoomClaims, withClaims, type RoomCandidate, type RoomTeam } from "./room-claims";
 import { scoringSkewNotes } from "./scoring";
 import type { LeagueProfile } from "@/lib/league/types";
+
+/**
+ * Roster caps a league's commissioner set that Sleeper doesn't store.
+ * Dah Chopped: no more than two quarterbacks per team (Jack, 2026-10-13).
+ */
+const POSITION_CAPS: Record<string, Record<string, number>> = {
+  "1398797523958652928": { QB: 2 },
+};
 import type { PoolPlayer, RoomOutlook, Wallet, WeeklyFaabReport } from "./types";
 
 // The one assembly. The page, the API and the email all call this, so a number
@@ -474,6 +482,8 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
 
   const card = buildBidCard({
     myPlayers,
+    reserveIds: myRoster.reserve ?? [],
+    positionCaps: POSITION_CAPS[leagueId],
     candidates: available,
     rosterPositions: profile.rosterPositions,
     budget,

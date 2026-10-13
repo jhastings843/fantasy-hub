@@ -131,6 +131,16 @@ const FILL_IN_SHARE = 0.5;
 
 export interface RecommendInput {
   myPlayers: PoolPlayer[];
+  /**
+   * Players in the IR slot. Dropping one frees the IR slot, not a roster
+   * spot, so a claim still needs a drop from the active roster.
+   */
+  reserveIds?: string[];
+  /**
+   * League roster caps by position that Sleeper doesn't store (Dah Chopped:
+   * two quarterbacks). At the cap, a claim at that position must drop one.
+   */
+  positionCaps?: Record<string, number>;
   candidates: PoolPlayer[];
   rosterPositions: string[];
   budget: BudgetPlan;
@@ -571,15 +581,39 @@ export function buildBidCard(input: RecommendInput): BidCard {
   const emptySlots = new Set(
     lineup.slots.filter((s) => s.player === null).map((s) => s.slot),
   );
+  // An IR player can't be the drop: it frees the IR slot, not a roster spot.
+  const reserve = new Set(input.reserveIds ?? []);
   const droppable = myPlayers
-    .filter((p) => !startingIds.has(p.playerId))
+    .filter((p) => !startingIds.has(p.playerId) && !reserve.has(p.playerId))
     .sort((a, b) => a.rosPoints - b.rosPoints);
 
-  let chains: BidChain[] = [...byNeed.entries()]
+  // At a position cap (two QBs), a claim there must drop that position, and
+  // other chains must leave that drop alone. Capped chains pick first.
+  const caps = input.positionCaps ?? {};
+  const atCap = (pos: string) =>
+    caps[pos] !== undefined && myPlayers.filter((p) => p.position === pos && !reserve.has(p.playerId)).length >= caps[pos];
+  const cappedPos = (targets: BidTarget[]) => {
+    const pos = targets[0]?.player.position;
+    return pos && atCap(pos) ? pos : null;
+  };
+  const picked = [...byNeed.entries()]
     .sort((a, b) => (b[1][0]?.weekGain ?? 0) - (a[1][0]?.weekGain ?? 0))
     .slice(0, MAX_CHAINS)
-    .map(([, targets], index) => {
-      const drop = droppable[index] ?? null;
+    .map(([, targets]) => targets);
+  const used = new Set<string>();
+  const dropFor = new Map<BidTarget[], PoolPlayer | null>();
+  for (const targets of [...picked.filter((x) => cappedPos(x)), ...picked.filter((x) => !cappedPos(x))]) {
+    const pos = cappedPos(targets);
+    const drop = droppable.find((p) => !used.has(p.playerId) && (!pos || p.position === pos)) ?? null;
+    if (drop) used.add(drop.playerId);
+    dropFor.set(targets, drop);
+  }
+
+  let chains: BidChain[] = picked
+    // A capped claim with nobody at that position to drop can't be made.
+    .filter((targets) => !(cappedPos(targets) && !dropFor.get(targets)))
+    .map((targets) => {
+      const drop = dropFor.get(targets) ?? null;
       return {
         need: needLabel(targets, emptySlots),
         drop: drop ? { playerId: drop.playerId, name: drop.name } : null,

@@ -232,6 +232,33 @@ describe("buildBidCard", () => {
     expect(["bench1", "bench2"]).toContain(dropId);
   });
 
+  it("never drops an IR player: that frees the IR slot, not a roster spot", () => {
+    const ir = player("ir", "WR", 0, { rosPoints: 0 });
+    const card = buildBidCard(input({ myPlayers: [...myPlayers, ir], reserveIds: ["ir"], candidates: [player("star", "WR", 20)] }));
+    expect(card.chains[0].drop?.playerId).not.toBe("ir");
+    expect(["bench1", "bench2"]).toContain(card.chains[0].drop?.playerId);
+  });
+
+  it("at a two-QB cap, a QB claim drops the backup QB and other chains leave him alone", () => {
+    const withBackup = [...myPlayers, player("qb2", "QB", 12, { rosPoints: 12 })];
+    const card = buildBidCard(
+      input({
+        myPlayers: withBackup,
+        positionCaps: { QB: 2 },
+        candidates: [player("qbA", "QB", 26), player("wrA", "WR", 20)],
+      }),
+    );
+    const qbChain = card.chains.find((c) => c.targets[0].player.position === "QB");
+    const wrChain = card.chains.find((c) => c.targets[0].player.position === "WR");
+    expect(qbChain?.drop?.playerId).toBe("qb2");
+    expect(wrChain?.drop?.playerId).not.toBe("qb2");
+  });
+
+  it("below the cap, a QB claim drops whoever is worst", () => {
+    const card = buildBidCard(input({ positionCaps: { QB: 2 }, candidates: [player("qbA", "QB", 26)] }));
+    expect(["bench1", "bench2"]).toContain(card.chains[0].drop?.playerId);
+  });
+
   it("gives each chain its own drop so two wins cannot collide", () => {
     const card = buildBidCard(
       input({
