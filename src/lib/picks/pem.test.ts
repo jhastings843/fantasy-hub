@@ -58,6 +58,9 @@ describe("PEM card", () => {
     expect(cardKind("Week 6 PEM picks. All 58 games, in kickoff order.")).toEqual({ week: 6, kind: "picks" });
     expect(cardKind("The full PEM Week 5 card, with every final result.")).toEqual({ week: 5, kind: "final" });
     expect(statedCount("Week 6 PEM picks. All 58 games, in kickoff order.")).toBe(58);
+    const wk7 = "PEM has Notre Dame by 26.3 at BYU.\n\nThe full Week 7 card: all 59 games, PEM spreads, SU winners, PEM ATS picks and EDGE.";
+    expect(cardKind(wk7)).toEqual({ week: 7, kind: "picks" });
+    expect(statedCount(wk7)).toBe(59);
   });
 
   it("joins every Week 5 game and reproduces the card's own ATS record", () => {

@@ -124,5 +124,8 @@ export function cardKind(text: string): { week: number; kind: "picks" | "final" 
   if (pick) return { week: Number(pick[1]), kind: "picks" };
   const fin = text.match(/PEM week (\d+) card, with every final|week (\d+) final card/i);
   if (fin) return { week: Number(fin[1] ?? fin[2]), kind: "final" };
+  // Week 7 on: the picks card goes out as "The full Week 7 card: all 59 games, PEM spreads..."
+  const full = text.match(/full week (\d+) card/i);
+  if (full) return { week: Number(full[1]), kind: "picks" };
   return null;
 }

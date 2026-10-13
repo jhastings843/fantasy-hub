@@ -34,7 +34,7 @@ function log(msg) {
   console.log(`${new Date().toISOString()} ${msg}`);
 }
 
-const isPicksCard = (text) => /week \d+ PEM picks|PEM week \d+ picks/i.test(text);
+const isPicksCard = (text) => /week \d+ PEM picks|PEM week \d+ picks|full week \d+ card(?!, with every final)/i.test(text);
 
 function latestPosts(user = "FansOfCFB") {
   const out = execFileSync(
