@@ -122,9 +122,11 @@ function playerLine(
 function leagueCard(league: WaiverContext): string {
   const head = `<div style="font:600 14px/1.3 -apple-system,sans-serif;color:${PALETTE.ink};">${escapeHtml(league.leagueName)}</div>`;
 
-  if (league.blocked) {
-    return card(`${head}${small(league.blocked, PALETTE.warn)}`, WARN);
-  }
+  // "Blocked" only ever blocks the this-week half (his weekly list is not
+  // up). The season claims still stand, and on a week he posts nothing at
+  // all they are the whole email: 2026-10-13 sent three league names and no
+  // claims because this returned early.
+  const blocked = league.blocked ? small(league.blocked, PALETTE.warn) : "";
 
   const budget =
     league.budgetLeft != null && league.budgetTotal
@@ -173,13 +175,14 @@ function leagueCard(league: WaiverContext): string {
     .join("");
 
   if (!starts && !season) {
+    if (league.blocked) return card(`${head}${blocked}${budget}`, WARN);
     return card(
       `${head}<div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:6px;">Nothing on the wire beats what you have.</div>${budget}`,
       GOOD,
     );
   }
 
-  return card(`${head}${stale}${budget}<div style="padding-top:4px;">${starts}${season}</div>`);
+  return card(`${head}${blocked}${stale}${budget}<div style="padding-top:4px;">${starts}${season}</div>`);
 }
 
 export function renderMidweekEmail(input: MidweekInput): string {
