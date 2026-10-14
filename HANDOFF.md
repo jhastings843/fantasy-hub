@@ -110,8 +110,16 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 - UI review is checks + journal only. There is no interaction data, so no claim of measured decision-quality improvement; layout changes stay with a reviewed session.
 - ESPN quotes have no quote timestamp; freshness is our read time.
 
+## Flock Fantasy backup for the midweek waiver email (2026-10-13, a3fd5a9 + email fix)
+- Cutoff is 8pm ET Tuesday (Jack's call; was 10pm). If Jingles' waiver post is not in by then, the pulse's midweek send goes out on Flock Fantasy's waiver email plus the redraft web research, every bid priced by the app (Flock prints no bids).
+- Flock source: "Week N Waiver Wire Targets" from flockfantasy@mail.beehiiv.com, Tuesdays ~5:30pm ET. The web link 404s, so the inbox is the only copy. `waivers/flock.ts` parses it (pure, fixtures weeks 2-6 in test/fixtures/flock); `flock-store.ts` reads the inbox over IMAP (same Gmail app password as the Jingles inbox reader) and stores `waivers:v1:flock:{season}:w{n}`. `runMidweekEmail` refreshes it before building.
+- build.ts: only when `readWaivers` finds no Jingles post and the league is not dynasty. Flock's adds lead the board (high-roster, adds, QB streams, DST, deeper), his don't-chase list is filtered off, his verdict sets a LOW tier floor (MUST ADD = multiweek, others filler/stash/streamer) that can only raise the app's own tier. Email shows "Flock Fantasy (Add #2, flex play): ..." on the player.
+- Fixed with it: the email used to return early on `league.blocked` (his weekly list not up), hiding every season claim. It now shows the note and still lists claims. On a no-Jingles week that early return would have sent three league names and nothing else.
+- Oct 13: redraft research had failed at 3:48pm ("named no players"); re-ran by hand at 10:24pm (19 targets). Pulse did NOT fire after 7:56pm ET, so neither the 8pm nor the old 10pm backstop would have sent; sent by hand via the "Send an email" workflow at 10:37pm. GitHub's schedule for pulse.yml is unreliable in the evening; worth moving the midweek backstop onto QStash (scripts/qstash-pulse.mjs) or the Mac.
+
 ## PEM (college third model)
 - Jay (@FansOfCFB) posts "Week N PEM picks" as one image every Tuesday. `scripts/pem-relay.mjs` (LaunchAgent `com.jackh.pem-relay`, every 2 hours, log `.pem-relay/relay.log`) reads his last 40 posts through OpenCLI and Chrome's X login and POSTs new cards to /api/picks/pem (`PEM_RELAY_SECRET`). Columns read with Haiku, retried with Sonnet; a week counts only if every EDGE checks. Needs Chrome logged into X. Team names: `CFB_ALIASES` in parse.ts.
+- 2026-10-13: Week 7 card was posted as "The full Week 7 card: all 59 games..." (no "Week N PEM picks" text), so the relay missed it. `cardKind` and the relay matcher now also accept "full Week N card" (a07eefb); Week 7 loaded, 59 games, verified. If a week goes missing again, list his posts with `opencli twitter tweets FansOfCFB --limit 40 -f json` and check the wording. Relay errors "Failed to fetch" 9:44am-3:45pm ET that day were transient (Chrome/X), cleared on their own.
 
 ## John Harris (@jhnhrris): tracked weekly, never bet (2026-10-08)
 - Jack's call: don't add him, keep tabs every week, implement only if he shows an edge or helps. Percival's #CFBPicker has him 2nd of 60 models in 2026 (53.8% ATS vs close, 271 games).
