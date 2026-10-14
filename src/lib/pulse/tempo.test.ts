@@ -188,11 +188,11 @@ describe("the week's shape, after the 3am waiver run was accounted for", () => {
     expect(due("2026-09-17T12:00:00Z")).toContain("thursday");
   });
 
-  it("holds the waiver email backstop until 10pm, leaving the evening to the relay", () => {
+  it("holds the waiver email backstop until 8pm, the cutoff for his post", () => {
     // The relay replies to his email when it lands; the pulse only covers a
-    // week it never called. 9:45pm ET Tuesday is too early; 10:30pm is due.
-    expect(due("2026-09-16T01:45:00Z")).not.toContain("midweek");
-    expect(due("2026-09-16T02:30:00Z")).toContain("midweek");
+    // week it never called. 7:45pm ET Tuesday is too early; 8:30pm is due.
+    expect(due("2026-09-15T23:45:00Z")).not.toContain("midweek");
+    expect(due("2026-09-16T00:30:00Z")).toContain("midweek");
   });
 
   it("keeps both Tuesday emails out of each other's way", () => {

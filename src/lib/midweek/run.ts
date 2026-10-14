@@ -6,6 +6,7 @@ import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/se
 import { midweekSubject, renderMidweekEmail } from "./email";
 import { refreshJinglesBeforeSend } from "@/lib/jingles/refresh";
 import { readWaivers } from "@/lib/jingles/ingest";
+import { refreshFlock } from "@/lib/waivers/flock-store";
 
 // The Wednesday job.
 //
@@ -48,6 +49,9 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
   const refreshed = dry ? null : await refreshJinglesBeforeSend();
   const all = await getMyLeagues();
   const sleeper = all.filter((l) => l.source !== "manual");
+  // Flock's waiver email, the backup on a week Jingles does not post. Read
+  // once here so the league builds below read it from Redis.
+  const flockRefreshed = await refreshFlock(String(sleeper[0]?.season ?? new Date().getFullYear()));
   const guillotineLeague = sleeper.find((l) => l.type === "guillotine") ?? null;
 
   // The guillotine league is excluded from the waiver run: its wire is the
@@ -140,6 +144,7 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
     sent: true,
     threaded: Boolean(replyTo),
     refreshed,
+    flock: flockRefreshed,
     subject,
     week,
     leagues: leagues.length,

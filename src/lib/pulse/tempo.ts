@@ -132,10 +132,12 @@ function sendTimes(days: SendDays): { id: SendId; day: number; at: number; until
     { id: "faab", day: days.faabDay ?? 2, at: 8 * 60 },
     // The backstop. Normally this email is a reply to Jingles' waiver email,
     // sent the moment it lands (the relay on Jack's Mac, POST
-    // /api/midweek-email). 10pm is for the week the Mac is asleep or he posts
-    // late: still five hours clear of the 3am Wednesday claims run, and the
-    // send log makes it a no-op when the reply already went.
-    { id: "midweek", day: 2, at: 22 * 60 },
+    // /api/midweek-email). 8pm is the cutoff (Jack's call, 2026-10-13): if
+    // he has not posted by then, the email goes on Flock Fantasy's waiver
+    // email plus the web research, priced by the app. Seven hours clear of the
+    // 3am Wednesday claims run; the send log makes it a no-op when the reply
+    // already went.
+    { id: "midweek", day: 2, at: 20 * 60 },
     // Twice, deliberately. The lineup email waits for waivers to process and
     // for his rankings to be published, and on a week where either is late
     // there has to be a second chance at it rather than no email at all. The

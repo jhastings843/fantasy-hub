@@ -73,6 +73,7 @@ function alternativeText(t: { alternative?: { name: string; jingles?: { rank: nu
 function usageNote(p: {
   lastWeek?: { week: number; points: number; snaps: number; targets: number; carries: number } | null;
   research?: { faabPercent: number | null; note: string } | null;
+  flock?: { note: string } | null;
   jingles?: { rank: number | null; faab: number; faabPercent: number; budget: number; note: string | null } | null;
 }): string {
   const usage = p.lastWeek ? ` ${usageText(p.lastWeek)}.` : "";
@@ -87,7 +88,8 @@ function usageNote(p: {
     // as "$22 of $100" it looked like Jack had $100 left when he had $84.
     ? ` Jingles${p.jingles.rank != null ? ` #${p.jingles.rank}` : ""} bids ${Math.round(p.jingles.faabPercent)}% of a season budget ($${p.jingles.faab} of his standard $${p.jingles.budget}).${p.jingles.note ? ` ${p.jingles.note}` : ""}`
     : "";
-  return `${usage}${research}${jingles}`;
+  const flock = p.flock ? ` ${p.flock.note}` : "";
+  return `${usage}${research}${flock}${jingles}`;
 }
 
 function bidText(

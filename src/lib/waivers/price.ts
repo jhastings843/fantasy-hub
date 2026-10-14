@@ -187,7 +187,7 @@ function starterBar(position: string, ctx: PricingContext): number {
 const TIER_ORDER: ClaimTier[] = ["winner", "starter", "multiweek", "streamer", "filler", "stash"];
 
 /** The stronger of two tiers, so a consensus call can lift but never lower one. */
-function strongerTier(a: ClaimTier, b: ClaimTier | null | undefined): ClaimTier {
+export function strongerTier(a: ClaimTier, b: ClaimTier | null | undefined): ClaimTier {
   if (!b) return a;
   return TIER_ORDER.indexOf(b) < TIER_ORDER.indexOf(a) ? b : a;
 }

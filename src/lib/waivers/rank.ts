@@ -30,6 +30,11 @@ export interface WaiverPlayer extends AdvicePlayer {
   /** The web consensus on him this week, when the research named him. */
   research?: { tier: string; faabPercent: number | null; note: string; source?: "dynasty-nerds" } | null;
   /**
+   * Flock Fantasy's waiver email on him, read only on a week Jingles has not
+   * posted his. Names and a verdict, never a bid: the price is the app's own.
+   */
+  flock?: { tier: string | null; note: string } | null;
+  /**
    * His waiver post on him this week.
    *
    * Kept apart from `research` on purpose. The web consensus is a dozen

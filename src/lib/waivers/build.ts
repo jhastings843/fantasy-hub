@@ -31,7 +31,9 @@ import { isFreshForRun, mergeWire, rankWire, staleNote, usageFrom, type WireCand
 import { resolveNames, toCandidates } from "@/lib/jingles/resolve";
 import { readWaiverResearch } from "./research";
 import { readDynastyNerds } from "./dynastynerds";
-import type { ClaimTier } from "./price";
+import { strongerTier, type ClaimTier } from "./price";
+import { flockNote, flockTier } from "./flock";
+import { readFlock } from "./flock-store";
 import {
   classifyClaim,
   pacingFor,
@@ -213,6 +215,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   const isDynastyWire = profile.type === "dynasty";
   const labFresh = !isDynastyWire && isFreshForRun(lab.postedAt);
   const jingles = isDynastyWire ? null : await readWaivers(season, nflWeek);
+  // Flock Fantasy is the backup for a week he has not posted: who to claim and
+  // who not to chase, with the bids left to the app's own pricing.
+  const flock = isDynastyWire || jingles ? null : await readFlock(season, nflWeek);
   let freeAgents: WaiverPlayer[];
   let source: WaiverContext["source"];
   if (labFresh) {
@@ -295,7 +300,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
 
     const lead = jingles
       ? "His waiver post leads the list"
-      : nerds
+      : flock
+        ? `Flock Fantasy's week ${flock.week} waiver email leads the list`
+        : nerds
         ? `Dynasty Nerds' week ${nerds.week} FAAB guide leads the list`
         : null;
     const researched = research
@@ -351,6 +358,38 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
 
     const budgetNote = ` His week ${jingles.week} waiver post prices ${jingles.rows.length} players against a $${jingles.budget} budget, shown here as a percent of yours.`;
     source = { ...source, note: (source.note ?? "") + budgetNote };
+  }
+
+  // No waiver post from him this week: Flock's email in its place, folded the
+  // same way. His adds lead in his order, then his streamers and deeper names;
+  // his "don't chase" list is kept off the board entirely. Bids are the app's.
+  const flockAvoid = new Set<string>();
+  if (flock) {
+    const resolved = resolveNames(
+      flock.rows.map((r) => ({ name: r.name, position: r.position, team: r.team, row: r })),
+      toCandidates(players),
+    ).resolved;
+    const order: Record<string, number> = { "high-roster": 0, add: 1, "qb-stream": 2, dst: 3, deeper: 4 };
+    const tagged = new Map<string, { tier: string | null; note: string }>();
+    const lead: string[] = [];
+    for (const r of [...resolved].sort((a, b) => (order[a.input.row.section] ?? 9) - (order[b.input.row.section] ?? 9) || a.input.row.rank - b.input.row.rank)) {
+      if (r.input.row.section === "dont-chase") {
+        flockAvoid.add(r.playerId);
+        continue;
+      }
+      if (tagged.has(r.playerId)) continue;
+      tagged.set(r.playerId, { tier: flockTier(r.input.row), note: flockNote(r.input.row) });
+      lead.push(r.playerId);
+    }
+    const onBoard = new Map(freeAgents.map((p) => [p.playerId, p]));
+    const his = lead
+      .filter((id) => !owned.has(id))
+      .map((id) => ({ ...(onBoard.get(id) ?? toPlayer(id)), flock: tagged.get(id)! }))
+      .filter((p) => isStartableIn(p.position, startable));
+    freeAgents = mergeWire(his, freeAgents).filter((p) => !flockAvoid.has(p.playerId));
+    const avoided = flock.rows.filter((r) => r.section === "dont-chase").map((r) => r.name);
+    const flockNoteText = ` Jingles has not posted his week ${nflWeek} waiver post, so Flock Fantasy's week ${flock.week} waiver email is the second opinion: ${his.length} of his names are free here${avoided.length ? `, and his don't-chase list (${avoided.join(", ")}) is left off` : ""}. Flock gives no bids; every price below is the app's own.`;
+    source = { ...source, note: (source.note ?? "") + flockNoteText };
   }
 
   const roster = (mine.players ?? []).map(toPlayer);
@@ -456,6 +495,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     const jinglesById = new Map(
       freeAgents.filter((p) => p.jingles).map((p) => [p.playerId, p.jingles!]),
     );
+    const flockById = new Map(
+      freeAgents.filter((p) => p.flock).map((p) => [p.playerId, p.flock!]),
+    );
     const researchById = new Map(
       freeAgents.filter((p) => p.research).map((p) => [p.playerId, p.research!]),
     );
@@ -467,7 +509,10 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
       seasonRankStale: !labFresh,
       ...gain,
       lastWeekSnaps: usageFrom(stats[id], scored[id], lastWeekNum)?.snaps ?? null,
-      researchTier: (researchById.get(id)?.tier as ClaimTier | undefined) ?? null,
+      researchTier: higherTier(
+        (researchById.get(id)?.tier as ClaimTier | undefined) ?? null,
+        (flockById.get(id)?.tier as ClaimTier | null | undefined) ?? null,
+      ),
       researchPercent: researchById.get(id)?.faabPercent ?? null,
       jinglesPercent: jinglesById.get(id)?.faabPercent ?? null,
     });
@@ -573,3 +618,9 @@ function blank(leagueId: string, why: string, profile?: LeagueProfile): WaiverCo
 }
 
 export type { LabIndex };
+
+/** The stronger of two optional tiers. */
+function higherTier(a: ClaimTier | null, b: ClaimTier | null): ClaimTier | null {
+  if (!a) return b;
+  return strongerTier(a, b);
+}
