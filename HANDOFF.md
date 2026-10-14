@@ -1,5 +1,15 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+
+## Weekly rule freeze (2026-10-13, deployed 277cba0)
+- Jack's call: revert the Oct 8 behavior where each final fed the rule pick on the next core build (the rule could flip mid-week). The rule and Tier 2 are now set week to week at the Tuesday 7am review.
+- `rule-freeze.ts`: Redis `picks:v2:<league>:<season>:rule:w<week>`, write-once (set nx), {reviewAt, policyId, throughWeek, board: StrategyBoard}. buildPicksCore reads review state BEFORE the policy, then: freeze exists, use it; else if `reviewedThisWeek` (finished.ts: last review in the same Tue-4am-ET calendar week) save one from `strategies(graded weeks < week)`; else provisional on the same games. A failed save returns null (stays provisional, next build retries). getPicksCore also applies the freeze on read, so a build that straddled the review can't serve a stale rule.
+- Last week grades from ESPN finals via `rowsFromForecasts` (latest pregame forecast snapshot per game). Without it, the Tuesday freeze missed NFL Week 5 entirely (sites hadn't posted their records): throughWeek was 4.
+- `reviewIfDue` has no mid-week catch-up any more; any real review (scheduled or the manual /api/picks/review GET) drops both cores. A manual review mid-week can still change the policy (staking) but not a rule already frozen.
+- Page: the Spreads week line says "Set at the <day> review on games through Week N; holds until next Tuesday" or "Provisional ... until Tuesday's 7am review". Strategy review blurb and Finished notice updated.
+- Astra reviewed: 3 findings fixed (manual review cache drop, straddling build, failed write), 1 noted (a game missing from the forecast archive can't grade before the sites post).
+- Oct 13 review check: ran 11:00Z, kept p2, all 24 hypotheses evaluated (16 ats/timing/parlay/pem/su collecting, 2 sizing restarting after the Oct 11 gap, flat1 retired). Every one shows 0 forward games: all 70 settled games were first archived at 03:05Z Oct 8, 40 min before registration (03:45Z). NFL Wk6 / college Wk7 are the first sample.
+
 ## Pool entry tracking (2026-10-12, deployed b06b945, 608462f, 3c0485b)
 - Results also grades Jack's REAL picks: roster found via SLEEPER_USERNAME (roster 48, joined Week 4), picks from get_pickem_picks_for_league per week, graded on ESPN finals (`gradeTeams`); shows his place and the pool best once Sleeper scores the week (`getPoolTrack`, cached 15 min).
 - Mid-week solve: once any game has started, buildPoolView calls `optimizeStandings` (pool.ts): each rival's correct picks so far + their actual picks on games left (unpicked open games drawn from field share; unpicked started games count as misses), Jack's started-game picks locked, only open games searched, ties split evenly. Before kickoff of the first game the old independent-field solver runs. Reason: Monday night re-solved as a one-game pool and flipped BUF to LAR.
