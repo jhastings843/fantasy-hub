@@ -378,8 +378,8 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "waivers", work: () => refreshWaivers() },
         { name: "picks-data", work: () => picksData(60) },
         { name: "pool-entry", work: () => savePoolEntry() },
-        // Weekly strategy review (Tue 6am ET slot) with catch-up after 15+
-        // newly settled games; most hours this is a cheap "not due".
+        // Weekly strategy review (Tue 7am ET slot), no mid-week catch-up;
+        // most hours this is a cheap "not due". The rule freezes after it.
         { name: "picks-review", work: () => tracked("review", 60, () => reviewIfDue()) },
         { name: "tracker", work: () => archiveTracker() },
       ];

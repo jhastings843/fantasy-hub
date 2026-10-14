@@ -1,6 +1,6 @@
 import "server-only";
 import { harrisReview } from "../harris";
-import { getPicksCore, getQuotes } from "../report";
+import { dropPicksCore, getPicksCore, getQuotes } from "../report";
 import { activatedFor } from "../report-scope";
 import { strategies } from "../engine";
 import { redis } from "@/lib/redis/client";
@@ -15,11 +15,10 @@ import type { League } from "../parse";
 import type { PicksPolicy } from "../policy";
 import { redisStore } from "./store";
 import { runReview, type ReviewInputs, type ReviewResult } from "./review";
-import { opportunities } from "./model";
 import { WEEKLY_CAP } from "../limits";
 
 // Gathers the real inputs and runs one review. Called by the pulse (weekly
-// slot plus catch-up) and by the dry-run endpoint; never by a page view.
+// slot) and by the dry-run endpoint; never by a page view.
 
 const LEAGUES: League[] = ["nfl", "cfb"];
 
@@ -52,7 +51,9 @@ async function gather(now: Date): Promise<ReviewInputs> {
             const ex = exposureFrom(league, core.week, issued, settled);
             // Rebuild the rules under the candidate policy, so a newly
             // activated cut is actually exercised by the replay.
-            const replayCore = { ...core, strategies: strategies(league, core.graded, { activated: activatedFor(league, policy.atsCandidates) }) };
+            // On the same games the weekly rule is chosen on (weeks before this one).
+            const prior = core.week ? core.graded.filter((g) => g.week < core.week!) : core.graded;
+            const replayCore = { ...core, strategies: strategies(league, prior, { activated: activatedFor(league, policy.atsCandidates) }) };
             const r = compose({ core: replayCore, quotes, issued: recs, exposure: ex, policy });
             const stakes = [...r.board.map((g) => g.stake ?? 0), ...r.totals.board.map((g) => g.stake ?? 0)].filter((x) => x > 0);
             const unpriced = r.board.filter((g) => (g.stake ?? 0) > 0 && g.priceSource !== "quoted").length;
@@ -66,16 +67,21 @@ async function gather(now: Date): Promise<ReviewInputs> {
 
 export async function runStrategyReview(opts: { dryRun?: boolean; reason?: string; now?: Date } = {}): Promise<ReviewResult> {
   const now = opts.now ?? new Date();
-  return runReview(redisStore, await gather(now), { dryRun: opts.dryRun, reason: opts.reason });
+  const r = await runReview(redisStore, await gather(now), { dryRun: opts.dryRun, reason: opts.reason });
+  // A real review (scheduled or manual): drop the cached cores so the next
+  // build freezes this week's rule under the policy it left in force
+  // (rule-freeze.ts). A rule already frozen this week stays as it is.
+  if (!opts.dryRun) await Promise.all(LEAGUES.map(dropPicksCore));
+  return r;
 }
 
 /**
- * The catch-up trigger, cheap enough for every hourly pulse: review when the
- * scheduled time has passed, or when 15+ matched games have settled since
- * the last review.
+ * The weekly trigger, cheap enough for every hourly pulse: review once the
+ * Tuesday 7am slot has passed. There is no mid-week catch-up: the rule and
+ * the policy change week to week, at this review only. A failed review
+ * retries after a 6-hour backoff (the slot stays due until one succeeds).
  */
 const BACKOFF = "picks:v2:learning:backoff";
-const CATCHUP_CHECK = "picks:v2:learning:catchup-checked";
 
 export async function reviewIfDue(now = new Date()): Promise<string> {
   // A review that failed waits before trying again, rather than every hour.
@@ -83,18 +89,9 @@ export async function reviewIfDue(now = new Date()): Promise<string> {
   if (until && now.toISOString() < until) return `backing off after a failed review until ${until}`;
   const state = await redisStore.state();
   const due = !state || now.toISOString() >= state.nextReviewAt;
-  let newlySettled = 0;
-  if (!due && state) {
-    // The catch-up count needs a full gather, so it runs at most every 6 hours.
-    const ok = (await redis.set(CATCHUP_CHECK, now.toISOString(), { nx: true, ex: 6 * 3600 }).catch(() => null)) === "OK";
-    if (!ok) return `not due (next ${state.nextReviewAt})`;
-    const x = await gather(now);
-    const opps = x.forecasts.flatMap((f) => opportunities(f.league, f.snaps, x.finals.find((m) => m.league === f.league)!.map, new Map()));
-    newlySettled = opps.filter((o) => o.final).length - state.settledOpportunities;
-  }
-  if (!due && newlySettled < 15) return `not due (next ${state?.nextReviewAt}; ${newlySettled} newly settled)`;
+  if (!due) return `not due (next ${state?.nextReviewAt})`;
   try {
-    const r = await runStrategyReview({ reason: due ? "scheduled" : `catch-up: ${newlySettled} newly settled`, now });
+    const r = await runStrategyReview({ reason: "scheduled", now });
     // The Harris tracker rides along: report-only, it can file a proposal, never a change.
     const harris = await harrisReview(now).catch((e) => `Harris tracker failed: ${e instanceof Error ? e.message : String(e)}`);
     return `${r.state.lastOutcome} · ${harris}`;

@@ -76,6 +76,8 @@ export interface PicksCore {
   closes: [string, ClosingLine][];
   /** The policy the core's strategies were built under. */
   policyId: string;
+  /** When this week's rule was frozen (the Tuesday review), or null while it is provisional. */
+  ruleSet?: { at: string; throughWeek: number | null } | null;
 }
 
 export interface Quotes {

@@ -42,9 +42,9 @@ export async function LearningPanel({ league, market }: { league: League; market
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="learning">Strategy review</h2>
         <p className={s.p}>
-          Runs on its own schedule (Tuesday mornings, and early when 15+ newly settled games arrive), compares the active
+          Runs once a week, Tuesday at 7am ET, compares the active
           policy with registered challengers on the same games, and only changes something when the evidence clears a
-          fixed bar. It can never raise a limit, change grading, or rewrite what was sent.
+          fixed bar. The rule and Tier 2 are set right after it and hold all week; games that finish mid-week count from the next review. It can never raise a limit, change grading, or rewrite what was sent.
         </p>
       </div>
       {full && (

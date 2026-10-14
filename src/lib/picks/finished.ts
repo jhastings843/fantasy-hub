@@ -4,6 +4,7 @@
 
 import { type GradedGame, type PemLine, type Result, grade, gradeGame, key } from "./engine";
 import { type League, type ModelLine, weekOf } from "./parse";
+import type { ForecastSnapshot } from "./forecasts";
 
 const ET = "America/New_York";
 /** Monday night is over by 4am ET Tuesday; that is when the board turns over. */
@@ -21,6 +22,17 @@ export function boardWeek(league: League, sourceWeek: number | null, now: Date):
   const cal = weekOf(league, etDate);
   const week = sourceWeek === null ? cal : cal > sourceWeek + 1 ? sourceWeek : cal;
   return { week, awaiting: sourceWeek === null || week > sourceWeek };
+}
+
+/**
+ * Whether this calendar week's Tuesday strategy review has run: the last
+ * review fell in the same board week (Tuesday 4am ET turnover) as now.
+ */
+export function reviewedThisWeek(league: League, lastReviewAt: string | null | undefined, now: Date): boolean {
+  if (!lastReviewAt) return false;
+  const at = new Date(lastReviewAt);
+  if (at.getTime() > now.getTime()) return false;
+  return boardWeek(league, null, at).week === boardWeek(league, null, now).week;
 }
 
 type Final = { home: number; away: number };
@@ -41,6 +53,24 @@ export function gradeFinished(week: number | null, rows: Row[], finals: Map<stri
     if (!final || !r.sam || !r.david || have.has(k)) return [];
     return [gradeGame({ week, home: r.home, away: r.away, final, sam: r.sam, david: r.david, ...(r.pem ? { pem: r.pem } : {}) })];
   });
+}
+
+/**
+ * Last week's games as the board had them, from the pregame forecast
+ * archive: each game's latest snapshot before kickoff (the lines each site
+ * last posted). Lets last week be graded from ESPN finals before the sites
+ * post their records, so Tuesday's review and rule see the whole week.
+ */
+export function rowsFromForecasts(snaps: ForecastSnapshot[], week: number): Row[] {
+  const last = new Map<string, ForecastSnapshot>();
+  for (const x of snaps) {
+    if (x.week !== week) continue;
+    if (x.ref?.kickoff && x.at >= x.ref.kickoff) continue;
+    const k = `${x.away}@${x.home}`;
+    const cur = last.get(k);
+    if (!cur || x.at > cur.at) last.set(k, x);
+  }
+  return [...last.values()].map((x) => ({ home: x.home, away: x.away, sam: x.sam, david: x.david, ...(x.pem ? { pem: x.pem } : {}) }));
 }
 
 export interface FinishedResults {

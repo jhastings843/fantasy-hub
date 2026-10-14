@@ -362,7 +362,7 @@ function Finished({ games, r }: { games: BoardGame[]; r: PicksReport }) {
         <h3 className={s.h3} id="ats-finished">{`Finished (${games.length})`}</h3>
         {parts.length > 0 && <span className={`${s.num} ${s.finTally}`}>{parts.join(" · ")}</span>}
       </div>
-      <p className={s.notice}>Graded from the final score the day each game ends, each model at its own line. Clears when the week turns over Tuesday morning.</p>
+      <p className={s.notice}>Graded from the final score the day each game ends, each model at its own line. These count toward the rule at the review next Tuesday, not before. Clears when the week turns over Tuesday morning.</p>
       <ul className={s.finList}>
         {games.map((g) => (
           <FinishedRow key={`${g.away}@${g.home}`} g={g} r={r} />
@@ -370,6 +370,17 @@ function Finished({ games, r }: { games: BoardGame[]; r: PicksReport }) {
       </ul>
     </div>
   );
+}
+
+/** When this week's rule was set: frozen at the Tuesday review, or provisional until it runs. */
+function ruleSetLine(r: PicksReport): string {
+  const through = (w: number | null | undefined) => (w ? ` on games through Week ${w}` : "");
+  if (r.ruleSet) {
+    const day = new Date(r.ruleSet.at).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" });
+    return `Set at the ${day} review${through(r.ruleSet.throughWeek)}; holds until next Tuesday.`;
+  }
+  const prior = r.weeksCovered.filter((w) => !r.week || w < r.week);
+  return `Provisional${through(prior.length ? Math.max(...prior) : null)} until Tuesday's 7am review sets it for the week.`;
 }
 
 export function AtsWeek({ r }: { r: PicksReport }) {
@@ -406,6 +417,7 @@ export function AtsWeek({ r }: { r: PicksReport }) {
           {st.rule
             ? `${bets.length} bet${bets.length === 1 ? "" : "s"}, ${total.toFixed(2).replace(/\.?0+$/, "")}u${early.length ? `, plus ${early.length} early look${early.length === 1 ? "" : "s"} that become bets at 9am on game day` : ""}. Rule: ${st.rule.label.toLowerCase()} (${rec(st.rule.record)})${st.second ? `; Tier 2: ${st.second.label.toLowerCase()} (${rec(st.second.record)} on the games it adds)` : "; no Tier 2"}.`
             : "No cut has a big enough winning record yet, so nothing is a bet this week."}
+          {` ${ruleSetLine(r)}`}
         </p>
       </div>
       {!r.boardUpdated.sam && !r.boardUpdated.david ? (

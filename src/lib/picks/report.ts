@@ -26,8 +26,10 @@ import { type PicksCore, type PicksReport, type Quotes, type SizedCandidate, com
 import { loadActivePolicy } from "./policy-store";
 import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
-import { archiveForecasts } from "./forecasts";
-import { boardWeek, carryStarted, gradeFinished } from "./finished";
+import { archiveForecasts, loadForecasts } from "./forecasts";
+import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
+import { loadRuleFreeze, saveRuleFreeze } from "./rule-freeze";
+import { redisStore } from "./learning/store";
 import {
   type BoardGame,
   type PemLine,
@@ -257,6 +259,10 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
       return p ? gradeGame({ ...g, pem: p }) : g;
     }),
   };
+  // Review state before the policy: a review that has finished has already
+  // stored its policy, so a freeze saved below never pairs a new review with
+  // the policy it replaced.
+  const reviewState = await redisStore.state().catch(() => null);
   const policy = await loadActivePolicy();
 
   // The week on the board is the calendar week: it turns over at 4am ET
@@ -284,17 +290,41 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // games are ever fetched; each is fetched once.
   // This week's games too, so each one is graded the day it ends.
   const thisWeek = week ? rows.map((r) => ({ week, home: r.home, away: r.away })) : [];
-  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam, ...thisWeek]);
+  // Last week as the board had it, so its games grade from ESPN finals
+  // before the sites post their records (Tuesday's rule needs all of it).
+  const lastRows = week ? rowsFromForecasts(await loadForecasts(league, season), week - 1) : [];
+  const lastWeek = week ? lastRows.map((r) => ({ week: week - 1, home: r.home, away: r.away })) : [];
+  const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam, ...lastWeek, ...thisWeek]);
   const finals = new Map(j.graded.map((g) => [key(g), g.final]));
   // Games only one model graded still have a final; ESPN fills in the rest,
   // so issued picks and totals grade even when neither site lists the game.
   for (const r of [...sam, ...david]) if (!finals.has(key(r))) finals.set(key(r), { home: r.homePts, away: r.awayPts });
   for (const [k, c] of closes) if (!finals.has(k) && c.final) finals.set(k, c.final);
   // This week's finished games, graded from ESPN finals until the sites post
-  // their own records (theirs replace these). The backtest, research and the
-  // strategy review all learn from them as they land.
+  // their own records (theirs replace these). They show in Finished and
+  // Results right away, but the rule only learns from them at the next
+  // Tuesday review.
+  j.graded = [...j.graded, ...(week ? gradeFinished(week - 1, lastRows, finals, j.graded) : [])];
   j.graded = [...j.graded, ...gradeFinished(week, rows, finals, j.graded)];
-  const s = strategies(league, j.graded, { activated: activatedFor(league, policy.atsCandidates) });
+  // The rule and Tier 2 are set week to week: chosen on every week before
+  // this one, frozen once this week's Tuesday review has run, and held until
+  // the next review (rule-freeze.ts). Before the review it is provisional on
+  // the same games.
+  const priorWeeks = week ? j.graded.filter((g) => g.week < week) : j.graded;
+  let frozen = week ? await loadRuleFreeze(league, season, week) : null;
+  if (!frozen && week && reviewState && reviewedThisWeek(league, reviewState.lastReviewAt, new Date())) {
+    frozen = await saveRuleFreeze({
+      league,
+      season,
+      week,
+      at: new Date().toISOString(),
+      reviewAt: reviewState.lastReviewAt,
+      policyId: policy.id,
+      throughWeek: priorWeeks.length ? Math.max(...priorWeeks.map((g) => g.week)) : null,
+      board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates) }),
+    });
+  }
+  const s = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates) });
   const su = suRecords(league, j.graded);
   const rule = s.rule;
   const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));
@@ -351,19 +381,22 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     posted,
     finals: [...finals],
     closes: [...closes],
-    policyId: policy.id,
+    policyId: frozen?.policyId ?? policy.id,
+    ruleSet: frozen ? { at: frozen.reviewAt, throughWeek: frozen.throughWeek } : null,
   };
 }
 
 const CORE_KEY = (league: League) => `picks:v2:${league}:core`;
+/** Forget the cached core, so the next read rebuilds it. */
+export const dropPicksCore = (league: League) => redis.del(CORE_KEY(league)).then(() => {}, () => {});
 const CORE_REFRESH_WHILE_PLAYING_MS = 30 * 60 * 1000;
 const QUOTES_KEY = (league: League, season: number, week: number) => `picks:v2:${league}:quotes:${season}:w${week}`;
 /** Current lines are re-read at most this often (the pulse forces a read every run). */
 const QUOTES_TTL_S = 10 * 60;
 
 /** The slow core: three hours fresh, a week of last-known-good. */
-export function getPicksCore(league: League) {
-  return cachedWithFallback<PicksCore | null>({
+export async function getPicksCore(league: League) {
+  const got = await cachedWithFallback<PicksCore | null>({
     key: CORE_KEY(league),
     ttlSeconds: 3 * 60 * 60,
     fetcher: () => buildPicksCore(league),
@@ -371,6 +404,14 @@ export function getPicksCore(league: League) {
     isComplete: (r) => !!r && r.graded.length > 0 && (r.rows.length > 0 || !!r.awaiting) && r.errors.length === 0,
     empty: null,
   });
+  // A core built before this week's rule froze (a build that straddled the
+  // review, or one cached from before it) takes the frozen rule on read.
+  const c = got.value;
+  if (c && !c.ruleSet && c.week) {
+    const f = await loadRuleFreeze(league, c.season, c.week);
+    if (f) return { ...got, value: { ...c, strategies: f.board, policyId: f.policyId, ruleSet: { at: f.reviewAt, throughWeek: f.throughWeek } } };
+  }
+  return got;
 }
 
 /** This week's quotes: ten minutes fresh; `force` re-reads ESPN now. */

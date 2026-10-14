@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boardWeek, carryStarted, finishedResults, gradeFinished } from "./finished";
+import { boardWeek, carryStarted, finishedResults, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
 import { gradeGame, key } from "./engine";
 
 // ET is UTC-4 in October.
@@ -82,5 +82,48 @@ describe("carryStarted", () => {
     ];
     const fresh = new Map([["6:usf@utsa", { kickoff: "2026-10-08T23:30:00Z" }]]);
     expect(carryStarted(prev, fresh, now).map(([k]) => k)).toEqual(["6:shsu@liberty"]);
+  });
+});
+
+describe("reviewedThisWeek", () => {
+  // Tue Oct 13 2026: the week turns over at 4am ET (08:00Z), the review runs at 7am ET (11:00Z).
+  const review = "2026-10-13T11:00:00.000Z";
+  it("is false after the turnover until this week's review has run", () => {
+    expect(reviewedThisWeek("nfl", "2026-10-06T11:00:00.000Z", new Date("2026-10-13T10:00:00Z"))).toBe(false);
+  });
+  it("is true from the review through Monday night", () => {
+    expect(reviewedThisWeek("nfl", review, new Date("2026-10-13T11:05:00Z"))).toBe(true);
+    expect(reviewedThisWeek("cfb", review, new Date("2026-10-17T23:00:00Z"))).toBe(true);
+    expect(reviewedThisWeek("nfl", review, new Date("2026-10-20T03:30:00Z"))).toBe(true);
+  });
+  it("is false once the next week turns over", () => {
+    expect(reviewedThisWeek("nfl", review, new Date("2026-10-20T09:00:00Z"))).toBe(false);
+  });
+  it("still counts last week's review in the hours before the turnover", () => {
+    expect(reviewedThisWeek("nfl", "2026-10-06T11:00:00.000Z", new Date("2026-10-13T07:00:00Z"))).toBe(true);
+  });
+  it("is false with no review", () => {
+    expect(reviewedThisWeek("nfl", null, new Date("2026-10-13T12:00:00Z"))).toBe(false);
+  });
+});
+
+describe("rowsFromForecasts", () => {
+  const line = (model: number, market: number) => ({ model, market });
+  const snap = (at: string, week: number, samModel: number, kickoff = "2026-10-12T00:20Z") => ({
+    at,
+    week,
+    home: "KC",
+    away: "BUF",
+    sam: line(samModel, -3),
+    david: line(-4, -3),
+    ref: { line: -3, kickoff },
+  });
+  it("takes each game's latest pregame snapshot for that week only", () => {
+    const rows = rowsFromForecasts(
+      [snap("2026-10-08T03:00Z", 5, -1), snap("2026-10-11T12:00Z", 5, -2), snap("2026-10-12T01:00Z", 5, -9), snap("2026-10-13T15:00Z", 6, -7)] as never,
+      5,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sam?.model).toBe(-2);
   });
 });
