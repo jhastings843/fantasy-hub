@@ -124,6 +124,23 @@ export interface TotalsBacktest {
   samAlone: { record: Record; weeks: number[]; clv: { avg: number; n: number } };
   /** Archived agreement rows that have a final. */
   archived: number;
+  /**
+   * How far each total landed from the real points, on the same graded games.
+   * This is the pick'em tiebreaker question (closest guess), not over/under.
+   */
+  miss: TotalsMiss;
+}
+
+export interface TotalsMiss {
+  games: number;
+  /** Average absolute miss in points. */
+  market: number;
+  sam: number;
+  david: number;
+  average: number;
+  /** Games where the models' average was strictly closer, and where the market was. */
+  averageCloser: number;
+  marketCloser: number;
 }
 
 const avg = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100 : 0);
@@ -168,6 +185,21 @@ export function totalsBacktest(
     rule,
     samAlone: { record: tally(results), weeks: [...weeks].sort((a, b) => a - b), clv: { avg: avg(clvs), n: clvs.length } },
     archived: graded.length,
+    miss: totalsMiss(graded.map((g) => ({ ...g, points: finals.get(keyOf(g))! }))),
+  };
+}
+
+export function totalsMiss(rows: { line: number; sam: number; david: number; points: number }[]): TotalsMiss {
+  const off = (x: number, p: number) => Math.abs(x - p);
+  const mean = (r: typeof rows[number]) => (r.sam + r.david) / 2;
+  return {
+    games: rows.length,
+    market: avg(rows.map((r) => off(r.line, r.points))),
+    sam: avg(rows.map((r) => off(r.sam, r.points))),
+    david: avg(rows.map((r) => off(r.david, r.points))),
+    average: avg(rows.map((r) => off(mean(r), r.points))),
+    averageCloser: rows.filter((r) => off(mean(r), r.points) < off(r.line, r.points)).length,
+    marketCloser: rows.filter((r) => off(r.line, r.points) < off(mean(r), r.points)).length,
   };
 }
 

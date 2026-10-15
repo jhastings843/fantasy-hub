@@ -22,7 +22,7 @@ function core(rows: PicksCore["rows"], over: Partial<PicksCore> = {}): PicksCore
     league: "nfl", season: 2026, week: 6, generatedAt: "2026-10-13T12:00:00Z", boardUpdated: { sam: true, david: true },
     weeksCovered: [3], graded, strategies: s, su: suRecords("nfl", graded), rows, notes: [], errors: [], pem: [], names: {},
     clvModels: [], research: [], pemCompare: null,
-    totalsBacktest: { cuts: [], rule: null, samAlone: { record: { w: 0, l: 0, p: 0, pct: 0, units: 0, lo: 0, hi: 0 }, weeks: [], clv: { avg: 0, n: 0 } }, archived: 0 },
+    totalsBacktest: { cuts: [], rule: null, samAlone: { record: { w: 0, l: 0, p: 0, pct: 0, units: 0, lo: 0, hi: 0 }, weeks: [], clv: { avg: 0, n: 0 } }, archived: 0, miss: { games: 0, market: 0, sam: 0, david: 0, average: 0, averageCloser: 0, marketCloser: 0 } },
     totalsEdge: 3, totalsArchived: 0, posted: {}, finals: [], closes: [], policyId: "p1", ...over,
   };
 }

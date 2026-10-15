@@ -11,6 +11,7 @@ import {
   totalsBacktest,
   totalsBoard,
   totalsCuts,
+  totalsMiss,
 } from "./totals";
 
 const fx = (f: string) => readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks", f), "utf8");
@@ -83,5 +84,16 @@ describe("totals backtest and board", () => {
     const rule = totalsCuts("nfl").find((c) => c.id === "t-over")!;
     const b = totalsBoard(board, rule);
     expect(b[0]).toMatchObject({ tier: "t1", play: "Over 45", side: "over", line: 45 });
+  });
+});
+
+describe("totalsMiss (tiebreak check)", () => {
+  it("averages absolute misses and counts which total was closer", () => {
+    const m = totalsMiss([
+      { line: 44, sam: 48, david: 46, points: 47 }, // market 3, avg 0
+      { line: 50, sam: 40, david: 44, points: 51 }, // market 1, avg 9
+    ]);
+    expect(m).toEqual({ games: 2, market: 2, sam: 6, david: 4, average: 4.5, averageCloser: 1, marketCloser: 1 });
+    expect(totalsMiss([]).games).toBe(0);
   });
 });

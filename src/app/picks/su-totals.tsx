@@ -396,6 +396,37 @@ export function TotalsResearch({ r }: { r: PicksReport }) {
           ? `Sam alone vs the closing total: ${bt.samAlone.clv.avg > 0 ? "+" : ""}${bt.samAlone.clv.avg.toFixed(2)} on ${bt.samAlone.clv.n}; flattered if he posted after the line moved.`
           : ""}
       </p>
+      <h3 className={s.h3}>Tiebreak check: closest total</h3>
+      <p className={s.p}>
+        {bt.miss?.games
+          ? `Average points missed on the same ${bt.miss.games} graded games. The pool tiebreak uses the market total; switch only if the models' average is clearly closer over 50+ games. Models' average closer in ${bt.miss.averageCloser}, market closer in ${bt.miss.marketCloser}.`
+          : "No graded games yet."}
+      </p>
+      {bt.miss && bt.miss.games > 0 && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Total</th>
+                <th>Avg miss (pts)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Market", bt.miss.market],
+                ["Sam", bt.miss.sam],
+                ["David", bt.miss.david],
+                ["Sam + David average", bt.miss.average],
+              ].map(([label, v]) => (
+                <tr key={label}>
+                  <td>{label}</td>
+                  <td className={s.num}>{(v as number).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
