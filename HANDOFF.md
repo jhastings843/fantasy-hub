@@ -1,6 +1,16 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
+
+## First TD tab (2026-10-15, deployed e51f346 + phone fix)
+- Picks > First TD (NFL only; `?m=ftd`, hidden for college). Views: This week (Sam's pick, side chances, top 3 per side with fair American price), Results (graded log), Research (trend checks).
+- Source: Sam's per-game pages `samthemodelman.smmodel.workers.dev/nfl/firsttd/<season>_<wk>_<AWAY>_<HOME>.html`. Only the current week exists online (past weeks 404, not in Wayback), so `src/lib/firsttd/store.ts` saves its own pregame copy: Redis `ftd:v1:<season>:w<week>` + `ftd:v1:<season>:weeks`. Latest pregame copy wins; a game first seen after kickoff is never saved (`missed`).
+- Release timing: Thursday's page is up early in the week; Sunday/Monday pages say "Not out yet / released Saturdays" until Saturday. Those report as `waiting`, not problems.
+- THIN players carry a hidden share (side chance minus printed numbers; DEN 6.8% on the first read). Stored as `team.thin`; a THIN scorer is charged that share split evenly (estimate, labelled on the page).
+- Grading (`grade.ts`): first ESPN scoringPlay with scoringType touchdown. Passing/Rushing TD (or own-fumble recovery) = offensive, scorer parsed from the play text and matched to Sam's "J.Smith-Njigba" form; any return/defensive TD or no TD = Sam's "no offensive first TD".
+- Trends (`trends.ts`): actual vs the sum of Sam's own chances per slice (pick, favored side, home, side facing the leakier defense by "games allowing the first TD", none, rank groups, price bands, s2-vs-s1 usage gap, under-20-touch players, pass share vs defense table). Called a trend only at 30+ graded games and |z| >= 1.645.
+- Runs: `/api/firsttd` (CRON_SECRET) from `.github/workflows/first-td.yml` (Thu/Sat 6:30pm, Sun 8:30am/noon/3:30pm/6:30pm, Mon 6:30pm ET) and as a rider on the daily `/api/snapshot`. No CRON_SECRET in .env.local: trigger by hand with `gh workflow run first-td.yml`.
+
 ## Weekly rule freeze (2026-10-13, deployed 277cba0)
 - Jack's call: revert the Oct 8 behavior where each final fed the rule pick on the next core build (the rule could flip mid-week). The rule and Tier 2 are now set week to week at the Tuesday 7am review.
 - `rule-freeze.ts`: Redis `picks:v2:<league>:<season>:rule:w<week>`, write-once (set nx), {reviewAt, policyId, throughWeek, board: StrategyBoard}. buildPicksCore reads review state BEFORE the policy, then: freeze exists, use it; else if `reviewedThisWeek` (finished.ts: last review in the same Tue-4am-ET calendar week) save one from `strategies(graded weeks < week)`; else provisional on the same games. A failed save returns null (stays provisional, next build retries). getPicksCore also applies the freeze on read, so a build that straddled the review can't serve a stale rule.
