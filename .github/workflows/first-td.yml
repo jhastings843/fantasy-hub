@@ -1,0 +1,38 @@
+name: First TD capture
+
+# Sam posts a first touchdown page per game and only keeps the current week
+# online, so the tracker saves each page itself, as late before kickoff as it
+# can (his injury notes change through the week), then grades it from ESPN.
+# A page first seen after kickoff is never saved. GitHub cron is UTC and can
+# run several minutes late, so each slot sits well ahead of its kickoffs.
+# During EDT: 22:30 UTC is 6:30pm, 12:30 is 8:30am, 16:00 is noon, 19:30 is
+# 3:30pm.
+
+on:
+  schedule:
+    # Thursday 6:30pm ET, ahead of the 8:15 game; Saturday the same, for late-season Saturdays.
+    - cron: "30 22 * * 4,6"
+    # Sunday 8:30am (London games), noon, 3:30pm and 6:30pm ET.
+    - cron: "30 12 * * 0"
+    - cron: "0 16 * * 0"
+    - cron: "30 19 * * 0"
+    - cron: "30 22 * * 0"
+    # Monday 6:30pm ET.
+    - cron: "30 22 * * 1"
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Save pregame pages and grade finished games
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd")
+          echo "HTTP $status"
+          jq -r '.report | "week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.problems[]? | "problem: \(.)")' response.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ]

@@ -5,6 +5,7 @@ import { recordGradeSnapshot, snapshotDate } from "@/lib/history/grades";
 import { ingestJingles } from "@/lib/jingles/ingest";
 import { runThursdayEmail } from "@/lib/thursday/run";
 import { settleFinishedWeeks, snapshotWeek } from "@/lib/scorecard/run";
+import { runFirstTd } from "@/lib/firsttd/store";
 
 export const dynamic = "force-dynamic";
 
@@ -120,11 +121,26 @@ export async function GET(request: Request) {
       failures.push(`scorecard: ${message}`);
     }
 
+    // Sam's first TD tracker: save today's pregame pages, grade finished
+    // games. The game-day workflow does the timely captures; this daily pass
+    // is the safety net that also grades Monday night by Tuesday morning.
+    let firstTd: unknown;
+    try {
+      const r = await runFirstTd();
+      firstTd = r;
+      for (const p of r.problems) failures.push(`first td: ${p}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      firstTd = { error: message };
+      failures.push(`first td: ${message}`);
+    }
+
     return Response.json({
       ok: failures.length === 0,
       failures,
       date: snapshotDate(),
       results,
+      firstTd,
       jingles,
       thursday,
       scorecard,
