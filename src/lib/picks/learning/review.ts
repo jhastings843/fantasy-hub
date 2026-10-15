@@ -259,6 +259,14 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   }
 
   const retained = decisions.filter((d) => d.verdict === "retain");
+  // Closest by progress toward the sample bar, not by sorting the reason text
+  // (which put "0 of 30" first and reported the furthest hypothesis).
+  const progress = (id: string) => {
+    const c = evaluations.find((e) => e.id === id)?.comparison;
+    if (!c) return -1;
+    return Math.min(c.n / CRITERIA.MIN_OPPORTUNITIES, 1) + Math.min(c.weeks.length / CRITERIA.MIN_WEEKS, 1) + (c.t ?? 0) / 100;
+  };
+  const closest = retained.slice().sort((a, b) => progress(b.id) - progress(a.id))[0];
   const outcome = activated
     ? `activated ${activated.to}`
     : rolledBack
@@ -269,7 +277,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     : rolledBack
       ? rolledBack.why
       : retained.length
-        ? `${retained.length} hypotheses still collecting (closest: ${retained.map((d) => d.why).sort()[0]}). Settled matched games so far: ${settled}. Calibration: ${cal.n} settled issued bets, mean estimate ${cal.meanP}, win rate ${cal.winRate}.${rollbackNote}`
+        ? `${retained.length} hypotheses still collecting (closest: ${closest.id}, ${closest.why}). Settled matched games so far: ${settled}. Calibration: ${cal.n} settled issued bets, mean estimate ${cal.meanP}, win rate ${cal.winRate}.${rollbackNote}`
         : `nothing collecting met the criteria${rollbackNote}`;
   const state: ReviewState = {
     lastReviewAt: at,
