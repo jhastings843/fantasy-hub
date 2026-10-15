@@ -23,6 +23,7 @@ const EMPTY: { [k in Market]: string } = {
   ats: "",
   su: "No straight-up hypotheses are registered yet.",
   ou: "No totals hypotheses yet: totals are tracking only until a cut has 10+ decided games and a winning rate.",
+  ftd: "",
 };
 
 export async function LearningPanel({ league, market }: { league: League; market: Market }) {

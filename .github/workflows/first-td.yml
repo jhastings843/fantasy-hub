@@ -3,6 +3,8 @@ name: First TD capture
 # Sam posts a first touchdown page per game and only keeps the current week
 # online, so the tracker saves each page itself, as late before kickoff as it
 # can (his injury notes change through the week), then grades it from ESPN.
+# Sam releases the Sunday and Monday pages on Saturday (the Thursday page
+# comes out earlier), so before then those read "waiting", not a problem.
 # A page first seen after kickoff is never saved. GitHub cron is UTC and can
 # run several minutes late, so each slot sits well ahead of its kickoffs.
 # During EDT: 22:30 UTC is 6:30pm, 12:30 is 8:30am, 16:00 is noon, 19:30 is
@@ -34,5 +36,5 @@ jobs:
           status=$(curl -sS -o response.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd")
           echo "HTTP $status"
-          jq -r '.report | "week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.problems[]? | "problem: \(.)")' response.json | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.report | "week \(.week): saved \(.captured | length), waiting \(.waiting | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.problems[]? | "problem: \(.)")' response.json | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$status" = "200" ]

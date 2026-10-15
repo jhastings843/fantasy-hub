@@ -77,13 +77,15 @@ export interface RunReport {
   captured: string[];
   kept: string[];
   missed: string[];
+  /** Not published yet: Sam releases the Sunday and Monday pages on Saturday. */
+  waiting: string[];
   graded: string[];
   problems: string[];
 }
 
 /** Save this week's pregame pages and grade anything final. Safe to call any time. */
 export async function runFirstTd(now = new Date()): Promise<RunReport> {
-  const report: RunReport = { week: null, captured: [], kept: [], missed: [], graded: [], problems: [] };
+  const report: RunReport = { week: null, captured: [], kept: [], missed: [], waiting: [], graded: [], problems: [] };
   let slugs: string[] = [];
   try {
     slugs = parseBoardLinks(await get(SAM_BOARD));
@@ -113,7 +115,12 @@ export async function runFirstTd(now = new Date()): Promise<RunReport> {
         continue;
       }
       try {
-        const g = parseFirstTdPage(slug, await get(SAM_PAGE(slug)));
+        const html = await get(SAM_PAGE(slug));
+        if (/Not out yet/i.test(html) && !/class="ftd-pick"/.test(html)) {
+          if (!have) report.waiting.push(slug);
+          continue;
+        }
+        const g = parseFirstTdPage(slug, html);
         if (!g) throw new Error("page did not read");
         w.games[slug] = {
           ...have,

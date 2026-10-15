@@ -299,3 +299,13 @@
   .betStake { grid-column: 1; grid-row: 3; }
   .betNet { grid-column: 2; grid-row: 2 / span 2; align-self: center; }
 }
+
+/* First TD tab */
+.ftdSides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ftdList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
+.ftdRow { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; padding: 2px 4px; border-radius: 3px; }
+.ftdRow > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftdHit { background: var(--accent-soft); font-weight: 600; }
+.ftdResult { border-top: 1px solid var(--rule); padding-top: 8px; font-size: 13.5px; display: flex; flex-direction: column; gap: 3px; }
+.ftdChips { display: flex; gap: 6px; margin-top: 2px; }
+@media (max-width: 380px) { .ftdSides { grid-template-columns: 1fr; } }
