@@ -74,6 +74,7 @@ function GameCard({ g, saved }: { g: FtdGame; saved: StoredGame }) {
       <div className={s.ftdSides}>
         {sides.map((t) => (
           <ol key={t.team} className={s.ftdList} aria-label={`${t.team} top three`}>
+            <li className={s.ftdTeam} aria-hidden>{`${t.team} top 3`}</li>
             {t.players
               .filter((p) => p.p !== null && !p.out)
               .slice(0, 3)
