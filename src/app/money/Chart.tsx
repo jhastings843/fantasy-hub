@@ -32,6 +32,8 @@ export function LineChart({
   empty?: string;
 }) {
   const W = width;
+  // Drawn in time order whatever order they arrived in.
+  series = series.map((s) => ({ ...s, points: [...s.points].sort((a, b) => a.x - b.x) }));
   const all = series.flatMap((s) => s.points);
   if (all.length < 2) return <p className={m.chartEmpty}>{empty}</p>;
   const xs = all.map((p) => p.x);
