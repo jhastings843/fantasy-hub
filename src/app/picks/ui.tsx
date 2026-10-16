@@ -5,16 +5,13 @@ import s from "./picks.module.css";
 
 export const LEAGUE_NAME: { [k in League]: string } = { nfl: "NFL", cfb: "College" };
 
-export type Market = "ats" | "su" | "ou" | "ftd";
+export type Market = "ats" | "su" | "ou";
 export type View = "week" | "results" | "research";
 export const MARKETS: { id: Market; label: string }[] = [
   { id: "ats", label: "Spreads" },
   { id: "su", label: "Straight up" },
   { id: "ou", label: "Totals" },
-  { id: "ftd", label: "First TD" },
 ];
-/** First TD is Sam's NFL model; college has no such page. */
-export const marketsFor = (league: League) => MARKETS.filter((m) => league === "nfl" || m.id !== "ftd");
 export const VIEWS: { id: View; label: string }[] = [
   { id: "week", label: "This week" },
   { id: "results", label: "Results" },
@@ -45,7 +42,7 @@ export function href(league: League, market: Market, view: View): string {
 }
 
 export function parseMarket(x: unknown): Market {
-  return x === "su" || x === "ou" || x === "ftd" ? x : "ats";
+  return x === "su" || x === "ou" ? x : "ats";
 }
 export function parseView(x: unknown): View {
   return x === "results" || x === "research" ? x : "week";

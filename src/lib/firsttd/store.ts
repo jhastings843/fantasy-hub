@@ -3,6 +3,7 @@ import { redis } from "@/lib/redis/client";
 import { parseBoardLinks, parseFirstTdPage, parseSlug, type FtdGame } from "./parse";
 import { firstTouchdown, grade, samTeam, type EspnScoringPlay, type Graded } from "./grade";
 import { trends, type GradedGame, type Trends } from "./trends";
+import { kalshiFirstTd, type KalshiGame } from "./kalshi";
 
 // The first TD tracker's memory. Sam only keeps the current week online, so
 // each game's page is saved before kickoff (the latest pregame copy wins, as
@@ -26,6 +27,8 @@ export interface StoredGame {
   firstSeenAt: string;
   kickoff?: string;
   espnId?: string;
+  /** Kalshi's first TD prices, read at the same capture as the page. */
+  kalshi?: KalshiGame;
   result?: Graded;
   gradedAt?: string;
 }
@@ -102,11 +105,18 @@ export async function runFirstTd(now = new Date()): Promise<RunReport> {
     } catch (e) {
       report.problems.push(`ESPN week ${first.week}: ${e instanceof Error ? e.message : String(e)}`);
     }
+    let kalshi = new Map<string, KalshiGame>();
+    try {
+      kalshi = await kalshiFirstTd(now);
+    } catch (e) {
+      report.problems.push(`Kalshi: ${e instanceof Error ? e.message : String(e)}`);
+    }
     for (const slug of slugs) {
       const id = parseSlug(slug);
       if (!id || id.week !== first.week) continue;
       const ev = espn.get(`${id.away}@${id.home}`);
       const have = w.games[slug];
+      const k = kalshi.get(`${id.away}@${id.home}`) ?? have?.kalshi;
       // Pregame only: ESPN says "pre", or ESPN hasn't answered and the clock agrees.
       const pre = ev ? ev.state === "pre" : !have?.kickoff || new Date(have.kickoff) > now;
       if (!pre) {
@@ -127,6 +137,7 @@ export async function runFirstTd(now = new Date()): Promise<RunReport> {
           game: g,
           capturedAt: now.toISOString(),
           firstSeenAt: have?.firstSeenAt ?? now.toISOString(),
+          ...(k ? { kalshi: k } : {}),
           ...(ev ? { kickoff: ev.kickoff, espnId: ev.id } : {}),
         };
         report.captured.push(slug);
@@ -185,7 +196,7 @@ export async function getFirstTdView(season: number): Promise<FirstTdView> {
   const weeks = (await Promise.all(nums.map((n) => loadWeek(season, n)))).filter((w) => Object.keys(w.games).length);
   const graded = weeks
     .flatMap((w) =>
-      Object.entries(w.games).flatMap(([slug, g]) => (g.result ? [{ slug, week: w.week, game: g.game, result: g.result }] : [])),
+      Object.entries(w.games).flatMap(([slug, g]) => (g.result ? [{ slug, week: w.week, game: g.game, result: g.result, kalshi: g.kalshi }] : [])),
     )
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
   return { season, current: weeks[0] ?? null, weeks, graded, trends: trends(graded) };

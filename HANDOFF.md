@@ -2,6 +2,17 @@
 
 
 
+## Props page (2026-10-15, committed, not yet deployed)
+- New `/props` page (nav "Props"): `?m=pp|ftd`, `?v=week|results|research`. First TD moved here from Picks; `/picks?m=ftd` redirects. Picks now has three markets.
+- Player props (`src/lib/props/`): Sam's per-game pages `nfl/props/<slug>.html` (SEA at DEN was the only one up on 10/15). parse.ts reads every market (model, every book's line and over/under, the "win" row, gap, projection weight), the favorites block and the break-even. Sam's play = gap drawn without the muted class (`clears`); side read from the playing book's line vs the median line (price comparison when all lines match). `lean` = where his projection points from the shown line.
+- Rotowire projections via Sleeper's free feed (`rotowire.ts`, name+team match, LAR->LA) saved with each copy as a second model.
+- store.ts: Redis hash `props:v1:<season>:w<week>` (field = slug), set `props:v1:<season>:weeks`. Latest pregame copy wins; `first` keeps the first copy's consensus lines (line movement). Grades from ESPN `summary` boxscore (passing/rushing/receiving); a player missing from the box score voids the market.
+- trends.ts: ~30 fixed slices (SLICES, stable ids) over Sam's plays, projection leans and Rotowire leans; 1u at the saved price; z of wins vs sum of break-evens. Profitable = 100+ decided bets and z >= 1.96 and units > 0 (stricter than Picks because many slices are checked). Accuracy table: mean miss of Sam, Rotowire and the consensus line.
+- The system: `props:v1:<season>:system` hash, write-once per slice. A slice joins when its record on weeks before the current one is profitable; money counts from that week on (out of sample). Retired when the full-season z falls under 1. Week view marks plays in an active slice.
+- First TD now saves Kalshi KXNFLFIRSTTD prices (bid/ask per player) with each pregame copy (`firsttd/kalshi.ts`). Cards show "K" cost (ask + Kalshi fee, 0.07 p(1-p) rounded up); research has a money table: Sam's chance above Kalshi's cost, by 3+ pts, the pick, longshots. Kalshi team codes JAC/LAR mapped to JAX/LA.
+- Runs: `/api/props` (CRON_SECRET) added to `.github/workflows/first-td.yml` (same slots) and the daily `/api/snapshot` rider. Local end-to-end run on 10/15 worked (SEA at DEN already in progress, so "missed"; Kalshi returned all 14 games). First real sample: Week 6 Sunday.
+- Not built yet (from the 10/15 source check): ESPN core propBets (DraftKings open/current lines, free, history), ESPN fantasy projections (third model), Kalshi prop ladders, nflverse first TD base rates, Pinnacle (ToS gray). The Odds API would need a new key and is paid past 500 credits.
+
 ## First TD tab (2026-10-15, deployed e51f346 + phone fix)
 - Picks > First TD (NFL only; `?m=ftd`, hidden for college). Views: This week (Sam's pick, side chances, top 3 per side with fair American price), Results (graded log), Research (trend checks).
 - Source: Sam's per-game pages `samthemodelman.smmodel.workers.dev/nfl/firsttd/<season>_<wk>_<AWAY>_<HOME>.html`. Only the current week exists online (past weeks 404, not in Wayback), so `src/lib/firsttd/store.ts` saves its own pregame copy: Redis `ftd:v1:<season>:w<week>` + `ftd:v1:<season>:weeks`. Latest pregame copy wins; a game first seen after kickoff is never saved (`missed`).

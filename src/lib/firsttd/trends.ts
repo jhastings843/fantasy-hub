@@ -14,7 +14,8 @@
 // "in line", and before MIN_GAMES everything reads "too early".
 
 import { pricedPlayers, type FtdGame, type FtdPlayer } from "./parse";
-import type { Graded } from "./grade";
+import { sameName, type Graded } from "./grade";
+import { kalshiFee, type KalshiGame, type KalshiPlayer } from "./kalshi";
 
 export const MIN_GAMES = 30;
 const Z_TREND = 1.645;
@@ -23,7 +24,30 @@ const Z_LEAN = 1;
 export interface GradedGame {
   game: FtdGame;
   result: Graded;
+  kalshi?: KalshiGame;
 }
+
+/** A bet slice at Kalshi's ask: money, not just counts. */
+export interface PriceSlice {
+  id: string;
+  label: string;
+  bets: number;
+  w: number;
+  units: number;
+  /** Wins needed to break even: the sum of the costs paid. */
+  needed: number;
+  z: number | null;
+  verdict: Verdict;
+}
+
+/** Sam's player against Kalshi's market for him. Null when Kalshi has no single match. */
+export function kalshiFor(k: KalshiGame | undefined, samName: string): KalshiPlayer | null {
+  if (!k) return null;
+  const xs = k.players.filter((x) => sameName(samName, x.name));
+  return xs.length === 1 ? xs[0] : null;
+}
+/** What one contract costs at the ask, fee included. */
+export const kalshiCost = (ask: number) => Math.round((ask + kalshiFee(ask)) * 100) / 100;
 
 export type Verdict = "early" | "in-line" | "lean-over" | "lean-under" | "over" | "under";
 
@@ -50,6 +74,10 @@ export interface Trends {
   usage: Slice[];
   /** Pass share of offensive first TDs against the defense table's pass share. */
   passShare: { n: number; actual: number; expected: number } | null;
+  /** Betting Sam's number at Kalshi's ask, 1 unit per player. */
+  market: PriceSlice[];
+  /** Games that had Kalshi prices saved. */
+  kalshiGames: number;
   /** Plain sentences for the slices that cleared the bar, strongest first. */
   findings: string[];
 }
@@ -166,10 +194,53 @@ export function trends(list: GradedGame[]): Trends {
   }
   const passShare = pn ? { n: pn, actual: pa, expected: Math.round(pe * 100) / 100 } : null;
 
+  // Money: every priced player whose Sam chance beats Kalshi's cost, bought at the ask.
+  const withK = list.filter((x) => x.kalshi);
+  const priceSlice = (id: string, label: string, keep: (p: FtdPlayer & { p: number }, cost: number, g: FtdGame) => boolean): PriceSlice => {
+    let bets = 0;
+    let w = 0;
+    let units = 0;
+    let needed = 0;
+    let variance = 0;
+    for (const { game, result, kalshi } of withK) {
+      for (const p of pricedPlayers(game)) {
+        const k = kalshiFor(kalshi, p.name);
+        if (!k?.ask) continue;
+        const cost = kalshiCost(k.ask);
+        if (cost >= 1 || !keep(p, cost, game)) continue;
+        bets++;
+        needed += cost;
+        variance += cost * (1 - cost);
+        if (isPlayer(result, p)) {
+          w++;
+          units += (1 - cost) / cost;
+        } else units -= 1;
+      }
+    }
+    const z = variance > 0 ? (w - needed) / Math.sqrt(variance) : null;
+    let verdict: Verdict = "in-line";
+    if (withK.length < MIN_GAMES) verdict = "early";
+    else if (z !== null && z >= Z_TREND && units > 0) verdict = "over";
+    else if (z !== null && z <= -Z_TREND) verdict = "under";
+    else if (z !== null && z >= Z_LEAN) verdict = "lean-over";
+    else if (z !== null && z <= -Z_LEAN) verdict = "lean-under";
+    return { id, label, bets, w, units: Math.round(units * 100) / 100, needed: Math.round(needed * 100) / 100, z: z === null ? null : Math.round(z * 100) / 100, verdict };
+  };
+  const market = [
+    priceSlice("k-value", "Sam's chance above Kalshi's cost", (p, c) => p.p > c),
+    priceSlice("k-value3", "Above Kalshi's cost by 3+ points", (p, c) => p.p >= c + 0.03),
+    priceSlice("k-pick", "Sam's pick, bought at Kalshi's ask", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team),
+    priceSlice("k-short", "Kalshi priced 10% or less, Sam above cost", (p, c) => c <= 0.1 && p.p > c),
+  ];
+
   const findings = [...headline, ...rank, ...price, ...usage]
     .filter((x) => x.verdict === "over" || x.verdict === "under")
     .sort((a, b) => Math.abs(b.z ?? 0) - Math.abs(a.z ?? 0))
     .map((x) => `${x.label}: ${x.actual} actual against ${x.expected.toFixed(1)} expected, so the model has ${x.verdict === "over" ? "undersold" : "oversold"} it.`);
 
-  return { games, headline, rank, price, usage, passShare, findings };
+  for (const x of market) {
+    if (x.verdict === "over") findings.push(`${x.label}: ${x.w} winners on ${x.bets} bets, ${x.units >= 0 ? "+" : ""}${x.units}u at Kalshi's ask.`);
+    if (x.verdict === "under") findings.push(`${x.label}: losing at Kalshi's ask (${x.units}u on ${x.bets} bets).`);
+  }
+  return { games, headline, rank, price, usage, passShare, market, kalshiGames: withK.length, findings };
 }

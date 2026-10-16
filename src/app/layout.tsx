@@ -27,6 +27,7 @@ const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/strategy", label: "Strategy" },
   { href: "/survivor", label: "Survivor" },
   { href: "/picks", label: "Picks" },
+  { href: "/props", label: "Props" },
   { href: "/resources", label: "Resources" },
 ];
 

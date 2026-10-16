@@ -3,9 +3,9 @@
 import { fairAmerican, type FtdGame } from "@/lib/firsttd/parse";
 import type { Graded } from "@/lib/firsttd/grade";
 import { getFirstTdView, type FirstTdView, type StoredGame } from "@/lib/firsttd/store";
-import { MIN_GAMES, type Slice, type Verdict } from "@/lib/firsttd/trends";
-import { whenEt } from "./ui";
-import s from "./picks.module.css";
+import { MIN_GAMES, kalshiCost, kalshiFor, type PriceSlice, type Slice, type Verdict } from "@/lib/firsttd/trends";
+import { whenEt } from "../picks/ui";
+import s from "../picks/picks.module.css";
 
 const SAM_FTD = "https://samthemodelman.smmodel.workers.dev/nfl/";
 const p1 = (p: number) => `${(p * 100).toFixed(1)}%`;
@@ -78,13 +78,20 @@ function GameCard({ g, saved }: { g: FtdGame; saved: StoredGame }) {
             {t.players
               .filter((p) => p.p !== null && !p.out)
               .slice(0, 3)
-              .map((p) => (
-                <li key={p.key} className={`${s.ftdRow} ${r?.key === p.key ? s.ftdHit : ""}`}>
-                  <span>{p.name}</span>
-                  <span className={s.num}>{p1(p.p!)}</span>
-                  <span className={`${s.num} ${s.dim}`}>{fairAmerican(p.p!)}</span>
-                </li>
-              ))}
+              .map((p) => {
+                const k = kalshiFor(saved.kalshi, p.name);
+                const cost = k?.ask ? kalshiCost(k.ask) : null;
+                return (
+                  <li key={p.key} className={`${s.ftdRow} ${s.ftdRow4} ${r?.key === p.key ? s.ftdHit : ""}`}>
+                    <span>{p.name}</span>
+                    <span className={s.num}>{p1(p.p!)}</span>
+                    <span className={`${s.num} ${s.dim}`}>{fairAmerican(p.p!)}</span>
+                    <span className={`${s.num} ${cost !== null && p.p! > cost ? s.pos : s.dim}`} title="Kalshi ask plus fee">
+                      {cost !== null ? `K ${Math.round(cost * 100)}¢` : "K n/a"}
+                    </span>
+                  </li>
+                );
+              })}
           </ol>
         ))}
       </div>
@@ -119,7 +126,7 @@ export async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="ftd-week">{`Week ${w.week} first touchdown`}</h2>
         <p className={s.p}>
-          {`Sam's model, saved before kickoff. Chances, not prices: the fair price is the break-even, so a book's first TD price is only worth a look when it pays more than that. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
+          {`Sam's model, saved before kickoff. Chances, not prices: the fair price is the break-even. "K" is what one Kalshi contract cost at the same moment (ask plus fee), in green when Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
         </p>
       </div>
       <ol className={s.cards}>
@@ -238,6 +245,40 @@ function SliceTable({ title, rows, unit }: { title: string; rows: Slice[]; unit:
   );
 }
 
+function PriceTable({ rows, games }: { rows: PriceSlice[]; games: number }) {
+  return (
+    <div className={s.tw}>
+      <table className={s.table}>
+        <caption className={s.caption}>{`Betting Sam's number at Kalshi's price (${games} games with prices saved)`}</caption>
+        <thead>
+          <tr>
+            <th>Bet</th>
+            <th>Bets</th>
+            <th>Won</th>
+            <th>Needed</th>
+            <th>Units</th>
+            <th>Read</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((x) => (
+            <tr key={x.id}>
+              <td>{x.label}</td>
+              <td className={s.num}>{x.bets}</td>
+              <td className={s.num}>{x.w}</td>
+              <td className={s.num}>{x.needed.toFixed(1)}</td>
+              <td className={`${s.num} ${x.units > 0 ? s.pos : x.units < 0 ? s.neg : ""}`}>{`${x.units >= 0 ? "+" : ""}${x.units.toFixed(1)}u`}</td>
+              <td className={x.verdict === "over" || x.verdict === "lean-over" ? s.pos : x.verdict === "under" || x.verdict === "lean-under" ? s.neg : s.dim}>
+                {x.verdict === "over" ? "trend: profitable" : x.verdict === "under" ? "trend: losing" : VERDICT[x.verdict]}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export async function FirstTdResearch({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
@@ -265,6 +306,7 @@ export async function FirstTdResearch({ season }: { season: number }) {
             : "Nothing has cleared the bar: every slice is within normal luck of Sam's own numbers."}
         </p>
       )}
+      <PriceTable rows={t.market} games={t.kalshiGames} />
       <SliceTable title="The headline checks" rows={t.headline} unit="Games" />
       <SliceTable title="Where the scorer sat in Sam's list" rows={t.rank} unit="Games" />
       <SliceTable title="By the size of Sam's number" rows={t.price} unit="Players" />
@@ -275,7 +317,7 @@ export async function FirstTdResearch({ season }: { season: number }) {
         </p>
       )}
       <p className={`${s.notice} ${s.dim}`}>
-        {"A THIN scorer is charged his side's unprinted THIN share, split evenly (an estimate: Sam's page gives the group a share but no names). Defensive, return and no-TD games count as Sam's \"no offensive first TD\". Source: "}
+        {"Kalshi bets: 1 unit per player, bought at the saved ask plus Kalshi's fee; \"needed\" is the wins it takes to break even at those costs. Kalshi prices are saved from Week 6 Sunday on. A THIN scorer is charged his side's unprinted THIN share, split evenly (an estimate: Sam's page gives the group a share but no names). Defensive, return and no-TD games count as Sam's \"no offensive first TD\". Source: "}
         <a href={SAM_FTD}>Sam&apos;s Models</a>, first touchdown pages; results from ESPN.
       </p>
     </section>

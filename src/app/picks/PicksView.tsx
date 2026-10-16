@@ -8,8 +8,7 @@ import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWee
 import { LearningPanel } from "./learning";
 import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
-import { FirstTdResearch, FirstTdResults, FirstTdWeek } from "./firsttd";
-import { LEAGUE_NAME, VIEWS, marketsFor, href, kickoffEt, rec, units, type Market, type View } from "./ui";
+import { LEAGUE_NAME, MARKETS, VIEWS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
 import s from "./picks.module.css";
 
 // The Picks tab. Sport, then market, then view, all in the URL (?m=, ?v=),
@@ -18,7 +17,7 @@ import s from "./picks.module.css";
 // Results and Research views and inside disclosures.
 
 export default async function PicksView({ league, market: asked, view }: { league: League; market: Market; view: View }) {
-  const market: Market = league === "cfb" && asked === "ftd" ? "ats" : asked;
+  const market: Market = asked;
   const fresh = await getPicksReport(league).catch(() => null);
   const r = fresh?.value ?? null;
   const other: League = league === "nfl" ? "cfb" : "nfl";
@@ -69,7 +68,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
           )}
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
           <nav className={s.tabs} aria-label="Market">
-            {marketsFor(league).map((m) => (
+            {MARKETS.map((m) => (
               <Link key={m.id} href={href(league, m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.tab}>
                 {m.label}
               </Link>
@@ -95,10 +94,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         {market === "ou" && view === "week" && <TotalsWeek r={r} />}
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
-        {market === "ftd" && view === "week" && <FirstTdWeek season={r.season} />}
-        {market === "ftd" && view === "results" && <FirstTdResults season={r.season} />}
-        {market === "ftd" && view === "research" && <FirstTdResearch season={r.season} />}
-        {view === "research" && market !== "ftd" && <LearningPanel league={league} market={market} />}
+        {view === "research" && <LearningPanel league={league} market={market} />}
 
         <footer className={s.footer}>
           <span>

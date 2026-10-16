@@ -24,6 +24,9 @@ vi.mock("@/lib/jingles/ingest", () => ({ ingestJingles: vi.fn(async () => ({ add
 vi.mock("@/lib/thursday/run", () => ({
   runThursdayEmail: vi.fn(async () => Response.json({ sent: false, reason: "not Thursday" })),
 }));
+vi.mock("@/lib/props/store", () => ({
+  runProps: vi.fn(async () => ({ week: 6, captured: [], kept: [], missed: [], graded: [], system: [], problems: [] })),
+}));
 vi.mock("@/lib/firsttd/store", () => ({
   runFirstTd: vi.fn(async () => ({ week: 6, captured: [], kept: [], missed: [], waiting: [], graded: [], problems: [] })),
 }));

@@ -312,3 +312,18 @@
 /* Four market tabs at phone width: tighter so First TD isn't hidden off the edge. */
 @media (max-width: 440px) { .tabs:not(.tabsSoft) .tab { padding: 10px 9px; letter-spacing: .03em; font-size: 11.5px; } }
 .ftdTeam { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .08em; color: var(--mute); padding: 0 4px 2px; }
+
+/* ---- 2026-10-15 first TD: Kalshi column ---- */
+.ftdRow4 { grid-template-columns: 1fr auto auto auto; }
+@media (max-width: 440px) { .ftdRow4 > span:nth-child(3) { display: none; } .ftdRow4 { grid-template-columns: 1fr auto auto; } }
+
+/* ---- 2026-10-15 player props ---- */
+.ppList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ppRow { border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.ppSys { border-color: var(--accent); background: var(--accent-soft); }
+.ppMain { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
+.ppWho { font-weight: 600; font-size: 14px; }
+.ppBet { font-family: var(--font-barlow), Impact, sans-serif; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.ppMeta { font-size: 12px; color: var(--mute); }
+.ppAll summary { cursor: pointer; font-size: 13px; color: var(--ink2); padding: 4px 0; }
+.ppAll .tw { margin-top: 6px; }

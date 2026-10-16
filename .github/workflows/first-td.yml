@@ -1,6 +1,6 @@
-name: First TD capture
+name: First TD and props capture
 
-# Sam posts a first touchdown page per game and only keeps the current week
+# Sam posts a first touchdown page and a player props page per game and only keeps the current week
 # online, so the tracker saves each page itself, as late before kickoff as it
 # can (his injury notes change through the week), then grades it from ESPN.
 # Sam releases the Sunday and Monday pages on Saturday (the Thursday page
@@ -37,4 +37,8 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd")
           echo "HTTP $status"
           jq -r '.report | "week \(.week): saved \(.captured | length), waiting \(.waiting | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.problems[]? | "problem: \(.)")' response.json | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$status" = "200" ]
+          pstatus=$(curl -sS -o props.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props")
+          echo "props HTTP $pstatus"
+          jq -r '.report | "props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' props.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ] && [ "$pstatus" = "200" ]

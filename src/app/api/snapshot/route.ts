@@ -6,6 +6,7 @@ import { ingestJingles } from "@/lib/jingles/ingest";
 import { runThursdayEmail } from "@/lib/thursday/run";
 import { settleFinishedWeeks, snapshotWeek } from "@/lib/scorecard/run";
 import { runFirstTd } from "@/lib/firsttd/store";
+import { runProps } from "@/lib/props/store";
 
 export const dynamic = "force-dynamic";
 
@@ -135,12 +136,25 @@ export async function GET(request: Request) {
       failures.push(`first td: ${message}`);
     }
 
+    // Sam's player props tracker, same pattern.
+    let props: unknown;
+    try {
+      const r = await runProps();
+      props = r;
+      for (const p of r.problems) failures.push(`props: ${p}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      props = { error: message };
+      failures.push(`props: ${message}`);
+    }
+
     return Response.json({
       ok: failures.length === 0,
       failures,
       date: snapshotDate(),
       results,
       firstTd,
+      props,
       jingles,
       thursday,
       scorecard,
