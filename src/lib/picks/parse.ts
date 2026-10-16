@@ -327,7 +327,8 @@ export function parseSheetWeek(league: League, week: number, csv: string): Grade
 /**
  * David's board, read as text.
  *
- * The NFL page lists "Market line" and "Model line" as "<abbr> −3.5". The
+ * The NFL page lists "Market line" and "Model line" as "<abbr> −3.5" (capitalized
+ * "Market Line" since Week 6, 2026, which silently emptied the board). The
  * college page lists "Open", "Current" (team name and number) and "Proj.
  * Line" as a bare home-side number. Current is used, matching the NFL page's
  * single market number.
@@ -339,7 +340,7 @@ export function parseDavidBoard(league: League, html: string): Board {
   const rows: BoardRow[] = [];
   if (league === "nfl") {
     const re =
-      /\| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| Market line \| ([^|]+?) \| Model line \| ([^|]+?) \|/g;
+      /\| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| Market [Ll]ine \| ([^|]+?) \| Model [Ll]ine \| ([^|]+?) \|/g;
     for (const m of t.matchAll(re)) {
       const away = teamKey(league, m[1]);
       const home = teamKey(league, m[3]);

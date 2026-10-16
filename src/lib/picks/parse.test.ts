@@ -76,6 +76,12 @@ describe("David's pages", () => {
     const atl = b.rows.find((r) => r.home === "ATL")!;
     expect(atl.line).toEqual({ market: -3.5, model: 0.3 });
   });
+  it("reads the Week 6 NFL board after the labels became 'Market Line'", () => {
+    const b = parseDavidBoard("nfl", fx("ds-board-wk6.html"));
+    expect(b.week).toBe(6);
+    expect(b.rows).toHaveLength(14);
+    expect(b.rows[0]).toMatchObject({ home: "DEN", away: "SEA", line: { market: 2.5, model: 1.5 } });
+  });
   it("reads the college board", () => {
     const b = parseDavidBoard("cfb", fx("ds-cfb-board.html"));
     expect(b.week).toBe(6);
