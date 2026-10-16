@@ -5,7 +5,7 @@ import { parseView } from "../picks/ui";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Props · Fantasy Hub",
+  title: "Props · Hobby Hub",
   description: "Sam's NFL player prop and first touchdown models, saved before kickoff, graded after, and checked for slices that beat the price.",
 };
 

@@ -6,7 +6,7 @@ import { parseMarket, parseView } from "./ui";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Picks · Fantasy Hub",
+  title: "Picks · Hobby Hub",
   description: "NFL spreads, totals and straight-up picks where Sam's and David Sasser's models agree at the current line.",
 };
 

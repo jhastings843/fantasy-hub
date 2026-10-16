@@ -116,7 +116,7 @@ export interface PageInput {
  */
 export function emailPage(input: PageInput): string {
   return fieldNotesPage({
-    brand: "Fantasy Hub", title: input.heading, kicker: input.kicker,
+    brand: "Hobby Hub", title: input.heading, kicker: input.kicker,
     preheader: input.preheader, ink: "#263d30", accent: "#dce5ae",
     body: input.body + (input.cta ? `<div style="padding:12px 0 6px">${button(input.cta.href, input.cta.text)}</div>` : ""),
     footer: input.footnote,

@@ -1,0 +1,51 @@
+/* The Money tab's own pieces. Colors come from the Picks tokens on .page. */
+
+.chart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.svg { width: 100%; height: auto; display: block; overflow: visible; }
+.svg[data-tone="pos"] { --line: var(--pos); }
+.svg[data-tone="neg"] { --line: var(--neg); }
+.svg[data-tone="mute"] { --line: var(--ink2); }
+.line { fill: none; stroke: var(--line); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.area { fill: color-mix(in srgb, var(--line) 12%, transparent); stroke: none; }
+.compare { fill: none; stroke: var(--mute); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.base { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 2 4; }
+.dot { fill: var(--line); stroke: var(--surface); stroke-width: 2; }
+.axis { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 11px; fill: var(--mute); }
+.endLabel { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 12px; font-weight: 600; fill: var(--line); }
+.chartEmpty { margin: 0; padding: 28px 16px; text-align: center; color: var(--mute); font-size: 14px; border: 1px dashed var(--rule); border-radius: 8px; }
+.legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--ink2); }
+.legendMain, .legendCompare { display: inline-flex; align-items: center; gap: 6px; }
+.legendMain::before { content: ""; width: 14px; height: 3px; border-radius: 2px; background: var(--pos); }
+.legendMain[data-tone="neg"]::before { background: var(--neg); }
+.legendCompare::before { content: ""; width: 14px; height: 0; border-top: 2px dashed var(--mute); }
+
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panelHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.panelTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; font-size: 22px; font-weight: 700; margin: 0; line-height: 1.1; }
+.panelLink { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); text-decoration: none; }
+.panelLink:hover { text-decoration: underline; }
+.big { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 40px; line-height: 1; }
+.sub { font-size: 13.5px; color: var(--ink2); }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.books { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+@media (max-width: 480px) { .books { grid-template-columns: 1fr; } .panels { grid-template-columns: 1fr; } }
+
+.scroll { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+.scroll table { min-width: 520px; }
+.why { color: var(--mute); font-size: 12.5px; max-width: 46ch; }
+.outcome { font-family: var(--font-plex-mono), monospace; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.oW { background: color-mix(in srgb, var(--pos) 16%, var(--surface)); color: var(--pos); }
+.oL { background: color-mix(in srgb, var(--neg) 14%, var(--surface)); color: var(--neg); }
+.oP, .ovoid, .oOpen { background: var(--surface2); color: var(--ink2); }
+.stale { color: var(--gold); }
+.meters { display: flex; flex-direction: column; gap: 10px; }
+.meter { display: grid; grid-template-columns: 120px 1fr 64px; align-items: center; gap: 10px; font-size: 13px; }
+.meterBar { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; }
+.meterFill { height: 100%; border-radius: 5px; }
+
+.holdings { border-top: 1px solid var(--rule); padding-top: 10px; }
+.holdings > summary { cursor: pointer; font-family: var(--font-plex-mono), monospace; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); list-style-position: inside; min-height: 32px; display: flex; align-items: center; }
+.holdList { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; }
+.hold { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.hold:last-child { border-bottom: 0; }
+.hold .why { grid-column: 1 / -1; max-width: none; }

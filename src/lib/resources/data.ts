@@ -3,7 +3,7 @@
 // RESOURCES, REDDITORS, and CATEGORIES below.
 //
 // Status flags are advisory and shown as colored badges:
-//   "integrated"      = Fantasy Hub already pulls data from this source
+//   "integrated"      = Hobby Hub already pulls data from this source
 //   "free"            = freely accessible, no scraping required
 //   "free_tier"       = has a useful free tier alongside paid
 //   "paid"            = paid only
@@ -100,7 +100,7 @@ export const CATEGORIES: ResourceCategory[] = [
     key: "league_power_rankings",
     title: "League power rankings",
     blurb:
-      "Useful for spotting trade fits. Fantasy Hub computes this locally on the trade analyzer.",
+      "Useful for spotting trade fits. Hobby Hub computes this locally on the trade analyzer.",
   },
   { key: "rookie_draft_prep", title: "Rookie draft prep" },
   { key: "adp", title: "ADP" },
@@ -123,7 +123,7 @@ export const RESOURCES: Resource[] = [
     formats: ["redraft"],
     status: ["integrated", "free"],
     featured: true,
-    note: "Half-PPR redraft research, and redraft or guillotine only: none of it is a dynasty opinion, because a redraft rank is a bet on four months and a dynasty value is a bet on three years. The Lab 300 is his tiered top-300 ranking, version 2.0 posted 2026-08-30; Fantasy Hub orders the redraft draft board by it. He also posts players he is high and low on versus ADP and single-player deep dives ending in a league-winner verdict. Updates often, so check the sub for anything newer than what Fantasy Hub has pulled in. Also @JinglesLabs on TikTok, X, and Instagram.",
+    note: "Half-PPR redraft research, and redraft or guillotine only: none of it is a dynasty opinion, because a redraft rank is a bet on four months and a dynasty value is a bet on three years. The Lab 300 is his tiered top-300 ranking, version 2.0 posted 2026-08-30; Hobby Hub orders the redraft draft board by it. He also posts players he is high and low on versus ADP and single-player deep dives ending in a league-winner verdict. Updates often, so check the sub for anything newer than what Hobby Hub has pulled in. Also @JinglesLabs on TikTok, X, and Instagram.",
   },
   {
     name: "FantasyPros weekly half-PPR rankings",
@@ -364,7 +364,7 @@ export const RESOURCES: Resource[] = [
     formats: ["dynasty"],
     status: ["integrated", "free"],
     featured: true,
-    note: "Primary data source for Fantasy Hub. Trade calculator, rankings, league hub, and free public API. Values include native TE-premium support matching this league's scoring.",
+    note: "Primary data source for Hobby Hub. Trade calculator, rankings, league hub, and free public API. Values include native TE-premium support matching this league's scoring.",
   },
 
   // --- Trade calculators ---
@@ -374,7 +374,7 @@ export const RESOURCES: Resource[] = [
     category: "trade_calculators",
     formats: ["dynasty"],
     status: ["free"],
-    note: "Secondary value source kept in Fantasy Hub for cross-reference on close trades.",
+    note: "Secondary value source kept in Hobby Hub for cross-reference on close trades.",
   },
   {
     name: "KeepTradeCut",

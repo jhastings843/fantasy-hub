@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Trophy } from "lucide-react";
-import { NavLink } from "@/components/NavLink";
+import { FantasyTabs, SectionTabs } from "@/components/SiteNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,20 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fantasy Hub",
-  description: "Fantasy football tools: dynasty leagues, survivor pools, and more.",
+  title: "Hobby Hub",
+  description: "Fantasy football, model picks and props, and the paper trading books, in one place.",
 };
 
-// Tools that belong to no single league. Per-league tools live one bar down,
-// in the league layout at /l/[leagueId].
-const NAV_LINKS: { href: string; label: string; exact?: boolean }[] = [
-  { href: "/", label: "Leagues", exact: true },
-  { href: "/strategy", label: "Strategy" },
-  { href: "/survivor", label: "Survivor" },
-  { href: "/picks", label: "Picks" },
-  { href: "/props", label: "Props" },
-  { href: "/resources", label: "Resources" },
-];
+// Sections and Fantasy's own tabs live in components/SiteNav.tsx.
 
 function BrandMark() {
   return (
@@ -52,21 +43,12 @@ function SiteHeader() {
         >
           <BrandMark />
           <span className="text-base font-bold tracking-tight">
-            Fantasy Hub
+            Hobby Hub
           </span>
         </Link>
         {/* Wrap on phones instead of a cramped horizontal scroll; stays a
             single row on sm+ where there is room. */}
-        <div className="-mx-1 flex flex-wrap items-center gap-x-1 gap-y-1 sm:mx-0">
-          {NAV_LINKS.map((l) => (
-            <NavLink
-              key={l.href}
-              href={l.href}
-              label={l.label}
-              exact={l.exact}
-            />
-          ))}
-        </div>
+        <SectionTabs />
       </nav>
     </header>
   );
@@ -80,10 +62,10 @@ function SiteFooter() {
           <BrandMark />
           <div className="flex flex-col gap-0.5">
             <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-              Fantasy Hub
+              Hobby Hub
             </span>
             <span className="text-zinc-500 dark:text-zinc-400">
-              Dynasty, redraft, and survivor tools
+              Fantasy, picks, props and the paper books
             </span>
           </div>
         </div>
@@ -147,6 +129,7 @@ export default function RootLayout({
           <div className="absolute bottom-0 left-1/2 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-rose-200/20 blur-3xl dark:bg-rose-900/10" />
         </div>
         <SiteHeader />
+        <FantasyTabs />
         <div className="flex-1">{children}</div>
         <SiteFooter />
       </body>
