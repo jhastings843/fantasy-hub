@@ -39,6 +39,8 @@ export interface StoredProps {
   dk?: { [id: string]: { open: number; current: number } };
   kickoff?: string;
   espnId?: string;
+  /** Set when the copy was read after kickoff (backfilled by hand). Shown, graded, never counted toward the system. */
+  late?: string;
   result?: GradedGame;
   gradedAt?: string;
 }
@@ -216,7 +218,8 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
   // its full record falls back under Z_RETIRE. Never rewritten otherwise.
   try {
     const current = report.week ?? weeks.at(-1) ?? 0;
-    const graded = await gradedList(season);
+    // Late copies are shown and graded but never help a slice qualify.
+    const graded = (await gradedList(season)).filter((x) => !x.late);
     const before = propTrends(graded.filter((x) => x.week < current));
     const all = propTrends(graded);
     const sys = new Map((await loadSystem(season)).map((e) => [e.id, e]));
@@ -244,7 +247,7 @@ async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
     .flatMap(([week, games]) =>
-      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, dk: g.dk }] : [])),
+      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, dk: g.dk, ...(g.late ? { late: g.late } : {}) }] : [])),
     )
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }

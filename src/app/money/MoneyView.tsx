@@ -11,13 +11,16 @@ import m from "./money.module.css";
 // Phil and the books are a snapshot posted from Jack's Mac after each run.
 
 export type MoneyTab = "overview" | "bets" | "phil" | "books";
+// My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
+// actually bet. The code and the logged data stay; flip this to bring it back.
+const SHOW_BETS = false;
 const TABS: { id: MoneyTab; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "bets", label: "My bets" },
+  ...(SHOW_BETS ? [{ id: "bets" as const, label: "My bets" }] : []),
   { id: "phil", label: "Phil" },
   { id: "books", label: "Stock books" },
 ];
-export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview");
+export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
 const href = (t: MoneyTab) => (t === "overview" ? "/money" : `/money?v=${t}`);
 
 const usd = (n: number, signed = false) =>
@@ -333,10 +336,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   return (
     <section className={s.section}>
       <div className={s.tiles}>
-        <div className={`${s.tile} ${v.summary.net > 0 ? s.good : v.summary.net < 0 ? s.bad : ""}`}>
-          <span className={s.tileV}>{units(v.summary.net)}</span>
-          <span className={s.tileK}>{`my bets, ${v.summary.wins}-${v.summary.losses}`}</span>
-        </div>
+        {SHOW_BETS && (
+          <div className={`${s.tile} ${v.summary.net > 0 ? s.good : v.summary.net < 0 ? s.bad : ""}`}>
+            <span className={s.tileV}>{units(v.summary.net)}</span>
+            <span className={s.tileK}>{`my bets, ${v.summary.wins}-${v.summary.losses}`}</span>
+          </div>
+        )}
         <div className={`${s.tile} ${p && p.equity > p.bankroll ? s.good : p && p.equity < p.bankroll ? s.bad : ""}`}>
           <span className={s.tileV}>{p && !p.error ? usd(p.equity - p.bankroll, true) : "n/a"}</span>
           <span className={s.tileK}>Phil, paper</span>
@@ -351,10 +356,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
         </div>
       </div>
       <div className={m.panels}>
-        <div className={m.panel}>
-          <div className={m.panelHead}><h2 className={m.panelTitle}>My bets</h2><Link className={m.panelLink} href={href("bets")}>All bets</Link></div>
-          {betChart(v.summary, 230, 360)}
-        </div>
+        {SHOW_BETS && (
+          <div className={m.panel}>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>My bets</h2><Link className={m.panelLink} href={href("bets")}>All bets</Link></div>
+            {betChart(v.summary, 230, 360)}
+          </div>
+        )}
         {p && !p.error && (
           <div className={m.panel}>
             <div className={m.panelHead}><h2 className={m.panelTitle}>Phil</h2><Link className={m.panelLink} href={href("phil")}>Ledger</Link></div>
@@ -414,13 +421,13 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         </header>
 
         {error && <p className={s.error}>{`The Money page could not load: ${error}`}</p>}
-        {v && v.problems.length > 0 && <p className={s.error}>{`Some bets could not be checked against ESPN: ${v.problems.join("; ")}`}</p>}
+        {SHOW_BETS && v && v.problems.length > 0 && <p className={s.error}>{`Some bets could not be checked against ESPN: ${v.problems.join("; ")}`}</p>}
         {v && !snap && tab !== "bets" && (
           <p className={s.calm}>Phil and the stock books have not reported yet. They post here from the Mac after their next run.</p>
         )}
 
         {v && tab === "overview" && <Overview v={v} />}
-        {v && tab === "bets" && <BetsTab v={v} />}
+        {SHOW_BETS && v && tab === "bets" && <BetsTab v={v} />}
         {v && tab === "phil" && snap?.phil && (snap.phil.error ? <p className={s.error}>{snap.phil.error}</p> : <PhilTab p={snap.phil} />)}
         {v && tab === "books" && snap && <BooksTab books={snap.books} />}
 

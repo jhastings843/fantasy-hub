@@ -35,6 +35,8 @@ export interface GradedPropsGame {
   espn?: { [id: string]: number };
   /** DraftKings' opening and current line per market (ESPN odds feed). */
   dk?: { [id: string]: { open: number; current: number } };
+  /** Copy read after kickoff: why it is still trusted. */
+  late?: string;
 }
 
 export type Verdict = "early" | "flat" | "lean-up" | "lean-down" | "profitable" | "losing";

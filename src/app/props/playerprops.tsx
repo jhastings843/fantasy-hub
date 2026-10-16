@@ -99,7 +99,7 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
         <summary className={s.ftdSum}>
           <span className={s.ftdWhen}>
             <b>{`${g.away} at ${g.home}`}</b>
-            <span className={s.dim}>{saved.kickoff ? whenEt(saved.kickoff) : `Week ${g.week}`}</span>
+            <span className={s.dim}>{`${saved.kickoff ? whenEt(saved.kickoff) : `Week ${g.week}`}${saved.late ? " · late copy" : ""}`}</span>
           </span>
           <span className={s.ftdPick}>
             <span className={s.ftdPickName}>{plays.length ? `${plays.length} play${plays.length > 1 ? "s" : ""}` : "No plays"}</span>
@@ -161,7 +161,7 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
           </table>
         </div>
       </details>
-          <p className={`${s.ftdNote} ${s.dim}`}>{`Saved ${whenEt(saved.capturedAt)}${saved.result ? ", graded" : ""}.`}</p>
+          <p className={`${s.ftdNote} ${s.dim}`}>{`Saved ${whenEt(saved.capturedAt)}${saved.result ? ", graded" : ""}.${saved.late ? ` Read after kickoff: ${saved.late} Graded, but kept out of the system.` : ""}`}</p>
         </div>
       </details>
     </li>
