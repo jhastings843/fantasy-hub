@@ -85,6 +85,7 @@
   ],
   "last_worked": "2026-10-15",
   "notes": [
+    "2026-10-15: Props adds ESPN projections (third model) and DraftKings opening lines; deployed 6280568.",
     "2026-10-15: New Props page (player props tracker with Rotowire second model, system of earned slices; First TD moved here with Kalshi prices). Commit 79ed65f, deployed.",
     "2026-10-15: Picks > First TD tab (NFL): saves Sam's first TD pages before kickoff (his site keeps only the current week), grades from ESPN, Research view checks his numbers by slice. Record starts Week 6 (SEA at DEN).",
     "2026-10-14: fixed picks review summary naming the furthest hypothesis as 'closest' (alphabetical sort); committed, not deployed.",
