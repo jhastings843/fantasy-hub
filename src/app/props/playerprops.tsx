@@ -90,15 +90,32 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
 function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
   const g = saved.game;
   const plays = g.markets.filter(isPlay).sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0));
+  const inSystem = plays.filter((m) => systemHits(m, saved, v.active, v.graded).length).length;
+  const top = plays[0];
+  const net = saved.result ? saved.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
   return (
-    <li className={s.card}>
-      <div className={s.cardTop}>
-        <div>
-          <div className={s.cardMeta}>{`${g.away} at ${g.home} · ${saved.kickoff ? whenEt(saved.kickoff) : `Week ${g.week}`}`}</div>
-          <div className={s.cardPick}>{plays.length ? `${plays.length} play${plays.length > 1 ? "s" : ""}` : "No plays"}</div>
-          <div className={s.cardMeta}>{`${g.markets.length} markets · saved ${whenEt(saved.capturedAt)}${saved.result ? " · graded" : ""}`}</div>
-        </div>
-      </div>
+    <li>
+      <details className={s.ftdGame}>
+        <summary className={s.ftdSum}>
+          <span className={s.ftdWhen}>
+            <b>{`${g.away} at ${g.home}`}</b>
+            <span className={s.dim}>{saved.kickoff ? whenEt(saved.kickoff) : `Week ${g.week}`}</span>
+          </span>
+          <span className={s.ftdPick}>
+            <span className={s.ftdPickName}>{plays.length ? `${plays.length} play${plays.length > 1 ? "s" : ""}` : "No plays"}</span>
+            <span className={`${s.dim} ${s.num}`}>{`${g.markets.length} markets`}</span>
+          </span>
+          <span className={`${s.ftdOdds}`}>{top ? `Top: ${top.player} ${sideWord(top.side!)} ${top.line} ${statShort(top)} (gap ${top.gap?.toFixed(3)})` : ""}</span>
+          <span className={s.ftdFlags}>
+            {net !== null ? (
+              <span className={`${s.resChip} ${net > 0 ? s.resW : net < 0 ? s.resL : s.resP}`}>{u(net)}</span>
+            ) : inSystem > 0 ? (
+              <span className={s.pill}>{`${inSystem} in system`}</span>
+            ) : null}
+            <span className={s.chev} aria-hidden>›</span>
+          </span>
+        </summary>
+        <div className={s.ftdBody}>
       {plays.length > 0 && (
         <ol className={s.ppList}>
           {plays.map((m) => (
@@ -144,6 +161,9 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
           </table>
         </div>
       </details>
+          <p className={`${s.ftdNote} ${s.dim}`}>{`Saved ${whenEt(saved.capturedAt)}${saved.result ? ", graded" : ""}.`}</p>
+        </div>
+      </details>
     </li>
   );
 }
@@ -166,7 +186,7 @@ export async function PropsWeek({ season }: { season: number }) {
           }`}
         </p>
       </div>
-      <ol className={s.cards}>
+      <ol className={s.ftdGames}>
         {games.map((g) => (
           <GameCard key={g.game.slug} saved={g} v={v} />
         ))}

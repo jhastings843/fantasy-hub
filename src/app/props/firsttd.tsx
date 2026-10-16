@@ -55,61 +55,124 @@ function Chip({ hit, label }: { hit: boolean | null; label: string }) {
   return <span className={`${s.resChip} ${hit ? `${s.resW}` : `${s.resL}`}`}>{`${label} ${hit ? "W" : "L"}`}</span>;
 }
 
-function GameCard({ g, saved }: { g: FtdGame; saved: StoredGame }) {
+/** One side's full list: every priced player, then THIN, OUT and the remainder. */
+function SideTable({ t, saved, hitKey }: { t: FtdGame["teams"][number]; saved: StoredGame; hitKey: string | null }) {
+  const priced = t.players.filter((p) => p.p !== null && !p.out).sort((a, b) => b.p! - a.p!);
+  const thin = t.players.filter((p) => p.thin && !p.out);
+  const out = t.players.filter((p) => p.out);
+  return (
+    <div className={s.ftdSide}>
+      <div className={s.ftdSideHead}>
+        <b>{t.team}</b>
+        <span className={s.num}>{`${p1(t.pFirst)} to score first`}</span>
+      </div>
+      <table className={s.ftdTable}>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Sam</th>
+            <th>Fair</th>
+            <th>Kalshi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {priced.map((p) => {
+            const k = kalshiFor(saved.kalshi, p.name);
+            const cost = k?.ask ? kalshiCost(k.ask) : null;
+            const edge = cost !== null ? p.p! - cost : null;
+            return (
+              <tr key={p.key} className={hitKey === p.key ? s.ftdHit : ""}>
+                <td>
+                  {p.name}
+                  <span className={s.dim}>{` ${p.touches} tch · ${p.tds} TD`}</span>
+                </td>
+                <td className={s.num}>{p1(p.p!)}</td>
+                <td className={`${s.num} ${s.dim}`}>{fairAmerican(p.p!)}</td>
+                <td className={`${s.num} ${edge !== null && edge > 0 ? s.pos : s.dim}`} title="Kalshi ask plus fee">
+                  {cost !== null ? `${Math.round(cost * 100)}¢${edge! > 0 ? ` +${(edge! * 100).toFixed(1)}` : ""}` : "–"}
+                </td>
+              </tr>
+            );
+          })}
+          {t.rest > 0 && (
+            <tr className={s.dim}>
+              <td>Anyone else</td>
+              <td className={s.num}>{p1(t.rest)}</td>
+              <td />
+              <td />
+            </tr>
+          )}
+          {t.thin > 0 && (
+            <tr className={s.dim}>
+              <td>{`THIN (${thin.map((p) => p.name).join(", ")})`}</td>
+              <td className={s.num}>{p1(t.thin)}</td>
+              <td />
+              <td />
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {out.length > 0 && <p className={`${s.ftdNote} ${s.dim}`}>{`Out: ${out.map((p) => p.name).join(", ")}`}</p>}
+    </div>
+  );
+}
+
+function GameRow({ g, saved }: { g: FtdGame; saved: StoredGame }) {
   const sides = [...g.teams].sort((a, b) => b.pFirst - a.pFirst);
   const r = saved.result;
+  const value = g.teams
+    .flatMap((t) => t.players)
+    .filter((p) => {
+      if (p.p === null || p.out) return false;
+      const k = kalshiFor(saved.kalshi, p.name);
+      return !!k?.ask && p.p > kalshiCost(k.ask);
+    }).length;
   return (
-    <li className={s.card}>
-      <div className={s.cardTop}>
-        <div>
-          <div className={s.cardMeta}>{`${g.away} at ${g.home} · ${saved.kickoff ? whenEt(saved.kickoff) : g.when}`}</div>
-          <div className={s.cardPick}>{g.pick ? g.pick.name : "No pick"}</div>
-          {g.pick && <div className={s.cardMeta}>{`${g.pick.team} · Sam's pick · fair price ${fairAmerican(g.pick.p)}`}</div>}
-        </div>
-        {g.pick && <span className={`${s.tier} ${s.t1}`}>{p1(g.pick.p)}</span>}
-      </div>
-      <div className={`${s.cardMeta} ${s.num}`}>
-        {[...sides.map((t) => `${t.team} ${p0(t.pFirst)}`), `none ${p0(g.none)}`].join(" · ")}
-      </div>
-      <div className={s.ftdSides}>
-        {sides.map((t) => (
-          <ol key={t.team} className={s.ftdList} aria-label={`${t.team} top three`}>
-            <li className={s.ftdTeam} aria-hidden>{`${t.team} top 3`}</li>
-            {t.players
-              .filter((p) => p.p !== null && !p.out)
-              .slice(0, 3)
-              .map((p) => {
-                const k = kalshiFor(saved.kalshi, p.name);
-                const cost = k?.ask ? kalshiCost(k.ask) : null;
-                return (
-                  <li key={p.key} className={`${s.ftdRow} ${s.ftdRow4} ${r?.key === p.key ? s.ftdHit : ""}`}>
-                    <span>{p.name}</span>
-                    <span className={s.num}>{p1(p.p!)}</span>
-                    <span className={`${s.num} ${s.dim}`}>{fairAmerican(p.p!)}</span>
-                    <span className={`${s.num} ${cost !== null && p.p! > cost ? s.pos : s.dim}`} title="Kalshi ask plus fee">
-                      {cost !== null ? `K ${Math.round(cost * 100)}¢` : "K n/a"}
-                    </span>
-                  </li>
-                );
-              })}
-          </ol>
-        ))}
-      </div>
-      {r ? (
-        <div className={s.ftdResult}>
-          <div>
-            <b>First TD: </b>
-            {scorerLine(r)}
+    <li>
+      <details className={s.ftdGame}>
+        <summary className={s.ftdSum}>
+          <span className={s.ftdWhen}>
+            <b>{`${g.away} at ${g.home}`}</b>
+            <span className={s.dim}>{saved.kickoff ? whenEt(saved.kickoff) : g.when}</span>
+          </span>
+          <span className={s.ftdPick}>
+            <span className={s.ftdPickName}>{g.pick ? g.pick.name : "No pick"}</span>
+            <span className={`${s.dim} ${s.num}`}>
+              {g.pick ? `${g.pick.team} · ${p1(g.pick.p)} · ${fairAmerican(g.pick.p)}` : ""}
+            </span>
+          </span>
+          <span className={`${s.ftdOdds} ${s.num}`}>{[...sides.map((t) => `${t.team} ${p0(t.pFirst)}`), `none ${p0(g.none)}`].join(" · ")}</span>
+          <span className={s.ftdFlags}>
+            {r ? <Chip hit={r.pickHit} label="Pick" /> : value > 0 ? <span className={s.pill}>{`${value} under Sam`}</span> : null}
+            <span className={s.chev} aria-hidden>›</span>
+          </span>
+        </summary>
+        <div className={s.ftdBody}>
+          {r && (
+            <div className={s.ftdResult}>
+              <div>
+                <b>First TD: </b>
+                {scorerLine(r)}
+              </div>
+              <div className={s.dim}>{samHad(r)}</div>
+              <div className={s.ftdChips}>
+                <Chip hit={r.pickHit} label="Pick" />
+                <Chip hit={r.teamHit} label="Side" />
+              </div>
+            </div>
+          )}
+          <div className={s.ftdSides}>
+            {sides.map((t) => (
+              <SideTable key={t.team} t={t} saved={saved} hitKey={r?.key ?? null} />
+            ))}
           </div>
-          <div className={s.dim}>{samHad(r)}</div>
-          <div className={s.ftdChips}>
-            <Chip hit={r.pickHit} label="Pick" />
-            <Chip hit={r.teamHit} label="Side" />
-          </div>
+          <p className={`${s.ftdNote} ${s.dim}`}>
+            {`No offensive first TD (defense, special teams or none): ${p1(g.none)}. Saved ${whenEt(saved.capturedAt)}${
+              saved.kalshi ? `, Kalshi prices from the same capture` : ", before Kalshi prices were saved"
+            }.`}
+          </p>
         </div>
-      ) : (
-        <div className={`${s.cardMeta} ${s.dim}`}>{`Saved ${whenEt(saved.capturedAt)}`}</div>
-      )}
+      </details>
     </li>
   );
 }
@@ -126,12 +189,12 @@ export async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="ftd-week">{`Week ${w.week} first touchdown`}</h2>
         <p className={s.p}>
-          {`Sam's model, saved before kickoff. Chances, not prices: the fair price is the break-even. "K" is what one Kalshi contract cost at the same moment (ask plus fee), in green when Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
+          {`Sam's model, saved before kickoff. Chances, not prices: the fair price is the break-even. Tap a game for every player. Kalshi is what one contract cost at the same moment (ask plus fee), green with the gap in points when Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
         </p>
       </div>
-      <ol className={s.cards}>
+      <ol className={s.ftdGames}>
         {games.map((g) => (
-          <GameCard key={g.game.slug} g={g.game} saved={g} />
+          <GameRow key={g.game.slug} g={g.game} saved={g} />
         ))}
       </ol>
     </section>
