@@ -2,7 +2,7 @@
 
 
 
-## Props page (2026-10-15, committed, not yet deployed)
+## Props page (2026-10-15, deployed 79ed65f)
 - New `/props` page (nav "Props"): `?m=pp|ftd`, `?v=week|results|research`. First TD moved here from Picks; `/picks?m=ftd` redirects. Picks now has three markets.
 - Player props (`src/lib/props/`): Sam's per-game pages `nfl/props/<slug>.html` (SEA at DEN was the only one up on 10/15). parse.ts reads every market (model, every book's line and over/under, the "win" row, gap, projection weight), the favorites block and the break-even. Sam's play = gap drawn without the muted class (`clears`); side read from the playing book's line vs the median line (price comparison when all lines match). `lean` = where his projection points from the shown line.
 - Rotowire projections via Sleeper's free feed (`rotowire.ts`, name+team match, LAR->LA) saved with each copy as a second model.
