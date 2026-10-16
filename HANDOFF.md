@@ -2,6 +2,14 @@
 
 
 
+## Hobby Hub: Money section, sectioned nav, rename (2026-10-15, deployed 3dc166c + 6246e21)
+- Renamed to Hobby Hub on screen and in emails (layout, page titles, email shell brand, resources text). URL, Vercel project and repo unchanged on purpose: workflows, crons, the PEM relay and email links all point at fantasy-hub-tan.vercel.app.
+- Nav (`src/components/SiteNav.tsx`): sections Fantasy, Survivor, Picks, Props, Money. Fantasy has its own bar (Leagues = /, Strategy, Resources); a league's tools stay one bar below in the league layout. Survivor is its own section (Jack). No route moved.
+- `/money` (`src/app/money/`): Overview, My bets, Phil, Stock books (`?v=`). Charts are server-drawn SVG (`Chart.tsx`, no library). Uses the Picks tokens (picks.module.css) plus money.module.css. Public, no password (Jack).
+- Phil + the four paper books: trade-bot posts a snapshot (`tradebot/money_export.py`) to `POST /api/money/ingest` (bearer `MONEY_INGEST_SECRET`, Vercel production + .env.local + trade-bot/.env). Hooked to the end of `scripts/phil_hourly.sh` and `scripts/paper_nightly.sh`. Redis `money:v1:snapshot`.
+- My bets: Redis hash `money:v1:bets`. Logged with `node scripts/money-bet.mjs card.json` (format in the script header), hand grade `--grade <id> W|L|P|void "why"`, `--remove <id>`. Graded when /money is read: ESPN scoreboard by date + summary (final score, first-half from linescores, props from the box score via props/grade boxStats; player missing = void). `src/lib/money/bets.ts` + tests.
+- Logged: the Week 6 TNF Jingles card (SEA at DEN, 6 bets, 10u). Assumed Jack placed it as sized.
+
 ## Props page (2026-10-15, deployed 79ed65f)
 - New `/props` page (nav "Props"): `?m=pp|ftd`, `?v=week|results|research`. First TD moved here from Picks; `/picks?m=ftd` redirects. Picks now has three markets.
 - Player props (`src/lib/props/`): Sam's per-game pages `nfl/props/<slug>.html` (SEA at DEN was the only one up on 10/15). parse.ts reads every market (model, every book's line and over/under, the "win" row, gap, projection weight), the favorites block and the break-even. Sam's play = gap drawn without the muted class (`clears`); side read from the playing book's line vs the median line (price comparison when all lines match). `lean` = where his projection points from the shown line.
