@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Phil, PhilBet } from "@/lib/money/types";
+import type { Book, Kalshi, KalshiRow, Phil, PhilBet } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
@@ -9,8 +9,10 @@ import m from "./money.module.css";
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
 // four paper stock books, all paper or unit-based. Bets live in this app;
 // Phil and the books are a snapshot posted from Jack's Mac after each run.
+// Kalshi is Phil's shadow record on a second venue, shown on its own tab and
+// never added into his Polymarket numbers.
 
-export type MoneyTab = "overview" | "bets" | "phil" | "books";
+export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -18,6 +20,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   ...(SHOW_BETS ? [{ id: "bets" as const, label: "My bets" }] : []),
   { id: "phil", label: "Phil" },
+  { id: "kalshi", label: "Kalshi" },
   { id: "books", label: "Stock books" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
@@ -315,10 +318,173 @@ function BooksTab({ books }: { books: Book[] }) {
   );
 }
 
+/* ----------------------------------------------------------- kalshi ---- */
+
+const cents = (p: number | null) => (p === null ? "?" : `${Math.round(p * 100)}¢`);
+const kalshiUrl = (ticker: string) => `https://kalshi.com/markets/${ticker.split("-")[0].toLowerCase()}`;
+
+function Decision({ r }: { r: KalshiRow }) {
+  return <span className={`${m.outcome} ${r.decision === "bet" ? m.oBet : m.oOpen}`}>{r.decision === "bet" ? "Shadow bet" : "Passed"}</span>;
+}
+
+function KalshiRowView({ r, settled }: { r: KalshiRow; settled?: boolean }) {
+  const side = r.side ? r.side.toUpperCase() : "";
+  const money = r.decision === "bet" ? r.pnl : r.hypoPnl;
+  return (
+    <tr>
+      <td>
+        <div><a href={kalshiUrl(r.ticker)} target="_blank" rel="noreferrer">{r.title ?? r.ticker}</a></div>
+        <div className={m.why}>
+          {[r.pick && !(r.title ?? "").includes(r.pick) ? r.pick : null, `${side} at ${cents(r.effPrice ?? r.ask)} after fee`, `Phil said ${r.est !== null ? Math.round(r.est * 100) + "%" : "?"}`,
+            r.origin === "kalshi_only" ? "Kalshi only" : "also on Polymarket", r.category].filter(Boolean).join(" · ")}
+        </div>
+        {r.decision === "skip" && r.skipReason && <div className={m.why}>{`Passed: ${r.skipReason}`}</div>}
+      </td>
+      <td><Decision r={r} /></td>
+      <td className={s.num}>{r.stake ? usd(r.stake) : ""}</td>
+      {settled ? (
+        <td className={`${s.num} ${money !== null ? tone(money) : ""}`}>
+          <Outcome o={r.status} />{" "}
+          {money !== null && r.status !== "void" ? (r.decision === "bet" ? usd(money, true) : <span className={s.muted}>{`would be ${usd(money, true)}`}</span>) : ""}
+        </td>
+      ) : (
+        <td className={`${s.num} ${s.muted}`}>{r.closes ? `settles ${when(r.closes)}` : ""}</td>
+      )}
+    </tr>
+  );
+}
+
+function Goal({ label, have, need, why }: { label: string; have: number; need: number; why: string }) {
+  const done = have >= need;
+  return (
+    <div className={m.goal}>
+      <div className={m.goalHead}><strong>{label}</strong><span className={`${s.num} ${done ? s.pos : s.muted}`}>{`${Math.min(have, need)} of ${need}`}</span></div>
+      <span className={m.meterBar}>
+        <span className={m.meterFill} style={{ display: "block", width: `${Math.min(1, have / need) * 100}%`, background: done ? "var(--pos)" : "var(--accent)" }} />
+      </span>
+      <span className={m.why}>{why}</span>
+    </div>
+  );
+}
+
+function KalshiTab({ k }: { k: Kalshi }) {
+  const vs = k.vsMarket;
+  const beat = vs ? -vs.brier_delta : null;
+  const near = k.lastScan?.picks.filter((p) => p.bucket === "near") ?? [];
+  const far = k.lastScan?.picks.filter((p) => p.bucket === "far") ?? [];
+  const passes = k.watching.filter((r) => r.decision === "skip").length;
+  const origin = (o: "matched" | "kalshi_only", label: string) => {
+    const x = k.byOrigin[o];
+    return (
+      <tr key={o}>
+        <td>{label}</td>
+        <td className={s.num}>{x.decisions}</td>
+        <td className={s.num}>{x.bets}</td>
+        <td className={s.num}>{x.settled}</td>
+        <td className={`${s.num} ${tone(x.pnl)}`}>{x.settled ? usd(x.pnl, true) : ""}</td>
+      </tr>
+    );
+  };
+  const radar = (list: typeof near) => (
+    <ul className={m.radar}>
+      {list.map((p) => (
+        <li key={p.ticker}>
+          <a href={kalshiUrl(p.ticker)} target="_blank" rel="noreferrer">{p.title ?? p.ticker}</a>
+          <span className={s.num}>{p.mid !== undefined ? cents(p.mid) : ""}</span>
+          <span className={m.why}>{[p.event && p.event !== p.title ? p.event : null, p.yes_sub_title && !(p.title ?? "").includes(p.yes_sub_title) ? p.yes_sub_title : null, p.category, p.settles_by ? `settles ${when(p.settles_by)}` : null].filter(Boolean).join(" · ")}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <section className={s.section}>
+      <div className={s.tiles}>
+        <div className={`${s.tile} ${k.pnl > 0 ? s.good : k.pnl < 0 ? s.bad : ""}`}>
+          <span className={s.tileV}>{usd(k.pnl, true)}</span>
+          <span className={s.tileK}>{`shadow P&L after ${usd(k.fees)} in fees`}</span>
+        </div>
+        <div className={s.tile}>
+          <span className={s.tileV}>{`${k.wins}-${k.settledBets - k.wins}`}</span>
+          <span className={s.tileK}>settled shadow bets</span>
+        </div>
+        <div className={`${s.tile} ${beat !== null && beat > 0 ? s.good : beat !== null && beat < 0 ? s.bad : ""}`}>
+          <span className={s.tileV}>{vs ? vs.brier_phil.toFixed(3) : "n/a"}</span>
+          <span className={s.tileK}>{vs ? `Brier, Kalshi price ${vs.brier_kalshi.toFixed(3)} (lower wins)` : "Brier vs Kalshi's price"}</span>
+        </div>
+        <div className={s.tile}>
+          <span className={s.tileV}>{k.open}</span>
+          <span className={s.tileK}>{`open: ${k.open - passes} ${k.open - passes === 1 ? "bet" : "bets"}, ${passes} ${passes === 1 ? "pass" : "passes"}`}</span>
+        </div>
+      </div>
+      <p className={s.notice}>
+        Shadow only. Phil researches Kalshi markets and writes down what he would do, priced against Kalshi&apos;s live order book with its fee.
+        Nothing is placed, and none of this is in his Polymarket numbers. Passes are tracked too, so the edge rule can be tested on what he turned down.
+      </p>
+
+      <div className={m.panel}>
+        <h2 className={m.panelTitle}>What it&apos;s learning</h2>
+        <div className={m.goals}>
+          <Goal label="Is Phil sharper than Kalshi's price?" have={k.settled} need={30}
+            why={vs ? `On ${vs.n} settled decisions Phil's Brier is ${vs.brier_phil.toFixed(3)} against the price's ${vs.brier_kalshi.toFixed(3)}. Under 30 is too few to call.` : "Scores once decisions settle, bets and passes alike."} />
+          <Goal label="Does the Polymarket edge rule fit Kalshi?" have={k.thresholds.usable} need={k.thresholds.needed * 2}
+            why={`Picks a threshold on the first half of settled decisions, then checks it on the second half. ${k.thresholds.testN >= k.thresholds.needed ? "Ready for review." : "Until then the Polymarket rule stays as is."}`} />
+          <Goal label="Same skill on both venues?" have={k.pooling.pairs} need={k.pooling.needed}
+            why="Needs markets Phil priced on both venues and that have settled. Even if they match, the records stay separate until a review says otherwise." />
+        </div>
+        <div className={m.scroll}>
+          <table className={s.table}>
+            <thead><tr><th>Where it came from</th><th>Decisions</th><th>Bets</th><th>Settled</th><th>P&amp;L</th></tr></thead>
+            <tbody>{origin("matched", "Also on Polymarket")}{origin("kalshi_only", "Kalshi only")}</tbody>
+          </table>
+        </div>
+        {k.comparisons.total > 0 && (
+          <p className={s.notice}>{`${k.comparisons.total} Polymarket markets checked against Kalshi: ${k.comparisons.equivalent ?? 0} the same bet, ${(k.comparisons.rejected ?? 0) + (k.comparisons.flagged ?? 0)} turned away for different wording, dates or rules.`}</p>
+        )}
+      </div>
+
+      <div className={m.panel}>
+        <h2 className={m.panelTitle}>Watching</h2>
+        {k.watching.length ? (
+          <div className={m.scroll}>
+            <table className={s.table}>
+              <thead><tr><th>Market</th><th>Call</th><th>Stake</th><th></th></tr></thead>
+              <tbody>{k.watching.map((r) => <KalshiRowView key={r.id} r={r} />)}</tbody>
+            </table>
+          </div>
+        ) : (
+          <p className={s.calm}>Nothing open yet. Phil looks at up to three Kalshi markets each full cycle and records a bet or a pass here.</p>
+        )}
+      </div>
+
+      {k.lastScan && (
+        <div className={m.panel}>
+          <div className={m.panelHead}><h2 className={m.panelTitle}>On the radar</h2><span className={s.muted}>{`scan ${when(k.lastScan.ts)}`}</span></div>
+          <p className={s.notice}>The most tradable Kalshi markets from the last scan, across every category. Phil researches a few of these each cycle. Prices are from the scan and can be hours old.</p>
+          {near.length > 0 && <><p className={m.bucket}>Settles within two weeks</p>{radar(near)}</>}
+          {far.length > 0 && <><p className={m.bucket}>Longer dated</p>{radar(far)}</>}
+        </div>
+      )}
+
+      {k.recent.length > 0 && (
+        <div className={m.panel}>
+          <h2 className={m.panelTitle}>Settled</h2>
+          <div className={m.scroll}>
+            <table className={s.table}>
+              <thead><tr><th>Market</th><th>Call</th><th>Stake</th><th>Result</th></tr></thead>
+              <tbody>{k.recent.map((r) => <KalshiRowView key={r.id} r={r} settled />)}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* --------------------------------------------------------- overview ---- */
 
 function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const p = v.snapshot?.phil;
+  const k = v.snapshot?.kalshi;
   const books = v.snapshot?.books ?? [];
   const bookStart = books.reduce((a, b) => a + b.start, 0);
   const bookNow = books.reduce((a, b) => a + b.equity, 0);
@@ -366,6 +532,13 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           <div className={m.panel}>
             <div className={m.panelHead}><h2 className={m.panelTitle}>Phil</h2><Link className={m.panelLink} href={href("phil")}>Ledger</Link></div>
             {philChart(p, 230, 360)}
+          </div>
+        )}
+        {k && !k.error && (
+          <div className={m.panel}>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Kalshi, shadow</h2><Link className={m.panelLink} href={href("kalshi")}>What it&apos;s tracking</Link></div>
+            <span className={m.big}>{k.open}</span>
+            <span className={m.sub}>{`open calls, ${k.settled} settled${k.settledBets ? `, shadow P&L ${usd(k.pnl, true)}` : ""}. Nothing placed; kept apart from Phil's Polymarket record.`}</span>
           </div>
         )}
         {books.length > 0 && (
@@ -429,6 +602,9 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "overview" && <Overview v={v} />}
         {SHOW_BETS && v && tab === "bets" && <BetsTab v={v} />}
         {v && tab === "phil" && snap?.phil && (snap.phil.error ? <p className={s.error}>{snap.phil.error}</p> : <PhilTab p={snap.phil} />)}
+        {v && tab === "kalshi" && snap && (snap.kalshi
+          ? (snap.kalshi.error ? <p className={s.error}>{snap.kalshi.error}</p> : <KalshiTab k={snap.kalshi} />)
+          : <p className={s.calm}>Kalshi has not reported yet. It posts with Phil after his next cycle.</p>)}
         {v && tab === "books" && snap && <BooksTab books={snap.books} />}
 
         <footer className={s.footer}>
