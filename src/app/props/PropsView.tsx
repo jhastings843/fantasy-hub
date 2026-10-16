@@ -62,7 +62,7 @@ export default function PropsView({ market, view }: { market: PropsMarket; view:
         <footer className={s.footer}>
           <span>
             Sources: <a href="https://samthemodelman.smmodel.workers.dev/nfl/">Sam&apos;s Models</a> (props and first TD pages), Rotowire projections via
-            Sleeper, Kalshi first TD prices, ESPN box scores and scoring plays. Model output and a record of it, not betting advice.
+            Sleeper, ESPN projections and DraftKings lines via ESPN, Kalshi first TD prices, ESPN box scores and scoring plays. Model output and a record of it, not betting advice.
           </span>
         </footer>
       </div>

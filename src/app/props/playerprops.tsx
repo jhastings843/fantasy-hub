@@ -34,10 +34,14 @@ function Empty() {
 /** Slice ids an unsettled market's play or lean falls in, among the active system slices. */
 function systemHits(m: PropMarket, saved: StoredProps, active: string[], all: GradedPropsGame[]): string[] {
   const rw = saved.rw?.[m.id];
+  const espn = saved.espn?.[m.id];
+  const dk = saved.dk?.[m.id];
   const pseudo = (side: Side | null) =>
-    side ? { week: 0, slug: saved.game.slug, m, g: { id: m.id, actual: null, play: null, lean: null }, bet: { side, line: m.line, price: 0, book: "", outcome: "P" as const, net: 0, breakEven: 0 }, rw } : null;
+    side
+      ? { week: 0, slug: saved.game.slug, m, g: { id: m.id, actual: null, play: null, lean: null }, bet: { side, line: m.line, price: 0, book: "", outcome: "P" as const, net: 0, breakEven: 0 }, rw, espn, dk }
+      : null;
   return active.filter((id) => {
-    const side = id.startsWith("play:") ? (isPlay(m) ? m.side : null) : id.startsWith("rw:") ? rwSide(m, rw) : m.lean;
+    const side = id.startsWith("play:") ? (isPlay(m) ? m.side : null) : id.startsWith("rw:") ? rwSide(m, rw) : id.startsWith("espn:") ? rwSide(m, espn) : m.lean;
     const row = pseudo(side);
     // Favorites need the week's own game; pass it as the only list entry.
     return !!row && matches(id, row, [{ week: 0, slug: saved.game.slug, game: saved.game, result: { markets: [], void: 0 } }, ...all]);
@@ -48,6 +52,8 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
   const w = m.books.find((b) => b.win);
   const price = w && m.side ? w[m.side] : null;
   const rw = saved.rw?.[m.id];
+  const espn = saved.espn?.[m.id];
+  const dk = saved.dk?.[m.id];
   const graded = saved.result?.markets.find((x) => x.id === m.id);
   const out = graded?.play?.outcome;
   return (
@@ -62,7 +68,9 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
           m.gap !== null ? `gap ${m.gap.toFixed(3)}` : null,
           `Sam ${m.model}`,
           rw !== undefined ? `Rotowire ${rw}` : null,
+          espn !== undefined ? `ESPN ${espn}` : null,
           `market ${m.consensus}`,
+          dk && dk.open !== dk.current ? `DK opened ${dk.open}` : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -108,6 +116,7 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
                 <th>Stat</th>
                 <th>Sam</th>
                 <th>RW</th>
+                <th>ESPN</th>
                 <th>Line</th>
                 <th>Lean</th>
                 {saved.result && <th>Actual</th>}
@@ -122,6 +131,7 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
                     <td>{statShort(m)}</td>
                     <td className={s.num}>{m.model}</td>
                     <td className={s.num}>{saved.rw?.[m.id] ?? "–"}</td>
+                    <td className={s.num}>{saved.espn?.[m.id] ?? "–"}</td>
                     <td className={s.num}>{m.line}</td>
                     <td>{m.lean ? (m.lean === "over" ? "O" : "U") : "–"}</td>
                     {saved.result && (
@@ -199,6 +209,7 @@ export async function PropsResults({ season }: { season: number }) {
         <Tile value={u(get("play:all")?.units ?? 0)} label={`Sam's plays · ${recOf(get("play:all"))}`} />
         <Tile value={u(get("lean:all")?.units ?? 0)} label={`Sam's projection, every market · ${recOf(get("lean:all"))}`} />
         <Tile value={u(get("rw:all")?.units ?? 0)} label={`Rotowire's projection · ${recOf(get("rw:all"))}`} />
+        <Tile value={u(get("espn:all")?.units ?? 0)} label={`ESPN's projection · ${recOf(get("espn:all"))}`} />
       </div>
       {plays.length > 0 && (
         <div className={s.tw}>
@@ -343,7 +354,7 @@ export async function PropsResearch({ season }: { season: number }) {
       </div>
 
       <SliceTable title="Sam's plays" rows={group("play")} active={v.active} />
-      <SliceTable title="Projection only: the side each number points to, every market" rows={[...group("lean"), ...group("rw")]} active={v.active} />
+      <SliceTable title="Projection only: the side each number points to, every market" rows={[...group("lean"), ...group("rw"), ...group("espn")]} active={v.active} />
 
       {t.accuracy.length > 0 && (
         <div className={s.tw}>
@@ -355,6 +366,7 @@ export async function PropsResearch({ season }: { season: number }) {
                 <th>Markets</th>
                 <th>Sam</th>
                 <th>Rotowire</th>
+                <th>ESPN</th>
                 <th>Market line</th>
                 <th>Sam closer</th>
               </tr>
@@ -366,6 +378,7 @@ export async function PropsResearch({ season }: { season: number }) {
                   <td className={s.num}>{a.n}</td>
                   <td className={`${s.num} ${a.model < a.market ? s.pos : ""}`}>{a.model}</td>
                   <td className={`${s.num} ${a.rw !== null && a.rw < a.market ? s.pos : ""}`}>{a.rw ?? "–"}</td>
+                  <td className={`${s.num} ${a.espn !== null && a.espn < a.market ? s.pos : ""}`}>{a.espn ?? "–"}</td>
                   <td className={s.num}>{a.market}</td>
                   <td className={s.num}>{`${Math.round((a.closer / a.n) * 100)}%`}</td>
                 </tr>
@@ -375,8 +388,8 @@ export async function PropsResearch({ season }: { season: number }) {
         </div>
       )}
       <p className={`${s.notice} ${s.dim}`}>
-        {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). The projection rows ignore that and bet the way the number points, at the same book's price. Rotowire's projections come through Sleeper's free feed, matched by name and team. A player missing from the box score voids the market. Sources: "}
-        <a href={SAM}>Sam&apos;s Models</a> props pages, Sleeper (Rotowire), ESPN box scores.
+        {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). The projection rows ignore that and bet the way the number points, at the same book's price. Rotowire's projections come through Sleeper's free feed, matched by name and team; ESPN's from its fantasy projections, matched by name. DraftKings' opening line comes from ESPN's odds feed; the line-move slices compare it with DraftKings' last pregame line. A player missing from the box score voids the market. Sources: "}
+        <a href={SAM}>Sam&apos;s Models</a> props pages, Sleeper (Rotowire), ESPN projections, odds and box scores.
       </p>
     </section>
   );

@@ -4,6 +4,7 @@ import { samTeam } from "@/lib/firsttd/grade";
 import { parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
+import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
 import { MIN_BETS, propTrends, sliceBets, SLICES, Z_RETIRE, type GradedPropsGame, type PropTrends } from "./trends";
 
 // The props tracker's memory, built like the first TD tracker: Sam keeps only
@@ -32,6 +33,10 @@ export interface StoredProps {
   first: { [id: string]: number };
   /** Rotowire's projection per market, from the latest copy's capture. */
   rw?: { [id: string]: number };
+  /** ESPN's fantasy projection per market, from the latest copy's capture. */
+  espn?: { [id: string]: number };
+  /** DraftKings' opening and latest pregame line per market (ESPN odds feed). */
+  dk?: { [id: string]: { open: number; current: number } };
   kickoff?: string;
   espnId?: string;
   result?: GradedGame;
@@ -59,16 +64,24 @@ interface EspnEvent {
   id: string;
   date?: string;
   status?: { type?: { state?: string; completed?: boolean } };
-  competitions?: { competitors?: { homeAway?: string; team?: { abbreviation?: string } }[] }[];
+  competitions?: { competitors?: { homeAway?: string; team?: { id?: string; abbreviation?: string } }[] }[];
+}
+interface EspnGame {
+  id: string;
+  kickoff?: string;
+  state: string;
+  completed: boolean;
+  teamIds: string[];
 }
 async function espnWeek(season: number, week: number) {
   const data = JSON.parse(await get(`${ESPN}/scoreboard?week=${week}&seasontype=2&dates=${season}`)) as { events?: EspnEvent[] };
-  const out = new Map<string, { id: string; kickoff?: string; state: string; completed: boolean }>();
+  const out = new Map<string, EspnGame>();
   for (const e of data.events ?? []) {
     const cs = e.competitions?.[0]?.competitors ?? [];
     const h = samTeam(cs.find((c) => c.homeAway === "home")?.team?.abbreviation ?? "");
     const a = samTeam(cs.find((c) => c.homeAway === "away")?.team?.abbreviation ?? "");
-    out.set(`${a}@${h}`, { id: e.id, kickoff: e.date, state: e.status?.type?.state ?? "", completed: !!e.status?.type?.completed });
+    const teamIds = cs.map((c) => c.team?.id).filter((x): x is string => !!x);
+    out.set(`${a}@${h}`, { id: e.id, kickoff: e.date, state: e.status?.type?.state ?? "", completed: !!e.status?.type?.completed, teamIds });
   }
   return out;
 }
@@ -108,7 +121,7 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
   if (first) {
     report.week = first.week;
     const have = await loadWeek(first.season, first.week);
-    let espn = new Map<string, { id: string; kickoff?: string; state: string; completed: boolean }>();
+    let espn = new Map<string, EspnGame>();
     try {
       espn = await espnWeek(first.season, first.week);
     } catch (e) {
@@ -119,6 +132,12 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
       rwIdx = await fetchProjections(first.season, first.week);
     } catch (e) {
       report.problems.push(`Rotowire projections: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    let espnIdx: Awaited<ReturnType<typeof fetchEspnProjections>> | null = null;
+    try {
+      espnIdx = await fetchEspnProjections(first.season, first.week);
+    } catch (e) {
+      report.problems.push(`ESPN projections: ${e instanceof Error ? e.message : String(e)}`);
     }
     for (const slug of slugs) {
       const id = parseSlug(slug);
@@ -135,6 +154,17 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
         if (!g) throw new Error("page did not read");
         const firstLines = { ...Object.fromEntries(g.markets.map((m) => [m.id, m.consensus])), ...old?.first };
         const rw = rwIdx ? projectionsFor(g.markets, rwIdx) : old?.rw;
+        const espnProj = espnIdx ? espnFor(g.markets, espnIdx) : old?.espn;
+        let dk = old?.dk;
+        if (ev) {
+          try {
+            // Keep the first open seen; take the latest current line.
+            const fresh = await fetchDkLines(ev.id, ev.teamIds, g.markets);
+            dk = { ...fresh, ...Object.fromEntries(Object.entries(old?.dk ?? {}).map(([k, v]) => [k, { open: v.open, current: fresh[k]?.current ?? v.current }])) };
+          } catch (e) {
+            report.problems.push(`DraftKings lines ${slug}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
         await saveGame(first.season, first.week, slug, {
           ...old,
           game: g,
@@ -142,6 +172,8 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
           firstSeenAt: old?.firstSeenAt ?? now.toISOString(),
           first: firstLines,
           ...(rw ? { rw } : {}),
+          ...(espnProj ? { espn: espnProj } : {}),
+          ...(dk ? { dk } : {}),
           ...(ev ? { kickoff: ev.kickoff, espnId: ev.id } : {}),
         });
         report.captured.push(slug);
@@ -171,7 +203,7 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
       try {
         const sum = JSON.parse(await get(`${ESPN}/summary?event=${ev.id}`)) as { boxscore?: { players?: EspnBoxTeam[] } };
         if (!sum.boxscore?.players?.length) throw new Error("no box score yet");
-        await saveGame(season, wk, slug, { ...g, result: gradeGame(g.game, sum.boxscore.players, g.rw), gradedAt: now.toISOString(), espnId: ev.id });
+        await saveGame(season, wk, slug, { ...g, result: gradeGame(g.game, sum.boxscore.players, { rw: g.rw, espn: g.espn }), gradedAt: now.toISOString(), espnId: ev.id });
         report.graded.push(slug);
       } catch (e) {
         report.problems.push(`grade ${slug}: ${e instanceof Error ? e.message : String(e)}`);
@@ -212,7 +244,7 @@ async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
     .flatMap(([week, games]) =>
-      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw }] : [])),
+      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, dk: g.dk }] : [])),
     )
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }

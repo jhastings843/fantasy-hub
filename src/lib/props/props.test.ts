@@ -5,6 +5,7 @@ import { parsePropsLinks, parsePropsPage, playSide, type PropsGame } from "./par
 import { boxStats, gradeGame, settle, type EspnBoxTeam } from "./grade";
 import { indexProjections, projectionsFor } from "./rotowire";
 import { MIN_BETS, propTrends, sliceBets, type GradedPropsGame } from "./trends";
+import { dkFor, espnFor, indexDkLines, indexEspnProjections } from "./espn";
 
 const fx = (f: string) => readFileSync(path.resolve(import.meta.dirname, "../../../test/fixtures/props", f), "utf8");
 const g = parsePropsPage("2026_06_SEA_DEN", fx("props-2026_06_SEA_DEN.html"))!;
@@ -57,12 +58,13 @@ describe("grading props", () => {
         g.markets.find((m) => m.id === "pass_yds|Bo Nix")!,
       ],
     };
-    const r = gradeGame(game, box, { "rec|George Pickens": 2 });
+    const r = gradeGame(game, box, { rw: { "rec|George Pickens": 2 }, espn: { "rec|George Pickens": 4.1 } });
     const p = r.markets[0];
     expect(p.actual).toBe(9);
     expect(p.play).toMatchObject({ side: "over", line: 2.5, price: -172, book: "draftkings", outcome: "W" });
     expect(p.play!.net).toBeCloseTo(0.581, 3);
     expect(p.rw).toMatchObject({ side: "under", outcome: "L", net: -1 });
+    expect(p.espn).toMatchObject({ side: "over", outcome: "W" });
     expect(r.markets[1]).toEqual({ id: "pass_yds|Bo Nix", actual: null, play: null, lean: null });
     expect(r.void).toBe(1);
   });
@@ -104,5 +106,47 @@ describe("prop trends", () => {
     expect(t.slices.find((x) => x.id === "play:under")!.n).toBe(0);
     expect(t.findings[0]).toMatch(/beating the prices/);
     expect(sliceBets(many, "play:all").filter((b) => b.week >= 8)).toHaveLength(33);
+  });
+});
+
+describe("ESPN projections and DraftKings lines", () => {
+  it("reads the week's projection by stat id and drops duplicate names", () => {
+    const idx = indexEspnProjections(
+      [
+        { player: { fullName: "Jaxon Smith-Njigba", stats: [{ id: "1120266", stats: { "42": 90.64, "53": 6.7 } }, { id: "102026", stats: { "42": 1122 } }] } },
+        { player: { fullName: "Mike Williams", stats: [{ id: "1120266", stats: { "42": 30 } }] } },
+        { player: { fullName: "Mike Williams", stats: [{ id: "1120266", stats: { "42": 50 } }] } },
+      ],
+      2026,
+      6,
+    );
+    const out = espnFor(g.markets, idx);
+    expect(out["rec_yds|Jaxon Smith-Njigba"]).toBe(90.6);
+    expect(out["rec|Jaxon Smith-Njigba"]).toBe(6.7);
+    expect(idx.get("mikewilliams")).toEqual({});
+  });
+
+  it("reads open and current lines per athlete and stat", () => {
+    const lines = indexDkLines([
+      { type: { name: "Total Receptions (incl. overtime)" }, athlete: { $ref: ".../athletes/4430878?lang=en" }, open: { target: { value: 6.5 } }, current: { target: { value: 7.5 } } },
+      { type: { name: "Total Receptions (incl. overtime)" }, athlete: { $ref: ".../athletes/4430878?lang=en" }, open: { target: { value: 9 } }, current: { target: { value: 9 } } },
+      { type: { name: "First Touchdown Scorer" }, athlete: { $ref: ".../athletes/1" }, open: {}, current: {} },
+    ]);
+    expect(lines.size).toBe(1);
+    const out = dkFor(g.markets, lines, new Map([["jaxonsmithnjigba", "4430878"]]));
+    expect(out["rec|Jaxon Smith-Njigba"]).toEqual({ open: 6.5, current: 7.5 });
+  });
+
+  it("splits Sam's plays by which way DraftKings moved", () => {
+    const box = JSON.parse(fx("espn-box-tb-dal.json")).boxscore.players as EspnBoxTeam[];
+    const pick = { ...g.markets.find((m) => m.id === "rec|Courtland Sutton")!, id: "rec|George Pickens", player: "George Pickens", team: "DAL" };
+    const game: PropsGame = { ...g, favorites: [], markets: [pick] };
+    const x: GradedPropsGame = { week: 6, slug: "s", game, result: gradeGame(game, box, { rw: { [pick.id]: 3 }, espn: { [pick.id]: 3.4 } }), dk: { [pick.id]: { open: 2.5, current: 3.5 } }, rw: { [pick.id]: 3 }, espn: { [pick.id]: 3.4 } };
+    const t = propTrends([x]);
+    expect(t.slices.find((s) => s.id === "play:dk-toward")!.n).toBe(1);
+    expect(t.slices.find((s) => s.id === "play:dk-against")!.n).toBe(0);
+    expect(t.slices.find((s) => s.id === "play:all3")!.n).toBe(1);
+    expect(t.slices.find((s) => s.id === "espn:all")!.w).toBe(1);
+    expect(t.accuracy[0].espn).toBe(5.6);
   });
 });

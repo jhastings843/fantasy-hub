@@ -78,6 +78,8 @@ export interface GradedMarket {
   lean: GradedBet | null;
   /** Rotowire's lean from the same line, when its projection was saved. */
   rw?: GradedBet | null;
+  /** ESPN's projection's lean, the same way. */
+  espn?: GradedBet | null;
 }
 
 export interface GradedGame {
@@ -110,7 +112,13 @@ function bet(m: PropMarket, side: Side | null, actual: number): GradedBet | null
 /** Is this one of Sam's plays (the gap clears the vig)? */
 export const isPlay = (m: PropMarket) => m.clears && m.side !== null;
 
-export function gradeGame(g: PropsGame, players: EspnBoxTeam[], rw: { [id: string]: number } = {}): GradedGame {
+const leanOf = (m: PropMarket, x: number | undefined): Side | null => (x === undefined ? null : x > m.line ? "over" : x < m.line ? "under" : null);
+
+export function gradeGame(
+  g: PropsGame,
+  players: EspnBoxTeam[],
+  alts: { rw?: { [id: string]: number }; espn?: { [id: string]: number } } = {},
+): GradedGame {
   const box = boxStats(players);
   let voids = 0;
   const markets: GradedMarket[] = g.markets.map((m) => {
@@ -120,14 +128,15 @@ export function gradeGame(g: PropsGame, players: EspnBoxTeam[], rw: { [id: strin
       return { id: m.id, actual: null, play: null, lean: null };
     }
     const actual = r[m.stat];
-    const r2 = rw[m.id];
-    const rwLean: Side | null = r2 === undefined ? null : r2 > m.line ? "over" : r2 < m.line ? "under" : null;
+    const r2 = alts.rw?.[m.id];
+    const e2 = alts.espn?.[m.id];
     return {
       id: m.id,
       actual,
       play: isPlay(m) ? bet(m, m.side, actual) : null,
       lean: bet(m, m.lean, actual),
-      ...(r2 !== undefined ? { rw: bet(m, rwLean, actual) } : {}),
+      ...(r2 !== undefined ? { rw: bet(m, leanOf(m, r2), actual) } : {}),
+      ...(e2 !== undefined ? { espn: bet(m, leanOf(m, e2), actual) } : {}),
     };
   });
   return { markets, void: voids };
