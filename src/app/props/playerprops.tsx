@@ -1,10 +1,12 @@
-// Player props: Sam's prop model, saved before kickoff with Rotowire's
-// projection for the same markets, graded from ESPN's box score. This week,
-// results, research (the slices and the system they feed). NFL only.
+// Player props: Sam's prop model, saved before kickoff with Rotowire's, ESPN's
+// and David Sasser's projections for the same markets, graded from ESPN's box
+// score. David's own board (six markets at DraftKings) is saved and graded
+// beside it for comparison. This week, results, research. NFL only.
 import { STAT_LABEL, type PropMarket, type Side } from "@/lib/props/parse";
 import { isPlay } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
 import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
+import { DAVID_LABEL, DAVID_URL, davidSide, type DavidGame, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
 import s from "../picks/picks.module.css";
 
@@ -69,6 +71,7 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
           `Sam ${m.model}`,
           rw !== undefined ? `Rotowire ${rw}` : null,
           espn !== undefined ? `ESPN ${espn}` : null,
+          saved.david?.[m.id] !== undefined ? `David ${saved.david[m.id]}` : null,
           `market ${m.consensus}`,
           dk && dk.open !== dk.current ? `DK opened ${dk.open}` : null,
         ]
@@ -134,6 +137,7 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
                 <th>Sam</th>
                 <th>RW</th>
                 <th>ESPN</th>
+                <th>David</th>
                 <th>Line</th>
                 <th>Lean</th>
                 {saved.result && <th>Actual</th>}
@@ -149,6 +153,7 @@ function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
                     <td className={s.num}>{m.model}</td>
                     <td className={s.num}>{saved.rw?.[m.id] ?? "–"}</td>
                     <td className={s.num}>{saved.espn?.[m.id] ?? "–"}</td>
+                    <td className={s.num}>{saved.david?.[m.id] ?? "–"}</td>
                     <td className={s.num}>{m.line}</td>
                     <td>{m.lean ? (m.lean === "over" ? "O" : "U") : "–"}</td>
                     {saved.result && (
@@ -172,10 +177,12 @@ export async function PropsWeek({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
   const games = Object.values(v.current).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "") || a.game.slug.localeCompare(b.game.slug));
-  if (!games.length) return <Empty />;
+  const davidNow = v.david.week !== null && (v.week === null || v.david.week >= v.week) ? v.david.games : [];
+  if (!games.length && !davidNow.length) return <Empty />;
   const live = v.system.filter((e) => !e.retired);
   return (
-    <section className={s.section} aria-labelledby="pp-week">
+    <>
+    {games.length > 0 && <section className={s.section} aria-labelledby="pp-week">
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-week">{`Week ${v.week} player props`}</h2>
         <p className={s.p}>
@@ -191,6 +198,109 @@ export async function PropsWeek({ season }: { season: number }) {
           <GameCard key={g.game.slug} saved={g} v={v} />
         ))}
       </ol>
+    </section>}
+    {davidNow.length > 0 && <DavidWeek week={v.david.week!} games={davidNow} />}
+    </>
+  );
+}
+
+const dShort: { [k: string]: string } = {
+  passing_yards: "pass yds",
+  pass_attempts: "pass att",
+  rushing_yards: "rush yds",
+  rush_attempts: "rush att",
+  receiving_yards: "rec yds",
+  receptions: "rec",
+};
+/** How far his number sits from the total, measured against his own 80% range (so a 0.5 rushing line doesn't top the list). */
+const dReach = (p: DavidProp) => Math.abs(p.projection - p.line) / (p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1));
+
+/** David's board this week: his projection against DraftKings, game by game, biggest gaps first. */
+function DavidWeek({ week, games }: { week: number; games: DavidGame[] }) {
+  const sorted = [...games].sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.gameId.localeCompare(b.gameId));
+  const total = games.reduce((a, g) => a + g.props.length, 0);
+  return (
+    <section className={s.section} aria-labelledby="pp-david">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id="pp-david">{`David's board, Week ${week}`}</h2>
+        <p className={s.p}>
+          {`David Sasser's own projections for ${total} props in six markets, set against DraftKings' total. For comparison and research only: each is graded the way his number points, 1 unit at DraftKings' price, and kept apart from Sam's record. Biggest gaps first, measured against his own 80% range.`}
+        </p>
+      </div>
+      <ol className={s.ftdGames}>
+        {sorted.map((g) => {
+          const [, , away, home] = g.gameId.split("_");
+          const props = [...g.props].sort((a, b) => dReach(b) - dReach(a));
+          const res = new Map((g.result ?? []).map((r) => [r.id, r]));
+          const net = g.result ? g.result.reduce((a, r) => a + r.net, 0) : null;
+          const top = props[0];
+          return (
+            <li key={g.gameId}>
+              <details className={s.ftdGame}>
+                <summary className={s.ftdSum}>
+                  <span className={s.ftdWhen}>
+                    <b>{`${away} at ${home}`}</b>
+                    <span className={s.dim}>{whenEt(g.kickoff)}</span>
+                  </span>
+                  <span className={s.ftdPick}>
+                    <span className={s.ftdPickName}>{`${props.length} props`}</span>
+                    <span className={`${s.dim} ${s.num}`}>{`${props.filter((p) => davidSide(p) === "over").length} over · ${props.filter((p) => davidSide(p) === "under").length} under`}</span>
+                  </span>
+                  <span className={s.ftdOdds}>{top ? `Top: ${top.player} ${davidSide(top) ? sideWord(davidSide(top)!) : "at"} ${top.line} ${dShort[top.market]} (his ${top.projection})` : ""}</span>
+                  <span className={s.ftdFlags}>
+                    {net !== null && <span className={`${s.resChip} ${net > 0 ? s.resW : net < 0 ? s.resL : s.resP}`}>{u(net)}</span>}
+                    <span className={s.chev} aria-hidden>›</span>
+                  </span>
+                </summary>
+                <div className={s.ftdBody}>
+                  <div className={s.tw}>
+                    <table className={s.table}>
+                      <thead>
+                        <tr>
+                          <th>Player</th>
+                          <th>Stat</th>
+                          <th>David</th>
+                          <th>DK</th>
+                          <th>Side</th>
+                          <th>Price</th>
+                          <th>80% range</th>
+                          {g.result && <th>Actual</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {props.map((p) => {
+                          const side = davidSide(p);
+                          const price = side === "over" ? p.over : side === "under" ? p.under : null;
+                          const r = res.get(p.id);
+                          const moved = g.first[p.id] !== undefined && g.first[p.id] !== p.line ? g.first[p.id] : null;
+                          return (
+                            <tr key={p.id}>
+                              <td>{`${p.player} `}<span className={s.dim}>{p.team}</span></td>
+                              <td>{dShort[p.market]}</td>
+                              <td className={s.num}>{p.projection}</td>
+                              <td className={s.num}>
+                                {p.line}
+                                {moved !== null && <span className={s.dim}>{` (was ${moved})`}</span>}
+                              </td>
+                              <td>{side ? (side === "over" ? "O" : "U") : "–"}</td>
+                              <td className={s.num}>{price !== null ? am(price) : "–"}</td>
+                              <td className={`${s.num} ${s.dim}`}>{p.lower !== null && p.upper !== null ? `${p.lower}–${p.upper}` : "–"}</td>
+                              {g.result && (
+                                <td className={`${s.num} ${r?.outcome === "W" ? s.resW : r?.outcome === "L" ? s.resL : ""}`}>{r?.actual ?? "DNP"}</td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className={`${s.ftdNote} ${s.dim}`}>{`Saved ${whenEt(g.capturedAt)} (his model updated ${g.updatedAt})${g.result ? ", graded" : ""}.`}</p>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -204,7 +314,7 @@ function Tile({ value, label }: { value: string; label: string }) {
   );
 }
 
-const recOf = (x: PropSlice | undefined) => (x ? `${x.w}-${x.l}${x.p ? `-${x.p}` : ""}` : "0-0");
+const recOf = (x: Pick<PropSlice, "w" | "l" | "p"> | undefined) => (x ? `${x.w}-${x.l}${x.p ? `-${x.p}` : ""}` : "0-0");
 
 export async function PropsResults({ season }: { season: number }) {
   const v = await load(season);
@@ -212,6 +322,7 @@ export async function PropsResults({ season }: { season: number }) {
   if (!v.graded.length) return <Empty />;
   const t = v.trends;
   const get = (id: string) => t.slices.find((x) => x.id === id);
+  const dAll = v.david.trends.slices.find((x) => x.id === "all");
   const plays = v.graded.flatMap((x) =>
     x.result.markets.flatMap((r) => {
       const m = x.game.markets.find((y) => y.id === r.id);
@@ -230,6 +341,8 @@ export async function PropsResults({ season }: { season: number }) {
         <Tile value={u(get("lean:all")?.units ?? 0)} label={`Sam's projection, every market · ${recOf(get("lean:all"))}`} />
         <Tile value={u(get("rw:all")?.units ?? 0)} label={`Rotowire's projection · ${recOf(get("rw:all"))}`} />
         <Tile value={u(get("espn:all")?.units ?? 0)} label={`ESPN's projection · ${recOf(get("espn:all"))}`} />
+        {(get("david:all")?.n ?? 0) > 0 && <Tile value={u(get("david:all")?.units ?? 0)} label={`David's projection, Sam's markets · ${recOf(get("david:all"))}`} />}
+        {(dAll?.n ?? 0) > 0 && <Tile value={u(dAll!.units)} label={`David's own board · ${recOf(dAll)}`} />}
       </div>
       {plays.length > 0 && (
         <div className={s.tw}>
@@ -273,7 +386,9 @@ const VERDICT: { [v in Verdict]: string } = {
   losing: "losing",
 };
 
-function SliceTable({ title, rows, active }: { title: string; rows: PropSlice[]; active: string[] }) {
+type SliceRow = Pick<PropSlice, "id" | "label" | "w" | "l" | "p" | "units" | "needed" | "move" | "verdict" | "z">;
+
+function SliceTable({ title, rows, active }: { title: string; rows: SliceRow[]; active: string[] }) {
   return (
     <div className={s.tw}>
       <table className={s.table}>
@@ -316,9 +431,10 @@ function SliceTable({ title, rows, active }: { title: string; rows: PropSlice[];
 export async function PropsResearch({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
-  if (!v.graded.length) return <Empty />;
+  if (!v.graded.length && !v.david.trends.games) return <Empty />;
   const t = v.trends;
   const group = (g: PropSlice["group"]) => t.slices.filter((x) => x.group === g);
+  const dt = v.david.trends;
   return (
     <section className={s.section} aria-labelledby="pp-research">
       <div className={s.sectionHead}>
@@ -374,7 +490,7 @@ export async function PropsResearch({ season }: { season: number }) {
       </div>
 
       <SliceTable title="Sam's plays" rows={group("play")} active={v.active} />
-      <SliceTable title="Projection only: the side each number points to, every market" rows={[...group("lean"), ...group("rw"), ...group("espn")]} active={v.active} />
+      <SliceTable title="Projection only: the side each number points to, every market" rows={[...group("lean"), ...group("rw"), ...group("espn"), ...group("david")]} active={v.active} />
 
       {t.accuracy.length > 0 && (
         <div className={s.tw}>
@@ -387,6 +503,7 @@ export async function PropsResearch({ season }: { season: number }) {
                 <th>Sam</th>
                 <th>Rotowire</th>
                 <th>ESPN</th>
+                <th>David</th>
                 <th>Market line</th>
                 <th>Sam closer</th>
               </tr>
@@ -399,6 +516,7 @@ export async function PropsResearch({ season }: { season: number }) {
                   <td className={`${s.num} ${a.model < a.market ? s.pos : ""}`}>{a.model}</td>
                   <td className={`${s.num} ${a.rw !== null && a.rw < a.market ? s.pos : ""}`}>{a.rw ?? "–"}</td>
                   <td className={`${s.num} ${a.espn !== null && a.espn < a.market ? s.pos : ""}`}>{a.espn ?? "–"}</td>
+                  <td className={`${s.num} ${a.david !== null && a.david < a.market ? s.pos : ""}`}>{a.david ?? "–"}</td>
                   <td className={s.num}>{a.market}</td>
                   <td className={s.num}>{`${Math.round((a.closer / a.n) * 100)}%`}</td>
                 </tr>
@@ -407,10 +525,57 @@ export async function PropsResearch({ season }: { season: number }) {
           </table>
         </div>
       )}
+      <DavidResearch slices={dt.slices} accuracy={dt.accuracy} games={dt.games} />
       <p className={`${s.notice} ${s.dim}`}>
-        {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). The projection rows ignore that and bet the way the number points, at the same book's price. Rotowire's projections come through Sleeper's free feed, matched by name and team; ESPN's from its fantasy projections, matched by name. DraftKings' opening line comes from ESPN's odds feed; the line-move slices compare it with DraftKings' last pregame line. A player missing from the box score voids the market. Sources: "}
-        <a href={SAM}>Sam&apos;s Models</a> props pages, Sleeper (Rotowire), ESPN projections, odds and box scores.
+        {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). The projection rows ignore that and bet the way the number points, at the same book's price. Rotowire's projections come through Sleeper's free feed, matched by name and team; ESPN's from its fantasy projections, matched by name; David's from his props board, matched by game, name and team. DraftKings' opening line comes from ESPN's odds feed; the line-move slices compare it with DraftKings' last pregame line. A player missing from the box score voids the market. Sources: "}
+        <a href={SAM}>Sam&apos;s Models</a> props pages, <a href={DAVID_URL}>David Sasser&apos;s props board</a>, Sleeper (Rotowire), ESPN projections, odds and box scores.
       </p>
     </section>
+  );
+}
+
+/** David's own board: his record at DraftKings by market and size of gap, and how close his numbers land. */
+function DavidResearch({ slices, accuracy, games }: { slices: DavidSlice[]; accuracy: { market: keyof typeof DAVID_LABEL; n: number; model: number; line: number; closer: number; inRange: number | null }[]; games: number }) {
+  return (
+    <>
+      <div className={s.sectionHead}>
+        <h3 className={s.h2}>David&apos;s own board</h3>
+        <p className={s.p}>
+          {games
+            ? `${games} game${games > 1 ? "s" : ""} graded. Every prop on his board bet the way his number points, at DraftKings' total and price. The 80% column checks his stated range: a well-built range catches about 80% of results.`
+            : "Nothing graded yet. His board is saved before each kickoff and graded once the game is final, the same as Sam's."}
+        </p>
+      </div>
+      {games > 0 && <SliceTable title="David's board at DraftKings" rows={slices} active={[]} />}
+      {accuracy.length > 0 && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <caption className={s.caption}>David&apos;s number against DraftKings&apos; total: average miss</caption>
+            <thead>
+              <tr>
+                <th>Market</th>
+                <th>Props</th>
+                <th>David</th>
+                <th>DK total</th>
+                <th>David closer</th>
+                <th>Inside 80%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accuracy.map((a) => (
+                <tr key={a.market}>
+                  <td>{DAVID_LABEL[a.market]}</td>
+                  <td className={s.num}>{a.n}</td>
+                  <td className={`${s.num} ${a.model < a.line ? s.pos : ""}`}>{a.model}</td>
+                  <td className={s.num}>{a.line}</td>
+                  <td className={s.num}>{`${Math.round((a.closer / a.n) * 100)}%`}</td>
+                  <td className={s.num}>{a.inRange !== null ? `${Math.round(a.inRange * 100)}%` : "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }

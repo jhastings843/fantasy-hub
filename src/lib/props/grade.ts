@@ -80,6 +80,8 @@ export interface GradedMarket {
   rw?: GradedBet | null;
   /** ESPN's projection's lean, the same way. */
   espn?: GradedBet | null;
+  /** David Sasser's projection's lean, the same way. */
+  david?: GradedBet | null;
 }
 
 export interface GradedGame {
@@ -117,7 +119,7 @@ const leanOf = (m: PropMarket, x: number | undefined): Side | null => (x === und
 export function gradeGame(
   g: PropsGame,
   players: EspnBoxTeam[],
-  alts: { rw?: { [id: string]: number }; espn?: { [id: string]: number } } = {},
+  alts: { rw?: { [id: string]: number }; espn?: { [id: string]: number }; david?: { [id: string]: number } } = {},
 ): GradedGame {
   const box = boxStats(players);
   let voids = 0;
@@ -130,6 +132,7 @@ export function gradeGame(
     const actual = r[m.stat];
     const r2 = alts.rw?.[m.id];
     const e2 = alts.espn?.[m.id];
+    const d2 = alts.david?.[m.id];
     return {
       id: m.id,
       actual,
@@ -137,6 +140,7 @@ export function gradeGame(
       lean: bet(m, m.lean, actual),
       ...(r2 !== undefined ? { rw: bet(m, leanOf(m, r2), actual) } : {}),
       ...(e2 !== undefined ? { espn: bet(m, leanOf(m, e2), actual) } : {}),
+      ...(d2 !== undefined ? { david: bet(m, leanOf(m, d2), actual) } : {}),
     };
   });
   return { markets, void: voids };

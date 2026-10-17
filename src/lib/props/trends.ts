@@ -33,6 +33,8 @@ export interface GradedPropsGame {
   rw?: { [id: string]: number };
   /** ESPN's fantasy projection per market. */
   espn?: { [id: string]: number };
+  /** David Sasser's projection per market. */
+  david?: { [id: string]: number };
   /** DraftKings' opening and current line per market (ESPN odds feed). */
   dk?: { [id: string]: { open: number; current: number } };
   /** Copy read after kickoff: why it is still trusted. */
@@ -43,7 +45,7 @@ export type Verdict = "early" | "flat" | "lean-up" | "lean-down" | "profitable" 
 
 export interface PropSlice {
   id: string;
-  group: "play" | "lean" | "rw" | "espn";
+  group: "play" | "lean" | "rw" | "espn" | "david";
   label: string;
   /** Decided bets (pushes excluded). */
   n: number;
@@ -72,6 +74,8 @@ export interface Accuracy {
   rw: number | null;
   /** Mean absolute miss of ESPN's projection, on the markets it covered. */
   espn: number | null;
+  /** Mean absolute miss of David's projection, on the markets he covered. */
+  david: number | null;
 }
 
 export interface PropTrends {
@@ -92,6 +96,7 @@ interface Row {
   /** Rotowire's projection for the market, when saved. */
   rw?: number;
   espn?: number;
+  david?: number;
   dk?: { open: number; current: number };
 }
 
@@ -130,7 +135,7 @@ function slice(id: string, group: PropSlice["group"], label: string, rows: Row[]
 
 const groupOf = (id: string): PropSlice["group"] => {
   const g = id.split(":")[0];
-  return g === "play" || g === "rw" || g === "espn" ? g : "lean";
+  return g === "play" || g === "rw" || g === "espn" || g === "david" ? g : "lean";
 };
 const STATS: Stat[] = ["pass_yds", "rush_yds", "rec_yds", "rec"];
 /** How far the projection sits from the line, as a share of the line. */
@@ -142,7 +147,8 @@ export function propTrends(list: GradedPropsGame[]): PropTrends {
   const leans: Row[] = [];
   const rws: Row[] = [];
   const espns: Row[] = [];
-  const acc = new Map<Stat, { n: number; model: number; market: number; closer: number; rwN: number; rw: number; eN: number; e: number }>();
+  const davids: Row[] = [];
+  const acc = new Map<Stat, { n: number; model: number; market: number; closer: number; rwN: number; rw: number; eN: number; e: number; dN: number; d: number }>();
   let markets = 0;
   for (const x of list) {
     const byId = new Map(x.game.markets.map((m) => [m.id, m]));
@@ -153,13 +159,19 @@ export function propTrends(list: GradedPropsGame[]): PropTrends {
       const first = x.first?.[m.id];
       const rw = x.rw?.[m.id];
       const espn = x.espn?.[m.id];
-      const base = { week: x.week, slug: x.slug, m, g, first, rw, espn, dk: x.dk?.[m.id] };
+      const david = x.david?.[m.id];
+      const base = { week: x.week, slug: x.slug, m, g, first, rw, espn, david, dk: x.dk?.[m.id] };
       if (g.play) plays.push({ ...base, bet: g.play });
       if (g.lean) leans.push({ ...base, bet: g.lean });
       if (g.rw) rws.push({ ...base, bet: g.rw });
       if (g.espn) espns.push({ ...base, bet: g.espn });
+      if (g.david) davids.push({ ...base, bet: g.david });
       if (m.stat) {
-        const a = acc.get(m.stat) ?? { n: 0, model: 0, market: 0, closer: 0, rwN: 0, rw: 0, eN: 0, e: 0 };
+        const a = acc.get(m.stat) ?? { n: 0, model: 0, market: 0, closer: 0, rwN: 0, rw: 0, eN: 0, e: 0, dN: 0, d: 0 };
+        if (david !== undefined) {
+          a.dN++;
+          a.d += Math.abs(g.actual - david);
+        }
         if (espn !== undefined) {
           a.eN++;
           a.e += Math.abs(g.actual - espn);
@@ -180,14 +192,14 @@ export function propTrends(list: GradedPropsGame[]): PropTrends {
   }
 
   const slices: PropSlice[] = SLICES.map(([id, label]) =>
-    slice(id, groupOf(id), label, ({ play: plays, rw: rws, espn: espns, lean: leans }[groupOf(id)]).filter((r) => matches(id, r, list))),
+    slice(id, groupOf(id), label, ({ play: plays, rw: rws, espn: espns, david: davids, lean: leans }[groupOf(id)]).filter((r) => matches(id, r, list))),
   );
 
   const accuracy: Accuracy[] = STATS.flatMap((stat) => {
     const a = acc.get(stat);
     if (!a?.n) return [];
     const r = (x: number) => Math.round((x / a.n) * 10) / 10;
-    return [{ stat, n: a.n, model: r(a.model), market: r(a.market), closer: a.closer, rw: a.rwN ? Math.round((a.rw / a.rwN) * 10) / 10 : null, espn: a.eN ? Math.round((a.e / a.eN) * 10) / 10 : null }];
+    return [{ stat, n: a.n, model: r(a.model), market: r(a.market), closer: a.closer, rw: a.rwN ? Math.round((a.rw / a.rwN) * 10) / 10 : null, espn: a.eN ? Math.round((a.e / a.eN) * 10) / 10 : null, david: a.dN ? Math.round((a.d / a.dN) * 10) / 10 : null }];
   });
 
   const findings = slices
@@ -219,6 +231,7 @@ export const SLICES: [string, string][] = [
   ["play:rw-agree", "Plays Rotowire's projection backs"],
   ["play:espn-agree", "Plays ESPN's projection backs"],
   ["play:all3", "Plays both Rotowire and ESPN back"],
+  ["play:david-agree", "Plays David's projection backs"],
   ["play:dk-toward", "DraftKings moved toward the play since its open"],
   ["play:dk-against", "DraftKings moved against the play since its open"],
   ["lean:all", "Projection lean, every market"],
@@ -231,8 +244,10 @@ export const SLICES: [string, string][] = [
   ["lean:noplay", "Lean where Sam has no play"],
   ["lean:rw-agree", "Sam and Rotowire lean the same way"],
   ["lean:all3", "Sam, Rotowire and ESPN all lean the same way"],
+  ["lean:david-agree", "Sam and David lean the same way"],
   ["rw:all", "Rotowire lean, every market"],
   ["espn:all", "ESPN lean, every market"],
+  ["david:all", "David lean, every market he covers"],
 ];
 
 function isFavorite(list: GradedPropsGame[], r: Row): boolean {
@@ -252,9 +267,9 @@ export function sliceBets(list: GradedPropsGame[], id: string): { week: number; 
       const m = byId.get(g.id);
       if (!m || g.actual === null) continue;
       const grp = groupOf(id);
-      const bet = grp === "play" ? g.play : grp === "rw" ? g.rw : grp === "espn" ? g.espn : g.lean;
+      const bet = grp === "play" ? g.play : grp === "rw" ? g.rw : grp === "espn" ? g.espn : grp === "david" ? g.david : g.lean;
       if (!bet) continue;
-      if (matches(id, { week: x.week, slug: x.slug, m, g, bet, rw: x.rw?.[m.id], espn: x.espn?.[m.id], dk: x.dk?.[m.id] }, list)) out.push({ week: x.week, slug: x.slug, market: m, bet });
+      if (matches(id, { week: x.week, slug: x.slug, m, g, bet, rw: x.rw?.[m.id], espn: x.espn?.[m.id], david: x.david?.[m.id], dk: x.dk?.[m.id] }, list)) out.push({ week: x.week, slug: x.slug, market: m, bet });
     }
   }
   return out;
@@ -270,6 +285,7 @@ export function matches(id: string, r: Row, list: GradedPropsGame[]): boolean {
   if (key === "over" || key === "under") return side === key;
   if (key === "rw-agree") return rwSide(m, r.rw) === side;
   if (key === "espn-agree") return rwSide(m, r.espn) === side;
+  if (key === "david-agree") return rwSide(m, r.david) === side && (group !== "lean" || m.lean === side);
   if (key === "all3") return rwSide(m, r.rw) === side && rwSide(m, r.espn) === side && (group !== "lean" || m.lean === side);
   if (key === "dk-toward" || key === "dk-against") {
     if (!r.dk || r.dk.current === r.dk.open) return false;

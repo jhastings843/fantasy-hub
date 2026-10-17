@@ -5,6 +5,7 @@ import { parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./pa
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
 import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
+import { davidFor, davidTrends, fetchDavidSlate, gradeDavid, type DavidGame, type DavidSlate, type DavidTrends } from "./david";
 import { MIN_BETS, propTrends, sliceBets, SLICES, Z_RETIRE, type GradedPropsGame, type PropTrends } from "./trends";
 
 // The props tracker's memory, built like the first TD tracker: Sam keeps only
@@ -24,6 +25,9 @@ const UA = { "user-agent": "Mozilla/5.0 (fantasy-hub props tracker)" };
 const weekKey = (season: number, week: number) => `props:v1:${season}:w${week}`;
 const weeksKey = (season: number) => `props:v1:${season}:weeks`;
 const systemKey = (season: number) => `props:v1:${season}:system`;
+// David Sasser's own board: one hash per week (field = game id), and its weeks.
+const davidKey = (season: number, week: number) => `props:v1:${season}:david:w${week}`;
+const davidWeeksKey = (season: number) => `props:v1:${season}:david:weeks`;
 
 export interface StoredProps {
   game: PropsGame;
@@ -35,6 +39,8 @@ export interface StoredProps {
   rw?: { [id: string]: number };
   /** ESPN's fantasy projection per market, from the latest copy's capture. */
   espn?: { [id: string]: number };
+  /** David Sasser's projection per market, from the latest copy's capture. */
+  david?: { [id: string]: number };
   /** DraftKings' opening and latest pregame line per market (ESPN odds feed). */
   dk?: { [id: string]: { open: number; current: number } };
   kickoff?: string;
@@ -100,6 +106,36 @@ export async function loadSystem(season: number): Promise<SystemEntry[]> {
   return Object.values(h).sort((a, b) => a.since - b.since || a.id.localeCompare(b.id));
 }
 
+export async function loadDavidWeek(season: number, week: number): Promise<{ [gameId: string]: DavidGame }> {
+  return (await redis.hgetall<{ [gameId: string]: DavidGame }>(davidKey(season, week))) ?? {};
+}
+
+/** Save David's pregame board, game by game (the latest pregame copy wins; the first copy's totals are kept). */
+async function saveDavid(slate: DavidSlate, now: Date): Promise<string[]> {
+  const have = await loadDavidWeek(slate.season, slate.week);
+  const byGame = new Map<string, DavidSlate["props"]>();
+  for (const p of slate.props) byGame.set(p.gameId, [...(byGame.get(p.gameId) ?? []), p]);
+  const saved: string[] = [];
+  for (const [gameId, props] of byGame) {
+    const kickoff = props[0].kickoff;
+    if (!kickoff || new Date(kickoff) <= now) continue;
+    const old = have[gameId];
+    const g: DavidGame = {
+      gameId,
+      kickoff,
+      props,
+      capturedAt: now.toISOString(),
+      firstSeenAt: old?.firstSeenAt ?? now.toISOString(),
+      first: { ...Object.fromEntries(props.map((p) => [p.id, p.line])), ...old?.first },
+      updatedAt: slate.updatedAt,
+    };
+    await redis.hset(davidKey(slate.season, slate.week), { [gameId]: g });
+    saved.push(gameId);
+  }
+  if (saved.length) await redis.sadd(davidWeeksKey(slate.season), String(slate.week));
+  return saved;
+}
+
 export interface PropsRunReport {
   week: number | null;
   captured: string[];
@@ -107,12 +143,22 @@ export interface PropsRunReport {
   missed: string[];
   graded: string[];
   system: string[];
+  /** David's board: games saved and graded this run. */
+  david: { week: number | null; saved: string[]; graded: string[] };
   problems: string[];
 }
 
 /** Save this week's pregame props pages, grade finals, update the system. Safe to call any time. */
 export async function runProps(now = new Date()): Promise<PropsRunReport> {
-  const report: PropsRunReport = { week: null, captured: [], kept: [], missed: [], graded: [], system: [], problems: [] };
+  const report: PropsRunReport = { week: null, captured: [], kept: [], missed: [], graded: [], system: [], david: { week: null, saved: [], graded: [] }, problems: [] };
+  let slate: DavidSlate | null = null;
+  try {
+    slate = await fetchDavidSlate();
+    report.david.week = slate.week;
+    report.david.saved = await saveDavid(slate, now);
+  } catch (e) {
+    report.problems.push(`David's board: ${e instanceof Error ? e.message : String(e)}`);
+  }
   let slugs: string[] = [];
   try {
     slugs = parsePropsLinks(await get(SAM_BOARD));
@@ -157,6 +203,8 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
         const firstLines = { ...Object.fromEntries(g.markets.map((m) => [m.id, m.consensus])), ...old?.first };
         const rw = rwIdx ? projectionsFor(g.markets, rwIdx) : old?.rw;
         const espnProj = espnIdx ? espnFor(g.markets, espnIdx) : old?.espn;
+        const davidNow = slate && slate.season === first.season && slate.week === first.week ? davidFor(slug, g.markets, slate.props) : null;
+        const david = davidNow && Object.keys(davidNow).length ? davidNow : old?.david;
         let dk = old?.dk;
         if (ev) {
           try {
@@ -175,6 +223,7 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
           first: firstLines,
           ...(rw ? { rw } : {}),
           ...(espnProj ? { espn: espnProj } : {}),
+          ...(david ? { david } : {}),
           ...(dk ? { dk } : {}),
           ...(ev ? { kickoff: ev.kickoff, espnId: ev.id } : {}),
         });
@@ -205,10 +254,38 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
       try {
         const sum = JSON.parse(await get(`${ESPN}/summary?event=${ev.id}`)) as { boxscore?: { players?: EspnBoxTeam[] } };
         if (!sum.boxscore?.players?.length) throw new Error("no box score yet");
-        await saveGame(season, wk, slug, { ...g, result: gradeGame(g.game, sum.boxscore.players, { rw: g.rw, espn: g.espn }), gradedAt: now.toISOString(), espnId: ev.id });
+        await saveGame(season, wk, slug, { ...g, result: gradeGame(g.game, sum.boxscore.players, { rw: g.rw, espn: g.espn, david: g.david }), gradedAt: now.toISOString(), espnId: ev.id });
         report.graded.push(slug);
       } catch (e) {
         report.problems.push(`grade ${slug}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
+  // Grade David's board the same way, from the same box scores.
+  const dWeeks = ((await redis.smembers(davidWeeksKey(season))) ?? []).map(Number).sort((a, b) => a - b);
+  for (const wk of dWeeks) {
+    const games = await loadDavidWeek(season, wk);
+    const open = Object.values(games).filter((g) => !g.result);
+    if (!open.length) continue;
+    let espn: Awaited<ReturnType<typeof espnWeek>>;
+    try {
+      espn = await espnWeek(season, wk);
+    } catch (e) {
+      report.problems.push(`ESPN week ${wk} (David): ${e instanceof Error ? e.message : String(e)}`);
+      continue;
+    }
+    for (const g of open) {
+      const [, , away, home] = g.gameId.split("_");
+      const ev = espn.get(`${away}@${home}`);
+      if (!ev?.completed) continue;
+      try {
+        const sum = JSON.parse(await get(`${ESPN}/summary?event=${ev.id}`)) as { boxscore?: { players?: EspnBoxTeam[] } };
+        if (!sum.boxscore?.players?.length) throw new Error("no box score yet");
+        await redis.hset(davidKey(season, wk), { [g.gameId]: { ...g, result: gradeDavid(g.props, sum.boxscore.players), gradedAt: now.toISOString() } });
+        report.david.graded.push(g.gameId);
+      } catch (e) {
+        report.problems.push(`grade David ${g.gameId}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   }
@@ -247,7 +324,7 @@ async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
     .flatMap(([week, games]) =>
-      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, dk: g.dk, ...(g.late ? { late: g.late } : {}) }] : [])),
+      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, david: g.david, dk: g.dk, ...(g.late ? { late: g.late } : {}) }] : [])),
     )
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
@@ -268,6 +345,8 @@ export interface PropsView {
   system: SystemRecord[];
   /** Ids of active system slices, for marking this week's qualifying plays. */
   active: string[];
+  /** David Sasser's own board: the latest week saved, and his graded record. */
+  david: { week: number | null; games: DavidGame[]; trends: DavidTrends };
 }
 
 /** Everything the page shows, read from Redis only. */
@@ -283,7 +362,10 @@ export async function getPropsView(season: number): Promise<PropsView> {
     const l = bets.filter((b) => b.bet.outcome === "L").length;
     return { ...e, w, l, p: bets.length - w - l, units: Math.round(bets.reduce((a, b) => a + b.bet.net, 0) * 100) / 100 };
   });
-  return { season, week, current, graded, trends: propTrends(graded), system, active: sys.filter((e) => !e.retired).map((e) => e.id) };
+  const dNums = ((await redis.smembers(davidWeeksKey(season))) ?? []).map(Number).sort((a, b) => b - a);
+  const dAll = await Promise.all(dNums.map((n) => loadDavidWeek(season, n)));
+  const david = { week: dNums[0] ?? null, games: Object.values(dAll[0] ?? {}), trends: davidTrends(dAll.flatMap((h) => Object.values(h))) };
+  return { season, week, current, graded, trends: propTrends(graded), system, active: sys.filter((e) => !e.retired).map((e) => e.id), david };
 }
 
 export { MIN_BETS, SLICES };
