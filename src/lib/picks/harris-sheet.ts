@@ -81,6 +81,7 @@ const WHOLE: { [w: string]: string } = {
   jmu: "james madison", wku: "western kentucky", uconn: "uconn", ul: "louisiana", umass: "massachusetts", "miami oh": "miami oh", "miami-oh": "miami oh", "ole miss": "ole miss",
   "miss st": "mississippi state", "miss state": "mississippi state", "so miss": "southern miss", "ul monroe": "louisiana monroe", ulm: "louisiana monroe",
   "texas a&m": "texas a and m", "boston coll": "boston college", "j'ville st": "jacksonville state",
+  "jax st": "jacksonville state", "jax state": "jacksonville state", "a&m": "texas a&m", "tamu": "texas a&m",
 };
 
 /** Our folded key for one of his team names. */

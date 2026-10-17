@@ -12,6 +12,9 @@ describe("harrisKey", () => {
     expect(harrisKey("Miami-OH")).toBe("miami oh");
     expect(harrisKey("Ole Miss")).toBe("ole miss");
     expect(harrisKey("Pitt")).toBe("pittsburgh");
+    // Weeks 1, 2 and 4 picks that never graded until these were added (2026-10-17).
+    expect(harrisKey("Jax St")).toBe(harrisKey("J'ville St"));
+    expect(harrisKey("A&M")).toBe(harrisKey("Texas A&M"));
   });
 });
 
