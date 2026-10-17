@@ -10,9 +10,9 @@ import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import s from "./picks.module.css";
 
-type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
+export type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
 
-function statusOf(g: BoardGame): Status {
+export function statusOf(g: BoardGame): Status {
   if (g.final) return "final";
   if (g.basis === "started") return "started";
   if (g.issued) return "sent";
@@ -26,7 +26,7 @@ function statusOf(g: BoardGame): Status {
   return "priced";
 }
 
-const STATUS_TEXT: { [k in Status]: string } = {
+export const STATUS_TEXT: { [k in Status]: string } = {
   sent: "Sent",
   early: "Early look",
   bet: "Bet",
@@ -39,7 +39,7 @@ const STATUS_TEXT: { [k in Status]: string } = {
   pass: "Pass",
 };
 
-function pickText(g: BoardGame, name: (k: string) => string): string {
+export function pickText(g: BoardGame, name: (k: string) => string): string {
   if (g.side && g.homeLine !== undefined) return `${name(g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine : -g.homeLine)}`;
   if (g.read && (g.tier === "split" || g.tier === "wait"))
     return `Sam ${name(g.read.samSide === "home" ? g.home : g.away)} · David ${name(g.read.davidSide === "home" ? g.home : g.away)}`;

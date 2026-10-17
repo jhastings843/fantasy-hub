@@ -2,6 +2,10 @@ import Link from "next/link";
 import { VIEWS, type View } from "../picks/ui";
 import { FirstTdResearch, FirstTdResults, FirstTdWeek } from "./firsttd";
 import { PropsResearch, PropsResults, PropsWeek } from "./playerprops";
+import WeekSearch from "../picks/WeekSearch";
+import { getPropsView } from "@/lib/props/store";
+import { getFirstTdView } from "@/lib/firsttd/store";
+import { propsSearchIndex } from "./search";
 import s from "../picks/picks.module.css";
 
 // The Props tab: Sam's NFL player props and first touchdown models. Same
@@ -26,8 +30,10 @@ function href(m: PropsMarket, v: View) {
 /** The NFL season a date belongs to: January to July is the season before. */
 const seasonOf = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
 
-export default function PropsView({ market, view }: { market: PropsMarket; view: View }) {
+export default async function PropsView({ market, view }: { market: PropsMarket; view: View }) {
   const season = seasonOf(new Date());
+  const [pv, fv] = await Promise.all([getPropsView(season).catch(() => null), getFirstTdView(season).catch(() => null)]);
+  const entries = propsSearchIndex(pv, fv);
   return (
     <main className={s.page}>
       <div className={s.wrap}>
@@ -36,6 +42,9 @@ export default function PropsView({ market, view }: { market: PropsMarket; view:
             <span className={s.eyebrow}>{`NFL ${season}`}</span>
           </div>
           <h1 className={s.h1}>Props</h1>
+          {entries.length > 0 && (
+            <WeekSearch entries={entries} label="Search this week: Sam's props, David's board and first TD" placeholder="Player or team, e.g. Kelce or Chiefs" />
+          )}
           <nav className={s.tabs} aria-label="Market">
             {MARKETS.map((m) => (
               <Link key={m.id} href={href(m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.tab}>

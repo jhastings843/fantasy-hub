@@ -9,6 +9,8 @@ import { LearningPanel } from "./learning";
 import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
 import { LEAGUE_NAME, MARKETS, VIEWS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
+import WeekSearch from "./WeekSearch";
+import { picksSearchIndex } from "./search";
 import s from "./picks.module.css";
 
 // The Picks tab. Sport, then market, then view, all in the URL (?m=, ?v=),
@@ -61,6 +63,13 @@ export default async function PicksView({ league, market: asked, view }: { leagu
           </div>
           <h1 className={s.h1}>Picks</h1>
           <RiskStrip r={r} coreStale={fresh?.stale ?? false} coreAt={fresh?.at ?? r.generatedAt} />
+          {r.board.length > 0 && (
+            <WeekSearch
+              entries={picksSearchIndex(r)}
+              label={`Search ${r.week ? `Week ${r.week}` : "this week"}: spread, winner and total`}
+              placeholder={league === "nfl" ? "Team, e.g. Bills or KC" : "Team, e.g. Ohio State"}
+            />
+          )}
           {r.board.length > 0 && (
             <p className={`${s.progress} ${s.num}`}>
               {`${r.board.filter((g) => g.final).length}/${r.board.length} games have completed`}
