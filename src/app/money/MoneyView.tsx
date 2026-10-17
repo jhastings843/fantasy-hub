@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Kalshi, KalshiRow, Phil, PhilBet } from "@/lib/money/types";
+import type { Book, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
-// four paper stock books, all paper or unit-based. Bets live in this app;
+// paper stock books, all paper or unit-based. Bets live in this app;
 // Phil and the books are a snapshot posted from Jack's Mac after each run.
 // Kalshi is Phil's shadow record on a second venue, shown on its own tab and
 // never added into his Polymarket numbers.
@@ -277,7 +277,7 @@ function BookPanel({ b }: { b: Book }) {
   return (
     <div className={m.panel}>
       <div className={m.panelHead}>
-        <h2 className={m.panelTitle}>{b.label}</h2>
+        <h2 className={m.panelTitle}>{b.label}{b.retired ? <span className={s.muted}>{` retired ${b.retired}`}</span> : null}</h2>
         <span className={`${s.num} ${tone(ret)}`}>{pct(ret)}{spy !== null ? <span className={s.muted}>{` vs SPY ${pct(spy)}`}</span> : null}</span>
       </div>
       <p className={m.sub}>{b.about}</p>
@@ -306,13 +306,49 @@ function BookPanel({ b }: { b: Book }) {
   );
 }
 
-function BooksTab({ books }: { books: Book[] }) {
+const TAG: Record<string, string> = { open: m.tagOpen, retire: m.tagRetire, fix: m.tagFix, watch: m.tagWatch };
+
+function Tag({ k }: { k: string }) {
+  return <span className={`${m.tag} ${TAG[k] ?? ""}`}>{k}</span>;
+}
+
+function LearnLog({ log }: { log: LearnEntry[] }) {
+  return (
+    <div className={m.panel}>
+      <div className={m.panelHead}><h2 className={m.panelTitle}>Learn log</h2><span className={m.sub}>Saturdays, newest first</span></div>
+      <p className={m.sub}>
+        What the weekly learner decided, what got fixed, and what Claude&apos;s retro is watching. The keep, retire and open rules are fixed; only Jack changes them.
+      </p>
+      {log.map((e) => (
+        <div key={e.day} className={m.week}>
+          <div className={m.weekHead}>
+            <span>{`Week of ${e.day}`}</span>
+            {e.tested !== null && <span className={s.muted}>{`${e.tested.toLocaleString("en-US")} tested, ${e.candidates} candidates, ${e.proven} proven`}</span>}
+          </div>
+          <ul className={m.logList}>
+            {e.decisions.map((d, i) => (
+              <li key={`d${i}`}><Tag k={d.action} /><b>{d.book}</b><span className={m.why}>{d.why}</span></li>
+            ))}
+            {e.watch.map((w, i) => <li key={`w${i}`}><Tag k="watch" />{w}</li>)}
+            {e.lessons && <li className={m.lesson}>{e.lessons}</li>}
+            {e.fixes.map((f, i) => <li key={`f${i}`}><Tag k="fix" />{f}</li>)}
+            {!e.decisions.length && !e.watch.length && !e.lessons && !e.fixes.length && <li className={s.muted}>No decisions. Every book kept.</li>}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BooksTab({ books, log }: { books: Book[]; log: LearnEntry[] }) {
   return (
     <section className={s.section}>
       <p className={s.notice}>
-        Four paper books, $100,000 each, traded by the trade bot at 6:30am Tuesday to Saturday on the previous close. The dashed line is the same
-        $100,000 put in SPY on day one and left alone: a book only earns its keep by staying above it.
+        {`${books.length} paper books, $100,000 each, traded by the trade bot at 6:30am Tuesday to Saturday on the previous close. The dashed line is the same `}
+        $100,000 put in SPY on day one and left alone: a book only earns its keep by staying above it. Books named Lab were picked by the strategy lab and
+        are kept or retired by the weekly learner.
       </p>
+      {log.length > 0 && <LearnLog log={log} />}
       <div className={m.books}>{books.map((b) => <BookPanel key={b.id} b={b} />)}</div>
     </section>
   );
@@ -489,7 +525,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const bookStart = books.reduce((a, b) => a + b.start, 0);
   const bookNow = books.reduce((a, b) => a + b.equity, 0);
   const spyNow = books.reduce((a, b) => a + (b.spyEquity ?? b.start), 0);
-  // The four books on one line: summed by day.
+  // All the books on one line: summed by day.
   const days = [...new Set(books.flatMap((b) => b.curve.map((c) => c.day)))].sort();
   const combined = days.map((d) => ({
     x: t(d),
@@ -514,7 +550,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
         </div>
         <div className={`${s.tile} ${bookNow > bookStart ? s.good : bookNow < bookStart ? s.bad : ""}`}>
           <span className={s.tileV}>{books.length ? pct(bookNow / bookStart - 1) : "n/a"}</span>
-          <span className={s.tileK}>stock books, all four</span>
+          <span className={s.tileK}>{`stock books, all ${books.length}`}</span>
         </div>
         <div className={s.tile}>
           <span className={s.tileV}>{books.length ? pct(spyNow / bookStart - 1) : "n/a"}</span>
@@ -545,12 +581,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           <div className={m.panel}>
             <div className={m.panelHead}><h2 className={m.panelTitle}>Stock books</h2><Link className={m.panelLink} href={href("books")}>Each book</Link></div>
             <LineChart
-              series={[{ label: "All four books", points: combined, tone: "auto" }, { label: "SPY held", points: combinedSpy }]}
+              series={[{ label: "All books", points: combined, tone: "auto" }, { label: "SPY held", points: combinedSpy }]}
               baseline={bookStart}
               format={(y) => `$${(y / 1000).toFixed(0)}k`}
               height={230}
               width={360}
-              ariaLabel="The four stock books combined against SPY"
+              ariaLabel="All the stock books combined against SPY"
             />
           </div>
         )}
@@ -605,7 +641,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "kalshi" && snap && (snap.kalshi
           ? (snap.kalshi.error ? <p className={s.error}>{snap.kalshi.error}</p> : <KalshiTab k={snap.kalshi} />)
           : <p className={s.calm}>Kalshi has not reported yet. It posts with Phil after his next cycle.</p>)}
-        {v && tab === "books" && snap && <BooksTab books={snap.books} />}
+        {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} />}
 
         <footer className={s.footer}>
           <span>

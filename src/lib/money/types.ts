@@ -21,6 +21,22 @@ export interface Book {
   curve: BookPoint[];
   positions: { symbol: string; shares: number; entryDay: string; entryPrice: number; last: number | null; lastDay: string | null; reason: string }[];
   fills: { day: string; symbol: string; side: string; shares: number; price: number; reason: string }[];
+  /** Day the learner retired it; the book is frozen from then. Missing before 2026-10-17. */
+  retired?: string | null;
+}
+
+/** One weekly learner run on the stock books (trade-bot tradebot/learnlog.py). */
+export interface LearnEntry {
+  day: string;
+  through: string | null;
+  tested: number | null;
+  candidates: number | null;
+  proven: number | null;
+  pbo: number | null;
+  decisions: { action: string; book: string; why: string }[];
+  fixes: string[];
+  watch: string[];
+  lessons: string | null;
 }
 
 export interface PhilBet {
@@ -121,6 +137,8 @@ export interface MoneySnapshot {
   phil: Phil | null;
   /** Missing from snapshots posted before 2026-10-16. */
   kalshi?: Kalshi | null;
+  /** The stock books' learn log, newest first. Missing before 2026-10-17. */
+  learnLog?: LearnEntry[] | null;
 }
 
 /** Enough of a check that a malformed post can't break the page. */
