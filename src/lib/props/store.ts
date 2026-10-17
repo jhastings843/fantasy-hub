@@ -5,7 +5,7 @@ import { parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./pa
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
 import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
-import { davidFor, davidTrends, fetchDavidSlate, gradeDavid, type DavidGame, type DavidSlate, type DavidTrends } from "./david";
+import { davidFor, davidSliceBets, davidTrends, fetchDavidSlate, gradeDavid, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
 import { MIN_BETS, propTrends, sliceBets, SLICES, Z_RETIRE, type GradedPropsGame, type PropTrends } from "./trends";
 
 // The props tracker's memory, built like the first TD tracker: Sam keeps only
@@ -294,13 +294,15 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
   // clears the bar; its money counts from the current week on. It leaves when
   // its full record falls back under Z_RETIRE. Never rewritten otherwise.
   try {
-    const current = report.week ?? weeks.at(-1) ?? 0;
+    const current = Math.max(report.week ?? weeks.at(-1) ?? 0, report.david.week ?? 0);
     // Late copies are shown and graded but never help a slice qualify.
     const graded = (await gradedList(season)).filter((x) => !x.late);
-    const before = propTrends(graded.filter((x) => x.week < current));
-    const all = propTrends(graded);
+    const dGames = await davidGames(season);
+    const sam = samIndex(graded);
+    const before = [...propTrends(graded.filter((x) => x.week < current)).slices, ...davidTrends(dGames.filter((x) => x.week < current), sam).slices];
+    const all = { slices: [...propTrends(graded).slices, ...davidTrends(dGames, sam).slices] };
     const sys = new Map((await loadSystem(season)).map((e) => [e.id, e]));
-    for (const sl of before.slices) {
+    for (const sl of before) {
       if (sl.verdict !== "profitable" || sys.has(sl.id) || !current) continue;
       const e: SystemEntry = { id: sl.id, label: sl.label, since: current, at: now.toISOString(), z: sl.z ?? 0, n: sl.n };
       if (await redis.hsetnx(systemKey(season), sl.id, e)) report.system.push(`joined: ${sl.label}`);
@@ -317,6 +319,13 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
     report.problems.push(`system: ${e instanceof Error ? e.message : String(e)}`);
   }
   return report;
+}
+
+/** Every saved David game, with its week. */
+async function davidGames(season: number): Promise<DavidWeekGame[]> {
+  const nums = ((await redis.smembers(davidWeeksKey(season))) ?? []).map(Number);
+  const weeks = await Promise.all(nums.map(async (n) => [n, await loadDavidWeek(season, n)] as const));
+  return weeks.flatMap(([week, h]) => Object.values(h).map((g) => ({ ...g, week })));
 }
 
 async function gradedList(season: number): Promise<GradedPropsGame[]> {
@@ -345,8 +354,8 @@ export interface PropsView {
   system: SystemRecord[];
   /** Ids of active system slices, for marking this week's qualifying plays. */
   active: string[];
-  /** David Sasser's own board: the latest week saved, and his graded record. */
-  david: { week: number | null; games: DavidGame[]; trends: DavidTrends };
+  /** David Sasser's board: the latest week saved, his record and the head to head with Sam. */
+  david: { week: number | null; games: DavidGame[]; trends: DavidTrends; sam: { [key: string]: number } };
 }
 
 /** Everything the page shows, read from Redis only. */
@@ -356,15 +365,18 @@ export async function getPropsView(season: number): Promise<PropsView> {
   const current = week ? await loadWeek(season, week) : {};
   const graded = await gradedList(season);
   const sys = await loadSystem(season);
+  const dGames = await davidGames(season);
+  const sam = samIndex([...graded, ...Object.values(current)]);
+  const samGraded = samIndex(graded.filter((x) => !x.late));
   const system = sys.map((e) => {
-    const bets = sliceBets(graded, e.id).filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week));
+    const all = e.id.startsWith("dboard:") || e.id.startsWith("h2h:") ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
+    const bets = all.filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week));
     const w = bets.filter((b) => b.bet.outcome === "W").length;
     const l = bets.filter((b) => b.bet.outcome === "L").length;
     return { ...e, w, l, p: bets.length - w - l, units: Math.round(bets.reduce((a, b) => a + b.bet.net, 0) * 100) / 100 };
   });
-  const dNums = ((await redis.smembers(davidWeeksKey(season))) ?? []).map(Number).sort((a, b) => b - a);
-  const dAll = await Promise.all(dNums.map((n) => loadDavidWeek(season, n)));
-  const david = { week: dNums[0] ?? null, games: Object.values(dAll[0] ?? {}), trends: davidTrends(dAll.flatMap((h) => Object.values(h))) };
+  const dWeek = dGames.reduce<number | null>((a, g) => (a === null || g.week > a ? g.week : a), null);
+  const david = { week: dWeek, games: dGames.filter((g) => g.week === dWeek), trends: davidTrends(dGames, sam), sam: Object.fromEntries(sam) };
   return { season, week, current, graded, trends: propTrends(graded), system, active: sys.filter((e) => !e.retired).map((e) => e.id), david };
 }
 

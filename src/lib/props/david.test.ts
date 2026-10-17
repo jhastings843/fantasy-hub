@@ -76,13 +76,28 @@ describe("David's prop board", () => {
     expect(tie).toMatchObject({ side: null, outcome: null, net: 0 });
   });
 
-  it("builds a record by market", () => {
+  it("builds his record by market, and the head to head with Sam at the same DraftKings price", () => {
     const props = [prop({ id: "a" }), prop({ id: "b", player: "Emanuel Wilson", market: "rushing_yards", projection: 70, line: 60.5 })];
-    const t = davidTrends([{ gameId: "2026_06_SEA_DEN", kickoff: "", props, capturedAt: "", firstSeenAt: "", first: { a: 33.5 }, updatedAt: "", result: gradeDavid(props, box) }]);
-    const all = t.slices.find((x) => x.id === "all")!;
-    expect(all).toMatchObject({ n: 2, w: 1, l: 1 });
-    expect(t.slices.find((x) => x.id === "pass_attempts")!.move).toBe(1);
+    const games = [{ week: 6, gameId: "2026_06_SEA_DEN", kickoff: "", props, capturedAt: "", firstSeenAt: "", first: { a: 33.5 }, updatedAt: "", result: gradeDavid(props, box) }];
+    // Sam: agrees on Darnold's attempts (over), splits on Wilson's yards (under).
+    const sam = new Map([
+      ["2026_06_SEA_DEN|samdarnold|SEA|pass_attempts", 40],
+      ["2026_06_SEA_DEN|emanuelwilson|SEA|rushing_yards", 50],
+    ]);
+    const t = davidTrends(games, sam);
+    const sl = (id: string) => t.slices.find((x) => x.id === id)!;
+    expect(sl("dboard:all")).toMatchObject({ n: 2, w: 1, l: 1 });
+    expect(sl("dboard:pass_attempts").move).toBe(1);
+    expect(sl("h2h:sam")).toMatchObject({ n: 2, w: 2, l: 0 });
+    expect(sl("h2h:david")).toMatchObject({ n: 2, w: 1, l: 1 });
+    expect(sl("h2h:agree")).toMatchObject({ n: 1, w: 1 });
+    expect(sl("h2h:split-sam")).toMatchObject({ n: 1, w: 1 });
+    expect(sl("h2h:split-david")).toMatchObject({ n: 1, l: 1 });
+    expect(t.shared).toBe(2);
     expect(t.accuracy.find((a) => a.market === "pass_attempts")).toMatchObject({ n: 1, model: 15, line: 16.5, closer: 1, inRange: 0 });
+    expect(t.h2h.find((a) => a.market === "rushing_yards")).toMatchObject({ n: 1, sam: 2, david: 18, samCloser: 1 });
+    // Without Sam, the head to head is empty and David's board still grades.
+    expect(davidTrends(games, new Map()).slices.find((x) => x.id === "h2h:david")!.n).toBe(0);
   });
 
   it("matches his numbers onto Sam's markets and grades the lean", () => {

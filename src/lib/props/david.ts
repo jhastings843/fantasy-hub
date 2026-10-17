@@ -5,16 +5,19 @@
 // and a game drops off once it kicks off, so the tracker keeps its own
 // pregame copy, the same way it keeps Sam's.
 //
-// Two uses:
-// - A third outside projection on Sam's markets (like Rotowire and ESPN),
-//   matched by game, player and stat, graded at Sam's shown line.
-// - His own board, graded as he lays it out: the side his number points to at
-//   DraftKings' total and price, 1 unit each. Kept apart from Sam's record.
+// David stands level with Sam, the way the Picks tab treats them:
+// - His board is graded as he lays it out: the side his number points to at
+//   DraftKings' total and price, 1 unit each.
+// - Head to head: on every prop both cover (same game, player and stat), each
+//   model's side is graded at the SAME DraftKings total and price, so the two
+//   records compare like for like, with agree and split cuts as on Picks.
+// - On Sam's own markets his number is also kept per market, beside Rotowire
+//   and ESPN, and graded at Sam's shown line.
 //
 // The page is a server-rendered React app; the whole slate rides in its RSC
 // payload as one JSON object ({"slate": {...}}), so no scraping of markup.
 
-import { implied, payout, type PropMarket, type Side, type Stat } from "./parse";
+import { implied, payout, type PropMarket, type PropsGame, type Side, type Stat } from "./parse";
 import { nameKey, settle, type EspnBoxTeam, type Outcome } from "./grade";
 import { MIN_BETS, type Verdict } from "./trends";
 
@@ -216,7 +219,7 @@ export function gradeDavid(props: DavidProp[], players: EspnBoxTeam[]): DavidGra
   });
 }
 
-// David's own board, graded week by week.
+// Records: David's board, and Sam against David on the props both cover.
 
 export interface DavidGame {
   gameId: string;
@@ -232,8 +235,77 @@ export interface DavidGame {
   gradedAt?: string;
 }
 
+/** A saved game with the week it belongs to. */
+export type DavidWeekGame = DavidGame & { week: number };
+
+/** Sam's projection keyed "gameId|name|team|davidMarket", to line up with David's props. */
+export type SamIndex = Map<string, number>;
+const samKey = (gameId: string, player: string, team: string, market: DavidMarket) => `${gameId}|${nameKey(player)}|${team}|${market}`;
+
+/** Index Sam's saved games (late copies left out: they were read after kickoff). */
+export function samIndex(games: { game: PropsGame; late?: string }[]): SamIndex {
+  const out: SamIndex = new Map();
+  for (const x of games) {
+    if (x.late) continue;
+    for (const m of x.game.markets) if (m.stat) out.set(samKey(x.game.slug, m.player, m.team, FROM_SAM[m.stat]), m.model);
+  }
+  return out;
+}
+export const samOn = (sam: SamIndex, p: DavidProp) => sam.get(samKey(p.gameId, p.player, p.team, p.market));
+
+/** A model's side from DraftKings' total. */
+const sideAt = (x: number | undefined, line: number): Side | null => (x === undefined ? null : x > line ? "over" : x < line ? "under" : null);
+
+export interface DBet {
+  side: Side;
+  outcome: Outcome;
+  net: number;
+  breakEven: number;
+}
+
+/** A side at a prop's DraftKings total and price. */
+function dkBet(p: DavidProp, side: Side | null, actual: number): DBet | null {
+  const price = side === "over" ? p.over : side === "under" ? p.under : null;
+  if (!side || price === null) return null;
+  const outcome = settle(side, p.line, actual);
+  return { side, outcome, net: outcome === "W" ? Math.round(payout(price) * 1000) / 1000 : outcome === "L" ? -1 : 0, breakEven: Math.round(implied(price) * 1000) / 1000 };
+}
+
+interface DRow {
+  week: number;
+  p: DavidProp;
+  actual: number;
+  first?: number;
+  david: DBet | null;
+  sam: DBet | null;
+  samProj?: number;
+}
+
+const reachD = (p: DavidProp) => Math.abs(p.projection - p.line) / Math.max(p.line, 1);
+const agree = (r: DRow) => !!r.david && !!r.sam && r.david.side === r.sam.side;
+const split = (r: DRow) => !!r.david && !!r.sam && r.david.side !== r.sam.side;
+
+/** Slice id, label, and the bet a row contributes (null: not in the slice). Ids are stable: the system keeps them. */
+export const DAVID_SLICES: [string, string, (r: DRow) => DBet | null][] = [
+  ["dboard:all", "Every prop on David's board", (r) => r.david],
+  ...DAVID_MARKETS.map((m): [string, string, (r: DRow) => DBet | null] => [`dboard:${m}`, `David: ${DAVID_LABEL[m].toLowerCase()}`, (r) => (r.p.market === m ? r.david : null)]),
+  ["dboard:over", "David on the over", (r) => (r.david?.side === "over" ? r.david : null)],
+  ["dboard:under", "David on the under", (r) => (r.david?.side === "under" ? r.david : null)],
+  ["dboard:near", "David within 10% of the total", (r) => (reachD(r.p) < 0.1 ? r.david : null)],
+  ["dboard:mid", "David 10% to 25% off the total", (r) => (reachD(r.p) >= 0.1 && reachD(r.p) < 0.25 ? r.david : null)],
+  ["dboard:far", "David 25%+ off the total", (r) => (reachD(r.p) >= 0.25 ? r.david : null)],
+  ["h2h:sam", "Sam's side, every shared prop", (r) => (r.david ? r.sam : null)],
+  ["h2h:david", "David's side, every shared prop", (r) => (r.sam ? r.david : null)],
+  ["h2h:agree", "Both agree", (r) => (agree(r) ? r.david : null)],
+  ["h2h:agree-over", "Both agree on the over", (r) => (agree(r) && r.david!.side === "over" ? r.david : null)],
+  ["h2h:agree-under", "Both agree on the under", (r) => (agree(r) && r.david!.side === "under" ? r.david : null)],
+  ["h2h:split-sam", "Split: Sam's side", (r) => (split(r) ? r.sam : null)],
+  ["h2h:split-david", "Split: David's side", (r) => (split(r) ? r.david : null)],
+];
+
 export interface DavidSlice {
   id: string;
+  group: "dboard" | "h2h";
   label: string;
   n: number;
   w: number;
@@ -242,9 +314,8 @@ export interface DavidSlice {
   units: number;
   needed: number;
   z: number | null;
-  /** Mean DraftKings move toward his side, first copy to last, in stat units. */
+  /** Mean DraftKings move toward the side, first copy to last, in stat units. */
   move: number | null;
-  /** Read on the same bar as Sam's slices. */
   verdict: Verdict;
 }
 
@@ -258,88 +329,122 @@ export interface DavidAccuracy {
   inRange: number | null;
 }
 
+/** Shared props: each model's average miss against DraftKings' total. */
+export interface H2hAccuracy {
+  market: DavidMarket;
+  n: number;
+  sam: number;
+  david: number;
+  line: number;
+  /** How often Sam's number was closer than David's. */
+  samCloser: number;
+}
+
 export interface DavidTrends {
   games: number;
   props: number;
+  shared: number;
   slices: DavidSlice[];
   accuracy: DavidAccuracy[];
+  h2h: H2hAccuracy[];
 }
 
-interface DRow {
-  p: DavidProp;
-  g: DavidGraded;
-  first?: number;
-}
-
-const reachD = (p: DavidProp) => Math.abs(p.projection - p.line) / Math.max(p.line, 1);
-
-export const DAVID_SLICES: [string, string, (r: DRow) => boolean][] = [
-  ["all", "Every prop on his board", () => true],
-  ...DAVID_MARKETS.map((m): [string, string, (r: DRow) => boolean] => [m, DAVID_LABEL[m], (r) => r.p.market === m]),
-  ["over", "His number over the total", (r) => r.g.side === "over"],
-  ["under", "His number under the total", (r) => r.g.side === "under"],
-  ["near", "Within 10% of the total", (r) => reachD(r.p) < 0.1],
-  ["mid", "10% to 25% off the total", (r) => reachD(r.p) >= 0.1 && reachD(r.p) < 0.25],
-  ["far", "25%+ off the total", (r) => reachD(r.p) >= 0.25],
-];
-
-export function davidTrends(games: DavidGame[]): DavidTrends {
+function rowsOf(games: DavidWeekGame[], sam: SamIndex): DRow[] {
   const rows: DRow[] = [];
-  const acc = new Map<DavidMarket, { n: number; model: number; line: number; closer: number; rN: number; r: number }>();
-  let graded = 0;
   for (const x of games) {
     if (!x.result) continue;
-    graded++;
-    const byId = new Map(x.props.map((p) => [p.id, p]));
-    for (const g of x.result) {
-      const p = byId.get(g.id);
-      if (!p || g.actual === null) continue;
-      const a = acc.get(p.market) ?? { n: 0, model: 0, line: 0, closer: 0, rN: 0, r: 0 };
-      const dm = Math.abs(g.actual - p.projection);
-      const dl = Math.abs(g.actual - p.line);
-      a.n++;
-      a.model += dm;
-      a.line += dl;
-      if (dm < dl) a.closer++;
-      if (g.inRange !== null) {
-        a.rN++;
-        if (g.inRange) a.r++;
-      }
-      acc.set(p.market, a);
-      if (g.outcome) rows.push({ p, g, first: x.first[p.id] });
+    const byId = new Map(x.result.map((g) => [g.id, g]));
+    for (const p of x.props) {
+      const g = byId.get(p.id);
+      if (!g || g.actual === null) continue;
+      const samProj = samOn(sam, p);
+      rows.push({ week: x.week, p, actual: g.actual, first: x.first[p.id], david: dkBet(p, davidSide(p), g.actual), sam: dkBet(p, sideAt(samProj, p.line), g.actual), samProj });
     }
   }
-  const slices = DAVID_SLICES.map(([id, label, f]) => {
-    const rs = rows.filter(f);
-    const decided = rs.filter((r) => r.g.outcome !== "P");
-    const w = decided.filter((r) => r.g.outcome === "W").length;
-    const needed = decided.reduce((a, r) => a + (r.g.breakEven ?? 0), 0);
-    const variance = decided.reduce((a, r) => a + (r.g.breakEven ?? 0) * (1 - (r.g.breakEven ?? 0)), 0);
+  return rows;
+}
+
+const verdictOf = (n: number, z: number | null, units: number): Verdict =>
+  n < MIN_BETS ? "early" : z !== null && z >= 1.96 && units > 0 ? "profitable" : z !== null && z <= -1.96 ? "losing" : z !== null && z >= 1 ? "lean-up" : z !== null && z <= -1 ? "lean-down" : "flat";
+
+export function davidTrends(games: DavidWeekGame[], sam: SamIndex): DavidTrends {
+  const rows = rowsOf(games, sam);
+  const slices: DavidSlice[] = DAVID_SLICES.map(([id, label, pick]) => {
+    const bs = rows.flatMap((r) => {
+      const b = pick(r);
+      return b ? [{ r, b }] : [];
+    });
+    const decided = bs.filter((x) => x.b.outcome !== "P");
+    const w = decided.filter((x) => x.b.outcome === "W").length;
+    const needed = decided.reduce((a, x) => a + x.b.breakEven, 0);
+    const variance = decided.reduce((a, x) => a + x.b.breakEven * (1 - x.b.breakEven), 0);
     const z = variance > 0 ? (w - needed) / Math.sqrt(variance) : null;
-    const units = rs.reduce((a, r) => a + r.g.net, 0);
-    const verdict: Verdict =
-      decided.length < MIN_BETS ? "early" : z !== null && z >= 1.96 && units > 0 ? "profitable" : z !== null && z <= -1.96 ? "losing" : z !== null && z >= 1 ? "lean-up" : z !== null && z <= -1 ? "lean-down" : "flat";
-    const moved = rs.filter((r) => r.first !== undefined);
-    const move = moved.length ? moved.reduce((a, r) => a + (r.g.side === "over" ? r.p.line - r.first! : r.first! - r.p.line), 0) / moved.length : null;
+    const units = bs.reduce((a, x) => a + x.b.net, 0);
+    const moved = bs.filter((x) => x.r.first !== undefined);
+    const move = moved.length ? moved.reduce((a, x) => a + (x.b.side === "over" ? x.r.p.line - x.r.first! : x.r.first! - x.r.p.line), 0) / moved.length : null;
     return {
       id,
+      group: id.startsWith("h2h:") ? "h2h" : "dboard",
       label,
       n: decided.length,
       w,
       l: decided.length - w,
-      p: rs.length - decided.length,
+      p: bs.length - decided.length,
       units: Math.round(units * 100) / 100,
       needed: Math.round(needed * 10) / 10,
       z: z === null ? null : Math.round(z * 100) / 100,
       move: move === null ? null : Math.round(move * 100) / 100,
-      verdict,
+      verdict: verdictOf(decided.length, z, units),
     };
   });
-  const accuracy = DAVID_MARKETS.flatMap((market) => {
-    const a = acc.get(market);
-    if (!a?.n) return [];
-    const r = (x: number) => Math.round((x / a.n) * 10) / 10;
-    return [{ market, n: a.n, model: r(a.model), line: r(a.line), closer: a.closer, inRange: a.rN ? Math.round((a.r / a.rN) * 100) / 100 : null }];
+
+  const r1 = (x: number, n: number) => Math.round((x / n) * 10) / 10;
+  const accuracy: DavidAccuracy[] = DAVID_MARKETS.flatMap((market) => {
+    const rs = rows.filter((r) => r.p.market === market);
+    if (!rs.length) return [];
+    const ranged = rs.filter((r) => r.p.lower !== null && r.p.upper !== null);
+    return [
+      {
+        market,
+        n: rs.length,
+        model: r1(rs.reduce((a, r) => a + Math.abs(r.actual - r.p.projection), 0), rs.length),
+        line: r1(rs.reduce((a, r) => a + Math.abs(r.actual - r.p.line), 0), rs.length),
+        closer: rs.filter((r) => Math.abs(r.actual - r.p.projection) < Math.abs(r.actual - r.p.line)).length,
+        inRange: ranged.length ? Math.round((ranged.filter((r) => r.actual >= r.p.lower! && r.actual <= r.p.upper!).length / ranged.length) * 100) / 100 : null,
+      },
+    ];
   });
-  return { games: graded, props: rows.length, slices, accuracy };
+  const h2h: H2hAccuracy[] = DAVID_MARKETS.flatMap((market) => {
+    const rs = rows.filter((r) => r.p.market === market && r.samProj !== undefined);
+    if (!rs.length) return [];
+    return [
+      {
+        market,
+        n: rs.length,
+        sam: r1(rs.reduce((a, r) => a + Math.abs(r.actual - r.samProj!), 0), rs.length),
+        david: r1(rs.reduce((a, r) => a + Math.abs(r.actual - r.p.projection), 0), rs.length),
+        line: r1(rs.reduce((a, r) => a + Math.abs(r.actual - r.p.line), 0), rs.length),
+        samCloser: rs.filter((r) => Math.abs(r.actual - r.samProj!) < Math.abs(r.actual - r.p.projection)).length,
+      },
+    ];
+  });
+  return { games: games.filter((g) => g.result).length, props: rows.length, shared: rows.filter((r) => r.samProj !== undefined).length, slices, accuracy, h2h };
+}
+
+/** A slice's bets with their weeks, for the system's out-of-sample record. */
+export function davidSliceBets(games: DavidWeekGame[], sam: SamIndex, id: string): { week: number; bet: DBet }[] {
+  const pick = DAVID_SLICES.find((x) => x[0] === id)?.[2];
+  if (!pick) return [];
+  return rowsOf(games, sam).flatMap((r) => {
+    const b = pick(r);
+    return b ? [{ week: r.week, bet: b }] : [];
+  });
+}
+
+/** Does an unsettled prop fall in a slice (for marking this week's system bets)? Returns the side it would bet. */
+export function davidSliceSide(id: string, p: DavidProp, samProj: number | undefined): Side | null {
+  const pick = DAVID_SLICES.find((x) => x[0] === id)?.[2];
+  if (!pick) return null;
+  const fake = (side: Side | null): DBet | null => (side ? { side, outcome: "P", net: 0, breakEven: 0 } : null);
+  return pick({ week: 0, p, actual: 0, david: fake(davidSide(p)), sam: fake(sideAt(samProj, p.line)), samProj })?.side ?? null;
 }

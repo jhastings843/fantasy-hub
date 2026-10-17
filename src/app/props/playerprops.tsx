@@ -1,14 +1,16 @@
-// Player props: Sam's prop model, saved before kickoff with Rotowire's, ESPN's
-// and David Sasser's projections for the same markets, graded from ESPN's box
-// score. David's own board (six markets at DraftKings) is saved and graded
-// beside it for comparison. This week, results, research. NFL only.
+// Player props: Sam's and David Sasser's prop models, side by side the way
+// Picks treats them. Both saved before kickoff (with Rotowire's and ESPN's
+// projections alongside), graded from ESPN's box score, and compared head to
+// head at the same DraftKings line where both cover a prop. This week,
+// results, research. NFL only.
 import { STAT_LABEL, type PropMarket, type Side } from "@/lib/props/parse";
-import { isPlay } from "@/lib/props/grade";
+import { isPlay, nameKey } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
 import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
-import { DAVID_LABEL, DAVID_URL, davidSide, type DavidGame, type DavidProp, type DavidSlice } from "@/lib/props/david";
+import { DAVID_LABEL, DAVID_URL, davidSide, davidSliceSide, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
 import s from "../picks/picks.module.css";
+import pp from "./props.module.css";
 
 const SAM = "https://samthemodelman.smmodel.workers.dev/nfl/";
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
@@ -27,37 +29,51 @@ function Unavailable() {
 function Empty() {
   return (
     <p className={s.calm}>
-      Nothing saved yet. Sam&apos;s props pages are saved before each kickoff (with Rotowire&apos;s projection for the same players) and graded from ESPN&apos;s
-      box score once final. His site only keeps the current week, so the record starts with Week 6 Sunday.
+      Nothing saved yet. Sam&apos;s props pages and David&apos;s board are saved before each kickoff and graded from ESPN&apos;s
+      box score once final. Both sites only keep the current week, so the record starts with Week 6 Sunday.
     </p>
   );
 }
 
 /** Slice ids an unsettled market's play or lean falls in, among the active system slices. */
-function systemHits(m: PropMarket, saved: StoredProps, active: string[], all: GradedPropsGame[]): string[] {
+export function systemHits(m: PropMarket, saved: StoredProps, active: string[], all: GradedPropsGame[]): string[] {
   const rw = saved.rw?.[m.id];
   const espn = saved.espn?.[m.id];
+  const david = saved.david?.[m.id];
   const dk = saved.dk?.[m.id];
   const pseudo = (side: Side | null) =>
     side
-      ? { week: 0, slug: saved.game.slug, m, g: { id: m.id, actual: null, play: null, lean: null }, bet: { side, line: m.line, price: 0, book: "", outcome: "P" as const, net: 0, breakEven: 0 }, rw, espn, dk }
+      ? { week: 0, slug: saved.game.slug, m, g: { id: m.id, actual: null, play: null, lean: null }, bet: { side, line: m.line, price: 0, book: "", outcome: "P" as const, net: 0, breakEven: 0 }, rw, espn, david, dk }
       : null;
   return active.filter((id) => {
-    const side = id.startsWith("play:") ? (isPlay(m) ? m.side : null) : id.startsWith("rw:") ? rwSide(m, rw) : id.startsWith("espn:") ? rwSide(m, espn) : m.lean;
+    if (id.startsWith("dboard:") || id.startsWith("h2h:")) return false;
+    const side = id.startsWith("play:")
+      ? isPlay(m)
+        ? m.side
+        : null
+      : id.startsWith("rw:")
+        ? rwSide(m, rw)
+        : id.startsWith("espn:")
+          ? rwSide(m, espn)
+          : id.startsWith("david:")
+            ? rwSide(m, david)
+            : m.lean;
     const row = pseudo(side);
     // Favorites need the week's own game; pass it as the only list entry.
     return !!row && matches(id, row, [{ week: 0, slug: saved.game.slug, game: saved.game, result: { markets: [], void: 0 } }, ...all]);
   });
 }
 
+/** Active system slices a David prop falls in. */
+const davidHits = (p: DavidProp, samProj: number | undefined, active: string[]) =>
+  active.filter((id) => (id.startsWith("dboard:") || id.startsWith("h2h:")) && davidSliceSide(id, p, samProj) !== null);
+
 function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: string[] }) {
   const w = m.books.find((b) => b.win);
   const price = w && m.side ? w[m.side] : null;
-  const rw = saved.rw?.[m.id];
-  const espn = saved.espn?.[m.id];
-  const dk = saved.dk?.[m.id];
   const graded = saved.result?.markets.find((x) => x.id === m.id);
   const out = graded?.play?.outcome;
+  const david = saved.david?.[m.id];
   return (
     <li className={`${s.ppRow} ${hits.length ? s.ppSys : ""}`}>
       <div className={s.ppMain}>
@@ -69,11 +85,8 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
           price !== null && w ? `${am(price)} ${w.book}` : null,
           m.gap !== null ? `gap ${m.gap.toFixed(3)}` : null,
           `Sam ${m.model}`,
-          rw !== undefined ? `Rotowire ${rw}` : null,
-          espn !== undefined ? `ESPN ${espn}` : null,
-          saved.david?.[m.id] !== undefined ? `David ${saved.david[m.id]}` : null,
+          david !== undefined ? `David ${david}${rwSide(m, david) === m.side ? " (agrees)" : rwSide(m, david) ? " (splits)" : ""}` : null,
           `market ${m.consensus}`,
-          dk && dk.open !== dk.current ? `DK opened ${dk.open}` : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -90,117 +103,36 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
   );
 }
 
-function GameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
-  const g = saved.game;
-  const plays = g.markets.filter(isPlay).sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0));
-  const inSystem = plays.filter((m) => systemHits(m, saved, v.active, v.graded).length).length;
-  const top = plays[0];
-  const net = saved.result ? saved.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
+function DavidRow({ p, samProj, result, hits }: { p: DavidProp; samProj: number | undefined; result: DavidGraded | undefined; hits: string[] }) {
+  const side = davidSide(p)!;
+  const price = side === "over" ? p.over : p.under;
+  const samSide = samProj === undefined ? null : samProj > p.line ? "over" : samProj < p.line ? "under" : null;
+  const out = result?.outcome;
   return (
-    <li>
-      <details className={s.ftdGame}>
-        <summary className={s.ftdSum}>
-          <span className={s.ftdWhen}>
-            <b>{`${g.away} at ${g.home}`}</b>
-            <span className={s.dim}>{`${saved.kickoff ? whenEt(saved.kickoff) : `Week ${g.week}`}${saved.late ? " · late copy" : ""}`}</span>
-          </span>
-          <span className={s.ftdPick}>
-            <span className={s.ftdPickName}>{plays.length ? `${plays.length} play${plays.length > 1 ? "s" : ""}` : "No plays"}</span>
-            <span className={`${s.dim} ${s.num}`}>{`${g.markets.length} markets`}</span>
-          </span>
-          <span className={`${s.ftdOdds}`}>{top ? `Top: ${top.player} ${sideWord(top.side!)} ${top.line} ${statShort(top)} (gap ${top.gap?.toFixed(3)})` : ""}</span>
-          <span className={s.ftdFlags}>
-            {net !== null ? (
-              <span className={`${s.resChip} ${net > 0 ? s.resW : net < 0 ? s.resL : s.resP}`}>{u(net)}</span>
-            ) : inSystem > 0 ? (
-              <span className={s.pill}>{`${inSystem} in system`}</span>
-            ) : null}
-            <span className={s.chev} aria-hidden>›</span>
-          </span>
-        </summary>
-        <div className={s.ftdBody}>
-      {plays.length > 0 && (
-        <ol className={s.ppList}>
-          {plays.map((m) => (
-            <PlayRow key={m.id} m={m} saved={saved} hits={systemHits(m, saved, v.active, v.graded)} />
-          ))}
-        </ol>
-      )}
-      <details className={s.ppAll}>
-        <summary>{`Every market (${g.markets.length})`}</summary>
-        <div className={s.tw}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Stat</th>
-                <th>Sam</th>
-                <th>RW</th>
-                <th>ESPN</th>
-                <th>David</th>
-                <th>Line</th>
-                <th>Lean</th>
-                {saved.result && <th>Actual</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {g.markets.map((m) => {
-                const r = saved.result?.markets.find((x) => x.id === m.id);
-                return (
-                  <tr key={m.id}>
-                    <td>{m.player}</td>
-                    <td>{statShort(m)}</td>
-                    <td className={s.num}>{m.model}</td>
-                    <td className={s.num}>{saved.rw?.[m.id] ?? "–"}</td>
-                    <td className={s.num}>{saved.espn?.[m.id] ?? "–"}</td>
-                    <td className={s.num}>{saved.david?.[m.id] ?? "–"}</td>
-                    <td className={s.num}>{m.line}</td>
-                    <td>{m.lean ? (m.lean === "over" ? "O" : "U") : "–"}</td>
-                    {saved.result && (
-                      <td className={`${s.num} ${r?.lean?.outcome === "W" ? s.resW : r?.lean?.outcome === "L" ? s.resL : ""}`}>{r?.actual ?? "DNP"}</td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </details>
-          <p className={`${s.ftdNote} ${s.dim}`}>{`Saved ${whenEt(saved.capturedAt)}${saved.result ? ", graded" : ""}.${saved.late ? ` Read after kickoff: ${saved.late} Graded, but kept out of the system.` : ""}`}</p>
-        </div>
-      </details>
-    </li>
-  );
-}
-
-export async function PropsWeek({ season }: { season: number }) {
-  const v = await load(season);
-  if (!v) return <Unavailable />;
-  const games = Object.values(v.current).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "") || a.game.slug.localeCompare(b.game.slug));
-  const davidNow = v.david.week !== null && (v.week === null || v.david.week >= v.week) ? v.david.games : [];
-  if (!games.length && !davidNow.length) return <Empty />;
-  const live = v.system.filter((e) => !e.retired);
-  return (
-    <>
-    {games.length > 0 && <section className={s.section} aria-labelledby="pp-week">
-      <div className={s.sectionHead}>
-        <h2 className={s.h2} id="pp-week">{`Week ${v.week} player props`}</h2>
-        <p className={s.p}>
-          {`Sam's plays: the markets where his page says the price clears the vig, at the book he'd play. Each is graded 1 unit at that price. ${
-            live.length
-              ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the system; plays that fall in one are marked.`
-              : "Nothing has earned a place in the system yet, so every play here is tracking, not a bet."
-          }`}
-        </p>
+    <li className={`${s.ppRow} ${hits.length ? s.ppSys : ""}`}>
+      <div className={s.ppMain}>
+        <span className={s.ppWho}>{`${p.player} `}<span className={s.dim}>{p.team}</span></span>
+        <span className={s.ppBet}>{`${sideWord(side)} ${p.line} ${dShort[p.market]}`}</span>
       </div>
-      <ol className={s.ftdGames}>
-        {games.map((g) => (
-          <GameCard key={g.game.slug} saved={g} v={v} />
-        ))}
-      </ol>
-    </section>}
-    {davidNow.length > 0 && <DavidWeek week={v.david.week!} games={davidNow} />}
-    </>
+      <div className={`${s.ppMeta} ${s.num}`}>
+        {[
+          price !== null ? `${am(price)} DraftKings` : null,
+          `David ${p.projection}`,
+          p.lower !== null && p.upper !== null ? `80% ${p.lower}–${p.upper}` : null,
+          samProj !== undefined ? `Sam ${samProj}${samSide === side ? " (agrees)" : samSide ? " (splits)" : ""}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </div>
+      {(hits.length > 0 || out) && (
+        <div className={s.ftdChips}>
+          {hits.length > 0 && <span className={`${s.pill}`}>in the system</span>}
+          {out && result?.actual !== null && (
+            <span className={`${s.resChip} ${out === "W" ? s.resW : out === "L" ? s.resL : s.resP}`}>{`${out} · ${result!.actual}`}</span>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -212,94 +144,218 @@ const dShort: { [k: string]: string } = {
   receiving_yards: "rec yds",
   receptions: "rec",
 };
+const TO_DAVID: { [k: string]: DavidMarket } = { pass_yds: "passing_yards", rush_yds: "rushing_yards", rec_yds: "receiving_yards", rec: "receptions" };
 /** How far his number sits from the total, measured against his own 80% range (so a 0.5 rushing line doesn't top the list). */
 const dReach = (p: DavidProp) => Math.abs(p.projection - p.line) / (p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1));
+/** David's top edges shown per game; the rest sit in the full table. */
+const DAVID_TOP = 6;
+const OU = (x: Side | null) => (x === "over" ? "O" : x === "under" ? "U" : "–");
+const sideFrom = (x: number | undefined, line: number): Side | null => (x === undefined ? null : x > line ? "over" : x < line ? "under" : null);
 
-/** David's board this week: his projection against DraftKings, game by game, biggest gaps first. */
-function DavidWeek({ week, games }: { week: number; games: DavidGame[] }) {
-  const sorted = [...games].sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.gameId.localeCompare(b.gameId));
-  const total = games.reduce((a, g) => a + g.props.length, 0);
+interface JoinedRow {
+  key: string;
+  player: string;
+  team: string;
+  stat: string;
+  sam?: number;
+  david?: number;
+  rw?: number;
+  espn?: number;
+  /** DraftKings' total when David has the prop, else Sam's shown line. */
+  line: number;
+  lineFrom: "DK" | "Sam";
+  actual?: number | null;
+}
+
+/** One row per player and stat across both models. */
+function joinRows(sam: StoredProps | undefined, david: DavidGame | undefined, samOf: (p: DavidProp) => number | undefined): JoinedRow[] {
+  const rows = new Map<string, JoinedRow>();
+  const dRes = new Map((david?.result ?? []).map((r) => [r.id, r]));
+  for (const p of david?.props ?? []) {
+    rows.set(`${nameKey(p.player)}|${p.team}|${p.market}`, {
+      key: p.id,
+      player: p.player,
+      team: p.team,
+      stat: dShort[p.market],
+      david: p.projection,
+      sam: samOf(p),
+      line: p.line,
+      lineFrom: "DK",
+      actual: dRes.get(p.id)?.actual,
+    });
+  }
+  for (const m of sam?.game.markets ?? []) {
+    if (!m.stat) continue;
+    const r = sam!.result?.markets.find((x) => x.id === m.id);
+    const extra = { rw: sam!.rw?.[m.id], espn: sam!.espn?.[m.id] };
+    const hit = rows.get(`${nameKey(m.player)}|${m.team}|${TO_DAVID[m.stat]}`);
+    if (hit) Object.assign(hit, { sam: m.model, ...extra, actual: hit.actual ?? r?.actual });
+    else rows.set(m.id, { key: m.id, player: m.player, team: m.team, stat: statShort(m), sam: m.model, ...extra, line: m.line, lineFrom: "Sam", actual: r?.actual });
+  }
+  return [...rows.values()].sort((a, b) => a.team.localeCompare(b.team) || a.player.localeCompare(b.player) || a.stat.localeCompare(b.stat));
+}
+
+function GameCard({ gameId, sam, david, v, samOf }: { gameId: string; sam?: StoredProps; david?: DavidGame; v: PropsView; samOf: (p: DavidProp) => number | undefined }) {
+  const [, , away, home] = gameId.split("_");
+  const kickoff = sam?.kickoff ?? david?.kickoff;
+  const plays = sam ? sam.game.markets.filter(isPlay).sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0)) : [];
+  const dProps = david ? david.props.filter((p) => davidSide(p)).sort((a, b) => dReach(b) - dReach(a)) : [];
+  const dRes = new Map((david?.result ?? []).map((r) => [r.id, r]));
+  const shared = (david?.props ?? []).filter((p) => samOf(p) !== undefined);
+  const agreeN = shared.filter((p) => davidSide(p) && sideFrom(samOf(p), p.line) === davidSide(p)).length;
+  const samNet = sam?.result ? sam.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
+  const dNet = david?.result ? david.result.reduce((a, r) => a + r.net, 0) : null;
+  const inSystem =
+    (sam ? plays.filter((m) => systemHits(m, sam, v.active, v.graded).length).length : 0) + dProps.filter((p) => davidHits(p, samOf(p), v.active).length).length;
+  const rows = joinRows(sam, david, samOf);
+  const graded = !!(sam?.result || david?.result);
   return (
-    <section className={s.section} aria-labelledby="pp-david">
+    <li>
+      <details className={s.ftdGame}>
+        <summary className={s.ftdSum}>
+          <span className={s.ftdWhen}>
+            <b>{`${away} at ${home}`}</b>
+            <span className={s.dim}>{`${kickoff ? whenEt(kickoff) : ""}${sam?.late ? " · late copy" : ""}`}</span>
+          </span>
+          <span className={s.ftdPick}>
+            <span className={s.ftdPickName}>{`Sam ${sam ? plays.length : "–"} · David ${david ? dProps.length : "–"}`}</span>
+            <span className={`${s.dim} ${s.num}`}>{sam ? `${plays.length === 1 ? "play" : "plays"} · props` : "plays · props"}</span>
+          </span>
+          <span className={s.ftdOdds}>
+            {shared.length ? `Agree on ${agreeN} of ${shared.length} shared props` : sam && david ? "No props in common" : sam ? "David hasn't posted this game" : "Sam's page not saved yet"}
+          </span>
+          <span className={s.ftdFlags}>
+            {samNet !== null && <span className={`${s.resChip} ${samNet > 0 ? s.resW : samNet < 0 ? s.resL : s.resP}`}>{`Sam ${u(samNet)}`}</span>}
+            {dNet !== null && <span className={`${s.resChip} ${dNet > 0 ? s.resW : dNet < 0 ? s.resL : s.resP}`}>{`David ${u(dNet)}`}</span>}
+            {samNet === null && dNet === null && inSystem > 0 && <span className={s.pill}>{`${inSystem} in system`}</span>}
+            <span className={s.chev} aria-hidden>›</span>
+          </span>
+        </summary>
+        <div className={s.ftdBody}>
+          <div className={pp.ppCols}>
+            <div className={pp.ppCol}>
+              <div className={pp.ppColH}>
+                <span>Sam&apos;s plays</span>
+                <span className={s.dim}>{sam ? `${sam.game.markets.length} markets` : ""}</span>
+              </div>
+              {plays.length ? (
+                <ol className={s.ppList}>
+                  {plays.map((m) => (
+                    <PlayRow key={m.id} m={m} saved={sam!} hits={systemHits(m, sam!, v.active, v.graded)} />
+                  ))}
+                </ol>
+              ) : (
+                <p className={pp.ppNone}>{sam ? "No play clears the vig on his page." : "Sam posts Sunday's props pages on Saturday; this fills in at the next capture."}</p>
+              )}
+            </div>
+            <div className={pp.ppCol}>
+              <div className={pp.ppColH}>
+                <span>David&apos;s biggest edges</span>
+                <span className={s.dim}>{david ? `${david.props.length} props` : ""}</span>
+              </div>
+              {dProps.length ? (
+                <ol className={s.ppList}>
+                  {dProps.slice(0, DAVID_TOP).map((p) => (
+                    <DavidRow key={p.id} p={p} samProj={samOf(p)} result={dRes.get(p.id)} hits={davidHits(p, samOf(p), v.active)} />
+                  ))}
+                </ol>
+              ) : (
+                <p className={pp.ppNone}>{david ? "No edges on his board." : "Not on David's board (his board drops a game at kickoff)."}</p>
+              )}
+            </div>
+          </div>
+          <details className={s.ppAll}>
+            <summary>{`Every prop, both models (${rows.length})`}</summary>
+            <div className={s.tw}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Stat</th>
+                    <th>Line</th>
+                    <th>Sam</th>
+                    <th>David</th>
+                    <th>Read</th>
+                    <th>RW</th>
+                    <th>ESPN</th>
+                    {graded && <th>Actual</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const ss = sideFrom(r.sam, r.line);
+                    const ds = sideFrom(r.david, r.line);
+                    const read = ss && ds ? (ss === ds ? `both ${OU(ss)}` : "split") : "–";
+                    return (
+                      <tr key={r.key}>
+                        <td>{`${r.player} `}<span className={s.dim}>{r.team}</span></td>
+                        <td>{r.stat}</td>
+                        <td className={s.num}>
+                          {r.line}
+                          <span className={s.dim}>{r.lineFrom === "DK" ? " DK" : ""}</span>
+                        </td>
+                        <td className={s.num}>{r.sam !== undefined ? `${r.sam} ${OU(ss)}` : "–"}</td>
+                        <td className={s.num}>{r.david !== undefined ? `${r.david} ${OU(ds)}` : "–"}</td>
+                        <td className={read.startsWith("both") ? s.pos : read === "split" ? s.neg : s.dim}>{read}</td>
+                        <td className={s.num}>{r.rw ?? "–"}</td>
+                        <td className={s.num}>{r.espn ?? "–"}</td>
+                        {graded && (
+                          <td className={s.num}>{r.actual === undefined ? "–" : r.actual === null ? "DNP" : r.actual}</td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <p className={`${s.ftdNote} ${s.dim}`}>
+            {[
+              sam ? `Sam's page saved ${whenEt(sam.capturedAt)}${sam.result ? ", graded" : ""}.` : null,
+              david ? `David's board saved ${whenEt(david.capturedAt)} (his model updated ${david.updatedAt})${david.result ? ", graded" : ""}.` : null,
+              "Sides in the table are read from the line shown: DraftKings' total where David has the prop, else Sam's playing book.",
+              sam?.late ? `Sam's copy was read after kickoff: ${sam.late} Graded, but kept out of the system.` : null,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </p>
+        </div>
+      </details>
+    </li>
+  );
+}
+
+export async function PropsWeek({ season }: { season: number }) {
+  const v = await load(season);
+  if (!v) return <Unavailable />;
+  const week = Math.max(v.week ?? 0, v.david.week ?? 0) || null;
+  const samGames = v.week === week ? Object.values(v.current) : [];
+  const dGames = v.david.week === week ? v.david.games : [];
+  const ids = [...new Set([...samGames.map((g) => g.game.slug), ...dGames.map((g) => g.gameId)])];
+  if (!ids.length) return <Empty />;
+  const samBy = new Map(samGames.map((g) => [g.game.slug, g]));
+  const dBy = new Map(dGames.map((g) => [g.gameId, g]));
+  const samMap = new Map(Object.entries(v.david.sam));
+  const samOf = (p: DavidProp) => samOn(samMap, p);
+  const kick = (id: string) => samBy.get(id)?.kickoff ?? dBy.get(id)?.kickoff ?? "";
+  ids.sort((a, b) => kick(a).localeCompare(kick(b)) || a.localeCompare(b));
+  const live = v.system.filter((e) => !e.retired);
+  return (
+    <section className={s.section} aria-labelledby="pp-week">
       <div className={s.sectionHead}>
-        <h2 className={s.h2} id="pp-david">{`David's board, Week ${week}`}</h2>
+        <h2 className={s.h2} id="pp-week">{`Week ${week} player props`}</h2>
         <p className={s.p}>
-          {`David Sasser's own projections for ${total} props in six markets, set against DraftKings' total. For comparison and research only: each is graded the way his number points, 1 unit at DraftKings' price, and kept apart from Sam's record. Biggest gaps first, measured against his own 80% range.`}
+          {`Sam and David, game by game. Sam's plays are the markets where his page says the price clears the vig, at the book he'd play. David's edges are where his projection sits furthest from DraftKings' total, measured against his own 80% range; every prop on his board is graded the way his number points, at DraftKings' price. Where both cover a prop, both sides are also graded at the same DraftKings line, so the two compare like for like. ${
+            live.length
+              ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the system; bets that fall in one are marked.`
+              : "Nothing has earned a place in the system yet, so every bet here is tracking, not money."
+          }`}
         </p>
       </div>
       <ol className={s.ftdGames}>
-        {sorted.map((g) => {
-          const [, , away, home] = g.gameId.split("_");
-          const props = [...g.props].sort((a, b) => dReach(b) - dReach(a));
-          const res = new Map((g.result ?? []).map((r) => [r.id, r]));
-          const net = g.result ? g.result.reduce((a, r) => a + r.net, 0) : null;
-          const top = props[0];
-          return (
-            <li key={g.gameId}>
-              <details className={s.ftdGame}>
-                <summary className={s.ftdSum}>
-                  <span className={s.ftdWhen}>
-                    <b>{`${away} at ${home}`}</b>
-                    <span className={s.dim}>{whenEt(g.kickoff)}</span>
-                  </span>
-                  <span className={s.ftdPick}>
-                    <span className={s.ftdPickName}>{`${props.length} props`}</span>
-                    <span className={`${s.dim} ${s.num}`}>{`${props.filter((p) => davidSide(p) === "over").length} over · ${props.filter((p) => davidSide(p) === "under").length} under`}</span>
-                  </span>
-                  <span className={s.ftdOdds}>{top ? `Top: ${top.player} ${davidSide(top) ? sideWord(davidSide(top)!) : "at"} ${top.line} ${dShort[top.market]} (his ${top.projection})` : ""}</span>
-                  <span className={s.ftdFlags}>
-                    {net !== null && <span className={`${s.resChip} ${net > 0 ? s.resW : net < 0 ? s.resL : s.resP}`}>{u(net)}</span>}
-                    <span className={s.chev} aria-hidden>›</span>
-                  </span>
-                </summary>
-                <div className={s.ftdBody}>
-                  <div className={s.tw}>
-                    <table className={s.table}>
-                      <thead>
-                        <tr>
-                          <th>Player</th>
-                          <th>Stat</th>
-                          <th>David</th>
-                          <th>DK</th>
-                          <th>Side</th>
-                          <th>Price</th>
-                          <th>80% range</th>
-                          {g.result && <th>Actual</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {props.map((p) => {
-                          const side = davidSide(p);
-                          const price = side === "over" ? p.over : side === "under" ? p.under : null;
-                          const r = res.get(p.id);
-                          const moved = g.first[p.id] !== undefined && g.first[p.id] !== p.line ? g.first[p.id] : null;
-                          return (
-                            <tr key={p.id}>
-                              <td>{`${p.player} `}<span className={s.dim}>{p.team}</span></td>
-                              <td>{dShort[p.market]}</td>
-                              <td className={s.num}>{p.projection}</td>
-                              <td className={s.num}>
-                                {p.line}
-                                {moved !== null && <span className={s.dim}>{` (was ${moved})`}</span>}
-                              </td>
-                              <td>{side ? (side === "over" ? "O" : "U") : "–"}</td>
-                              <td className={s.num}>{price !== null ? am(price) : "–"}</td>
-                              <td className={`${s.num} ${s.dim}`}>{p.lower !== null && p.upper !== null ? `${p.lower}–${p.upper}` : "–"}</td>
-                              {g.result && (
-                                <td className={`${s.num} ${r?.outcome === "W" ? s.resW : r?.outcome === "L" ? s.resL : ""}`}>{r?.actual ?? "DNP"}</td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className={`${s.ftdNote} ${s.dim}`}>{`Saved ${whenEt(g.capturedAt)} (his model updated ${g.updatedAt})${g.result ? ", graded" : ""}.`}</p>
-                </div>
-              </details>
-            </li>
-          );
-        })}
+        {ids.map((id) => (
+          <GameCard key={id} gameId={id} sam={samBy.get(id)} david={dBy.get(id)} v={v} samOf={samOf} />
+        ))}
       </ol>
     </section>
   );
@@ -319,30 +375,66 @@ const recOf = (x: Pick<PropSlice, "w" | "l" | "p"> | undefined) => (x ? `${x.w}-
 export async function PropsResults({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
-  if (!v.graded.length) return <Empty />;
+  const dt = v.david.trends;
+  if (!v.graded.length && !dt.games) return <Empty />;
   const t = v.trends;
   const get = (id: string) => t.slices.find((x) => x.id === id);
-  const dAll = v.david.trends.slices.find((x) => x.id === "all");
+  const dget = (id: string) => dt.slices.find((x) => x.id === id);
   const plays = v.graded.flatMap((x) =>
     x.result.markets.flatMap((r) => {
       const m = x.game.markets.find((y) => y.id === r.id);
       return m && r.play ? [{ week: x.week, slug: x.slug, game: x.game, m, r }] : [];
     }),
   );
+  const h2hSam = dget("h2h:sam");
+  const h2hDavid = dget("h2h:david");
   return (
     <section className={s.section} aria-labelledby="pp-results">
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-results">Player prop results</h2>
-        <p className={s.p}>Every saved market once its game is final, against the copy saved before kickoff. 1 unit risked per bet at the price the page showed.</p>
+        <p className={s.p}>
+          Sam and David, graded the same way: every saved prop once its game is final, against the copy saved before kickoff, 1 unit risked per bet at the price
+          shown. The head to head grades both on the props they share, at the same DraftKings line and price.
+        </p>
       </div>
       <div className={s.tiles}>
-        <Tile value={`${t.markets}`} label={`markets graded · ${v.graded.length} games`} />
         <Tile value={u(get("play:all")?.units ?? 0)} label={`Sam's plays · ${recOf(get("play:all"))}`} />
         <Tile value={u(get("lean:all")?.units ?? 0)} label={`Sam's projection, every market · ${recOf(get("lean:all"))}`} />
-        <Tile value={u(get("rw:all")?.units ?? 0)} label={`Rotowire's projection · ${recOf(get("rw:all"))}`} />
-        <Tile value={u(get("espn:all")?.units ?? 0)} label={`ESPN's projection · ${recOf(get("espn:all"))}`} />
-        {(get("david:all")?.n ?? 0) > 0 && <Tile value={u(get("david:all")?.units ?? 0)} label={`David's projection, Sam's markets · ${recOf(get("david:all"))}`} />}
-        {(dAll?.n ?? 0) > 0 && <Tile value={u(dAll!.units)} label={`David's own board · ${recOf(dAll)}`} />}
+        <Tile value={u(dget("dboard:all")?.units ?? 0)} label={`David's board, every prop · ${recOf(dget("dboard:all"))}`} />
+        <Tile value={u(dget("h2h:agree")?.units ?? 0)} label={`Both agree · ${recOf(dget("h2h:agree"))}`} />
+      </div>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <caption className={s.caption}>{`Head to head: ${dt.shared} shared props at DraftKings' line and price`}</caption>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Record</th>
+              <th>Units</th>
+              <th>When they split</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(
+              [
+                ["Sam", h2hSam, dget("h2h:split-sam")],
+                ["David", h2hDavid, dget("h2h:split-david")],
+              ] as const
+            ).map(([who, all, sp]) => (
+              <tr key={who}>
+                <td>{who}</td>
+                <td className={s.num}>{recOf(all)}</td>
+                <td className={`${s.num} ${(all?.units ?? 0) > 0 ? s.pos : (all?.units ?? 0) < 0 ? s.neg : ""}`}>{u(all?.units ?? 0)}</td>
+                <td className={s.num}>{`${recOf(sp)}, ${u(sp?.units ?? 0)}`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className={s.tiles}>
+        <Tile value={`${t.markets + dt.props}`} label={`props graded · Sam ${t.markets}, David ${dt.props}`} />
+        <Tile value={u(get("rw:all")?.units ?? 0)} label={`Rotowire's projection, Sam's markets · ${recOf(get("rw:all"))}`} />
+        <Tile value={u(get("espn:all")?.units ?? 0)} label={`ESPN's projection, Sam's markets · ${recOf(get("espn:all"))}`} />
       </div>
       {plays.length > 0 && (
         <div className={s.tw}>
@@ -354,21 +446,52 @@ export async function PropsResults({ season }: { season: number }) {
                 <th>Player</th>
                 <th>Bet</th>
                 <th>Price</th>
+                <th>David</th>
                 <th>Actual</th>
                 <th>Net</th>
               </tr>
             </thead>
             <tbody>
-              {plays.map(({ week, slug, m, r }) => (
-                <tr key={`${slug}|${m.id}`}>
-                  <td className={s.num}>{week}</td>
-                  <td>{`${m.player} (${m.team})`}</td>
-                  <td>{`${sideWord(r.play!.side)} ${r.play!.line} ${statShort(m)}`}</td>
-                  <td className={s.num}>{`${am(r.play!.price)} ${r.play!.book}`}</td>
-                  <td className={s.num}>{r.actual}</td>
-                  <td className={`${s.num} ${r.play!.outcome === "W" ? s.resW : r.play!.outcome === "L" ? s.resL : s.resP}`}>{r.play!.outcome === "P" ? "push" : u(r.play!.net)}</td>
-                </tr>
-              ))}
+              {plays.map(({ week, slug, m, r }) => {
+                const d = v.graded.find((x) => x.slug === slug && x.week === week)?.david?.[m.id];
+                const ds = d === undefined ? null : d > r.play!.line ? "over" : d < r.play!.line ? "under" : null;
+                return (
+                  <tr key={`${slug}|${m.id}`}>
+                    <td className={s.num}>{week}</td>
+                    <td>{`${m.player} (${m.team})`}</td>
+                    <td>{`${sideWord(r.play!.side)} ${r.play!.line} ${statShort(m)}`}</td>
+                    <td className={s.num}>{`${am(r.play!.price)} ${r.play!.book}`}</td>
+                    <td className={ds === r.play!.side ? s.pos : ds ? s.neg : s.dim}>{d === undefined ? "–" : `${d} ${ds === r.play!.side ? "agrees" : ds ? "splits" : ""}`}</td>
+                    <td className={s.num}>{r.actual}</td>
+                    <td className={`${s.num} ${r.play!.outcome === "W" ? s.resW : r.play!.outcome === "L" ? s.resL : s.resP}`}>{r.play!.outcome === "P" ? "push" : u(r.play!.net)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {dt.games > 0 && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <caption className={s.caption}>David&apos;s board by market</caption>
+            <thead>
+              <tr>
+                <th>Market</th>
+                <th>Record</th>
+                <th>Units</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dt.slices
+                .filter((x) => x.group === "dboard" && x.n + x.p > 0 && Object.keys(DAVID_LABEL).includes(x.id.split(":")[1]))
+                .map((x) => (
+                  <tr key={x.id}>
+                    <td>{DAVID_LABEL[x.id.split(":")[1] as DavidMarket]}</td>
+                    <td className={s.num}>{recOf(x)}</td>
+                    <td className={`${s.num} ${x.units > 0 ? s.pos : x.units < 0 ? s.neg : ""}`}>{u(x.units)}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -431,27 +554,34 @@ function SliceTable({ title, rows, active }: { title: string; rows: SliceRow[]; 
 export async function PropsResearch({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
-  if (!v.graded.length && !v.david.trends.games) return <Empty />;
   const t = v.trends;
-  const group = (g: PropSlice["group"]) => t.slices.filter((x) => x.group === g);
   const dt = v.david.trends;
+  if (!v.graded.length && !dt.games) return <Empty />;
+  const group = (g: PropSlice["group"]) => t.slices.filter((x) => x.group === g);
+  const dgroup = (g: DavidSlice["group"]) => dt.slices.filter((x) => x.group === g);
+  const findings = [
+    ...t.findings,
+    ...dt.slices
+      .filter((x) => x.verdict === "profitable" || x.verdict === "losing")
+      .map((x) => `${x.label}: ${recOf(x)}, ${u(x.units)}, ${x.w} wins against ${x.needed} needed to break even, so it is ${x.verdict === "profitable" ? "beating" : "losing to"} the prices.`),
+  ];
   return (
     <section className={s.section} aria-labelledby="pp-research">
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-research">Where the prop models make money</h2>
         <p className={s.p}>
-          {`Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Line move is how far the consensus moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
+          {`Sam and David on the same footing. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Either model's slices can earn a place in the system. Line move is how far the line moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
         </p>
       </div>
-      {t.findings.length > 0 ? (
+      {findings.length > 0 ? (
         <ul className={s.journal}>
-          {t.findings.map((f) => (
+          {findings.map((f) => (
             <li key={f}>{f}</li>
           ))}
         </ul>
       ) : (
         <p className={s.calm}>
-          {`No slice has cleared the bar yet. At about 30 markets a game, the bigger slices reach ${MIN_BETS} bets in a week or two; small ones take most of the season.`}
+          {`No slice has cleared the bar yet. At about 30 markets a game for Sam and 25 for David, the bigger slices reach ${MIN_BETS} bets in a week or two; small ones take most of the season.`}
         </p>
       )}
 
@@ -489,21 +619,54 @@ export async function PropsResearch({ season }: { season: number }) {
         </table>
       </div>
 
+      <SliceTable title="Head to head: the props both cover, both sides at DraftKings' line and price" rows={dgroup("h2h")} active={v.active} />
+      {dt.h2h.length > 0 && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <caption className={s.caption}>Head to head: whose number was closer, average miss</caption>
+            <thead>
+              <tr>
+                <th>Market</th>
+                <th>Shared</th>
+                <th>Sam</th>
+                <th>David</th>
+                <th>DK total</th>
+                <th>Sam closer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dt.h2h.map((a) => (
+                <tr key={a.market}>
+                  <td>{DAVID_LABEL[a.market]}</td>
+                  <td className={s.num}>{a.n}</td>
+                  <td className={`${s.num} ${a.sam < a.david ? s.pos : ""}`}>{a.sam}</td>
+                  <td className={`${s.num} ${a.david < a.sam ? s.pos : ""}`}>{a.david}</td>
+                  <td className={s.num}>{a.line}</td>
+                  <td className={s.num}>{`${Math.round((a.samCloser / a.n) * 100)}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <SliceTable title="Sam's plays" rows={group("play")} active={v.active} />
-      <SliceTable title="Projection only: the side each number points to, every market" rows={[...group("lean"), ...group("rw"), ...group("espn"), ...group("david")]} active={v.active} />
+      <SliceTable title="Sam's projection: the side it points to, every market" rows={group("lean")} active={v.active} />
+      <SliceTable title="David's board: the side his number points to, every prop, at DraftKings" rows={dgroup("dboard")} active={v.active} />
+      <SliceTable title="Other projections on Sam's markets, at his playing book" rows={[...group("rw"), ...group("espn"), ...group("david")]} active={v.active} />
 
       {t.accuracy.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
-            <caption className={s.caption}>Whose number was closer: average miss</caption>
+            <caption className={s.caption}>Sam&apos;s markets: whose number was closer, average miss</caption>
             <thead>
               <tr>
                 <th>Stat</th>
                 <th>Markets</th>
                 <th>Sam</th>
+                <th>David</th>
                 <th>Rotowire</th>
                 <th>ESPN</th>
-                <th>David</th>
                 <th>Market line</th>
                 <th>Sam closer</th>
               </tr>
@@ -514,9 +677,9 @@ export async function PropsResearch({ season }: { season: number }) {
                   <td>{STAT_LABEL[a.stat]}</td>
                   <td className={s.num}>{a.n}</td>
                   <td className={`${s.num} ${a.model < a.market ? s.pos : ""}`}>{a.model}</td>
+                  <td className={`${s.num} ${a.david !== null && a.david < a.market ? s.pos : ""}`}>{a.david ?? "–"}</td>
                   <td className={`${s.num} ${a.rw !== null && a.rw < a.market ? s.pos : ""}`}>{a.rw ?? "–"}</td>
                   <td className={`${s.num} ${a.espn !== null && a.espn < a.market ? s.pos : ""}`}>{a.espn ?? "–"}</td>
-                  <td className={`${s.num} ${a.david !== null && a.david < a.market ? s.pos : ""}`}>{a.david ?? "–"}</td>
                   <td className={s.num}>{a.market}</td>
                   <td className={s.num}>{`${Math.round((a.closer / a.n) * 100)}%`}</td>
                 </tr>
@@ -525,32 +688,10 @@ export async function PropsResearch({ season }: { season: number }) {
           </table>
         </div>
       )}
-      <DavidResearch slices={dt.slices} accuracy={dt.accuracy} games={dt.games} />
-      <p className={`${s.notice} ${s.dim}`}>
-        {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). The projection rows ignore that and bet the way the number points, at the same book's price. Rotowire's projections come through Sleeper's free feed, matched by name and team; ESPN's from its fantasy projections, matched by name; David's from his props board, matched by game, name and team. DraftKings' opening line comes from ESPN's odds feed; the line-move slices compare it with DraftKings' last pregame line. A player missing from the box score voids the market. Sources: "}
-        <a href={SAM}>Sam&apos;s Models</a> props pages, <a href={DAVID_URL}>David Sasser&apos;s props board</a>, Sleeper (Rotowire), ESPN projections, odds and box scores.
-      </p>
-    </section>
-  );
-}
-
-/** David's own board: his record at DraftKings by market and size of gap, and how close his numbers land. */
-function DavidResearch({ slices, accuracy, games }: { slices: DavidSlice[]; accuracy: { market: keyof typeof DAVID_LABEL; n: number; model: number; line: number; closer: number; inRange: number | null }[]; games: number }) {
-  return (
-    <>
-      <div className={s.sectionHead}>
-        <h3 className={s.h2}>David&apos;s own board</h3>
-        <p className={s.p}>
-          {games
-            ? `${games} game${games > 1 ? "s" : ""} graded. Every prop on his board bet the way his number points, at DraftKings' total and price. The 80% column checks his stated range: a well-built range catches about 80% of results.`
-            : "Nothing graded yet. His board is saved before each kickoff and graded once the game is final, the same as Sam's."}
-        </p>
-      </div>
-      {games > 0 && <SliceTable title="David's board at DraftKings" rows={slices} active={[]} />}
-      {accuracy.length > 0 && (
+      {dt.accuracy.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
-            <caption className={s.caption}>David&apos;s number against DraftKings&apos; total: average miss</caption>
+            <caption className={s.caption}>David&apos;s board: his number against DraftKings&apos; total, average miss</caption>
             <thead>
               <tr>
                 <th>Market</th>
@@ -558,11 +699,11 @@ function DavidResearch({ slices, accuracy, games }: { slices: DavidSlice[]; accu
                 <th>David</th>
                 <th>DK total</th>
                 <th>David closer</th>
-                <th>Inside 80%</th>
+                <th>Inside his 80%</th>
               </tr>
             </thead>
             <tbody>
-              {accuracy.map((a) => (
+              {dt.accuracy.map((a) => (
                 <tr key={a.market}>
                   <td>{DAVID_LABEL[a.market]}</td>
                   <td className={s.num}>{a.n}</td>
@@ -576,6 +717,10 @@ function DavidResearch({ slices, accuracy, games }: { slices: DavidSlice[]; accu
           </table>
         </div>
       )}
-    </>
+      <p className={`${s.notice} ${s.dim}`}>
+        {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). David's board is graded the way his number points from DraftKings' total, at DraftKings' price; his 80% range should catch about 80% of results if it is honest. The head to head takes every prop both cover (same game, player and stat) and grades each model's side at that same DraftKings line and price. Rotowire's projections come through Sleeper's free feed, matched by name and team; ESPN's from its fantasy projections, matched by name. A player missing from the box score voids the prop. Sources: "}
+        <a href={SAM}>Sam&apos;s Models</a> props pages, <a href={DAVID_URL}>David Sasser&apos;s props board</a>, Sleeper (Rotowire), ESPN projections, odds and box scores.
+      </p>
+    </section>
   );
 }
