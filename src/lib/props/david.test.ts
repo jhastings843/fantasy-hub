@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { davidBox, davidFor, davidTrends, gradeDavid, parseDavidSlate, type DavidProp } from "./david";
+import { agreeEdge, davidBox, davidFor, davidSliceSide, davidTrends, gradeDavid, parseDavidSlate, type DavidProp } from "./david";
 import { gradeGame, type EspnBoxTeam } from "./grade";
 import { parsePropsPage } from "./parse";
 import { propTrends } from "./trends";
@@ -110,5 +110,29 @@ describe("David's prop board", () => {
     const t = propTrends([{ week: 6, slug: g.slug, game: g, result: r, david: d }]);
     expect(t.slices.find((x) => x.id === "david:all")!.n).toBe(1);
     expect(t.accuracy.find((a) => a.stat === "pass_yds")!.david).toBe(Math.abs(278 - darnold.line - 20));
+  });
+});
+
+describe("Both agree, by estimated edge", () => {
+  const strong = prop({ market: "rushing_yards", projection: 57.5, line: 67.5, over: -111, under: -109, lower: 40, upper: 80 });
+  const thin = prop({}); // David 36 over 34.5 at -120
+
+  it("uses the less confident model and nets out the price", () => {
+    // Sam 57.2 vs David 57.5: David's 10 under is the smaller gap. 10 / (40 / 2.563) = z 0.64, about 74%, less -109's 52.2%.
+    expect(agreeEdge(strong, 57.2)).toBeCloseTo(0.217, 2);
+    // Half a yard past the line barely beats a coin flip, short of -120's 54.5%.
+    expect(agreeEdge(thin, 35)!).toBeLessThan(0);
+  });
+
+  it("is null when they split or Sam has no number", () => {
+    expect(agreeEdge(thin, 30)).toBeNull();
+    expect(agreeEdge(thin, undefined)).toBeNull();
+  });
+
+  it("sorts agreements into the two edge bands", () => {
+    expect(davidSliceSide("h2h:agree-edge-hi", strong, 57.2)).toBe("under");
+    expect(davidSliceSide("h2h:agree-edge-lo", strong, 57.2)).toBeNull();
+    expect(davidSliceSide("h2h:agree-edge-lo", thin, 35)).toBe("over");
+    expect(davidSliceSide("h2h:agree-edge-hi", thin, 30)).toBeNull();
   });
 });

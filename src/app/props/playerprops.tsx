@@ -7,7 +7,7 @@ import { STAT_LABEL, type PropMarket, type Side } from "@/lib/props/parse";
 import { isPlay, nameKey } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
 import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
-import { DAVID_LABEL, DAVID_URL, davidSide, davidSliceSide, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
+import { DAVID_LABEL, DAVID_URL, agreeEdge, davidSide, davidSliceSide, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
@@ -212,24 +212,14 @@ function agreements(david: DavidGame | undefined, samOf: (p: DavidProp) => numbe
     const side = davidSide(p);
     const sam = samOf(p);
     if (!side || sam === undefined || sideFrom(sam, p.line) !== side) continue;
-    const range = p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1);
-    // David's 80% range as a normal band (80% spans 2.563 sd); the weaker model's distance sets the chance.
-    const sd = range / 2.563;
-    const win = phi(Math.min(Math.abs(p.projection - p.line), Math.abs(sam - p.line)) / sd);
-    const price = side === "over" ? p.over : p.under;
-    const be = price === null ? 0.5238 : price < 0 ? -price / (-price + 100) : 100 / (price + 100);
-    out.push({ p, sam, side, score: win - be, result: dRes.get(p.id) });
+    const score = agreeEdge(p, sam);
+    if (score === null) continue;
+    out.push({ p, sam, side, score, result: dRes.get(p.id) });
   }
   return out.sort((a, b) => b.score - a.score);
 }
 
 const BEST_TOP = 10;
-/** Standard normal CDF (Abramowitz and Stegun 7.1.26). */
-function phi(z: number) {
-  const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
-  const e = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
-  return z >= 0 ? (1 + e) / 2 : (1 - e) / 2;
-}
 const pct = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(0)}%`;
 /** Server render time, to split games that have kicked off from those still to come. */
 const renderedAt = () => Date.now();

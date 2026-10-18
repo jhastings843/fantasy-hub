@@ -282,6 +282,32 @@ interface DRow {
 }
 
 const reachD = (p: DavidProp) => Math.abs(p.projection - p.line) / Math.max(p.line, 1);
+/** Standard normal CDF (Abramowitz and Stegun 7.1.26). */
+function phi(z: number) {
+  const t = 1 / (1 + (0.3275911 * Math.abs(z)) / Math.SQRT2);
+  const e = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
+  return z >= 0 ? (1 + e) / 2 : (1 - e) / 2;
+}
+
+/** Edge-band cut for the "both agree" slices and the Props page's Best bets ranking. */
+export const AGREE_EDGE_HI = 0.1;
+
+/**
+ * Estimated edge when Sam and David agree: the less confident model's chance of
+ * clearing DraftKings' total, reading David's 80% range as a normal band (80%
+ * spans 2.563 sd), minus the price's break-even. Null when they don't agree or
+ * the side has no price. An estimate for ranking, not a calibrated probability.
+ */
+export function agreeEdge(p: DavidProp, samProj: number | undefined): number | null {
+  const side = davidSide(p);
+  if (!side || sideAt(samProj, p.line) !== side) return null;
+  const price = side === "over" ? p.over : p.under;
+  if (price === null) return null;
+  const range = p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1);
+  const win = phi(Math.min(Math.abs(p.projection - p.line), Math.abs(samProj! - p.line)) / (range / 2.563));
+  return win - implied(price);
+}
+
 const agree = (r: DRow) => !!r.david && !!r.sam && r.david.side === r.sam.side;
 const split = (r: DRow) => !!r.david && !!r.sam && r.david.side !== r.sam.side;
 
@@ -298,6 +324,8 @@ export const DAVID_SLICES: [string, string, (r: DRow) => DBet | null][] = [
   ["h2h:david", "David's side, every shared prop", (r) => (r.sam ? r.david : null)],
   ["h2h:agree", "Both agree", (r) => (agree(r) ? r.david : null)],
   ["h2h:agree-over", "Both agree on the over", (r) => (agree(r) && r.david!.side === "over" ? r.david : null)],
+  ["h2h:agree-edge-hi", "Both agree, est. edge 10%+", (r) => (agree(r) && (agreeEdge(r.p, r.samProj) ?? -1) >= AGREE_EDGE_HI ? r.david : null)],
+  ["h2h:agree-edge-lo", "Both agree, est. edge under 10%", (r) => (agree(r) && (agreeEdge(r.p, r.samProj) ?? -1) < AGREE_EDGE_HI ? r.david : null)],
   ["h2h:agree-under", "Both agree on the under", (r) => (agree(r) && r.david!.side === "under" ? r.david : null)],
   ["h2h:split-sam", "Split: Sam's side", (r) => (split(r) ? r.sam : null)],
   ["h2h:split-david", "Split: David's side", (r) => (split(r) ? r.david : null)],
