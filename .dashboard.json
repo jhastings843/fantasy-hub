@@ -84,8 +84,10 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-17",
+  "last_worked": "2026-10-18",
   "notes": [
+    "2026-10-18: Props week view leads with a cross-game Best bets list (props Sam and David agree on at DraftKings' line, ranked by estimated edge net of price, with the Both agree season record); game cards now summarize as 'N both agree of M shared' with a top-5 agree list inside.",
+    "2026-10-17: New project-only Gmail App Password (GMAIL_APP_PASSWORD) after Jack's Google password change revoked all old ones; set in .env.local + Vercel production, redeployed; verified against Gmail.",
     "2026-10-16: Money > Kalshi tab shows Phil's Kalshi shadow record (open calls, last scan's radar, learning progress), separate from his Polymarket numbers.",
     "2026-10-15: Renamed to Hobby Hub; nav split into Fantasy (Leagues, Strategy, Resources), Survivor, Picks, Props, Money; new /money page with my bets (auto-graded from ESPN), Phil and the paper stock books (snapshot posted from trade-bot). Deployed 3dc166c.",
     "2026-10-15: Props adds ESPN projections (third model) and DraftKings opening lines; deployed 6280568.",

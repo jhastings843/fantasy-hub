@@ -195,6 +195,123 @@ function joinRows(sam: StoredProps | undefined, david: DavidGame | undefined, sa
   return [...rows.values()].sort((a, b) => a.team.localeCompare(b.team) || a.player.localeCompare(b.player) || a.stat.localeCompare(b.stat));
 }
 
+/** A prop both models point the same way on, at DraftKings' line: the "Both agree" slice the results page tracks. */
+interface Agree {
+  p: DavidProp;
+  sam: number;
+  side: Side;
+  /** Estimated win chance minus the price's break-even, using the less confident model: both have to clear it. */
+  score: number;
+  result?: DavidGraded;
+}
+
+function agreements(david: DavidGame | undefined, samOf: (p: DavidProp) => number | undefined): Agree[] {
+  const dRes = new Map((david?.result ?? []).map((r) => [r.id, r]));
+  const out: Agree[] = [];
+  for (const p of david?.props ?? []) {
+    const side = davidSide(p);
+    const sam = samOf(p);
+    if (!side || sam === undefined || sideFrom(sam, p.line) !== side) continue;
+    const range = p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1);
+    // David's 80% range as a normal band (80% spans 2.563 sd); the weaker model's distance sets the chance.
+    const sd = range / 2.563;
+    const win = phi(Math.min(Math.abs(p.projection - p.line), Math.abs(sam - p.line)) / sd);
+    const price = side === "over" ? p.over : p.under;
+    const be = price === null ? 0.5238 : price < 0 ? -price / (-price + 100) : 100 / (price + 100);
+    out.push({ p, sam, side, score: win - be, result: dRes.get(p.id) });
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+
+const BEST_TOP = 10;
+/** Standard normal CDF (Abramowitz and Stegun 7.1.26). */
+function phi(z: number) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const e = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
+  return z >= 0 ? (1 + e) / 2 : (1 - e) / 2;
+}
+const pct = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(0)}%`;
+/** Server render time, to split games that have kicked off from those still to come. */
+const renderedAt = () => Date.now();
+
+function AgreeRow({ a, teams }: { a: Agree; teams?: string }) {
+  const price = a.side === "over" ? a.p.over : a.p.under;
+  const out = a.result?.outcome;
+  return (
+    <li className={pp.bbRow}>
+      <div className={pp.bbMain}>
+        <span className={s.ppWho}>
+          {`${a.p.player} `}
+          <span className={s.dim}>{a.p.team}</span>
+        </span>
+        <span className={s.ppBet}>{`${sideWord(a.side)} ${a.p.line} ${dShort[a.p.market]}`}</span>
+      </div>
+      <div className={`${pp.bbMeta} ${s.num}`}>
+        <span>{`Sam ${a.sam} · David ${a.p.projection}`}</span>
+        {price !== null && <span>{`${am(price)} DK`}</span>}
+        <span className={a.score > 0 ? s.pos : s.dim}>{`edge ${pct(a.score)} est.`}</span>
+        {teams && <span className={s.dim}>{teams}</span>}
+        {out && a.result?.actual !== null && (
+          <span className={`${s.resChip} ${out === "W" ? s.resW : out === "L" ? s.resL : s.resP}`}>{`${out} · ${a.result!.actual}`}</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function BestBets({ games, samOf, record, now }: { now: number; games: DavidGame[]; samOf: (p: DavidProp) => number | undefined; record: Pick<PropSlice, "w" | "l" | "p" | "units"> | undefined }) {
+  const all = games.flatMap((g) => {
+    const [, , away, home] = g.gameId.split("_");
+    const when = `${away} at ${home} · ${whenEt(g.kickoff)}`;
+    return agreements(g, samOf).map((a) => ({ a, when, started: new Date(g.kickoff).getTime() <= now }));
+  });
+  const up = all.filter((x) => !x.started).sort((x, y) => y.a.score - x.a.score);
+  const done = all.filter((x) => x.started).sort((x, y) => y.a.score - x.a.score);
+  const rec = record && record.w + record.l + record.p > 0 ? `${recOf(record)}, ${u(record.units)}` : null;
+  if (!all.length) return null;
+  return (
+    <section className={pp.bb} aria-labelledby="pp-best">
+      <div className={pp.bbHead}>
+        <h3 className={pp.bbH} id="pp-best">Best bets: both models agree</h3>
+        <span className={`${s.dim} ${s.num}`}>{rec ? `Season so far ${rec}` : "No graded record yet"}</span>
+      </div>
+      <p className={pp.bbNote}>
+        Props where Sam and David land on the same side of DraftKings&apos; line. Ranked by edge, an estimate: the less confident model&apos;s chance of hitting (from David&apos;s 80% range) minus what DraftKings&apos; price needs.
+        Tracking only, not in the system yet.
+      </p>
+      {up.length ? (
+        <ol className={pp.bbList}>
+          {up.slice(0, BEST_TOP).map(({ a, when }) => (
+            <AgreeRow key={a.p.id} a={a} teams={when} />
+          ))}
+        </ol>
+      ) : (
+        <p className={pp.ppNone}>Every game with a shared prop has kicked off.</p>
+      )}
+      {up.length > BEST_TOP && (
+        <details className={s.ppAll}>
+          <summary>{`${up.length - BEST_TOP} more agreements`}</summary>
+          <ol className={pp.bbList}>
+            {up.slice(BEST_TOP).map(({ a, when }) => (
+              <AgreeRow key={a.p.id} a={a} teams={when} />
+            ))}
+          </ol>
+        </details>
+      )}
+      {done.length > 0 && (
+        <details className={s.ppAll}>
+          <summary>{`${done.length} from games already started`}</summary>
+          <ol className={pp.bbList}>
+            {done.map(({ a, when }) => (
+              <AgreeRow key={a.p.id} a={a} teams={when} />
+            ))}
+          </ol>
+        </details>
+      )}
+    </section>
+  );
+}
+
 function GameCard({ gameId, sam, david, v, samOf }: { gameId: string; sam?: StoredProps; david?: DavidGame; v: PropsView; samOf: (p: DavidProp) => number | undefined }) {
   const [, , away, home] = gameId.split("_");
   const kickoff = sam?.kickoff ?? david?.kickoff;
@@ -202,7 +319,7 @@ function GameCard({ gameId, sam, david, v, samOf }: { gameId: string; sam?: Stor
   const dProps = david ? david.props.filter((p) => davidSide(p)).sort((a, b) => dReach(b) - dReach(a)) : [];
   const dRes = new Map((david?.result ?? []).map((r) => [r.id, r]));
   const shared = (david?.props ?? []).filter((p) => samOf(p) !== undefined);
-  const agreeN = shared.filter((p) => davidSide(p) && sideFrom(samOf(p), p.line) === davidSide(p)).length;
+  const agree = agreements(david, samOf);
   const samNet = sam?.result ? sam.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
   const dNet = david?.result ? david.result.reduce((a, r) => a + r.net, 0) : null;
   const inSystem =
@@ -218,11 +335,11 @@ function GameCard({ gameId, sam, david, v, samOf }: { gameId: string; sam?: Stor
             <span className={s.dim}>{`${kickoff ? whenEt(kickoff) : ""}${sam?.late ? " · late copy" : ""}`}</span>
           </span>
           <span className={s.ftdPick}>
-            <span className={s.ftdPickName}>{`Sam ${sam ? plays.length : "–"} · David ${david ? dProps.length : "–"}`}</span>
-            <span className={`${s.dim} ${s.num}`}>{sam ? `${plays.length === 1 ? "play" : "plays"} · props` : "plays · props"}</span>
+            <span className={s.ftdPickName}>{agree.length ? `${agree.length} both agree` : "No agreements"}</span>
+            <span className={`${s.dim} ${s.num}`}>{shared.length ? `of ${shared.length} props they share` : sam && david ? "no props in common" : sam ? "David hasn't posted" : "Sam's page not saved yet"}</span>
           </span>
           <span className={s.ftdOdds}>
-            {shared.length ? `Agree on ${agreeN} of ${shared.length} shared props` : sam && david ? "No props in common" : sam ? "David hasn't posted this game" : "Sam's page not saved yet"}
+            {[sam ? `Sam ${plays.length} ${plays.length === 1 ? "play" : "plays"}` : null, david ? `David ${david.props.length} props` : null].filter(Boolean).join(" · ")}
           </span>
           <span className={s.ftdFlags}>
             {samNet !== null && <span className={`${s.resChip} ${samNet > 0 ? s.resW : samNet < 0 ? s.resL : s.resP}`}>{`Sam ${u(samNet)}`}</span>}
@@ -232,6 +349,19 @@ function GameCard({ gameId, sam, david, v, samOf }: { gameId: string; sam?: Stor
           </span>
         </summary>
         <div className={s.ftdBody}>
+          {agree.length > 0 && (
+            <div className={pp.ppCol}>
+              <div className={pp.ppColH}>
+                <span>Both agree</span>
+                <span className={s.dim}>{agree.length > 5 ? `top 5 of ${agree.length}, the rest in the table below` : "at DraftKings' line"}</span>
+              </div>
+              <ol className={pp.bbList}>
+                {agree.slice(0, 5).map((a) => (
+                  <AgreeRow key={a.p.id} a={a} />
+                ))}
+              </ol>
+            </div>
+          )}
           <div className={pp.ppCols}>
             <div className={pp.ppCol}>
               <div className={pp.ppColH}>
@@ -340,18 +470,21 @@ export async function PropsWeek({ season }: { season: number }) {
   const kick = (id: string) => samBy.get(id)?.kickoff ?? dBy.get(id)?.kickoff ?? "";
   ids.sort((a, b) => kick(a).localeCompare(kick(b)) || a.localeCompare(b));
   const live = v.system.filter((e) => !e.retired);
+  const now = renderedAt();
   return (
     <section className={s.section} aria-labelledby="pp-week">
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-week">{`Week ${week} player props`}</h2>
         <p className={s.p}>
-          {`Sam and David, game by game. Sam's plays are the markets where his page says the price clears the vig, at the book he'd play. David's edges are where his projection sits furthest from DraftKings' total, measured against his own 80% range; every prop on his board is graded the way his number points, at DraftKings' price. Where both cover a prop, both sides are also graded at the same DraftKings line, so the two compare like for like. ${
+          {`Sam's and David's prop models. Start with the props they agree on, then open a game for Sam's plays (where his page says the price clears the vig), David's biggest edges and every prop side by side. ${
             live.length
               ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the system; bets that fall in one are marked.`
-              : "Nothing has earned a place in the system yet, so every bet here is tracking, not money."
+              : "Nothing has earned a place in the system yet, so all of it is tracking, not money."
           }`}
         </p>
       </div>
+      <BestBets now={now} games={dGames} samOf={samOf} record={v.david.trends.slices.find((x) => x.id === "h2h:agree")} />
+      <h3 className={pp.bbH}>Game by game</h3>
       <ol className={s.ftdGames}>
         {ids.map((id) => (
           <GameCard key={id} gameId={id} sam={samBy.get(id)} david={dBy.get(id)} v={v} samOf={samOf} />
