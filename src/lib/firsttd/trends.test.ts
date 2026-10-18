@@ -26,4 +26,25 @@ describe("first TD trends", () => {
     expect(t.headline.find((x) => x.id === "pick")!.verdict).toBe("over");
     expect(t.findings[0]).toMatch(/undersold/);
   });
+
+  it("tracks Kalshi bets by Sam's probability tier, value or not", () => {
+    const kalshi = {
+      event: "x",
+      at: "2026-10-16T00:00:00Z",
+      players: [
+        { name: "Emanuel Wilson", bid: 0.11, ask: 0.12, last: null },
+        { name: "Jaxon Smith-Njigba", bid: 0.14, ask: 0.15, last: null },
+        { name: "Courtland Sutton", bid: 0.04, ask: 0.05, last: null },
+      ],
+    };
+    const t = trends([{ game: g, result: grade(g, wilson), kalshi }]);
+    const m = (id: string) => t.market.find((x) => x.id === id)!;
+    // Wilson 15.7% at 12c + 1c fee: a winner paying 0.87 / 0.13.
+    expect(m("k-p12")).toMatchObject({ bets: 1, w: 1, units: 6.69 });
+    // Top two in the game: Wilson and Smith-Njigba (11.1%, 15c + 1c), one winner.
+    expect(m("k-top2")).toMatchObject({ bets: 2, w: 1 });
+    expect(m("k-p4")).toMatchObject({ bets: 1, w: 0, units: -1 });
+    // 8%+ and above cost keeps Wilson, drops Smith-Njigba (11.1% under his 16c).
+    expect(m("k-p8-value")).toMatchObject({ bets: 1, w: 1 });
+  });
 });

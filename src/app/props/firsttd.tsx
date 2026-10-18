@@ -1,6 +1,6 @@
 // First TD: Sam's first touchdown model, saved before kickoff and graded
 // after. This week, results, research (the trend checks). NFL only.
-import { fairAmerican, type FtdGame } from "@/lib/firsttd/parse";
+import { fairAmerican, pricedPlayers, type FtdGame } from "@/lib/firsttd/parse";
 import type { Graded } from "@/lib/firsttd/grade";
 import { getFirstTdView, type FirstTdView, type StoredGame } from "@/lib/firsttd/store";
 import { MIN_GAMES, kalshiCost, kalshiFor, type PriceSlice, type Slice, type Verdict } from "@/lib/firsttd/trends";
@@ -177,6 +177,70 @@ function GameRow({ g, saved }: { g: FtdGame; saved: StoredGame }) {
   );
 }
 
+/** How many of the slate's most likely scorers the top list shows; the rest are a tap away. */
+const LIKELY_TOP = 12;
+/** Server render time, to split games that have kicked off from those still to come. */
+const renderedAt = () => Date.now();
+
+/** Every priced player on the slate, most likely first, with Kalshi's cost beside Sam's chance. */
+function MostLikely({ games, now }: { games: StoredGame[]; now: number }) {
+  const rows = games
+    .filter((g) => !g.result && (!g.kickoff || new Date(g.kickoff).getTime() > now))
+    .flatMap((g) =>
+      pricedPlayers(g.game).map((p) => {
+        const k = kalshiFor(g.kalshi, p.name);
+        const cost = k?.ask ? kalshiCost(k.ask) : null;
+        return { p, g, cost, edge: cost !== null ? p.p - cost : null };
+      }),
+    )
+    .sort((a, b) => b.p.p - a.p.p);
+  if (!rows.length) return null;
+  const table = (xs: typeof rows, from: number) => (
+    <table className={s.ftdTable}>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Sam</th>
+          <th>Fair</th>
+          <th>Kalshi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {xs.map(({ p, g, cost, edge }, i) => (
+          <tr key={`${g.game.slug}|${p.key}`}>
+            <td className={`${s.num} ${s.dim}`}>{from + i + 1}</td>
+            <td>
+              {`${p.name} `}
+              <span className={s.dim}>{`${p.team} · ${g.game.away} at ${g.game.home}${g.kickoff ? `, ${whenEt(g.kickoff)}` : ""}`}</span>
+            </td>
+            <td className={s.num}>{p1(p.p)}</td>
+            <td className={`${s.num} ${s.dim}`}>{fairAmerican(p.p)}</td>
+            <td className={`${s.num} ${edge !== null && edge > 0 ? s.pos : s.dim}`} title="Kalshi ask plus fee">
+              {cost !== null ? `${Math.round(cost * 100)}¢${edge! > 0 ? ` +${(edge! * 100).toFixed(1)}` : ""}` : "–"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+  return (
+    <div className={s.ftdSide}>
+      <div className={s.ftdSideHead}>
+        <b>Most likely to score first</b>
+        <span className={`${s.dim} ${s.num}`}>{`${rows.length} players, games still to come`}</span>
+      </div>
+      {table(rows.slice(0, LIKELY_TOP), 0)}
+      {rows.length > LIKELY_TOP && (
+        <details className={s.ppAll}>
+          <summary>{`The other ${rows.length - LIKELY_TOP}`}</summary>
+          {table(rows.slice(LIKELY_TOP), LIKELY_TOP)}
+        </details>
+      )}
+    </div>
+  );
+}
+
 export async function FirstTdWeek({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
@@ -189,9 +253,10 @@ export async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="ftd-week">{`Week ${w.week} first touchdown`}</h2>
         <p className={s.p}>
-          {`Sam's model, saved before kickoff. Chances, not prices: the fair price is the break-even. Tap a game for every player. Kalshi is what one contract cost at the same moment (ask plus fee), green with the gap in points when Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
+          {`Sam's model, saved before kickoff, ranked by his chance a player scores the game's first TD. The fair price is the break-even. Tap a game for every player. Kalshi is what one contract cost at the same moment (ask plus fee), green with the gap in points when Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
         </p>
       </div>
+      <MostLikely games={games} now={renderedAt()} />
       <ol className={s.ftdGames}>
         {games.map((g) => (
           <GameRow key={g.game.slug} g={g.game} saved={g} />

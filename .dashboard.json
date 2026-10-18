@@ -86,6 +86,7 @@
   ],
   "last_worked": "2026-10-18",
   "notes": [
+    "2026-10-18: First TD week view leads with the slate's most likely first TD scorers ranked by Sam's chance (Kalshi cost and value kept beside it); Research adds Kalshi bet slices by probability tier (top 2 per game, 12%+, 8-12%, 4-8%, under 4%, 8%+ with value).",
     "2026-10-18: Two tracked prop slices, 'Both agree, est. edge 10%+' and 'under 10%', test whether the Best bets ranking beats the rest; edge formula shared (agreeEdge in lib/props/david.ts).",
     "2026-10-18: Props week view leads with a cross-game Best bets list (props Sam and David agree on at DraftKings' line, ranked by estimated edge net of price, with the Both agree season record); game cards now summarize as 'N both agree of M shared' with a top-5 agree list inside.",
     "2026-10-17: New project-only Gmail App Password (GMAIL_APP_PASSWORD) after Jack's Google password change revoked all old ones; set in .env.local + Vercel production, redeployed; verified against Gmail.",

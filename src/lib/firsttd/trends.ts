@@ -231,6 +231,13 @@ export function trends(list: GradedGame[]): Trends {
     priceSlice("k-value3", "Above Kalshi's cost by 3+ points", (p, c) => p.p >= c + 0.03),
     priceSlice("k-pick", "Sam's pick, bought at Kalshi's ask", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team),
     priceSlice("k-short", "Kalshi priced 10% or less, Sam above cost", (p, c) => c <= 0.1 && p.p > c),
+    // By probability, value or not: which tier of Sam's list (if any) beats Kalshi's price.
+    priceSlice("k-top2", "Sam's two most likely in each game", (p, _c, g) => pricedPlayers(g).slice(0, 2).some((x) => x.key === p.key)),
+    priceSlice("k-p12", "Sam 12% or more, every one", (p) => p.p >= 0.12),
+    priceSlice("k-p8", "Sam 8% to 12%, every one", (p) => p.p >= 0.08 && p.p < 0.12),
+    priceSlice("k-p4", "Sam 4% to 8%, every one", (p) => p.p >= 0.04 && p.p < 0.08),
+    priceSlice("k-p0", "Sam under 4%, every one", (p) => p.p < 0.04),
+    priceSlice("k-p8-value", "Sam 8% or more and above Kalshi's cost", (p, c) => p.p >= 0.08 && p.p > c),
   ];
 
   const findings = [...headline, ...rank, ...price, ...usage]
