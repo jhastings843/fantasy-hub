@@ -24,6 +24,16 @@
 .panelTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; font-size: 22px; font-weight: 700; margin: 0; line-height: 1.1; }
 .panelLink { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); text-decoration: none; }
 .panelLink:hover { text-decoration: underline; }
+/* Collapsible panel (Phil's settled bets). Closed by default; the chevron turns when open. */
+.fold:not([open]) { gap: 0; }
+.foldHead { display: flex; align-items: baseline; gap: 10px; cursor: pointer; list-style: none; user-select: none; }
+.foldHead::-webkit-details-marker { display: none; }
+.foldHead::after { content: ""; margin-left: auto; align-self: center; width: 8px; height: 8px; border-right: 2px solid var(--ink2); border-bottom: 2px solid var(--ink2); transform: rotate(45deg) translateY(-2px); }
+.fold[open] > .foldHead::after { transform: rotate(-135deg) translateY(-2px); }
+.foldHead:hover .panelTitle { color: var(--accent); }
+.foldHead:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+.foldMeta { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+@media (prefers-reduced-motion: no-preference) { .foldHead::after { transition: transform .15s ease; } }
 .big { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 40px; line-height: 1; }
 .sub { font-size: 13.5px; color: var(--ink2); }
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }

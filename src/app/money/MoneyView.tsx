@@ -219,15 +219,18 @@ function PhilTab({ p }: { p: Phil }) {
           </div>
         </div>
       )}
-      <div className={m.panel}>
-        <h2 className={m.panelTitle}>Settled</h2>
+      <details className={`${m.panel} ${m.fold}`}>
+        <summary className={m.foldHead}>
+          <h2 className={m.panelTitle}>Settled</h2>
+          <span className={m.foldMeta}>{`${p.settledBets.length} bets`}</span>
+        </summary>
         <div className={m.scroll}>
           <table className={s.table}>
             <thead><tr><th>Market</th><th>Stake</th><th>Result</th><th>P&amp;L</th></tr></thead>
             <tbody>{p.settledBets.map((b) => <PhilRow key={b.id} b={b} />)}</tbody>
           </table>
         </div>
-      </div>
+      </details>
       {p.tracks.length > 0 && (
         <div className={m.panel}>
           <h2 className={m.panelTitle}>Pilot tracks</h2>
