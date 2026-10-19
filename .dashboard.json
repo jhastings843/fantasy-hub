@@ -86,6 +86,7 @@
   ],
   "last_worked": "2026-10-19",
   "notes": [
+    "2026-10-19: Money > Kalshi tab shows Kalshi Phil (same ledger view as Phil) above Phil's shadow check; Overview gets a Kalshi Phil tile and panel (72de2b3).",
     "2026-10-19: Money > Books shows a live point and tag during market hours and a Latest grades panel; deployed.",
     "2026-10-18: Phil settled bets on the Money tab now collapse (closed by default, bet count in header).",
     "2026-10-18: First TD week view leads with the slate's most likely first TD scorers ranked by Sam's chance (Kalshi cost and value kept beside it); Research adds Kalshi bet slices by probability tier (top 2 per game, 12%+, 8-12%, 4-8%, under 4%, 8%+ with value).",
