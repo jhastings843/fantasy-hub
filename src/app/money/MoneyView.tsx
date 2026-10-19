@@ -179,23 +179,25 @@ function PhilRetro({ e }: { e: PhilLearn }) {
       {e.lessons.map((x, i) => <li key={`l${i}`}><Tag k="lesson" />{x}</li>)}
       {e.changes.map((x, i) => <li key={`c${i}`}><Tag k="changed" />{x}</li>)}
       {e.noted.map((x, i) => <li key={`n${i}`}><Tag k="noted" /><span className={m.why}>{x}</span></li>)}
-      {e.kalshi && <li><Tag k="kalshi" /><span className={m.why}>{e.kalshi}</span></li>}
-      {!e.lessons.length && !e.changes.length && !e.noted.length && !e.kalshi && <li className={s.muted}>Nothing recorded beyond the headline.</li>}
+      {e.review && <li><Tag k="review" /><span className={m.why}>{e.review}</span></li>}
+      {!e.lessons.length && !e.changes.length && !e.noted.length && !e.review && <li className={s.muted}>Nothing recorded beyond the headline.</li>}
     </ul>
   );
 }
 
-function PhilLearnLog({ log, who }: { log: PhilLearn[]; who: string }) {
+/** A retro log, folded shut: the header says how recent and how much is inside. */
+function PhilLearnLog({ log, title, about }: { log: PhilLearn[]; title: string; about: string }) {
   const [latest, ...older] = log;
   const lessons = log.reduce((n, e) => n + e.lessons.length, 0);
   const changes = log.reduce((n, e) => n + e.changes.length, 0);
   const stamp = (e: PhilLearn) => (e.ts ? when(e.ts) : e.file);
   return (
-    <div className={m.panel}>
-      <h2 className={m.panelTitle}>Learner log</h2>
-      <p className={m.sub}>
-        {`What ${who} noted, learned and changed in its own playbook after bets and forecasts settled, from its last ${log.length} retros (${lessons} ${lessons === 1 ? "lesson" : "lessons"}, ${changes} ${changes === 1 ? "change" : "changes"}). Its own words, trimmed.`}
-      </p>
+    <details className={`${m.panel} ${m.fold}`}>
+      <summary className={m.foldHead}>
+        <h2 className={m.panelTitle}>{title}</h2>
+        <span className={m.foldMeta}>{`${log.length} ${log.length === 1 ? "retro" : "retros"} · ${lessons} ${lessons === 1 ? "lesson" : "lessons"} · ${changes} ${changes === 1 ? "change" : "changes"}`}</span>
+      </summary>
+      <p className={m.sub}>{about}</p>
       <div className={m.week}>
         <div className={m.weekHead}>
           <span>{stamp(latest)}</span>
@@ -212,7 +214,7 @@ function PhilLearnLog({ log, who }: { log: PhilLearn[]; who: string }) {
           <div className={m.rowBody}><PhilRetro e={e} /></div>
         </details>
       ))}
-    </div>
+    </details>
   );
 }
 
@@ -287,7 +289,17 @@ function PhilTab({ p }: { p: Phil }) {
           </table>
         </div>
       </details>
-      {p.learner && p.learner.length > 0 && <PhilLearnLog log={p.learner} who={p.venue === "kalshi" ? "Kalshi Phil" : "Phil"} />}
+      {p.learner && p.learner.length > 0 && (
+        <PhilLearnLog
+          log={p.learner}
+          title="Learner log"
+          about={
+            p.venue === "kalshi"
+              ? "What Kalshi Phil noted, learned and changed in its own playbook after its Kalshi bets and forecasts settled, newest first. Its own words, trimmed."
+              : "What Phil noted, learned and changed in its own playbook after Polymarket bets and forecasts settled, newest first. Polymarket only: its Kalshi shadow notes are on the Kalshi tab. Its own words, trimmed."
+          }
+        />
+      )}
     </section>
   );
 }
@@ -387,7 +399,7 @@ function BookHoldings({ b }: { b: Book }) {
 
 const TAG: Record<string, string> = {
   open: m.tagOpen, retire: m.tagRetire, fix: m.tagFix, watch: m.tagWatch, idea: m.tagIdea,
-  lesson: m.tagIdea, changed: m.tagFix, kalshi: m.tagWatch,
+  lesson: m.tagIdea, changed: m.tagFix, review: m.tagWatch,
 };
 
 function Tag({ k }: { k: string }) {
@@ -686,6 +698,13 @@ function KalshiTab({ k }: { k: Kalshi }) {
             </table>
           </div>
         </div>
+      )}
+      {k.learner && k.learner.length > 0 && (
+        <PhilLearnLog
+          log={k.learner}
+          title="Shadow learner log"
+          about="What Phil's retros said about his Kalshi shadow picks once they settled, and the Kalshi review's verdict. Kalshi only, kept apart from his Polymarket record. Retros where nothing on Kalshi settled are left out."
+        />
       )}
     </section>
   );

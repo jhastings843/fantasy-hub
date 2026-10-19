@@ -129,7 +129,8 @@ export interface PhilLearn {
   noted: string[];
   lessons: string[];
   changes: string[];
-  kalshi: string | null;
+  /** Phil's Kalshi review verdict (shadow check only). */
+  review: string | null;
 }
 
 export interface KalshiRow {
@@ -182,6 +183,8 @@ export interface Kalshi {
   lastScan: { ts: string; eligible?: Record<string, number>; picks: { ticker: string; bucket: "near" | "far"; category?: string; event?: string; title?: string; yes_sub_title?: string; mid?: number; settles_by?: string }[] } | null;
   watching: KalshiRow[];
   recent: KalshiRow[];
+  /** The Kalshi half of Phil's retros, newest first. Missing before 2026-10-19. */
+  learner?: PhilLearn[];
 }
 
 export interface MoneySnapshot {
