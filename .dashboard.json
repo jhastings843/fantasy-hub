@@ -253,7 +253,8 @@
     "2026-10-12: Results tracks Jack's real pool picks from Sleeper; entry now solves mid-week from real standings (3c0485b). MNF Wk5: Jack 9, leader 10, BUF only live path (~6%).",
     "2026-10-13: Reverted mid-week rule moves; rule/Tier 2 freeze at the Tuesday 7am review and hold all week (277cba0). Today's review checked: ran 7:00am, all 24 hypotheses evaluated, 0 forward games yet by design.",
     "2026-10-17: Props: David Sasser's prop board (davidsasser.com/nfl/props, 6 markets vs DraftKings) saved pregame each capture, graded from ESPN box scores, shown as 'David's board' on /props, plus a David column/lean on Sam's markets and David research tables. Week 6 board saved (13 games).",
-    "2026-10-17: Props: David now equal to Sam (one card per game with both, head-to-head slices at the same DraftKings line, both models' slices can enter the system)."
+    "2026-10-17: Props: David now equal to Sam (one card per game with both, head-to-head slices at the same DraftKings line, both models' slices can enter the system).",
+    "2026-10-19: Money books tab: learn log absorbs grades with hourly 'Latest check'; holdings rows explain each strategy."
   ],
   "tags": [
     "personal",

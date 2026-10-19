@@ -28,6 +28,8 @@ export interface Book {
   retired?: string | null;
   /** When the last curve point is live, the quote time. Missing before 2026-10-19. */
   liveAt?: string | null;
+  /** Plain-English description (trade-bot tradebot/explain.py): the idea, the exact rule, why it was opened. */
+  strategy?: { what: string; how: string; record: string | null } | null;
 }
 
 /** The learner's weekday grade of every active book (trade-bot learner.grade). Changes nothing. */
@@ -48,6 +50,9 @@ export interface BookGrade {
 export interface Grades {
   day: string;
   through: string;
+  /** When the check ran (hourly with the Money push), and the live prices it used if any. */
+  checked?: string;
+  liveAt?: string | null;
   books: BookGrade[];
 }
 

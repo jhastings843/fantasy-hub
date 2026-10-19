@@ -3,7 +3,7 @@
 
 
 ## Money > Phil: learner log replaces pilot tracks (2026-10-19, deployed 2026-10-19)
-- Phil and Kalshi Phil tabs: "Pilot tracks" removed; "Learner log" shows the newest 12 retros (journal/retros/RETRO-*.md in trade-bot/phil and kalshi-phil). Headline = the retro's commit subject; tags lesson / changed / noted / kalshi. Parsed in trade-bot `money_export.parse_retro` (free-form markdown: "Lesson ..." paragraphs and sections with "lesson" in the heading, bullets under Edits/Playbook edit, other sections as noted with their Verdict line or first sentence). `Phil.learner?: PhilLearn[]` in types.ts. If retros change shape and items go missing, fix the parser there.
+- Phil and Kalshi Phil tabs: "Pilot tracks" removed; "Learner log" shows the newest 10 retros (journal/retros/RETRO-*.md in trade-bot/phil and kalshi-phil). Headline = the retro's commit subject; tags lesson / changed / noted / kalshi. Parsed in trade-bot `money_export.parse_retro` (free-form markdown: "Lesson ..." paragraphs and sections with "lesson" in the heading, bullets under Edits/Playbook edit, other sections as noted with their Verdict line or first sentence). `Phil.learner?: PhilLearn[]` in types.ts. If retros change shape and items go missing, fix the parser there.
 
 ## Picks > NBA (2026-10-19, local, not deployed or committed)
 - New `/picks/nba` (sport switcher now NFL, College, NBA). Next 3 NBA game days from ESPN's scoreboard (DraftKings spread with both prices, total, moneylines; `dates=YYYYMMDD` ET, 7-day lookahead).
@@ -205,3 +205,7 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 
 ## Dynasty (from Oct 5, unchanged)
 - Keep list in `src/lib/dynasty/untouchables.ts`: Gibbs (9221) and Dart (12508). Retooling for 2027. The app prices on RosterAudit, which values veterans far below FantasyCalc.
+
+## 2026-10-19 late: hourly learn check + strategy explainers
+- trade-bot: `learner.check()` (`--check`) runs every hour in scripts/phil_hourly.sh before the Money push: Saturday rules on live prices, rewrites today's grades.jsonl line, opens/retires nothing. live.quotes reuses quotes fetched <10 min ago. tradebot/explain.py describes every lab family from params; money_export adds book.strategy {what, how, record}.
+- fantasy-hub: Learn log fold now holds the hourly "Latest check" then the Saturday weeks (GradesPanel removed); Holdings rows show the strategy explainer. Uncommitted until Jack says commit; needs `vercel --prod`.

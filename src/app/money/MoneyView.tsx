@@ -341,7 +341,15 @@ function BookHoldings({ b }: { b: Book }) {
         </span>
       </summary>
       <div className={m.rowBody}>
-        <p className={m.sub}>{b.about}</p>
+        {b.strategy ? (
+          <div className={m.strat}>
+            <span className={m.stratWhat}>{b.strategy.what}</span>
+            <span className={m.stratHow}>{b.strategy.how}</span>
+            {b.strategy.record && <span className={m.stratRec}>{b.strategy.record}</span>}
+          </div>
+        ) : (
+          <p className={m.sub}>{b.about}</p>
+        )}
         {held.length > 0 && (
           <ul className={m.holdList}>
             {held.map(({ p, g }) => (
@@ -400,25 +408,66 @@ function LearnWeek({ e }: { e: LearnEntry }) {
   );
 }
 
-function LearnLog({ log }: { log: LearnEntry[] }) {
-  const [latest, ...older] = log;
-  const moves = latest.decisions.length;
+function CheckRows({ g, books }: { g: Grades; books: Book[] }) {
+  const label = (id: string) => books.find((b) => b.id === id)?.label ?? id;
+  const rows = [...g.books].sort((a, b) => (a.action === "retire" ? 0 : 1) - (b.action === "retire" ? 0 : 1) || (b.excess ?? -9) - (a.excess ?? -9));
   return (
-    <details className={`${m.panel} ${m.fold}`}>
+    <ul className={m.grades}>
+      {rows.map((r) => (
+        <li key={r.book} className={m.grade}>
+          <span className={s.play}>{r.action === "retire" ? <Tag k="retire" /> : null}{label(r.book)}</span>
+          <span className={`${s.num} ${r.excess !== null ? tone(r.excess) : s.muted}`}>{r.excess !== null ? `${pct(r.excess)} vs SPY` : "n/a"}</span>
+          <span className={m.why}>
+            {`${r.sessions} sessions${r.t !== null ? `, t ${r.t.toFixed(2)}` : ""}${
+              r.passes === null ? "" : r.passes ? ", strategy still passes the lab filter" : ", strategy fails the lab filter"
+            }.${r.action === "retire" ? ` ${r.why}` : ""}`}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// One fold for everything the learner does: the hourly check on top (the
+// Saturday rules run on live prices, changing nothing), then each Saturday's
+// moves. It opens itself when a book would retire, so that never hides.
+function LearnLog({ log, grades, books }: { log: LearnEntry[]; grades: Grades | null; books: Book[] }) {
+  const [latest, ...older] = log;
+  const atRisk = grades ? grades.books.filter((b) => b.action === "retire").length : 0;
+  const when = grades ? (grades.checked ? `${shortDay(grades.day)} ${clockEt(grades.checked)}` : shortDay(grades.day)) : null;
+  const meta = grades
+    ? `Checked ${when}: ${atRisk ? `${atRisk} would retire` : "all kept"}`
+    : latest
+      ? `${shortDay(latest.day)}: ${latest.decisions.length ? `${latest.decisions.length} ${latest.decisions.length === 1 ? "move" : "moves"}` : "no moves"}`
+      : "";
+  return (
+    <details className={`${m.panel} ${m.fold}`} open={atRisk > 0}>
       <summary className={m.foldHead}>
         <h2 className={m.panelTitle}>Learn log</h2>
-        <span className={m.foldMeta}>{`${shortDay(latest.day)}: ${moves ? `${moves} ${moves === 1 ? "move" : "moves"}` : "no moves"}`}</span>
+        <span className={`${m.foldMeta} ${atRisk ? s.neg : ""}`}>{meta}</span>
       </summary>
       <p className={m.sub}>
-        What the Saturday learner decided, what got fixed, what Claude&apos;s retro is watching, and the new ideas it set the lab to test. The keep, retire and open rules are fixed; only Jack changes them.
+        Every hour the learner grades each book with Saturday&apos;s rules at live prices and changes nothing. On Saturday it acts: retires books, opens new ones, and Claude&apos;s retro writes what to watch and what to test next. The rules are fixed; only Jack changes them.
       </p>
-      <div className={m.week}>
-        <div className={m.weekHead}>
-          <span>{`Week of ${latest.day}`}</span>
-          {latest.tested !== null && <span className={s.muted}>{`${latest.tested.toLocaleString("en-US")} tested, ${latest.candidates} candidates, ${latest.proven} proven`}</span>}
+      {grades && grades.books.length > 0 && (
+        <div className={m.week}>
+          <div className={m.checkHead}>
+            <span>{`Latest check, ${when}${grades.liveAt ? ` (prices ${clockEt(grades.liveAt)})` : ""}`}</span>
+            <span className={atRisk ? s.neg : s.muted}>{atRisk ? `${atRisk} ${atRisk === 1 ? "book would" : "books would"} retire Saturday` : "no rule would fire"}</span>
+          </div>
+          <CheckRows g={grades} books={books} />
+          <p className={m.why}>{`Lab results through ${grades.through}; they move once a day.`}</p>
         </div>
-        <LearnWeek e={latest} />
-      </div>
+      )}
+      {latest && (
+        <div className={m.week}>
+          <div className={m.weekHead}>
+            <span>{`Week of ${latest.day}`}</span>
+            {latest.tested !== null && <span className={s.muted}>{`${latest.tested.toLocaleString("en-US")} tested, ${latest.candidates} candidates, ${latest.proven} proven`}</span>}
+          </div>
+          <LearnWeek e={latest} />
+        </div>
+      )}
       {older.map((e) => (
         <details key={e.day} className={m.row}>
           <summary className={m.rowHead}>
@@ -428,39 +477,6 @@ function LearnLog({ log }: { log: LearnEntry[] }) {
           <div className={m.rowBody}><LearnWeek e={e} /></div>
         </details>
       ))}
-    </details>
-  );
-}
-
-function GradesPanel({ g, books }: { g: Grades; books: Book[] }) {
-  const label = (id: string) => books.find((b) => b.id === id)?.label ?? id;
-  const rows = [...g.books].sort((a, b) => (a.action === "retire" ? 0 : 1) - (b.action === "retire" ? 0 : 1) || (b.excess ?? -9) - (a.excess ?? -9));
-  const atRisk = g.books.filter((b) => b.action === "retire").length;
-  return (
-    // Opens itself when a book is in trouble, so a retirement never hides behind a fold.
-    <details className={`${m.panel} ${m.fold}`} open={atRisk > 0}>
-      <summary className={m.foldHead}>
-        <h2 className={m.panelTitle}>Latest grades</h2>
-        <span className={`${m.foldMeta} ${atRisk ? s.neg : ""}`}>{atRisk ? `${atRisk} would retire` : `${shortDay(g.day)}, all kept`}</span>
-      </summary>
-      <p className={m.sub}>
-        {`Every weekday the learner grades each book with Saturday's rules but changes nothing. Closes through ${g.through}. ${
-          atRisk ? `${atRisk} ${atRisk === 1 ? "book would" : "books would"} be retired if Saturday saw these numbers.` : "No retirement rule would fire today."
-        }`}
-      </p>
-      <ul className={m.grades}>
-        {rows.map((r) => (
-          <li key={r.book} className={m.grade}>
-            <span className={s.play}>{r.action === "retire" ? <Tag k="retire" /> : null}{label(r.book)}</span>
-            <span className={`${s.num} ${r.excess !== null ? tone(r.excess) : s.muted}`}>{r.excess !== null ? `${pct(r.excess)} vs SPY` : "n/a"}</span>
-            <span className={m.why}>
-              {`${r.sessions} sessions${r.t !== null ? `, t ${r.t.toFixed(2)}` : ""}${
-                r.passes === null ? "" : r.passes ? ", strategy still passes the lab filter" : ", strategy fails the lab filter"
-              }.${r.action === "retire" ? ` ${r.why}` : ""}`}
-            </span>
-          </li>
-        ))}
-      </ul>
     </details>
   );
 }
@@ -486,8 +502,7 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
         </summary>
         <div className={m.rows}>{books.map((b) => <BookHoldings key={b.id} b={b} />)}</div>
       </details>
-      {grades && grades.books.length > 0 && <GradesPanel g={grades} books={books} />}
-      {log.length > 0 && <LearnLog log={log} />}
+      {(log.length > 0 || (grades && grades.books.length > 0)) && <LearnLog log={log} grades={grades} books={books} />}
     </section>
   );
 }

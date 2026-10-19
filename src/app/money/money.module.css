@@ -101,6 +101,11 @@
 .bucket { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 4px 0 0; }
 
 /* Stock books learn log */
+.strat { margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; background: var(--surface2); display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; line-height: 1.45; }
+.stratWhat { font-weight: 600; color: var(--ink); }
+.stratHow { color: var(--ink2); }
+.stratRec { color: var(--mute); font-size: 12.5px; }
+.checkHead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-family: var(--font-plex-mono), monospace; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; margin: 4px 0 6px; }
 .week { border-top: 1px solid var(--rule); padding-top: 10px; }
 .weekHead { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-family: var(--font-plex-mono), monospace; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 6px; }
 .logList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.45; }
