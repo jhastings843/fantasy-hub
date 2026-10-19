@@ -9,8 +9,9 @@ import m from "./money.module.css";
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
 // paper stock books, all paper or unit-based. Bets live in this app;
 // Phil and the books are a snapshot posted from Jack's Mac after each run.
-// Kalshi is Phil's shadow record on a second venue, shown on its own tab and
-// never added into his Polymarket numbers.
+// The Kalshi tab holds Kalshi Phil (a separate agent paper-trading Kalshi,
+// same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
+// added into Phil's Polymarket numbers.
 
 export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
@@ -134,26 +135,33 @@ function BetsTab({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
 
 /* ------------------------------------------------------------- phil ---- */
 
+const who = (p: Phil) => (p.venue === "kalshi" ? "Kalshi Phil" : "Phil");
+
 function philChart(p: Phil, height?: number, width?: number) {
   return (
     <LineChart
-      series={[{ label: "Phil", points: p.curve.map((c) => ({ x: t(c.ts), y: c.equity })), tone: "auto" }]}
+      series={[{ label: who(p), points: p.curve.map((c) => ({ x: t(c.ts), y: c.equity })), tone: "auto" }]}
       baseline={p.bankroll}
       format={(y) => usd(y)}
       height={height}
       width={width}
-      ariaLabel="Phil's paper bankroll after each settled bet"
+      ariaLabel={`${who(p)}'s paper bankroll after each settled bet`}
     />
   );
 }
 
 function PhilRow({ b }: { b: PhilBet }) {
+  const kalshi = b.venue === "kalshi";
+  const link = kalshi
+    ? (b.series ? `https://kalshi.com/markets/${b.series.toLowerCase()}` : null)
+    : (b.slug ? `https://polymarket.com/event/${b.slug}` : null);
   return (
     <tr>
       <td>
-        <div>{b.slug ? <a href={`https://polymarket.com/event/${b.slug}`} target="_blank" rel="noreferrer">{b.question}</a> : b.question}</div>
+        <div>{link ? <a href={link} target="_blank" rel="noreferrer">{b.question}</a> : b.question}</div>
         <div className={m.why}>
-          {b.outcome} at {b.entry !== null ? `${Math.round(b.entry * 100)}¢` : "?"} · Phil said {b.est !== null ? `${Math.round(b.est * 100)}%` : "?"}
+          {b.outcome} at {b.entry !== null ? `${(b.entry * 100).toFixed(kalshi ? 1 : 0)}¢${kalshi ? " all in" : ""}` : "?"} · {kalshi ? "Kalshi Phil" : "Phil"} said {b.est !== null ? `${Math.round(b.est * 100)}%` : "?"}
+          {kalshi && b.contracts ? ` · ${b.contracts} contracts` : ""}
           {b.category ? ` · ${b.category}` : ""}
         </div>
       </td>
@@ -190,8 +198,10 @@ function PhilTab({ p }: { p: Phil }) {
       <div className={m.panel}>{philChart(p)}</div>
       <p className={s.notice}>
         <span className={p.healthOk ? "" : m.stale}>{p.health}</span>
-        {p.lastCycle ? `, last cycle ${when(p.lastCycle)}.` : "."}{" "}Phil is a Claude agent paper-trading short Polymarket markets. Its yardstick is the
-        market itself: a Brier score below the market&apos;s on the same bets means its probabilities beat the prices it paid.
+        {p.lastCycle ? `, last cycle ${when(p.lastCycle)}.` : "."}{" "}
+        {p.venue === "kalshi"
+          ? `Kalshi Phil is a copy of Phil that paper-trades Kalshi instead: same loop and limits, every fill priced on Kalshi's live book with its taker fee${p.fees ? ` (${usd(p.fees)} paid so far, already counted)` : ""}. Its yardstick is Kalshi's price before fees: a lower Brier score on the same bets means its probabilities beat the market.`
+          : "Phil is a Claude agent paper-trading short Polymarket markets. Its yardstick is the market itself: a Brier score below the market's on the same bets means its probabilities beat the prices it paid."}
         {p.settled < 30 ? ` ${p.settled} settled bets is too few to call either way.` : ""}
       </p>
       {p.open.length > 0 && (
@@ -564,6 +574,7 @@ function KalshiTab({ k }: { k: Kalshi }) {
 function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const p = v.snapshot?.phil;
   const k = v.snapshot?.kalshi;
+  const kp = v.snapshot?.kalshiPhil;
   const books = v.snapshot?.books ?? [];
   const bookStart = books.reduce((a, b) => a + b.start, 0);
   const bookNow = books.reduce((a, b) => a + b.equity, 0);
@@ -591,6 +602,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           <span className={s.tileV}>{p && !p.error ? usd(p.equity - p.bankroll, true) : "n/a"}</span>
           <span className={s.tileK}>Phil, paper</span>
         </div>
+        {kp && !kp.error && (
+          <div className={`${s.tile} ${kp.equity > kp.bankroll ? s.good : kp.equity < kp.bankroll ? s.bad : ""}`}>
+            <span className={s.tileV}>{usd(kp.equity - kp.bankroll, true)}</span>
+            <span className={s.tileK}>Kalshi Phil, paper</span>
+          </div>
+        )}
         <div className={`${s.tile} ${bookNow > bookStart ? s.good : bookNow < bookStart ? s.bad : ""}`}>
           <span className={s.tileV}>{books.length ? pct(bookNow / bookStart - 1) : "n/a"}</span>
           <span className={s.tileK}>{`stock books, all ${books.length}`}</span>
@@ -613,9 +630,17 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
             {philChart(p, 230, 360)}
           </div>
         )}
+        {kp && !kp.error && (
+          <div className={m.panel}>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Kalshi Phil</h2><Link className={m.panelLink} href={href("kalshi")}>Ledger</Link></div>
+            {kp.settled > 0
+              ? philChart(kp, 230, 360)
+              : <span className={m.sub}>{`No settled bets yet. ${kp.open.length} open, ${usd(kp.cash)} cash. ${kp.health}.`}</span>}
+          </div>
+        )}
         {k && !k.error && (
           <div className={m.panel}>
-            <div className={m.panelHead}><h2 className={m.panelTitle}>Kalshi, shadow</h2><Link className={m.panelLink} href={href("kalshi")}>What it&apos;s tracking</Link></div>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Phil&apos;s Kalshi shadow</h2><Link className={m.panelLink} href={href("kalshi")}>What it&apos;s tracking</Link></div>
             <span className={m.big}>{k.open}</span>
             <span className={m.sub}>{`open calls, ${k.settled} settled${k.settledBets ? `, shadow P&L ${usd(k.pnl, true)}` : ""}. Nothing placed; kept apart from Phil's Polymarket record.`}</span>
           </div>
@@ -658,7 +683,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
             <span className={s.eyebrow}>Paper and units, no real balances</span>
             {snap && (
               <span className={`${s.eyebrow} ${age !== null && age > 3 ? m.stale : ""}`}>
-                {`Phil and books updated ${when(snap.generatedAt)}`}
+                {`Phil, Kalshi Phil and books updated ${when(snap.generatedAt)}`}
               </span>
             )}
           </div>
@@ -681,14 +706,29 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "overview" && <Overview v={v} />}
         {SHOW_BETS && v && tab === "bets" && <BetsTab v={v} />}
         {v && tab === "phil" && snap?.phil && (snap.phil.error ? <p className={s.error}>{snap.phil.error}</p> : <PhilTab p={snap.phil} />)}
-        {v && tab === "kalshi" && snap && (snap.kalshi
-          ? (snap.kalshi.error ? <p className={s.error}>{snap.kalshi.error}</p> : <KalshiTab k={snap.kalshi} />)
-          : <p className={s.calm}>Kalshi has not reported yet. It posts with Phil after his next cycle.</p>)}
+        {v && tab === "kalshi" && snap && (
+          <>
+            <div className={m.venueHead}>
+              <h2 className={s.h2}>Kalshi Phil</h2>
+              <span className={m.foldMeta}>Its own agent and paper book on Kalshi</span>
+            </div>
+            {snap.kalshiPhil
+              ? (snap.kalshiPhil.error ? <p className={s.error}>{snap.kalshiPhil.error}</p> : <PhilTab p={snap.kalshiPhil} />)
+              : <p className={s.calm}>Kalshi Phil has not reported yet. It posts with Phil after the next hourly cycle.</p>}
+            <div className={m.venueHead}>
+              <h2 className={s.h2}>Phil&apos;s shadow check</h2>
+              <span className={m.foldMeta}>Phil&apos;s Polymarket picks, priced on Kalshi. Nothing placed</span>
+            </div>
+            {snap.kalshi
+              ? (snap.kalshi.error ? <p className={s.error}>{snap.kalshi.error}</p> : <KalshiTab k={snap.kalshi} />)
+              : <p className={s.calm}>The shadow check has not reported yet. It posts with Phil after his next cycle.</p>}
+          </>
+        )}
         {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} />}
 
         <footer className={s.footer}>
           <span>
-            Phil and the stock books run on the Mac (trade-bot) and post a snapshot here after each run. Bets grade from ESPN. Everything here is paper
+            Phil, Kalshi Phil and the stock books run on the Mac and post a snapshot here after each run. Bets grade from ESPN. Everything here is paper
             money or betting units, a record and not advice.
           </span>
         </footer>
