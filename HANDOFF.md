@@ -1,5 +1,12 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+
+## Picks > NBA (2026-10-19, local, not deployed or committed)
+- New `/picks/nba` (sport switcher now NFL, College, NBA). Next 3 NBA game days from ESPN's scoreboard (DraftKings spread with both prices, total, moneylines; `dates=YYYYMMDD` ET, 7-day lookahead).
+- Sam's NBA board (`samthemodelman.smmodel.workers.dev/nba/`) said "Projections and player prop tool coming 10/19" on build day. `parseSamNba` (src/lib/picks/nba.ts) reads the placeholder as `soon` and otherwise reads his NFL board template (article.game, nm/pts, Vegas line, Model line), keying names to ESPN abbreviations through an index built from the slate (full name, nickname, city, abbr). If his NBA page uses different markup the page says `unread` instead of guessing: update the parser then (fixture: test/fixtures/picks/sam-nba-soon.html).
+- One model, so reads only: Sam's side and edge at the DK line, plus his total vs DK. Kept OUT of the League type, engine, weekly rule, budget, allocator and emails on purpose until his NBA picks build a record. Nothing saved to Redis yet: next step is saving pregame copies and grading from ESPN finals so a record exists.
+- No David NBA page (davidsasser.com/nba is 404).
+
 ## Learn log: idea tag (2026-10-19, deployed dpl_6rKTEr4zBDoboTnYeerLgmQBJ1ZG, uncommitted)
 - trade-bot's reviewer now logs `idea` decisions (new things the lab tests); styled with .tagIdea.
 

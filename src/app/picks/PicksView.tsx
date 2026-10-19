@@ -36,6 +36,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
           {LEAGUE_NAME[l]}
         </Link>
       ))}
+      <Link href="/picks/nba">NBA</Link>
     </nav>
   );
 
