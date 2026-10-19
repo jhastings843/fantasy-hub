@@ -516,7 +516,7 @@ function KalshiTab({ k }: { k: Kalshi }) {
         </div>
         <div className={s.tile}>
           <span className={s.tileV}>{`${k.wins}-${k.settledBets - k.wins}`}</span>
-          <span className={s.tileK}>{`settled shadow bets${k.settled > k.settledBets ? `, plus ${k.settled - k.settledBets} settled ${k.settled - k.settledBets === 1 ? "pass" : "passes"} below` : ""}`}</span>
+          <span className={s.tileK}>settled shadow bets</span>
         </div>
         <div className={`${s.tile} ${beat !== null && beat > 0 ? s.good : beat !== null && beat < 0 ? s.bad : ""}`}>
           <span className={s.tileV}>{vs ? vs.brier_phil.toFixed(3) : "n/a"}</span>
