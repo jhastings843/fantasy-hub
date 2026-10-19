@@ -6,6 +6,9 @@ export interface BookPoint {
   equity: number;
   /** The same start in SPY on the same days, held the whole time. */
   spy: number | null;
+  /** Today at live prices (trade-bot tradebot/live.py), replaced by the close mark the next morning. */
+  live?: boolean;
+  at?: string;
 }
 
 export interface Book {
@@ -23,6 +26,29 @@ export interface Book {
   fills: { day: string; symbol: string; side: string; shares: number; price: number; reason: string }[];
   /** Day the learner retired it; the book is frozen from then. Missing before 2026-10-17. */
   retired?: string | null;
+  /** When the last curve point is live, the quote time. Missing before 2026-10-19. */
+  liveAt?: string | null;
+}
+
+/** The learner's weekday grade of every active book (trade-bot learner.grade). Changes nothing. */
+export interface BookGrade {
+  book: string;
+  /** "retire" means a rule would fire if Saturday's run saw these numbers. */
+  action: "keep" | "retire";
+  sessions: number;
+  ret: number;
+  spy: number | null;
+  excess: number | null;
+  t: number | null;
+  /** Whether its strategy still passes the lab's filter; null for books with no backtest on file. */
+  passes: boolean | null;
+  why: string;
+}
+
+export interface Grades {
+  day: string;
+  through: string;
+  books: BookGrade[];
 }
 
 /** One weekly learner run on the stock books (trade-bot tradebot/learnlog.py). */
@@ -53,10 +79,21 @@ export interface PhilBet {
   endDate: string | null;
   pnl: number | null;
   slug: string | null;
+  /** Missing before 2026-10-19 (Polymarket then). */
+  venue?: "polymarket" | "kalshi";
+  /** Kalshi Phil only: market ticker, series, fee paid, whole contracts. */
+  ticker?: string | null;
+  series?: string | null;
+  fee?: number | null;
+  contracts?: number | null;
 }
 
 export interface Phil {
   error?: string;
+  /** Missing before 2026-10-19 (Polymarket then). */
+  venue?: "polymarket" | "kalshi";
+  /** Kalshi fees paid, already inside every number. */
+  fees?: number;
   bankroll: number;
   equity: number;
   cash: number;
@@ -137,8 +174,13 @@ export interface MoneySnapshot {
   phil: Phil | null;
   /** Missing from snapshots posted before 2026-10-16. */
   kalshi?: Kalshi | null;
+  /** Kalshi Phil: a separate agent trading Kalshi on paper, same shape as Phil.
+   *  Never added to Phil's numbers. Missing before 2026-10-19. */
+  kalshiPhil?: Phil | null;
   /** The stock books' learn log, newest first. Missing before 2026-10-17. */
   learnLog?: LearnEntry[] | null;
+  /** Latest weekday grade. Missing before 2026-10-19. */
+  grades?: Grades | null;
 }
 
 /** Enough of a check that a malformed post can't break the page. */

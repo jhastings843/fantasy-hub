@@ -84,8 +84,9 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-18",
+  "last_worked": "2026-10-19",
   "notes": [
+    "2026-10-19: Money > Books shows a live point and tag during market hours and a Latest grades panel; deployed.",
     "2026-10-18: Phil settled bets on the Money tab now collapse (closed by default, bet count in header).",
     "2026-10-18: First TD week view leads with the slate's most likely first TD scorers ranked by Sam's chance (Kalshi cost and value kept beside it); Research adds Kalshi bet slices by probability tier (top 2 per game, 12%+, 8-12%, 4-8%, under 4%, 8%+ with value).",
     "2026-10-18: Two tracked prop slices, 'Both agree, est. edge 10%+' and 'under 10%', test whether the Best bets ranking beats the rest; edge formula shared (agreeEdge in lib/props/david.ts).",

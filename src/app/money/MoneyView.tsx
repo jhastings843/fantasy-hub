@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet } from "@/lib/money/types";
+import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
@@ -31,6 +31,8 @@ const usd = (n: number, signed = false) =>
 const units = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}u`;
 const pct = (n: number) => `${n > 0 ? "+" : ""}${(n * 100).toFixed(1)}%`;
 const tone = (n: number) => (n > 0 ? s.pos : n < 0 ? s.neg : "");
+const clockEt = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).replace(" AM", "am").replace(" PM", "pm");
 const t = (iso: string) => Date.parse(iso.length === 10 ? `${iso}T16:00:00Z` : iso);
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
@@ -304,7 +306,12 @@ function BookPanel({ b }: { b: Book }) {
           </ul>
         </details>
       )}
-      <p className={m.why}>{`Cash ${usd(b.cash)}. Started ${b.started}, marked through ${b.asOf ?? "n/a"}.`}</p>
+      <p className={m.why}>
+        {b.liveAt ? <span className={`${m.tag} ${m.tagLive}`}>live</span> : null}
+        {b.liveAt
+          ? `Valued at ${clockEt(b.liveAt)} ET prices. Cash ${usd(b.cash)}. Started ${b.started}; the official close is marked at 6:30am.`
+          : `Cash ${usd(b.cash)}. Started ${b.started}, marked through ${b.asOf ?? "n/a"}.`}
+      </p>
     </div>
   );
 }
@@ -343,14 +350,47 @@ function LearnLog({ log }: { log: LearnEntry[] }) {
   );
 }
 
-function BooksTab({ books, log }: { books: Book[]; log: LearnEntry[] }) {
+function GradesPanel({ g, books }: { g: Grades; books: Book[] }) {
+  const label = (id: string) => books.find((b) => b.id === id)?.label ?? id;
+  const rows = [...g.books].sort((a, b) => (a.action === "retire" ? 0 : 1) - (b.action === "retire" ? 0 : 1) || (b.excess ?? -9) - (a.excess ?? -9));
+  const atRisk = g.books.filter((b) => b.action === "retire").length;
+  return (
+    <div className={m.panel}>
+      <div className={m.panelHead}>
+        <h2 className={m.panelTitle}>Latest grades</h2>
+        <span className={m.sub}>{`${g.day}, closes through ${g.through}`}</span>
+      </div>
+      <p className={m.sub}>
+        {`Every weekday the learner grades each book with Saturday's rules but changes nothing. ${
+          atRisk ? `${atRisk} ${atRisk === 1 ? "book would" : "books would"} be retired if Saturday saw these numbers.` : "No retirement rule would fire today."
+        }`}
+      </p>
+      <ul className={m.grades}>
+        {rows.map((r) => (
+          <li key={r.book} className={m.grade}>
+            <span className={s.play}>{r.action === "retire" ? <Tag k="retire" /> : null}{label(r.book)}</span>
+            <span className={`${s.num} ${r.excess !== null ? tone(r.excess) : s.muted}`}>{r.excess !== null ? `${pct(r.excess)} vs SPY` : "n/a"}</span>
+            <span className={m.why}>
+              {`${r.sessions} sessions${r.t !== null ? `, t ${r.t.toFixed(2)}` : ""}${
+                r.passes === null ? "" : r.passes ? ", strategy still passes the lab filter" : ", strategy fails the lab filter"
+              }.${r.action === "retire" ? ` ${r.why}` : ""}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; grades: Grades | null }) {
   return (
     <section className={s.section}>
       <p className={s.notice}>
         {`${books.length} paper books, $100,000 each, traded by the trade bot at 6:30am Tuesday to Saturday on the previous close. The dashed line is the same `}
         $100,000 put in SPY on day one and left alone: a book only earns its keep by staying above it. Books named Lab were picked by the strategy lab and
-        are kept or retired by the weekly learner.
+        are kept or retired by the weekly learner. During market hours the last point on each chart is live, refreshed every hour.
       </p>
+      {grades && grades.books.length > 0 && <GradesPanel g={grades} books={books} />}
       {log.length > 0 && <LearnLog log={log} />}
       <div className={m.books}>{books.map((b) => <BookPanel key={b.id} b={b} />)}</div>
     </section>
@@ -644,7 +684,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "kalshi" && snap && (snap.kalshi
           ? (snap.kalshi.error ? <p className={s.error}>{snap.kalshi.error}</p> : <KalshiTab k={snap.kalshi} />)
           : <p className={s.calm}>Kalshi has not reported yet. It posts with Phil after his next cycle.</p>)}
-        {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} />}
+        {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} />}
 
         <footer className={s.footer}>
           <span>
