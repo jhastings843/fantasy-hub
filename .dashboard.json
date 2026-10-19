@@ -87,6 +87,7 @@
   ],
   "last_worked": "2026-10-19",
   "notes": [
+    "2026-10-19: Whole site restyled to the Picks ledger look, dark always (src/app/ledger-look.css remaps Tailwind zinc/amber/emerald/rose + fonts; .dark class on <html>). Backup: git tag pre-ledger-look; undo = git revert 1ca630b.",
     "2026-10-19: Money > Phil: pilot tracks replaced by a learner log of Phil's retros (lessons, playbook changes, notes).",
     "2026-10-19: Added NBA section to Picks (/picks/nba): DraftKings slate from ESPN + Sam's NBA line when his board is live; unstaked, untracked for now.",
     "2026-10-19: Money > Kalshi tab shows Kalshi Phil (same ledger view as Phil) above Phil's shadow check; Overview gets a Kalshi Phil tile and panel (72de2b3).",
@@ -254,7 +255,8 @@
     "2026-10-13: Reverted mid-week rule moves; rule/Tier 2 freeze at the Tuesday 7am review and hold all week (277cba0). Today's review checked: ran 7:00am, all 24 hypotheses evaluated, 0 forward games yet by design.",
     "2026-10-17: Props: David Sasser's prop board (davidsasser.com/nfl/props, 6 markets vs DraftKings) saved pregame each capture, graded from ESPN box scores, shown as 'David's board' on /props, plus a David column/lean on Sam's markets and David research tables. Week 6 board saved (13 games).",
     "2026-10-17: Props: David now equal to Sam (one card per game with both, head-to-head slices at the same DraftKings line, both models' slices can enter the system).",
-    "2026-10-19: Money books tab: learn log absorbs grades with hourly 'Latest check'; holdings rows explain each strategy."
+    "2026-10-19: Money books tab: learn log absorbs grades with hourly 'Latest check'; holdings rows explain each strategy.",
+    "2026-10-19: Money overview adds picks (all sports) and props unit charts; Weather tab for the weather desk."
   ],
   "tags": [
     "personal",
