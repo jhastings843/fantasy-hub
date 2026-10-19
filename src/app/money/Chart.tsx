@@ -12,6 +12,8 @@ export interface Series {
 }
 
 const PAD = { l: 8, r: 62, t: 14, b: 26 };
+// Small multiples: no date axis or legend (the page states both once), tighter margins.
+const PAD_COMPACT = { l: 4, r: 52, t: 10, b: 8 };
 
 export function LineChart({
   series,
@@ -21,6 +23,7 @@ export function LineChart({
   width = 640,
   ariaLabel,
   empty = "Not enough history to draw yet.",
+  compact = false,
 }: {
   series: Series[];
   baseline?: number;
@@ -30,8 +33,10 @@ export function LineChart({
   width?: number;
   ariaLabel: string;
   empty?: string;
+  compact?: boolean;
 }) {
   const W = width;
+  const PAD_ = compact ? PAD_COMPACT : PAD;
   // Drawn in time order whatever order they arrived in.
   series = series.map((s) => ({ ...s, points: [...s.points].sort((a, b) => a.x - b.x) }));
   const all = series.flatMap((s) => s.points);
@@ -45,25 +50,25 @@ export function LineChart({
   const span = y1 - y0 || Math.abs(y1) * 0.02 || 1;
   y0 -= span * 0.12;
   y1 += span * 0.12;
-  const X = (x: number) => PAD.l + ((x - x0) / (x1 - x0 || 1)) * (W - PAD.l - PAD.r);
-  const Y = (y: number) => PAD.t + (1 - (y - y0) / (y1 - y0)) * (height - PAD.t - PAD.b);
+  const X = (x: number) => PAD_.l + ((x - x0) / (x1 - x0 || 1)) * (W - PAD_.l - PAD_.r);
+  const Y = (y: number) => PAD_.t + (1 - (y - y0) / (y1 - y0)) * (height - PAD_.t - PAD_.b);
   const path = (pts: { x: number; y: number }[]) => pts.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
   const main = series[0];
   const last = main.points[main.points.length - 1];
   const up = baseline !== undefined ? last.y >= baseline : last.y >= main.points[0].y;
   const tone = main.tone === "auto" || !main.tone ? (up ? "pos" : "neg") : main.tone;
   const day = (x: number) => new Date(x).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
-  const area = `${path(main.points)}L${X(last.x).toFixed(1)},${(height - PAD.b).toFixed(1)}L${X(main.points[0].x).toFixed(1)},${(height - PAD.b).toFixed(1)}Z`;
+  const area = `${path(main.points)}L${X(last.x).toFixed(1)},${(height - PAD_.b).toFixed(1)}L${X(main.points[0].x).toFixed(1)},${(height - PAD_.b).toFixed(1)}Z`;
 
   return (
     <figure className={m.chart}>
       <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label={ariaLabel} className={m.svg} data-tone={tone}>
         {baseline !== undefined && (
           <>
-            <line x1={PAD.l} x2={W - PAD.r} y1={Y(baseline)} y2={Y(baseline)} className={m.base} />
+            <line x1={PAD_.l} x2={W - PAD_.r} y1={Y(baseline)} y2={Y(baseline)} className={m.base} />
             {/* Dropped when it would sit on the end value's label. */}
             {Math.abs(Y(baseline) - Y(last.y)) > 14 && (
-              <text x={W - PAD.r + 6} y={Y(baseline) + 4} className={m.axis}>{format(baseline)}</text>
+              <text x={W - PAD_.r + 6} y={Y(baseline) + 4} className={m.axis}>{format(baseline)}</text>
             )}
           </>
         )}
@@ -73,11 +78,15 @@ export function LineChart({
         ))}
         <path d={path(main.points)} className={m.line} />
         <circle cx={X(last.x)} cy={Y(last.y)} r={4} className={m.dot} />
-        <text x={W - PAD.r + 6} y={Y(last.y) + 4} className={m.endLabel}>{format(last.y)}</text>
-        <text x={PAD.l} y={height - 6} className={m.axis}>{day(x0)}</text>
-        <text x={W - PAD.r} y={height - 6} textAnchor="end" className={m.axis}>{day(x1)}</text>
+        <text x={W - PAD_.r + 6} y={Y(last.y) + 4} className={m.endLabel}>{format(last.y)}</text>
+        {!compact && (
+          <>
+            <text x={PAD_.l} y={height - 6} className={m.axis}>{day(x0)}</text>
+            <text x={W - PAD_.r} y={height - 6} textAnchor="end" className={m.axis}>{day(x1)}</text>
+          </>
+        )}
       </svg>
-      {series.length > 1 && (
+      {series.length > 1 && !compact && (
         <figcaption className={m.legend}>
           {series.map((s, i) => (
             <span key={s.label} className={i ? m.legendCompare : m.legendMain} data-tone={i ? undefined : tone}>

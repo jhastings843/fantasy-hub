@@ -1,5 +1,11 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## Learn log: idea tag (2026-10-19, deployed dpl_6rKTEr4zBDoboTnYeerLgmQBJ1ZG, uncommitted)
+- trade-bot's reviewer now logs `idea` decisions (new things the lab tests); styled with .tagIdea.
+
+## Money > Stock books restructured (2026-10-19, deployed dpl_CFV1gpcjAKv3A7vmx4Xsakz2vxfM, uncommitted)
+- Chart cards first (3x3 desktop, 2 across on phone; LineChart `compact` drops date axis and legend), then three closed folds: Holdings and trades (one expandable row per book, last 10 trades nested), Latest grades (opens itself if any book would retire), Learn log (latest week shown, older weeks as rows).
+
 ## Money > Books: live point and Latest grades (2026-10-19, deployed dpl_8w3ChLhCRQmD63i2vfTTAdr7HADE, uncommitted)
 - `Book.liveAt` and `BookPoint.live/at`: during market hours the last curve point is today at live prices (trade-bot tradebot/live.py), tagged "live" on the panel. `MoneySnapshot.grades`: the learner's weekday grade, drawn as a Latest grades panel above the learn log.
 - Two lint errors in MoneyView.tsx (an unescaped ' at ~239, Date.now in render at ~652) predate this change.

@@ -34,6 +34,7 @@ const pct = (n: number) => `${n > 0 ? "+" : ""}${(n * 100).toFixed(1)}%`;
 const tone = (n: number) => (n > 0 ? s.pos : n < 0 ? s.neg : "");
 const clockEt = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).replace(" AM", "am").replace(" PM", "pm");
+const shortDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const t = (iso: string) => Date.parse(iso.length === 10 ? `${iso}T16:00:00Z` : iso);
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
@@ -270,93 +271,138 @@ function PhilTab({ p }: { p: Phil }) {
 
 /* ------------------------------------------------------------ books ---- */
 
-function bookChart(b: Book, height?: number, width?: number) {
-  return (
-    <LineChart
-      series={[
-        { label: b.label, points: b.curve.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
-        { label: "SPY held", points: b.curve.filter((c) => c.spy !== null).map((c) => ({ x: t(c.day), y: c.spy! })) },
-      ]}
-      baseline={b.start}
-      format={(y) => `$${(y / 1000).toFixed(1)}k`}
-      height={height}
-      width={width}
-      ariaLabel={`${b.label} against SPY`}
-    />
-  );
-}
+// Charts first, everything else folded: the tab opens on the 9 charts and three
+// closed sections (holdings, grades, learn log) that each say in their header
+// what is inside, so most visits need no scrolling at all.
 
-function BookPanel({ b }: { b: Book }) {
+function BookCard({ b }: { b: Book }) {
   const ret = b.equity / b.start - 1;
   const spy = b.spyEquity !== null ? b.spyEquity / b.start - 1 : null;
+  const edge = spy !== null ? ret - spy : null;
   return (
-    <div className={m.panel}>
-      <div className={m.panelHead}>
-        <h2 className={m.panelTitle}>{b.label}{b.retired ? <span className={s.muted}>{` retired ${b.retired}`}</span> : null}</h2>
-        <span className={`${s.num} ${tone(ret)}`}>{pct(ret)}{spy !== null ? <span className={s.muted}>{` vs SPY ${pct(spy)}`}</span> : null}</span>
+    <div className={`${m.card} ${b.retired ? m.cardRetired : ""}`}>
+      <div className={m.cardHead}>
+        <h3 className={m.cardTitle} title={b.about}>{b.label}</h3>
+        {b.retired ? <span className={m.tag}>retired</span> : null}
       </div>
-      <p className={m.sub}>{b.about}</p>
-      {bookChart(b, 220, 480)}
-      {b.positions.length > 0 && (
-        <details className={m.holdings}>
-          <summary>{`${b.positions.length} ${b.positions.length === 1 ? "holding" : "holdings"}`}</summary>
-          <ul className={m.holdList}>
-            {[...b.positions]
-              .map((p) => ({ p, g: p.last !== null ? p.last / p.entryPrice - 1 : null }))
-              .sort((x, y) => (y.g ?? -9) - (x.g ?? -9))
-              .map(({ p, g }) => (
-                <li key={p.symbol} className={m.hold}>
-                  <span className={s.play}>{p.symbol}</span>
-                  <span className={`${s.num} ${g !== null ? tone(g) : s.muted}`}>{g !== null ? pct(g) : "n/a"}</span>
-                  <span className={m.why}>
-                    {`${p.shares} sh at ${p.entryPrice.toFixed(2)}${p.last !== null ? `, now ${p.last.toFixed(2)}` : ""}. ${p.reason}`}
-                  </span>
-                </li>
-              ))}
-          </ul>
-        </details>
-      )}
-      <p className={m.why}>
-        {b.liveAt ? <span className={`${m.tag} ${m.tagLive}`}>live</span> : null}
-        {b.liveAt
-          ? `Valued at ${clockEt(b.liveAt)} ET prices. Cash ${usd(b.cash)}. Started ${b.started}; the official close is marked at 6:30am.`
-          : `Cash ${usd(b.cash)}. Started ${b.started}, marked through ${b.asOf ?? "n/a"}.`}
-      </p>
+      <div className={m.cardNums}>
+        <span className={`${m.cardRet} ${tone(ret)}`}>{pct(ret)}</span>
+        {edge !== null && <span className={`${s.num} ${tone(edge)}`}>{`${pct(edge)} vs SPY`}</span>}
+      </div>
+      <LineChart
+        series={[
+          { label: b.label, points: b.curve.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
+          { label: "SPY held", points: b.curve.filter((c) => c.spy !== null).map((c) => ({ x: t(c.day), y: c.spy! })) },
+        ]}
+        baseline={b.start}
+        format={(y) => `$${(y / 1000).toFixed(1)}k`}
+        height={130}
+        width={300}
+        compact
+        ariaLabel={`${b.label} against SPY`}
+      />
     </div>
   );
 }
 
-const TAG: Record<string, string> = { open: m.tagOpen, retire: m.tagRetire, fix: m.tagFix, watch: m.tagWatch };
+function BookHoldings({ b }: { b: Book }) {
+  const held = [...b.positions]
+    .map((p) => ({ p, g: p.last !== null ? p.last / p.entryPrice - 1 : null }))
+    .sort((x, y) => (y.g ?? -9) - (x.g ?? -9));
+  return (
+    <details className={m.row}>
+      <summary className={m.rowHead}>
+        <span className={m.rowTitle}>{b.label}</span>
+        <span className={m.rowMeta}>
+          {b.retired ? `retired ${b.retired}` : `${held.length} ${held.length === 1 ? "holding" : "holdings"}, ${usd(b.cash)} cash`}
+        </span>
+      </summary>
+      <div className={m.rowBody}>
+        <p className={m.sub}>{b.about}</p>
+        {held.length > 0 && (
+          <ul className={m.holdList}>
+            {held.map(({ p, g }) => (
+              <li key={p.symbol} className={m.hold}>
+                <span className={s.play}>{p.symbol}</span>
+                <span className={`${s.num} ${g !== null ? tone(g) : s.muted}`}>{g !== null ? pct(g) : "n/a"}</span>
+                <span className={m.why}>{`${p.shares} sh at ${p.entryPrice.toFixed(2)}${p.last !== null ? `, now ${p.last.toFixed(2)}` : ""}. ${p.reason}`}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {b.fills.length > 0 && (
+          <details className={m.inner}>
+            <summary>{`Last ${Math.min(b.fills.length, 10)} trades`}</summary>
+            <ul className={m.holdList}>
+              {b.fills.slice(0, 10).map((f, i) => (
+                <li key={i} className={m.hold}>
+                  <span className={s.play}>{`${f.side === "buy" ? "Bought" : "Sold"} ${f.symbol}`}</span>
+                  <span className={`${s.num} ${s.muted}`}>{f.day}</span>
+                  <span className={m.why}>{`${f.shares} sh at ${f.price.toFixed(2)}. ${f.reason}`}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <p className={m.why}>
+          {b.liveAt
+            ? `Valued at ${clockEt(b.liveAt)} ET prices; the official close is marked at 6:30am. Started ${b.started}.`
+            : `Marked through ${b.asOf ?? "n/a"}. Started ${b.started}.`}
+        </p>
+      </div>
+    </details>
+  );
+}
+
+const TAG: Record<string, string> = { open: m.tagOpen, retire: m.tagRetire, fix: m.tagFix, watch: m.tagWatch, idea: m.tagIdea };
 
 function Tag({ k }: { k: string }) {
   return <span className={`${m.tag} ${TAG[k] ?? ""}`}>{k}</span>;
 }
 
-function LearnLog({ log }: { log: LearnEntry[] }) {
+function LearnWeek({ e }: { e: LearnEntry }) {
   return (
-    <div className={m.panel}>
-      <div className={m.panelHead}><h2 className={m.panelTitle}>Learn log</h2><span className={m.sub}>Saturdays, newest first</span></div>
-      <p className={m.sub}>
-        What the weekly learner decided, what got fixed, and what Claude&apos;s retro is watching. The keep, retire and open rules are fixed; only Jack changes them.
-      </p>
-      {log.map((e) => (
-        <div key={e.day} className={m.week}>
-          <div className={m.weekHead}>
-            <span>{`Week of ${e.day}`}</span>
-            {e.tested !== null && <span className={s.muted}>{`${e.tested.toLocaleString("en-US")} tested, ${e.candidates} candidates, ${e.proven} proven`}</span>}
-          </div>
-          <ul className={m.logList}>
-            {e.decisions.map((d, i) => (
-              <li key={`d${i}`}><Tag k={d.action} /><b>{d.book}</b><span className={m.why}>{d.why}</span></li>
-            ))}
-            {e.watch.map((w, i) => <li key={`w${i}`}><Tag k="watch" />{w}</li>)}
-            {e.lessons && <li className={m.lesson}>{e.lessons}</li>}
-            {e.fixes.map((f, i) => <li key={`f${i}`}><Tag k="fix" />{f}</li>)}
-            {!e.decisions.length && !e.watch.length && !e.lessons && !e.fixes.length && <li className={s.muted}>No decisions. Every book kept.</li>}
-          </ul>
-        </div>
+    <ul className={m.logList}>
+      {e.decisions.map((d, i) => (
+        <li key={`d${i}`}><Tag k={d.action} /><b>{d.book}</b><span className={m.why}>{d.why}</span></li>
       ))}
-    </div>
+      {e.watch.map((w, i) => <li key={`w${i}`}><Tag k="watch" />{w}</li>)}
+      {e.lessons && <li className={m.lesson}>{e.lessons}</li>}
+      {e.fixes.map((f, i) => <li key={`f${i}`}><Tag k="fix" />{f}</li>)}
+      {!e.decisions.length && !e.watch.length && !e.lessons && !e.fixes.length && <li className={s.muted}>No decisions. Every book kept.</li>}
+    </ul>
+  );
+}
+
+function LearnLog({ log }: { log: LearnEntry[] }) {
+  const [latest, ...older] = log;
+  const moves = latest.decisions.length;
+  return (
+    <details className={`${m.panel} ${m.fold}`}>
+      <summary className={m.foldHead}>
+        <h2 className={m.panelTitle}>Learn log</h2>
+        <span className={m.foldMeta}>{`${shortDay(latest.day)}: ${moves ? `${moves} ${moves === 1 ? "move" : "moves"}` : "no moves"}`}</span>
+      </summary>
+      <p className={m.sub}>
+        What the Saturday learner decided, what got fixed, what Claude&apos;s retro is watching, and the new ideas it set the lab to test. The keep, retire and open rules are fixed; only Jack changes them.
+      </p>
+      <div className={m.week}>
+        <div className={m.weekHead}>
+          <span>{`Week of ${latest.day}`}</span>
+          {latest.tested !== null && <span className={s.muted}>{`${latest.tested.toLocaleString("en-US")} tested, ${latest.candidates} candidates, ${latest.proven} proven`}</span>}
+        </div>
+        <LearnWeek e={latest} />
+      </div>
+      {older.map((e) => (
+        <details key={e.day} className={m.row}>
+          <summary className={m.rowHead}>
+            <span className={m.rowTitle}>{`Week of ${e.day}`}</span>
+            <span className={m.rowMeta}>{e.decisions.length ? `${e.decisions.length} ${e.decisions.length === 1 ? "move" : "moves"}` : "no moves"}</span>
+          </summary>
+          <div className={m.rowBody}><LearnWeek e={e} /></div>
+        </details>
+      ))}
+    </details>
   );
 }
 
@@ -365,13 +411,14 @@ function GradesPanel({ g, books }: { g: Grades; books: Book[] }) {
   const rows = [...g.books].sort((a, b) => (a.action === "retire" ? 0 : 1) - (b.action === "retire" ? 0 : 1) || (b.excess ?? -9) - (a.excess ?? -9));
   const atRisk = g.books.filter((b) => b.action === "retire").length;
   return (
-    <div className={m.panel}>
-      <div className={m.panelHead}>
+    // Opens itself when a book is in trouble, so a retirement never hides behind a fold.
+    <details className={`${m.panel} ${m.fold}`} open={atRisk > 0}>
+      <summary className={m.foldHead}>
         <h2 className={m.panelTitle}>Latest grades</h2>
-        <span className={m.sub}>{`${g.day}, closes through ${g.through}`}</span>
-      </div>
+        <span className={`${m.foldMeta} ${atRisk ? s.neg : ""}`}>{atRisk ? `${atRisk} would retire` : `${shortDay(g.day)}, all kept`}</span>
+      </summary>
       <p className={m.sub}>
-        {`Every weekday the learner grades each book with Saturday's rules but changes nothing. ${
+        {`Every weekday the learner grades each book with Saturday's rules but changes nothing. Closes through ${g.through}. ${
           atRisk ? `${atRisk} ${atRisk === 1 ? "book would" : "books would"} be retired if Saturday saw these numbers.` : "No retirement rule would fire today."
         }`}
       </p>
@@ -388,21 +435,33 @@ function GradesPanel({ g, books }: { g: Grades; books: Book[] }) {
           </li>
         ))}
       </ul>
-    </div>
+    </details>
   );
 }
 
 function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; grades: Grades | null }) {
+  const active = books.filter((b) => !b.retired);
+  const ahead = active.filter((b) => b.spyEquity !== null && b.equity > b.spyEquity).length;
+  const live = books.find((b) => b.liveAt)?.liveAt;
   return (
     <section className={s.section}>
-      <p className={s.notice}>
-        {`${books.length} paper books, $100,000 each, traded by the trade bot at 6:30am Tuesday to Saturday on the previous close. The dashed line is the same `}
-        $100,000 put in SPY on day one and left alone: a book only earns its keep by staying above it. Books named Lab were picked by the strategy lab and
-        are kept or retired by the weekly learner. During market hours the last point on each chart is live, refreshed every hour.
-      </p>
+      <div className={m.booksHead}>
+        <p className={m.sub}>
+          {`${ahead} of ${active.length} books ahead of SPY. $100,000 each, traded at 6:30am on the previous close; the dashed line is the same money left in SPY.${
+            live ? ` Charts are live at ${clockEt(live)} ET.` : ""
+          }`}
+        </p>
+      </div>
+      <div className={m.cards}>{[...active, ...books.filter((b) => b.retired)].map((b) => <BookCard key={b.id} b={b} />)}</div>
+      <details className={`${m.panel} ${m.fold}`}>
+        <summary className={m.foldHead}>
+          <h2 className={m.panelTitle}>Holdings and trades</h2>
+          <span className={m.foldMeta}>{`${books.reduce((a, b) => a + (b.retired ? 0 : b.positions.length), 0)} positions`}</span>
+        </summary>
+        <div className={m.rows}>{books.map((b) => <BookHoldings key={b.id} b={b} />)}</div>
+      </details>
       {grades && grades.books.length > 0 && <GradesPanel g={grades} books={books} />}
       {log.length > 0 && <LearnLog log={log} />}
-      <div className={m.books}>{books.map((b) => <BookPanel key={b.id} b={b} />)}</div>
     </section>
   );
 }
