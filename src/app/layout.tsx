@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Trophy } from "lucide-react";
 import { FantasyTabs, SectionTabs } from "@/components/SiteNav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// The Picks ledger faces, site wide since 2026-10-19 (see ledger-look.css).
+const barlow = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-barlow" });
+const plex = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-plex" });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono" });
 
 export const metadata: Metadata = {
   title: "Hobby Hub",
@@ -26,7 +21,7 @@ function BrandMark() {
   return (
     <span
       aria-hidden
-      className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30 ring-1 ring-amber-400/20"
+      className="grid size-7 place-items-center rounded-lg bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
     >
       <Trophy size={14} strokeWidth={2.5} />
     </span>
@@ -42,7 +37,7 @@ function SiteHeader() {
           className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
         >
           <BrandMark />
-          <span className="text-base font-bold tracking-tight">
+          <span className="ledger-brand text-xl font-extrabold uppercase">
             Hobby Hub
           </span>
         </Link>
@@ -116,18 +111,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${barlow.variable} ${plex.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="relative flex min-h-full flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-        {/* Subtle ambient gradient backdrop */}
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-        >
-          <div className="absolute -left-32 top-0 h-[600px] w-[600px] rounded-full bg-amber-200/30 blur-3xl dark:bg-amber-900/15" />
-          <div className="absolute -right-32 top-96 h-[500px] w-[500px] rounded-full bg-cyan-200/25 blur-3xl dark:bg-cyan-900/10" />
-          <div className="absolute bottom-0 left-1/2 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-rose-200/20 blur-3xl dark:bg-rose-900/10" />
-        </div>
         <SiteHeader />
         <FantasyTabs />
         <div className="flex-1">{children}</div>

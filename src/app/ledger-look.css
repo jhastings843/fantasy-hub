@@ -1,0 +1,125 @@
+/* The ledger look, site wide (2026-10-19).
+   Fantasy and Survivor are written in Tailwind's stock palette (zinc, amber,
+   emerald, rose). Instead of touching their markup, this file repoints those
+   palette variables and the fonts at the Picks tab's tokens (picks.module.css),
+   so every page reads as one betting ledger while its layout stays exactly as
+   written. Unlayered, so it wins over Tailwind's @layer theme defaults.
+   Revert: delete this file's import in globals.css (or git tag pre-ledger-look). */
+
+:root {
+  /* Neutrals: the Picks greens-greys. One scale serves both modes, because
+     the markup already picks light shades by day and dark shades by night. */
+  --color-zinc-50: #f3f5f1;
+  --color-zinc-100: #e9ede6;
+  --color-zinc-200: #d5dcd3;
+  --color-zinc-300: #b9c5bf;
+  --color-zinc-400: #86958e;
+  --color-zinc-500: #6c7a72;
+  --color-zinc-600: #56645d;
+  --color-zinc-700: #3d4b44;
+  --color-zinc-800: #2a3631;
+  --color-zinc-900: #151d1a;
+  --color-zinc-950: #0e1412;
+
+  /* Amber (the old brand accent, also "watch" states): the ledger's gold. */
+  --color-amber-50: #fbf5e6;
+  --color-amber-100: #f6ead0;
+  --color-amber-200: #ecd6a6;
+  --color-amber-300: #dfbd72;
+  --color-amber-400: #d9a640;
+  --color-amber-500: #c08a1f;
+  --color-amber-600: #a8730f;
+  --color-amber-700: #8a5d0b;
+  --color-amber-800: #6b480a;
+  --color-amber-900: #4d3408;
+  --color-amber-950: #3a2f17;
+  --color-orange-400: #d9a640;
+  --color-orange-500: #c08a1f;
+  --color-orange-600: #a8730f;
+  --color-orange-700: #8a5d0b;
+
+  /* Emerald (good news): the ledger's green accent. */
+  --color-emerald-50: #eaf5f0;
+  --color-emerald-100: #d6ebe3;
+  --color-emerald-200: #b3dacb;
+  --color-emerald-300: #7fc4ab;
+  --color-emerald-400: #43b996;
+  --color-emerald-500: #1f9273;
+  --color-emerald-600: #0d6b57;
+  --color-emerald-700: #0a5a49;
+  --color-emerald-800: #08493b;
+  --color-emerald-900: #07382e;
+  --color-emerald-950: #173a30;
+
+  /* Rose and red (bad news): the ledger's brick. */
+  --color-rose-50: #fbefee;
+  --color-rose-100: #f5dcda;
+  --color-rose-200: #ebbcb9;
+  --color-rose-300: #e69a95;
+  --color-rose-400: #e0716b;
+  --color-rose-500: #c9534f;
+  --color-rose-600: #b0413e;
+  --color-rose-700: #92332f;
+  --color-rose-800: #742a27;
+  --color-rose-900: #55201e;
+  --color-rose-950: #3a1716;
+  --color-red-50: #fbefee;
+  --color-red-100: #f5dcda;
+  --color-red-200: #ebbcb9;
+  --color-red-300: #e69a95;
+  --color-red-400: #e0716b;
+  --color-red-500: #c9534f;
+  --color-red-600: #b0413e;
+  --color-red-700: #92332f;
+  --color-red-800: #742a27;
+  --color-red-900: #55201e;
+  --color-red-950: #3a1716;
+
+  /* Flatter, squarer cards. */
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+  --shadow-sm: 0 1px 0 rgb(20 33 28 / 0.04);
+
+}
+
+/* Numbers in mono, like the ledger. */
+.tabular-nums {
+  font-family: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+}
+
+/* Small caps labels become the ledger's mono eyebrows. */
+.uppercase:is(.tracking-wide, .tracking-wider, .tracking-widest) {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  font-weight: 500;
+}
+
+/* Headlines and card titles: condensed, upper case. */
+:is(h1, h2, h3):is(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl),
+:is(h1, h2, h3, h4).tracking-tight {
+  font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  line-height: 1.02;
+}
+h1:is(.text-4xl, .text-5xl, .text-6xl) {
+  font-weight: 800;
+}
+
+/* No gradient text: the second hero line reads in the ledger green. */
+.bg-clip-text {
+  background-image: none !important;
+  color: var(--color-emerald-600) !important;
+}
+.dark .bg-clip-text {
+  color: var(--color-emerald-400) !important;
+}
+
+.ledger-brand {
+  font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}

@@ -75,7 +75,7 @@ export function FantasyTabs() {
             >
               {t.label}
               {active && (
-                <span aria-hidden className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
+                <span aria-hidden className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-zinc-900 dark:bg-zinc-50" />
               )}
             </Link>
           );
