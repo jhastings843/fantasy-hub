@@ -87,6 +87,7 @@
   ],
   "last_worked": "2026-10-19",
   "notes": [
+    "2026-10-19: Money > Phil: pilot tracks replaced by a learner log of Phil's retros (lessons, playbook changes, notes).",
     "2026-10-19: Added NBA section to Picks (/picks/nba): DraftKings slate from ESPN + Sam's NBA line when his board is live; unstaked, untracked for now.",
     "2026-10-19: Money > Kalshi tab shows Kalshi Phil (same ledger view as Phil) above Phil's shadow check; Overview gets a Kalshi Phil tile and panel (72de2b3).",
     "2026-10-19: Money > Books shows a live point and tag during market hours and a Latest grades panel; deployed.",

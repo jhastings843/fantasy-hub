@@ -1,6 +1,10 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
+
+## Money > Phil: learner log replaces pilot tracks (2026-10-19, deployed 2026-10-19)
+- Phil and Kalshi Phil tabs: "Pilot tracks" removed; "Learner log" shows the newest 12 retros (journal/retros/RETRO-*.md in trade-bot/phil and kalshi-phil). Headline = the retro's commit subject; tags lesson / changed / noted / kalshi. Parsed in trade-bot `money_export.parse_retro` (free-form markdown: "Lesson ..." paragraphs and sections with "lesson" in the heading, bullets under Edits/Playbook edit, other sections as noted with their Verdict line or first sentence). `Phil.learner?: PhilLearn[]` in types.ts. If retros change shape and items go missing, fix the parser there.
+
 ## Picks > NBA (2026-10-19, local, not deployed or committed)
 - New `/picks/nba` (sport switcher now NFL, College, NBA). Next 3 NBA game days from ESPN's scoreboard (DraftKings spread with both prices, total, moneylines; `dates=YYYYMMDD` ET, 7-day lookahead).
 - Sam's NBA board (`samthemodelman.smmodel.workers.dev/nba/`) said "Projections and player prop tool coming 10/19" on build day. `parseSamNba` (src/lib/picks/nba.ts) reads the placeholder as `soon` and otherwise reads his NFL board template (article.game, nm/pts, Vegas line, Model line), keying names to ESPN abbreviations through an index built from the slate (full name, nickname, city, abbr). If his NBA page uses different markup the page says `unread` instead of guessing: update the parser then (fixture: test/fixtures/picks/sam-nba-soon.html).
