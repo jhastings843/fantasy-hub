@@ -333,7 +333,7 @@ async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
     .flatMap(([week, games]) =>
-      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, david: g.david, dk: g.dk, ...(g.late ? { late: g.late } : {}) }] : [])),
+      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, david: g.david, dk: g.dk, kickoff: g.kickoff, ...(g.late ? { late: g.late } : {}) }] : [])),
     )
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
@@ -378,6 +378,52 @@ export async function getPropsView(season: number): Promise<PropsView> {
   const dWeek = dGames.reduce<number | null>((a, g) => (a === null || g.week > a ? g.week : a), null);
   const david = { week: dWeek, games: dGames.filter((g) => g.week === dWeek), trends: davidTrends(dGames, sam), sam: Object.fromEntries(sam) };
   return { season, week, current, graded, trends: propTrends(graded), system, active: sys.filter((e) => !e.retired).map((e) => e.id), david };
+}
+
+/** One week of prop results for the Money page's chart, in units (1u risked per bet). */
+export interface PropsWeek {
+  week: number;
+  /** Latest kickoff that week. */
+  at: string | null;
+  /** Every play Sam's model made (copies read after kickoff left out, as on the props page). */
+  sam: number;
+  samBets: number;
+  /** The system slices' bets, summed slice by slice the way the props page totals them. */
+  system: number;
+  systemBets: number;
+}
+
+export async function propsWeeks(season: number): Promise<PropsWeek[]> {
+  const [graded, sys, dGames] = await Promise.all([gradedList(season), loadSystem(season), davidGames(season)]);
+  const samGraded = samIndex(graded.filter((x) => !x.late));
+  const weeks = new Map<number, PropsWeek>();
+  const wk = (n: number) => {
+    let w = weeks.get(n);
+    if (!w) weeks.set(n, (w = { week: n, at: null, sam: 0, samBets: 0, system: 0, systemBets: 0 }));
+    return w;
+  };
+  for (const g of [...graded, ...dGames]) {
+    const w = wk(g.week);
+    if (g.kickoff && (!w.at || g.kickoff > w.at)) w.at = g.kickoff;
+  }
+  for (const g of graded) {
+    if (g.late) continue;
+    for (const m of g.result.markets) {
+      if (!m.play) continue;
+      const w = wk(g.week);
+      w.sam += m.play.net;
+      w.samBets++;
+    }
+  }
+  for (const e of sys) {
+    const all = e.id.startsWith("dboard:") || e.id.startsWith("h2h:") ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
+    for (const b of all.filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week))) {
+      const w = wk(b.week);
+      w.system += b.bet.net;
+      w.systemBets++;
+    }
+  }
+  return [...weeks.values()].filter((w) => w.samBets || w.systemBets).sort((a, b) => a.week - b.week);
 }
 
 export { MIN_BETS, SLICES };

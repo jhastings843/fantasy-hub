@@ -3,6 +3,7 @@ import { redis } from "@/lib/redis/client";
 import { boxStats, type EspnBoxTeam } from "@/lib/props/grade";
 import { gradeBet, netUnits, summarize, type BetSummary, type FinalGame, type MoneyBet } from "./bets";
 import type { MoneySnapshot } from "./types";
+import { getSportsView, type SportsView } from "./sports";
 
 // The Money page's memory. Two keys:
 // - money:v1:snapshot  the latest Phil and paper-book snapshot, posted by
@@ -111,10 +112,12 @@ export interface MoneyView {
   bets: MoneyBet[];
   summary: BetSummary;
   problems: string[];
+  /** Picks and props results for the overview charts; null if they could not be read. */
+  sports: SportsView | null;
 }
 
 export async function getMoneyView(): Promise<MoneyView> {
-  const [snapshot, raw] = await Promise.all([getSnapshot(), getBets()]);
+  const [snapshot, raw, sports] = await Promise.all([getSnapshot(), getBets(), getSportsView().catch(() => null)]);
   const { bets, problems } = await gradePending(raw);
-  return { snapshot, bets, summary: summarize(bets), problems };
+  return { snapshot, bets, summary: summarize(bets), problems, sports };
 }

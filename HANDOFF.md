@@ -209,3 +209,7 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 ## 2026-10-19 late: hourly learn check + strategy explainers
 - trade-bot: `learner.check()` (`--check`) runs every hour in scripts/phil_hourly.sh before the Money push: Saturday rules on live prices, rewrites today's grades.jsonl line, opens/retires nothing. live.quotes reuses quotes fetched <10 min ago. tradebot/explain.py describes every lab family from params; money_export adds book.strategy {what, how, record}.
 - fantasy-hub: Learn log fold now holds the hourly "Latest check" then the Saturday weeks (GradesPanel removed); Holdings rows show the strategy explainer. Uncommitted until Jack says commit; needs `vercel --prod`.
+
+- 2026-10-19: Money > Weather tab (WeatherTab) + overview tile/panel for the weather desk. Uncommitted, needs deploy.
+
+- 2026-10-19: Money overview gains "Picks, all sports" and "Props" charts (lib/money/sports.ts, props/store.ts propsWeeks). Cumulative units by week; NBA joins once it keeps a record. No new tabs.

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn } from "@/lib/money/types";
+import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
@@ -13,7 +13,7 @@ import m from "./money.module.css";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books";
+export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books" | "weather";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -23,6 +23,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "phil", label: "Phil" },
   { id: "kalshi", label: "Kalshi" },
   { id: "books", label: "Stock books" },
+  { id: "weather", label: "Weather" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
 const href = (t: MoneyTab) => (t === "overview" ? "/money" : `/money?v=${t}`);
@@ -710,12 +711,239 @@ function KalshiTab({ k }: { k: Kalshi }) {
   );
 }
 
+/* ---------------------------------------------------------- weather ---- */
+
+// The weather desk: its own paper book on Kalshi's daily-high markets, kept
+// apart from both Phils. Everything here comes from weather-desk's status.json.
+
+const wc = (p: number) => `${Math.round(p * 100)}¢`;
+const deg = (x: number) => `${x.toFixed(0)}°`;
+
+function weatherChart(w: Weather, height?: number, width?: number) {
+  const pts = w.curve.map((c) => ({ x: t(c.day), y: c.equity }));
+  if (pts.length) pts.unshift({ x: pts[0].x - 86_400_000, y: w.start });
+  return (
+    <LineChart
+      series={[{ label: "Weather desk", points: pts, tone: "auto" }]}
+      baseline={w.start}
+      format={(y) => usd(y)}
+      height={height}
+      width={width}
+      empty={`${w.open.length} ${w.open.length === 1 ? "bet" : "bets"} open. The line starts when the first one settles, the morning after its day.`}
+      ariaLabel="Weather desk paper bankroll after each settled day"
+    />
+  );
+}
+
+function WeatherBetRow({ b }: { b: WeatherBet }) {
+  const own = b.desk ?? b.p;
+  return (
+    <li className={m.hold}>
+      <span className={s.play}>{`${b.side === "yes" ? "Yes" : "No"} ${b.label}, ${b.name}`}</span>
+      <span className={`${s.num} ${b.pnl !== undefined ? tone(b.pnl) : s.muted}`}>
+        {b.pnl !== undefined ? usd(b.pnl, true) : usd(b.cost + b.fee)}
+      </span>
+      <span className={m.why}>
+        {`${shortDay(b.day)} high. ${b.contracts} at ${wc(b.price)}. Forecast ${deg(b.mu)} ±${b.sigma.toFixed(1)}°; desk ${Math.round(own * 100)}%, blended with the market ${Math.round(b.p * 100)}%, edge ${wc(b.edge)}.`}
+        {b.status !== "open" ? ` ${b.status === "won" ? "Won" : "Lost"}.` : ""}
+      </span>
+    </li>
+  );
+}
+
+function WeatherDayRow({ d, benched }: { d: WeatherDay; benched: boolean }) {
+  return (
+    <li className={m.grade}>
+      <span className={s.play}>{d.name}</span>
+      <span className={`${s.num} ${s.muted}`}>{`${deg(d.mu)} ±${d.sigma.toFixed(1)}°`}</span>
+      <span className={m.why}>
+        {`Most likely ${d.favorite}: desk ${Math.round(d.favoriteP * 100)}%, market ${d.favoriteMid !== null ? wc(d.favoriteMid) : "n/a"}. `}
+        {benched ? "Benched: the market has out-forecast the desk here." : d.pick ? `Edge: ${d.pick} (${wc(d.edge ?? 0)}).` : "No edge."}
+      </span>
+    </li>
+  );
+}
+
+function WeatherCityRow({ c }: { c: WeatherCity }) {
+  const ahead = c.desk !== null && c.market !== null ? c.desk < c.market : null;
+  return (
+    <li className={m.grade}>
+      <span className={s.play}>{c.benched ? <Tag k="retire" /> : null}{c.name}</span>
+      <span className={`${s.num} ${ahead === null ? s.muted : ahead ? s.pos : s.neg}`}>
+        {ahead === null ? "not scored yet" : ahead ? "desk ahead" : "market ahead"}
+      </span>
+      <span className={m.why}>
+        {`Forecasts run ${c.bias !== null ? `${c.bias > 0 ? "+" : ""}${c.bias.toFixed(1)}°` : "?"} off here (corrected), usual miss ${c.sigma !== null ? c.sigma.toFixed(1) : "?"}°, from ${c.misses} days.`}
+        {c.scored ? ` Scored ${c.scored} days: desk ${c.desk!.toFixed(3)}, market ${c.market!.toFixed(3)} (lower is better).` : ""}
+      </span>
+    </li>
+  );
+}
+
+function WeatherTab({ w }: { w: Weather }) {
+  const r = w.record;
+  const benched = new Set(w.cities.filter((c) => c.benched).map((c) => c.key));
+  const days = [...new Set(w.upcoming.map((u) => u.day))].sort();
+  const next = days[0];
+  const lost = r.settled - r.won;
+  return (
+    <section className={s.section}>
+      <div className={s.tiles}>
+        <div className={`${s.tile} ${w.equity > w.start ? s.good : w.equity < w.start ? s.bad : ""}`}>
+          <span className={s.tileV}>{usd(w.equity - w.start, true)}</span>
+          <span className={s.tileK}>{`paper, from ${usd(w.start)}`}</span>
+        </div>
+        <div className={s.tile}>
+          <span className={s.tileV}>{r.settled ? `${r.won}-${lost}` : "0-0"}</span>
+          <span className={s.tileK}>{`settled, ${w.open.length} open`}</span>
+        </div>
+        <div className={s.tile}>
+          <span className={s.tileV}>{`${Math.round(w.trust.w * 100)}%`}</span>
+          <span className={s.tileK}>trust in its own forecast</span>
+        </div>
+      </div>
+      <div className={m.panel}>
+        <h2 className={m.panelTitle}>Bankroll</h2>
+        {weatherChart(w, 220, 640)}
+        <p className={m.sub}>
+          {`Bets on tomorrow's high in ${w.cities.length} cities on Kalshi. Each forecast averages five weather models and corrects them by what it has learned about each station. The desk's odds are blended with the market's: ${Math.round(w.trust.w * 100)}% desk, ${100 - Math.round(w.trust.w * 100)}% market${
+            w.trust.days ? `, re-fit from ${w.trust.days} settled days` : ", until 20 days have settled"
+          }. It bets only when the blend beats the price by ${wc(w.rules.min_edge)} after fees, no more than ${usd(w.rules.max_stake)} a bet, and never after ${w.rules.cutoff_hour}am on the day.`}
+        </p>
+      </div>
+      {w.open.length > 0 && (
+        <details className={`${m.panel} ${m.fold}`} open>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>Open bets</h2>
+            <span className={m.foldMeta}>{`${w.open.length}, ${usd(w.openCost)} staked`}</span>
+          </summary>
+          <ul className={m.holdList}>{w.open.map((b) => <WeatherBetRow key={b.id} b={b} />)}</ul>
+        </details>
+      )}
+      {next && (
+        <details className={`${m.panel} ${m.fold}`}>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>{`The board, ${shortDay(next)}`}</h2>
+            <span className={m.foldMeta}>{`${w.upcoming.filter((u) => u.day === next && u.pick).length} edges, updated ${clockEt(w.generatedAt)}`}</span>
+          </summary>
+          <ul className={m.grades}>
+            {w.upcoming.filter((u) => u.day === next).map((d) => <WeatherDayRow key={d.city} d={d} benched={benched.has(d.city)} />)}
+          </ul>
+        </details>
+      )}
+      <details className={`${m.panel} ${m.fold}`} open={benched.size > 0}>
+        <summary className={m.foldHead}>
+          <h2 className={m.panelTitle}>What it has learned</h2>
+          <span className={m.foldMeta}>
+            {w.learned.scored ? `${w.learned.scored} days scored${benched.size ? `, ${benched.size} benched` : ""}` : `${w.learned.days.toLocaleString("en-US")} city-days of history`}
+          </span>
+        </summary>
+        <p className={m.sub}>
+          {`Every settled day, in every city, bet or not, teaches it two things: how far the models run off at that station, and whether its odds beat the market's (Brier score, lower is better). A city where the market keeps winning after ${w.rules.bench_min} scored days gets benched until the desk catches up.${
+            w.learned.desk !== null && w.learned.market !== null ? ` Overall so far: desk ${w.learned.desk.toFixed(3)}, market ${w.learned.market.toFixed(3)}.` : ""
+          }`}
+        </p>
+        <ul className={m.grades}>{w.cities.map((c) => <WeatherCityRow key={c.key} c={c} />)}</ul>
+      </details>
+      {w.settled.length > 0 && (
+        <details className={`${m.panel} ${m.fold}`}>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>Settled</h2>
+            <span className={m.foldMeta}>{`${r.won}-${lost}, ${usd(r.pnl, true)}`}</span>
+          </summary>
+          <ul className={m.holdList}>{w.settled.map((b) => <WeatherBetRow key={b.id} b={b} />)}</ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+/* ----------------------------------------------------------- sports ---- */
+
+// Picks and props on the overview: cumulative units by week, from the same
+// records the Picks and Props pages total (lib/money/sports.ts).
+
+type Sports = NonNullable<Awaited<ReturnType<typeof getMoneyView>>["sports"]>;
+
+function cumulative(rows: { at: string | null; v: number }[]) {
+  const pts: { x: number; y: number }[] = [];
+  let run = 0;
+  for (const r of rows) {
+    if (!r.at) continue;
+    run += r.v;
+    pts.push({ x: t(r.at), y: Math.round(run * 100) / 100 });
+  }
+  if (pts.length) pts.unshift({ x: pts[0].x - 7 * 86_400_000, y: 0 });
+  return pts;
+}
+
+function PicksPanel({ sp }: { sp: Sports }) {
+  const leagues = (["nfl", "cfb"] as const).map((l) => {
+    const rows = sp.picks.filter((p) => p.league === l);
+    return { l, units: rows.reduce((a, r) => a + r.units, 0), w: rows.reduce((a, r) => a + r.w, 0), l_: rows.reduce((a, r) => a + r.l, 0), p: rows.reduce((a, r) => a + r.p, 0), n: rows.length };
+  });
+  const name = { nfl: "NFL", cfb: "College" };
+  return (
+    <div className={m.panel}>
+      <div className={m.panelHead}><h2 className={m.panelTitle}>Picks, all sports</h2><Link className={m.panelLink} href="/picks">Picks</Link></div>
+      <LineChart
+        series={[{ label: "All sports", points: cumulative(sp.picks.map((p) => ({ at: p.at, v: p.units }))), tone: "auto" }]}
+        baseline={0}
+        format={units}
+        height={230}
+        width={360}
+        empty="No graded picks yet this season."
+        ariaLabel="Net units on every staked pick, all sports, by week"
+      />
+      <span className={m.sub}>
+        {leagues.filter((x) => x.n).map((x) => `${name[x.l]} ${units(Math.round(x.units * 100) / 100)} (${x.w}-${x.l_}${x.p ? `-${x.p}` : ""})`).join(" · ") || "Nothing settled yet."}
+        {" "}Staked bets as the emails sent them. NBA joins once it keeps a record.
+      </span>
+    </div>
+  );
+}
+
+function PropsPanel({ sp }: { sp: Sports }) {
+  const sys = sp.props.reduce((a, w) => a + w.system, 0);
+  const sam = sp.props.reduce((a, w) => a + w.sam, 0);
+  const nSys = sp.props.reduce((a, w) => a + w.systemBets, 0);
+  const nSam = sp.props.reduce((a, w) => a + w.samBets, 0);
+  return (
+    <div className={m.panel}>
+      <div className={m.panelHead}><h2 className={m.panelTitle}>Props</h2><Link className={m.panelLink} href="/props">Props</Link></div>
+      <LineChart
+        series={
+          // The system line leads once it has bets; until then it would be a flat zero.
+          nSys
+            ? [
+                { label: "System bets", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.system }))), tone: "auto" },
+                { label: "Every Sam play", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.sam }))) },
+              ]
+            : [{ label: "Every Sam play", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.sam }))), tone: "auto" }]
+        }
+        baseline={0}
+        format={units}
+        height={230}
+        width={360}
+        empty="No graded props yet this season."
+        ariaLabel="Net units on prop bets by week: the system's bets and every play Sam's model made"
+      />
+      <span className={m.sub}>
+        {`Every play Sam's model made: ${units(Math.round(sam * 100) / 100)} on ${nSam}. ${
+          nSys ? `The system's bets: ${units(Math.round(sys * 100) / 100)} on ${nSys}.` : "No system bets settled yet."
+        } 1 unit risked per bet, at the book's price.`}
+      </span>
+    </div>
+  );
+}
+
 /* --------------------------------------------------------- overview ---- */
 
 function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const p = v.snapshot?.phil;
   const k = v.snapshot?.kalshi;
   const kp = v.snapshot?.kalshiPhil;
+  const wx = v.snapshot?.weather;
   const books = v.snapshot?.books ?? [];
   const bookStart = books.reduce((a, b) => a + b.start, 0);
   const bookNow = books.reduce((a, b) => a + b.equity, 0);
@@ -747,6 +975,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           <div className={`${s.tile} ${kp.equity > kp.bankroll ? s.good : kp.equity < kp.bankroll ? s.bad : ""}`}>
             <span className={s.tileV}>{usd(kp.equity - kp.bankroll, true)}</span>
             <span className={s.tileK}>Kalshi Phil, paper</span>
+          </div>
+        )}
+        {wx && (
+          <div className={`${s.tile} ${wx.equity > wx.start ? s.good : wx.equity < wx.start ? s.bad : ""}`}>
+            <span className={s.tileV}>{usd(wx.equity - wx.start, true)}</span>
+            <span className={s.tileK}>Weather desk, paper</span>
           </div>
         )}
         <div className={`${s.tile} ${bookNow > bookStart ? s.good : bookNow < bookStart ? s.bad : ""}`}>
@@ -784,6 +1018,16 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
             <div className={m.panelHead}><h2 className={m.panelTitle}>Phil&apos;s Kalshi shadow</h2><Link className={m.panelLink} href={href("kalshi")}>What it&apos;s tracking</Link></div>
             <span className={m.big}>{k.open}</span>
             <span className={m.sub}>{`open calls, ${k.settled} settled${k.settledBets ? `, shadow P&L ${usd(k.pnl, true)}` : ""}. Nothing placed; kept apart from Phil's Polymarket record.`}</span>
+          </div>
+        )}
+        {v.sports && <PicksPanel sp={v.sports} />}
+        {v.sports && <PropsPanel sp={v.sports} />}
+        {wx && (
+          <div className={m.panel}>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Weather desk</h2><Link className={m.panelLink} href={href("weather")}>Bets and board</Link></div>
+            {wx.record.settled > 0
+              ? weatherChart(wx, 230, 360)
+              : <span className={m.sub}>{`No settled bets yet. ${wx.open.length} open on tomorrow's highs, ${usd(wx.cash)} cash. Trusts its own forecast ${Math.round(wx.trust.w * 100)}%, the market the rest.`}</span>}
           </div>
         )}
         {books.length > 0 && (
@@ -865,6 +1109,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
               : <p className={s.calm}>The shadow check has not reported yet. It posts with Phil after his next cycle.</p>}
           </>
         )}
+        {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The weather desk hasn&apos;t posted yet.</p>)}
         {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} />}
 
         <footer className={s.footer}>

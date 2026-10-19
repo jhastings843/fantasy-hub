@@ -201,6 +201,80 @@ export interface MoneySnapshot {
   learnLog?: LearnEntry[] | null;
   /** Latest weekday grade. Missing before 2026-10-19. */
   grades?: Grades | null;
+  /** The weather desk (~/Projects/weather-desk). Missing before 2026-10-19. */
+  weather?: Weather | null;
+}
+
+/** One paper bet on a Kalshi daily-high bracket. */
+export interface WeatherBet {
+  id: string;
+  placed: string;
+  city: string;
+  name: string;
+  day: string;
+  lead: "day1" | "day0";
+  ticker: string;
+  label: string;
+  side: "yes" | "no";
+  price: number;
+  contracts: number;
+  cost: number;
+  fee: number;
+  /** Chance the bet wins: the desk's own, and blended with the market by the trust weight. */
+  desk?: number;
+  p: number;
+  edge: number;
+  mu: number;
+  sigma: number;
+  status: "open" | "won" | "lost";
+  settled?: string;
+  pnl?: number;
+}
+
+export interface WeatherCity {
+  key: string;
+  name: string;
+  scored: number;
+  desk: number | null;
+  market: number | null;
+  benched: boolean;
+  bias: number | null;
+  sigma: number | null;
+  misses: number;
+}
+
+export interface WeatherDay {
+  city: string;
+  name: string;
+  day: string;
+  lead: "day1" | "day0";
+  mu: number;
+  sigma: number;
+  favorite: string;
+  favoriteP: number;
+  favoriteMid: number | null;
+  models?: Record<string, number>;
+  edge: number | null;
+  pick: string | null;
+}
+
+/** Weather desk status (weather-desk desk/desk.py report()). */
+export interface Weather {
+  version: 1;
+  generatedAt: string;
+  start: number;
+  equity: number;
+  cash: number;
+  openCost: number;
+  record: { settled: number; won: number; pnl: number; staked: number };
+  curve: { day: string; equity: number }[];
+  open: WeatherBet[];
+  settled: WeatherBet[];
+  cities: WeatherCity[];
+  upcoming: WeatherDay[];
+  learned: { days: number; scored: number; desk: number | null; market: number | null };
+  trust: { w: number; days: number; fit: number | null };
+  rules: { min_edge: number; kelly: number; max_stake: number; cutoff_hour: number; bench_min: number };
 }
 
 /** Enough of a check that a malformed post can't break the page. */
