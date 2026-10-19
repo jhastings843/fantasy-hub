@@ -112,7 +112,19 @@ export interface Phil {
   open: PhilBet[];
   settledBets: PhilBet[];
   categories: { category: string; bets: number; pnl: number }[];
-  tracks: { name: string; maxStake: number; cash: number; realizedPnl: number; bets: number; open: number }[];
+  /** Phil's retros, newest first. Missing in snapshots before 2026-10-19. */
+  learner?: PhilLearn[];
+}
+
+/** One of Phil's retros, read by trade-bot's money_export.parse_retro. */
+export interface PhilLearn {
+  file: string;
+  ts: string | null;
+  headline: string;
+  noted: string[];
+  lessons: string[];
+  changes: string[];
+  kalshi: string | null;
 }
 
 export interface KalshiRow {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet } from "@/lib/money/types";
+import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
@@ -173,6 +173,49 @@ function PhilRow({ b }: { b: PhilBet }) {
   );
 }
 
+function PhilRetro({ e }: { e: PhilLearn }) {
+  return (
+    <ul className={m.logList}>
+      {e.lessons.map((x, i) => <li key={`l${i}`}><Tag k="lesson" />{x}</li>)}
+      {e.changes.map((x, i) => <li key={`c${i}`}><Tag k="changed" />{x}</li>)}
+      {e.noted.map((x, i) => <li key={`n${i}`}><Tag k="noted" /><span className={m.why}>{x}</span></li>)}
+      {e.kalshi && <li><Tag k="kalshi" /><span className={m.why}>{e.kalshi}</span></li>}
+      {!e.lessons.length && !e.changes.length && !e.noted.length && !e.kalshi && <li className={s.muted}>Nothing recorded beyond the headline.</li>}
+    </ul>
+  );
+}
+
+function PhilLearnLog({ log, who }: { log: PhilLearn[]; who: string }) {
+  const [latest, ...older] = log;
+  const lessons = log.reduce((n, e) => n + e.lessons.length, 0);
+  const changes = log.reduce((n, e) => n + e.changes.length, 0);
+  const stamp = (e: PhilLearn) => (e.ts ? when(e.ts) : e.file);
+  return (
+    <div className={m.panel}>
+      <h2 className={m.panelTitle}>Learner log</h2>
+      <p className={m.sub}>
+        {`What ${who} noted, learned and changed in its own playbook after bets and forecasts settled, from its last ${log.length} retros (${lessons} ${lessons === 1 ? "lesson" : "lessons"}, ${changes} ${changes === 1 ? "change" : "changes"}). Its own words, trimmed.`}
+      </p>
+      <div className={m.week}>
+        <div className={m.weekHead}>
+          <span>{stamp(latest)}</span>
+        </div>
+        <p className={m.retroHead}>{latest.headline}</p>
+        <PhilRetro e={latest} />
+      </div>
+      {older.map((e) => (
+        <details key={e.file} className={m.row}>
+          <summary className={m.rowHead}>
+            <span className={m.rowTitle}>{e.headline}</span>
+            <span className={m.rowMeta}>{stamp(e)}</span>
+          </summary>
+          <div className={m.rowBody}><PhilRetro e={e} /></div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 function PhilTab({ p }: { p: Phil }) {
   const edge = p.brierPhil !== null && p.brierMarket !== null ? p.brierMarket - p.brierPhil : null;
   const maxAbs = Math.max(1, ...p.categories.map((c) => Math.abs(c.pnl)));
@@ -244,27 +287,7 @@ function PhilTab({ p }: { p: Phil }) {
           </table>
         </div>
       </details>
-      {p.tracks.length > 0 && (
-        <div className={m.panel}>
-          <h2 className={m.panelTitle}>Pilot tracks</h2>
-          <p className={s.notice}>Shadow tracks: Phil's bets since the pilot started, replayed at a capped stake per bet on paper entry prices. Fills and liquidity at larger sizes are not modeled.</p>
-          <div className={m.scroll}>
-            <table className={s.table}>
-              <thead><tr><th>Track</th><th>Max stake</th><th>Bets</th><th>P&amp;L</th></tr></thead>
-              <tbody>
-                {p.tracks.map((k) => (
-                  <tr key={k.name}>
-                    <td>{k.name}</td>
-                    <td className={s.num}>{usd(k.maxStake)}</td>
-                    <td className={s.num}>{k.bets}</td>
-                    <td className={`${s.num} ${tone(k.realizedPnl)}`}>{usd(k.realizedPnl, true)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {p.learner && p.learner.length > 0 && <PhilLearnLog log={p.learner} who={p.venue === "kalshi" ? "Kalshi Phil" : "Phil"} />}
     </section>
   );
 }
@@ -354,7 +377,10 @@ function BookHoldings({ b }: { b: Book }) {
   );
 }
 
-const TAG: Record<string, string> = { open: m.tagOpen, retire: m.tagRetire, fix: m.tagFix, watch: m.tagWatch, idea: m.tagIdea };
+const TAG: Record<string, string> = {
+  open: m.tagOpen, retire: m.tagRetire, fix: m.tagFix, watch: m.tagWatch, idea: m.tagIdea,
+  lesson: m.tagIdea, changed: m.tagFix, kalshi: m.tagWatch,
+};
 
 function Tag({ k }: { k: string }) {
   return <span className={`${m.tag} ${TAG[k] ?? ""}`}>{k}</span>;
