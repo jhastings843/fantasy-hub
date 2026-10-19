@@ -431,15 +431,37 @@ function KalshiRowView({ r, settled }: { r: KalshiRow; settled?: boolean }) {
       </td>
       <td><Decision r={r} /></td>
       <td className={s.num}>{r.stake ? usd(r.stake) : ""}</td>
-      {settled ? (
-        <td className={`${s.num} ${money !== null ? tone(money) : ""}`}>
-          <Outcome o={r.status} />{" "}
-          {money !== null && r.status !== "void" ? (r.decision === "bet" ? usd(money, true) : <span className={s.muted}>{`would be ${usd(money, true)}`}</span>) : ""}
-        </td>
-      ) : (
+      {settled ? <SettledCell r={r} money={money} /> : (
         <td className={`${s.num} ${s.muted}`}>{r.closes ? `settles ${when(r.closes)}` : ""}</td>
       )}
     </tr>
+  );
+}
+
+// A settled row says three separate things, so none of them hides the others:
+// what Kalshi settled, what the call did with money (a bet's P&L, or what a
+// pass avoided or missed), and whether Phil's probability pointed the right
+// way. "status" is whether the named side won, which for a pass is not a loss.
+function SettledCell({ r, money }: { r: KalshiRow; money: number | null }) {
+  if (r.status === "void") return <td className={s.num}><Outcome o="void" /></td>;
+  const sideWon = r.status === "won";
+  const kalshiSaid = r.side ? (sideWon ? r.side : r.side === "yes" ? "no" : "yes").toUpperCase() : null;
+  const readRight = r.est !== null ? (r.est >= 0.5) === sideWon : null;
+  const bet = r.decision === "bet";
+  return (
+    <td className={s.num}>
+      <span className={`${m.outcome} ${bet ? (sideWon ? m.oW : m.oL) : m.oOpen}`}>
+        {bet ? (sideWon ? "Won" : "Lost") : kalshiSaid ? `Settled ${kalshiSaid}` : "Settled"}
+      </span>
+      {money !== null && (
+        <div className={tone(bet ? money : -money)}>
+          {bet ? usd(money, true) : money < 0 ? `pass avoided ${usd(-money)}` : `pass missed ${usd(money, true)}`}
+        </div>
+      )}
+      {readRight !== null && (
+        <div className={`${m.why} ${readRight ? "" : s.neg}`}>{readRight ? "Phil's read was right" : "Phil's read was wrong"}</div>
+      )}
+    </td>
   );
 }
 
@@ -494,7 +516,7 @@ function KalshiTab({ k }: { k: Kalshi }) {
         </div>
         <div className={s.tile}>
           <span className={s.tileV}>{`${k.wins}-${k.settledBets - k.wins}`}</span>
-          <span className={s.tileK}>settled shadow bets</span>
+          <span className={s.tileK}>{`settled shadow bets${k.settled > k.settledBets ? `, plus ${k.settled - k.settledBets} settled ${k.settled - k.settledBets === 1 ? "pass" : "passes"} below` : ""}`}</span>
         </div>
         <div className={`${s.tile} ${beat !== null && beat > 0 ? s.good : beat !== null && beat < 0 ? s.bad : ""}`}>
           <span className={s.tileV}>{vs ? vs.brier_phil.toFixed(3) : "n/a"}</span>
