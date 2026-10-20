@@ -984,11 +984,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
         )}
         <div className={`${s.tile} ${bookNow > bookStart ? s.good : bookNow < bookStart ? s.bad : ""}`}>
           <span className={s.tileV}>{books.length ? pct(bookNow / bookStart - 1) : "n/a"}</span>
-          <span className={s.tileK}>{`stock books, all ${books.length}`}</span>
-        </div>
-        <div className={s.tile}>
-          <span className={s.tileV}>{books.length ? pct(spyNow / bookStart - 1) : "n/a"}</span>
-          <span className={s.tileK}>SPY over the same days</span>
+          <span className={s.tileK}>{books.length ? `stock books, all ${books.length} · SPY ${pct(spyNow / bookStart - 1)} same days` : "stock books"}</span>
         </div>
       </div>
       <div className={m.panels}>
