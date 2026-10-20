@@ -36,7 +36,7 @@ export const DAVID_LABEL: { [m in DavidMarket]: string } = {
 export const DAVID_MARKETS = Object.keys(DAVID_LABEL) as DavidMarket[];
 
 /** David's market for each of Sam's stats. */
-const FROM_SAM: { [s in Stat]: DavidMarket } = { pass_yds: "passing_yards", rush_yds: "rushing_yards", rec_yds: "receiving_yards", rec: "receptions" };
+const FROM_SAM: { [s in Stat]?: DavidMarket } = { pass_yds: "passing_yards", rush_yds: "rushing_yards", rec_yds: "receiving_yards", rec: "receptions" };
 
 export interface DavidProp {
   id: string;
@@ -134,8 +134,9 @@ export function davidFor(gameId: string, markets: PropMarket[], props: DavidProp
   const idx = new Map(props.filter((p) => p.gameId === gameId).map((p) => [`${nameKey(p.player)}|${p.team}|${p.market}`, p.projection]));
   const out: { [id: string]: number } = {};
   for (const m of markets) {
-    if (!m.stat) continue;
-    const v = idx.get(`${nameKey(m.player)}|${m.team}|${FROM_SAM[m.stat]}`);
+    const dm = m.stat ? FROM_SAM[m.stat] : undefined;
+    if (!dm) continue;
+    const v = idx.get(`${nameKey(m.player)}|${m.team}|${dm}`);
     if (v !== undefined) out[m.id] = v;
   }
   return out;
@@ -247,7 +248,10 @@ export function samIndex(games: { game: PropsGame; late?: string }[]): SamIndex 
   const out: SamIndex = new Map();
   for (const x of games) {
     if (x.late) continue;
-    for (const m of x.game.markets) if (m.stat) out.set(samKey(x.game.slug, m.player, m.team, FROM_SAM[m.stat]), m.model);
+    for (const m of x.game.markets) {
+      const dm = m.stat ? FROM_SAM[m.stat] : undefined;
+      if (dm) out.set(samKey(x.game.slug, m.player, m.team, dm), m.model);
+    }
   }
   return out;
 }

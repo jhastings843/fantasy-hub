@@ -14,7 +14,10 @@
 // 0% projection weight, so there the play can point against his own number.
 // Both are kept: `side` is Sam's play, `lean` is where the projection points.
 
-export type Stat = "pass_yds" | "rush_yds" | "rec_yds" | "rec";
+export type NflStat = "pass_yds" | "rush_yds" | "rec_yds" | "rec";
+export type NbaStat = "pts" | "reb" | "ast" | "threes";
+export type Stat = NflStat | NbaStat;
+export type League = "nfl" | "nba";
 export type Side = "over" | "under";
 
 export const STAT_LABEL: { [s in Stat]: string } = {
@@ -22,6 +25,10 @@ export const STAT_LABEL: { [s in Stat]: string } = {
   rush_yds: "Rushing yards",
   rec_yds: "Receiving yards",
   rec: "Receptions",
+  pts: "Points",
+  reb: "Rebounds",
+  ast: "Assists",
+  threes: "Threes",
 };
 
 export interface BookLine {
@@ -103,6 +110,10 @@ export function statOf(label: string): Stat | null {
   if (/^rushing yards/.test(l)) return "rush_yds";
   if (/^receiving yards/.test(l)) return "rec_yds";
   if (/^receptions/.test(l)) return "rec";
+  if (/^points/.test(l)) return "pts";
+  if (/^rebounds/.test(l)) return "reb";
+  if (/^assists/.test(l)) return "ast";
+  if (/^threes/.test(l)) return "threes";
   return null;
 }
 
@@ -179,7 +190,8 @@ function parseMarkets(html: string): PropMarket[] {
     const line = num((body.match(/class="pp-line"><em>line<\/em>\s*<b>([^<]+)<\/b>/) ?? [])[1]);
     const gapM = body.match(/<span class="gapv( nil)?">([^<]*)<\/span>/);
     const gap = gapM ? num(gapM[2]) : null;
-    const weightM = body.match(/counted at\s*<b>(\d+(?:\.\d+)?)%<\/b>/);
+    // NFL pages say "counted at 25%", NBA pages "It counts 0%".
+    const weightM = body.match(/(?:counted at|counts)\s*<b>(\d+(?:\.\d+)?)%<\/b>/);
     const books: BookLine[] = [];
     for (const r of body.matchAll(/<tr class="(win)?"><td>([^<]+)<\/td><td>([^<]+)<\/td><td>([^<]*)<\/td><td>([^<]*)<\/td><\/tr>/g)) {
       const l = num(r[3]);
@@ -214,7 +226,8 @@ function parseFavorites(html: string): PropFavorite[] {
   for (const c of html.matchAll(/<div class="tp-c">([\s\S]*?)<div class="tp-w">([\s\S]*?)<\/div><\/div>/g)) {
     const b = c[1];
     const rank = num((b.match(/<b>(\d+)\.<\/b>/) ?? [])[1]);
-    const nameM = b.match(/<b>\d+\.<\/b>\s*([^<]+)<em>([A-Z]{2,3})<\/em>/);
+    // NFL favorites carry the team (<em>DEN</em>); NBA favorites don't.
+    const nameM = b.match(/<b>\d+\.<\/b>\s*([^<]+)(?:<em>([A-Z]{2,3})<\/em>)?/);
     const betM = b.match(/class="tp-b">\s*(OVER|UNDER)\s+([\d.]+)\s*<span>([^<]+)<\/span>/i);
     const metaM = b.match(/class="tp-m">([\s\S]*?)<\/div>/);
     if (rank === null || !nameM || !betM) continue;
@@ -223,7 +236,7 @@ function parseFavorites(html: string): PropFavorite[] {
     out.push({
       rank,
       player: nameM[1].trim(),
-      team: nameM[2],
+      team: nameM[2] ?? "",
       side: betM[1].toLowerCase() as Side,
       line: Number(betM[2]),
       statLabel: text(betM[3]),
@@ -234,6 +247,49 @@ function parseFavorites(html: string): PropFavorite[] {
     });
   }
   return out;
+}
+
+/** The props links on Sam's NBA board: one page per game, named by the NBA's game id. */
+export function parseNbaPropsLinks(html: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/href="props\/(\d{10})(?:\.html)?"/g)) {
+    if (!out.includes(m[1])) out.push(m[1]);
+  }
+  return out;
+}
+
+/** The season an NBA game id belongs to: "0022600001" is 2026-27, filed as 2026. */
+export const nbaSeasonOf = (gameId: string): number | null => (/^\d{3}(\d{2})\d{5}$/.test(gameId) ? 2000 + Number(gameId.slice(3, 5)) : null);
+
+/** The season a date belongs to (October to June is one season, filed under its first year). */
+export const nbaSeasonOfDate = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
+
+/** Eastern date (YYYY-MM-DD) of an instant. */
+export function etDate(at: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+}
+
+/** Week of the season for a tip time. Week 1 is the Monday-to-Sunday week holding October 21. */
+export function nbaWeek(at: Date, season: number): number {
+  const anchor = new Date(Date.UTC(season, 9, 21));
+  const monday = Date.UTC(season, 9, 21 - ((anchor.getUTCDay() + 6) % 7));
+  const day = Date.parse(`${etDate(at)}T00:00:00Z`);
+  return Math.floor((day - monday) / (7 * 86_400_000)) + 1;
+}
+
+/**
+ * One NBA props page. Same template as the NFL pages; the teams come from the
+ * title ("BOS at DET") and the week from the tip date (see nba-props.ts).
+ */
+export function parseNbaPropsPage(gameId: string, html: string, week: number): PropsGame | null {
+  const season = nbaSeasonOf(gameId);
+  const t = html.match(/<title>\s*([A-Z]{2,4}) at ([A-Z]{2,4})/);
+  if (season === null || !t) return null;
+  // NBA pages put the book count ("4 bk") where the NFL pages put the team.
+  const markets = parseMarkets(html).map((m) => (/\bbk$/.test(m.team) ? { ...m, team: "" } : m));
+  if (!markets.length) return null;
+  const be = html.match(/<b>([\d.]+)<\/b>\s*breaks even/);
+  return { season, week, slug: gameId, away: t[1], home: t[2], breakEven: be ? Number(be[1]) : null, favorites: parseFavorites(html), markets };
 }
 
 /** One props page. Null when it isn't a props page we can read. */

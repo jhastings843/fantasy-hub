@@ -1,23 +1,25 @@
 import Link from "next/link";
 import { VIEWS, type View } from "../picks/ui";
 import { FirstTdResearch, FirstTdResults, FirstTdWeek } from "./firsttd";
-import { PropsResearch, PropsResults, PropsWeek } from "./playerprops";
+import { NbaPropsWeek, PropsResearch, PropsResults, PropsWeek } from "./playerprops";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
 import { getFirstTdView } from "@/lib/firsttd/store";
 import { propsSearchIndex } from "./search";
 import s from "../picks/picks.module.css";
 
-// The Props tab: Sam's NFL player props and first touchdown models. Same
+// The Props tab: Sam's NFL player props and first touchdown models, and his
+// NBA player props (same tracker, own record and system). Same
 // shape as Picks (market, then view, both in the URL), no stakes: everything
 // here is tracked and graded until a slice earns its way into the system.
 
-export type PropsMarket = "pp" | "ftd";
+export type PropsMarket = "pp" | "ftd" | "nba";
 const MARKETS: { id: PropsMarket; label: string }[] = [
   { id: "pp", label: "Player props" },
   { id: "ftd", label: "First TD" },
+  { id: "nba", label: "NBA props" },
 ];
-export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" ? "ftd" : "pp");
+export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" ? x : "pp");
 
 function href(m: PropsMarket, v: View) {
   const q = new URLSearchParams();
@@ -39,10 +41,10 @@ export default async function PropsView({ market, view }: { market: PropsMarket;
       <div className={s.wrap}>
         <header className={s.header}>
           <div className={s.headRow}>
-            <span className={s.eyebrow}>{`NFL ${season}`}</span>
+            <span className={s.eyebrow}>{market === "nba" ? `NBA ${season}-${String(season + 1).slice(2)}` : `NFL ${season}`}</span>
           </div>
           <h1 className={s.h1}>Props</h1>
-          {entries.length > 0 && (
+          {market !== "nba" && entries.length > 0 && (
             <WeekSearch entries={entries} label="Search this week: Sam's props, David's board and first TD" placeholder="Player or team, e.g. Kelce or Chiefs" />
           )}
           <nav className={s.tabs} aria-label="Market">
@@ -67,10 +69,13 @@ export default async function PropsView({ market, view }: { market: PropsMarket;
         {market === "ftd" && view === "week" && <FirstTdWeek season={season} />}
         {market === "ftd" && view === "results" && <FirstTdResults season={season} />}
         {market === "ftd" && view === "research" && <FirstTdResearch season={season} />}
+        {market === "nba" && view === "week" && <NbaPropsWeek season={season} />}
+        {market === "nba" && view === "results" && <PropsResults season={season} league="nba" />}
+        {market === "nba" && view === "research" && <PropsResearch season={season} league="nba" />}
 
         <footer className={s.footer}>
           <span>
-            Sources: <a href="https://samthemodelman.smmodel.workers.dev/nfl/">Sam&apos;s Models</a> (props and first TD pages), Rotowire projections via
+            Sources: <a href="https://samthemodelman.smmodel.workers.dev/nfl/">Sam&apos;s Models</a> (NFL and NBA props pages, first TD pages), Rotowire projections via
             Sleeper, ESPN projections and DraftKings lines via ESPN, Kalshi first TD prices, ESPN box scores and scoring plays. Model output and a record of it, not betting advice.
           </span>
         </footer>

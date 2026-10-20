@@ -9,7 +9,7 @@
 
 import { nameKey, settle } from "@/lib/props/grade";
 import { payout } from "@/lib/props/parse";
-import type { Stat } from "@/lib/props/parse";
+import type { NflStat as Stat } from "@/lib/props/parse";
 
 export type Market = "spread" | "moneyline" | "total" | "h1_spread" | "h1_moneyline" | "h1_total" | "prop";
 export type Outcome = "W" | "L" | "P" | "void";

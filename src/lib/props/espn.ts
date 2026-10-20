@@ -18,7 +18,7 @@ const PROPS = (event: string, page: number) =>
 const ROSTER = (teamId: string) => `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamId}/roster`;
 
 // ESPN fantasy stat ids.
-const STAT_ID: { [s in Stat]: string } = { pass_yds: "3", rush_yds: "24", rec_yds: "42", rec: "53" };
+const STAT_ID: { [s in Stat]?: string } = { pass_yds: "3", rush_yds: "24", rec_yds: "42", rec: "53" };
 const PROP_TYPE: { [name: string]: Stat } = {
   "Total Passing Yards (incl. overtime)": "pass_yds",
   "Total Rushing Yards (incl. overtime)": "rush_yds",
@@ -55,8 +55,9 @@ export function indexEspnProjections(players: FantasyPlayer[], season: number, w
 export function espnFor(markets: PropMarket[], idx: Map<string, { [k: string]: number }>): { [id: string]: number } {
   const out: { [id: string]: number } = {};
   for (const m of markets) {
-    if (!m.stat) continue;
-    const v = idx.get(nameKey(m.player))?.[STAT_ID[m.stat]];
+    const sid = m.stat ? STAT_ID[m.stat] : undefined;
+    if (!sid) continue;
+    const v = idx.get(nameKey(m.player))?.[sid];
     if (typeof v === "number" && Number.isFinite(v)) out[m.id] = Math.round(v * 10) / 10;
   }
   return out;

@@ -1,0 +1,31 @@
+name: NBA props capture
+
+# Sam posts an NBA player props page per game and only keeps the current
+# slate online, so the tracker saves each page before tip and grades it from
+# ESPN once final. NBA games are daily: the early slot (noon ET) grades last
+# night's games and saves afternoon tips; the late slots save the 7pm and
+# 10pm slates as close to tip as GitHub's cron allows (it can run several
+# minutes late). During EDT: 16:00 UTC is noon, 21:30 is 5:30pm, 01:00 is 9pm.
+
+on:
+  schedule:
+    - cron: "0 16 * * *"
+    - cron: "30 21 * * *"
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Save pregame NBA props pages and grade finished games
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          status=$(curl -sS -o nba.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nba")
+          echo "HTTP $status"
+          jq -r '.report | "NBA props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' nba.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ]

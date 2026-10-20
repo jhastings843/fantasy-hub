@@ -7,6 +7,7 @@ import { runThursdayEmail } from "@/lib/thursday/run";
 import { settleFinishedWeeks, snapshotWeek } from "@/lib/scorecard/run";
 import { runFirstTd } from "@/lib/firsttd/store";
 import { runProps } from "@/lib/props/store";
+import { runNbaProps } from "@/lib/props/nba-props";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,18 @@ export async function GET(request: Request) {
       failures.push(`props: ${message}`);
     }
 
+    // Sam's NBA props, the same tracker on the NBA's own keys (grades last night's games).
+    let nbaProps: unknown;
+    try {
+      const r = await runNbaProps();
+      nbaProps = r;
+      for (const p of r.problems) failures.push(`nba props: ${p}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      nbaProps = { error: message };
+      failures.push(`nba props: ${message}`);
+    }
+
     return Response.json({
       ok: failures.length === 0,
       failures,
@@ -155,6 +168,7 @@ export async function GET(request: Request) {
       results,
       firstTd,
       props,
+      nbaProps,
       jingles,
       thursday,
       scorecard,

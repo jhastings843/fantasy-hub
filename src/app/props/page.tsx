@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Props · Hobby Hub",
-  description: "Sam's NFL player prop and first touchdown models, saved before kickoff, graded after, and checked for slices that beat the price.",
+  description: "Sam's NFL and NBA player prop models and first touchdown model, saved before kickoff, graded after, and checked for slices that beat the price.",
 };
 
 export default async function PropsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {

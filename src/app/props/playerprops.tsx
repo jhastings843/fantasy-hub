@@ -2,10 +2,12 @@
 // Picks treats them. Both saved before kickoff (with Rotowire's and ESPN's
 // projections alongside), graded from ESPN's box score, and compared head to
 // head at the same DraftKings line where both cover a prop. This week,
-// results, research. NFL only.
-import { STAT_LABEL, type PropMarket, type Side } from "@/lib/props/parse";
+// results, research. NBA props (Sam only) run through the same views, with
+// league="nba": its own record and system, no David board or outside projections.
+import { STAT_LABEL, type League, type PropMarket, type Side } from "@/lib/props/parse";
 import { isPlay, nameKey } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
+import { getNbaPropsView } from "@/lib/props/nba-props";
 import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
 import { DAVID_LABEL, DAVID_URL, agreeEdge, davidSide, davidSliceSide, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
@@ -13,20 +15,30 @@ import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
 
 const SAM = "https://samthemodelman.smmodel.workers.dev/nfl/";
+const SAM_NBA = "https://samthemodelman.smmodel.workers.dev/nba/";
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
-const short: { [k: string]: string } = { pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
+const short: { [k: string]: string } = { pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec", pts: "pts", reb: "reb", ast: "ast", threes: "threes" };
 const statShort = (m: PropMarket) => (m.stat ? short[m.stat] : m.statLabel.toLowerCase());
 const sideWord = (x: Side) => (x === "over" ? "Over" : "Under");
 
-async function load(season: number): Promise<PropsView | null> {
-  return getPropsView(season).catch(() => null);
+async function load(season: number, league: League = "nfl"): Promise<PropsView | null> {
+  return (league === "nba" ? getNbaPropsView(season) : getPropsView(season)).catch(() => null);
 }
 
 function Unavailable() {
   return <p className={s.calm}>The props tracker couldn&apos;t be read just now. Try again in a minute.</p>;
 }
-function Empty() {
+function Empty({ league = "nfl", graded = false }: { league?: League; graded?: boolean }) {
+  if (league === "nba" && graded)
+    return <p className={s.calm}>Nothing graded yet. Each night&apos;s games are graded from ESPN&apos;s box scores by the next morning&apos;s run.</p>;
+  if (league === "nba")
+    return (
+      <p className={s.calm}>
+        Nothing saved yet. Sam&apos;s NBA props pages are saved before each tip and graded from ESPN&apos;s box score once final. His site only keeps
+        the current slate, so the record starts with opening night, October 20.
+      </p>
+    );
   return (
     <p className={s.calm}>
       Nothing saved yet. Sam&apos;s props pages and David&apos;s board are saved before each kickoff and graded from ESPN&apos;s
@@ -484,6 +496,117 @@ export async function PropsWeek({ season }: { season: number }) {
   );
 }
 
+function NbaGameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
+  const g = saved.game;
+  const plays = g.markets.filter(isPlay).sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0));
+  const net = saved.result ? saved.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
+  const inSystem = plays.filter((m) => systemHits(m, saved, v.active, v.graded).length).length;
+  const res = new Map((saved.result?.markets ?? []).map((r) => [r.id, r]));
+  return (
+    <li>
+      <details className={s.ftdGame}>
+        <summary className={s.ftdSum}>
+          <span className={s.ftdWhen}>
+            <b>{`${g.away} at ${g.home}`}</b>
+            <span className={s.dim}>{saved.kickoff ? whenEt(saved.kickoff) : ""}</span>
+          </span>
+          <span className={s.ftdPick}>
+            <span className={s.ftdPickName}>{plays.length ? `${plays.length} ${plays.length === 1 ? "play" : "plays"}` : "No plays"}</span>
+            <span className={`${s.dim} ${s.num}`}>{`of ${g.markets.length} props`}</span>
+          </span>
+          <span className={s.ftdOdds}>{plays[0] ? `Top: ${plays[0].player} ${sideWord(plays[0].side!)} ${plays[0].line} ${statShort(plays[0])}` : ""}</span>
+          <span className={s.ftdFlags}>
+            {net !== null && <span className={`${s.resChip} ${net > 0 ? s.resW : net < 0 ? s.resL : s.resP}`}>{u(net)}</span>}
+            {net === null && inSystem > 0 && <span className={s.pill}>{`${inSystem} in system`}</span>}
+            <span className={s.chev} aria-hidden>›</span>
+          </span>
+        </summary>
+        <div className={s.ftdBody}>
+          {plays.length ? (
+            <ol className={s.ppList}>
+              {plays.map((m) => (
+                <PlayRow key={m.id} m={m} saved={saved} hits={systemHits(m, saved, v.active, v.graded)} />
+              ))}
+            </ol>
+          ) : (
+            <p className={pp.ppNone}>No play clears the vig on his page.</p>
+          )}
+          <details className={s.ppAll}>
+            <summary>{`Every prop (${g.markets.length})`}</summary>
+            <div className={s.tw}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>Stat</th>
+                    <th>Line</th>
+                    <th>Sam</th>
+                    <th>Play</th>
+                    {saved.result && <th>Actual</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.markets.map((m) => {
+                    const r = res.get(m.id);
+                    return (
+                      <tr key={m.id}>
+                        <td>{m.player}</td>
+                        <td>{statShort(m)}</td>
+                        <td className={s.num}>{m.line}</td>
+                        <td className={s.num}>{`${m.model} ${OU(m.lean)}`}</td>
+                        <td>{isPlay(m) ? sideWord(m.side!) : <span className={s.dim}>–</span>}</td>
+                        {saved.result && <td className={s.num}>{r?.actual === undefined ? "–" : r.actual === null ? "DNP" : r.actual}</td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <p className={`${s.ftdNote} ${s.dim}`}>{`Sam's page saved ${whenEt(saved.capturedAt)}${saved.result ? ", graded" : ""}.`}</p>
+        </div>
+      </details>
+    </li>
+  );
+}
+
+export async function NbaPropsWeek({ season }: { season: number }) {
+  const v = await load(season, "nba");
+  if (!v) return <Unavailable />;
+  const games = Object.values(v.current).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
+  if (!games.length) return <Empty league="nba" />;
+  const live = v.system.filter((e) => !e.retired);
+  const byDay = new Map<string, StoredProps[]>();
+  for (const g of games) {
+    const day = g.kickoff ? new Date(g.kickoff).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long", month: "short", day: "numeric" }) : "Date unknown";
+    byDay.set(day, [...(byDay.get(day) ?? []), g]);
+  }
+  return (
+    <section className={s.section} aria-labelledby="nba-pp-week">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id="nba-pp-week">{`Week ${v.week} NBA player props`}</h2>
+        <p className={s.p}>
+          {`Sam's NBA props, saved before each tip and graded from ESPN's box score. A play is a market where his page says the price clears the vig. ${
+            live.length
+              ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the NBA system; plays that fall in one are marked.`
+              : "Nothing has earned a place in the NBA system yet, so all of it is tracking, not money."
+          }`}
+        </p>
+      </div>
+      {[...byDay.entries()].reverse().map(([day, gs]) => (
+        <div key={day}>
+          <h3 className={pp.bbH}>{day}</h3>
+          <ol className={s.ftdGames}>
+            {gs.map((g) => (
+              <NbaGameCard key={g.game.slug} saved={g} v={v} />
+            ))}
+          </ol>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function Tile({ value, label }: { value: string; label: string }) {
   return (
     <div className={s.tile}>
@@ -495,11 +618,12 @@ function Tile({ value, label }: { value: string; label: string }) {
 
 const recOf = (x: Pick<PropSlice, "w" | "l" | "p"> | undefined) => (x ? `${x.w}-${x.l}${x.p ? `-${x.p}` : ""}` : "0-0");
 
-export async function PropsResults({ season }: { season: number }) {
-  const v = await load(season);
+export async function PropsResults({ season, league = "nfl" }: { season: number; league?: League }) {
+  const nba = league === "nba";
+  const v = await load(season, league);
   if (!v) return <Unavailable />;
   const dt = v.david.trends;
-  if (!v.graded.length && !dt.games) return <Empty />;
+  if (!v.graded.length && !dt.games) return <Empty league={league} graded={Object.keys(v.current).length > 0} />;
   const t = v.trends;
   const get = (id: string) => t.slices.find((x) => x.id === id);
   const dget = (id: string) => dt.slices.find((x) => x.id === id);
@@ -514,18 +638,35 @@ export async function PropsResults({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="pp-results">
       <div className={s.sectionHead}>
-        <h2 className={s.h2} id="pp-results">Player prop results</h2>
+        <h2 className={s.h2} id="pp-results">{nba ? "NBA player prop results" : "Player prop results"}</h2>
+        {nba ? (
+          <p className={s.p}>
+            Sam&apos;s NBA props, graded the way the NFL ones are: every saved prop once its game is final, against the copy saved before tip, 1 unit risked per
+            bet at the price shown. A player who sat voids his props. Weeks run Monday to Sunday.
+          </p>
+        ) : (
         <p className={s.p}>
           Sam and David, graded the same way: every saved prop once its game is final, against the copy saved before kickoff, 1 unit risked per bet at the price
           shown. The head to head grades both on the props they share, at the same DraftKings line and price.
         </p>
+        )}
       </div>
       <div className={s.tiles}>
         <Tile value={u(get("play:all")?.units ?? 0)} label={`Sam's plays · ${recOf(get("play:all"))}`} />
         <Tile value={u(get("lean:all")?.units ?? 0)} label={`Sam's projection, every market · ${recOf(get("lean:all"))}`} />
-        <Tile value={u(dget("dboard:all")?.units ?? 0)} label={`David's board, every prop · ${recOf(dget("dboard:all"))}`} />
-        <Tile value={u(dget("h2h:agree")?.units ?? 0)} label={`Both agree · ${recOf(dget("h2h:agree"))}`} />
+        {nba ? (
+          <>
+            <Tile value={`${t.markets}`} label="props graded" />
+            <Tile value={`${v.system.filter((e) => !e.retired).length}`} label="slices in the system" />
+          </>
+        ) : (
+          <>
+            <Tile value={u(dget("dboard:all")?.units ?? 0)} label={`David's board, every prop · ${recOf(dget("dboard:all"))}`} />
+            <Tile value={u(dget("h2h:agree")?.units ?? 0)} label={`Both agree · ${recOf(dget("h2h:agree"))}`} />
+          </>
+        )}
       </div>
+      {!nba && (<>
       <div className={s.tw}>
         <table className={s.table}>
           <caption className={s.caption}>{`Head to head: ${dt.shared} shared props at DraftKings' line and price`}</caption>
@@ -559,6 +700,7 @@ export async function PropsResults({ season }: { season: number }) {
         <Tile value={u(get("rw:all")?.units ?? 0)} label={`Rotowire's projection, Sam's markets · ${recOf(get("rw:all"))}`} />
         <Tile value={u(get("espn:all")?.units ?? 0)} label={`ESPN's projection, Sam's markets · ${recOf(get("espn:all"))}`} />
       </div>
+      </>)}
       {plays.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
@@ -569,22 +711,23 @@ export async function PropsResults({ season }: { season: number }) {
                 <th>Player</th>
                 <th>Bet</th>
                 <th>Price</th>
-                <th>David</th>
+                {!nba && <th>David</th>}
                 <th>Actual</th>
                 <th>Net</th>
               </tr>
             </thead>
             <tbody>
-              {plays.map(({ week, slug, m, r }) => {
+              {plays.map(({ week, slug, m, r, game: xg }) => {
+                const x = { game: xg };
                 const d = v.graded.find((x) => x.slug === slug && x.week === week)?.david?.[m.id];
                 const ds = d === undefined ? null : d > r.play!.line ? "over" : d < r.play!.line ? "under" : null;
                 return (
                   <tr key={`${slug}|${m.id}`}>
                     <td className={s.num}>{week}</td>
-                    <td>{`${m.player} (${m.team})`}</td>
+                    <td>{m.team ? `${m.player} (${m.team})` : `${m.player} (${x.game.away} at ${x.game.home})`}</td>
                     <td>{`${sideWord(r.play!.side)} ${r.play!.line} ${statShort(m)}`}</td>
                     <td className={s.num}>{`${am(r.play!.price)} ${r.play!.book}`}</td>
-                    <td className={ds === r.play!.side ? s.pos : ds ? s.neg : s.dim}>{d === undefined ? "–" : `${d} ${ds === r.play!.side ? "agrees" : ds ? "splits" : ""}`}</td>
+                    {!nba && <td className={ds === r.play!.side ? s.pos : ds ? s.neg : s.dim}>{d === undefined ? "–" : `${d} ${ds === r.play!.side ? "agrees" : ds ? "splits" : ""}`}</td>}
                     <td className={s.num}>{r.actual}</td>
                     <td className={`${s.num} ${r.play!.outcome === "W" ? s.resW : r.play!.outcome === "L" ? s.resL : s.resP}`}>{r.play!.outcome === "P" ? "push" : u(r.play!.net)}</td>
                   </tr>
@@ -674,12 +817,13 @@ function SliceTable({ title, rows, active }: { title: string; rows: SliceRow[]; 
   );
 }
 
-export async function PropsResearch({ season }: { season: number }) {
-  const v = await load(season);
+export async function PropsResearch({ season, league = "nfl" }: { season: number; league?: League }) {
+  const nba = league === "nba";
+  const v = await load(season, league);
   if (!v) return <Unavailable />;
   const t = v.trends;
   const dt = v.david.trends;
-  if (!v.graded.length && !dt.games) return <Empty />;
+  if (!v.graded.length && !dt.games) return <Empty league={league} graded={Object.keys(v.current).length > 0} />;
   const group = (g: PropSlice["group"]) => t.slices.filter((x) => x.group === g);
   const dgroup = (g: DavidSlice["group"]) => dt.slices.filter((x) => x.group === g);
   const findings = [
@@ -691,9 +835,9 @@ export async function PropsResearch({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="pp-research">
       <div className={s.sectionHead}>
-        <h2 className={s.h2} id="pp-research">Where the prop models make money</h2>
+        <h2 className={s.h2} id="pp-research">{nba ? "Where Sam's NBA props make money" : "Where the prop models make money"}</h2>
         <p className={s.p}>
-          {`Sam and David on the same footing. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Either model's slices can earn a place in the system. Line move is how far the line moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
+          {nba ? `The NFL props' research, on Sam's NBA pages. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better. One that clears it joins the NBA system the week after and counts money only from then; it leaves when its full record falls back under z 1. Line move is how far the consensus moved toward the bet between the first and last pregame copy.` : `Sam and David on the same footing. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Either model's slices can earn a place in the system. Line move is how far the line moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
         </p>
       </div>
       {findings.length > 0 ? (
@@ -704,7 +848,7 @@ export async function PropsResearch({ season }: { season: number }) {
         </ul>
       ) : (
         <p className={s.calm}>
-          {`No slice has cleared the bar yet. At about 30 markets a game for Sam and 25 for David, the bigger slices reach ${MIN_BETS} bets in a week or two; small ones take most of the season.`}
+          {nba ? `No slice has cleared the bar yet. At about 13 props a game and up to 15 games a night, the bigger slices reach ${MIN_BETS} bets within the first couple of weeks.` : `No slice has cleared the bar yet. At about 30 markets a game for Sam and 25 for David, the bigger slices reach ${MIN_BETS} bets in a week or two; small ones take most of the season.`}
         </p>
       )}
 
@@ -742,8 +886,8 @@ export async function PropsResearch({ season }: { season: number }) {
         </table>
       </div>
 
-      <SliceTable title="Head to head: the props both cover, both sides at DraftKings' line and price" rows={dgroup("h2h")} active={v.active} />
-      {dt.h2h.length > 0 && (
+      {!nba && <SliceTable title="Head to head: the props both cover, both sides at DraftKings' line and price" rows={dgroup("h2h")} active={v.active} />}
+      {!nba && dt.h2h.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
             <caption className={s.caption}>Head to head: whose number was closer, average miss</caption>
@@ -775,8 +919,8 @@ export async function PropsResearch({ season }: { season: number }) {
 
       <SliceTable title="Sam's plays" rows={group("play")} active={v.active} />
       <SliceTable title="Sam's projection: the side it points to, every market" rows={group("lean")} active={v.active} />
-      <SliceTable title="David's board: the side his number points to, every prop, at DraftKings" rows={dgroup("dboard")} active={v.active} />
-      <SliceTable title="Other projections on Sam's markets, at his playing book" rows={[...group("rw"), ...group("espn"), ...group("david")]} active={v.active} />
+      {!nba && <SliceTable title="David's board: the side his number points to, every prop, at DraftKings" rows={dgroup("dboard")} active={v.active} />}
+      {!nba && <SliceTable title="Other projections on Sam's markets, at his playing book" rows={[...group("rw"), ...group("espn"), ...group("david")]} active={v.active} />}
 
       {t.accuracy.length > 0 && (
         <div className={s.tw}>
@@ -787,9 +931,9 @@ export async function PropsResearch({ season }: { season: number }) {
                 <th>Stat</th>
                 <th>Markets</th>
                 <th>Sam</th>
-                <th>David</th>
-                <th>Rotowire</th>
-                <th>ESPN</th>
+                {!nba && <th>David</th>}
+                {!nba && <th>Rotowire</th>}
+                {!nba && <th>ESPN</th>}
                 <th>Market line</th>
                 <th>Sam closer</th>
               </tr>
@@ -800,9 +944,9 @@ export async function PropsResearch({ season }: { season: number }) {
                   <td>{STAT_LABEL[a.stat]}</td>
                   <td className={s.num}>{a.n}</td>
                   <td className={`${s.num} ${a.model < a.market ? s.pos : ""}`}>{a.model}</td>
-                  <td className={`${s.num} ${a.david !== null && a.david < a.market ? s.pos : ""}`}>{a.david ?? "–"}</td>
-                  <td className={`${s.num} ${a.rw !== null && a.rw < a.market ? s.pos : ""}`}>{a.rw ?? "–"}</td>
-                  <td className={`${s.num} ${a.espn !== null && a.espn < a.market ? s.pos : ""}`}>{a.espn ?? "–"}</td>
+                  {!nba && <td className={`${s.num} ${a.david !== null && a.david < a.market ? s.pos : ""}`}>{a.david ?? "–"}</td>}
+                  {!nba && <td className={`${s.num} ${a.rw !== null && a.rw < a.market ? s.pos : ""}`}>{a.rw ?? "–"}</td>}
+                  {!nba && <td className={`${s.num} ${a.espn !== null && a.espn < a.market ? s.pos : ""}`}>{a.espn ?? "–"}</td>}
                   <td className={s.num}>{a.market}</td>
                   <td className={s.num}>{`${Math.round((a.closer / a.n) * 100)}%`}</td>
                 </tr>
@@ -811,7 +955,7 @@ export async function PropsResearch({ season }: { season: number }) {
           </table>
         </div>
       )}
-      {dt.accuracy.length > 0 && (
+      {!nba && dt.accuracy.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
             <caption className={s.caption}>David&apos;s board: his number against DraftKings&apos; total, average miss</caption>
@@ -840,10 +984,17 @@ export async function PropsResearch({ season }: { season: number }) {
           </table>
         </div>
       )}
+      {nba ? (
+        <p className={`${s.notice} ${s.dim}`}>
+          {"Sam's play is his own pick of side and book: a book off the consensus, nudged by his projection at the weight his page states (0% until this season has games behind it). The lean grades the side his projection points to on every market. A player who sat (ESPN's did-not-play) voids the prop. Sources: "}
+          <a href={SAM_NBA}>Sam&apos;s Models</a> NBA props pages, ESPN scoreboard and box scores.
+        </p>
+      ) : (
       <p className={`${s.notice} ${s.dim}`}>
         {"Sam's play is his own pick of side and book (mostly a book off the consensus, nudged by his projection at the weight his page states; receiving yards carry 0%). David's board is graded the way his number points from DraftKings' total, at DraftKings' price; his 80% range should catch about 80% of results if it is honest. The head to head takes every prop both cover (same game, player and stat) and grades each model's side at that same DraftKings line and price. Rotowire's projections come through Sleeper's free feed, matched by name and team; ESPN's from its fantasy projections, matched by name. A player missing from the box score voids the prop. Sources: "}
         <a href={SAM}>Sam&apos;s Models</a> props pages, <a href={DAVID_URL}>David Sasser&apos;s props board</a>, Sleeper (Rotowire), ESPN projections, odds and box scores.
       </p>
+      )}
     </section>
   );
 }

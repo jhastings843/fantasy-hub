@@ -9,7 +9,7 @@ import { nameKey } from "./grade";
 const URL = (season: number, week: number) =>
   `https://api.sleeper.app/projections/nfl/${season}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE`;
 
-const FIELD: { [s in Stat]: string } = { pass_yds: "pass_yd", rush_yds: "rush_yd", rec_yds: "rec_yd", rec: "rec" };
+const FIELD: { [s in Stat]?: string } = { pass_yds: "pass_yd", rush_yds: "rush_yd", rec_yds: "rec_yd", rec: "rec" };
 
 export interface SleeperProjection {
   team?: string | null;
@@ -37,8 +37,9 @@ export function indexProjections(rows: SleeperProjection[]): Map<string, { [k: s
 export function projectionsFor(markets: PropMarket[], idx: Map<string, { [k: string]: number | undefined }>): { [id: string]: number } {
   const out: { [id: string]: number } = {};
   for (const m of markets) {
-    if (!m.stat) continue;
-    const v = idx.get(`${nameKey(m.player)}|${m.team}`)?.[FIELD[m.stat]];
+    const field = m.stat ? FIELD[m.stat] : undefined;
+    if (!field) continue;
+    const v = idx.get(`${nameKey(m.player)}|${m.team}`)?.[field];
     if (typeof v === "number" && Number.isFinite(v)) out[m.id] = Math.round(v * 10) / 10;
   }
   return out;

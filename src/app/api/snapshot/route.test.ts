@@ -27,6 +27,9 @@ vi.mock("@/lib/thursday/run", () => ({
 vi.mock("@/lib/props/store", () => ({
   runProps: vi.fn(async () => ({ week: 6, captured: [], kept: [], missed: [], graded: [], system: [], problems: [] })),
 }));
+vi.mock("@/lib/props/nba-props", () => ({
+  runNbaProps: vi.fn(async () => ({ week: 1, captured: [], kept: [], missed: [], graded: [], system: [], problems: [] })),
+}));
 vi.mock("@/lib/firsttd/store", () => ({
   runFirstTd: vi.fn(async () => ({ week: 6, captured: [], kept: [], missed: [], waiting: [], graded: [], problems: [] })),
 }));

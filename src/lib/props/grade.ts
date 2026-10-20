@@ -11,25 +11,25 @@
 // book would void it. A player in the box score with no line in a table had
 // zero of that stat (a back with no catches).
 
-import { implied, payout, playPrice, type PropMarket, type PropsGame, type Side, type Stat } from "./parse";
+import { implied, payout, playPrice, type League, type NbaStat, type NflStat, type PropMarket, type PropsGame, type Side, type Stat } from "./parse";
 
 export interface EspnBoxTeam {
   team?: { abbreviation?: string };
-  statistics?: { name?: string; keys?: string[]; athletes?: { athlete?: { displayName?: string }; stats?: string[] }[] }[];
+  statistics?: { name?: string; keys?: string[]; athletes?: { athlete?: { displayName?: string }; stats?: string[]; didNotPlay?: boolean }[] }[];
 }
 
 const SUFFIX = /\s+(jr|sr|ii|iii|iv|v)\.?$/i;
 export const nameKey = (s: string) => s.replace(SUFFIX, "").toLowerCase().replace(/[^a-z]/g, "");
 
 /** Every player's stat line from a box score, by name key. */
-export function boxStats(players: EspnBoxTeam[]): Map<string, { [s in Stat]: number }> {
-  const out = new Map<string, { [s in Stat]: number }>();
+export function boxStats(players: EspnBoxTeam[]): Map<string, { [s in NflStat]: number }> {
+  const out = new Map<string, { [s in NflStat]: number }>();
   const row = (k: string) => {
     let r = out.get(k);
     if (!r) out.set(k, (r = { pass_yds: 0, rush_yds: 0, rec_yds: 0, rec: 0 }));
     return r;
   };
-  const want: { [table: string]: [string, Stat][] } = {
+  const want: { [table: string]: [string, NflStat][] } = {
     passing: [["passingYards", "pass_yds"]],
     rushing: [["rushingYards", "rush_yds"]],
     receiving: [
@@ -50,6 +50,31 @@ export function boxStats(players: EspnBoxTeam[]): Map<string, { [s in Stat]: num
           const v = i >= 0 ? Number(a.stats?.[i]) : NaN;
           if (Number.isFinite(v)) r[stat] = v;
         }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * An NBA box score (one table per team: points, rebounds, assists, and threes
+ * as "made-attempted"). A player marked did-not-play, or with no stat line,
+ * is left out, so his props void.
+ */
+export function nbaBoxStats(players: EspnBoxTeam[]): Map<string, { [s in NbaStat]: number }> {
+  const out = new Map<string, { [s in NbaStat]: number }>();
+  for (const t of players) {
+    for (const table of t.statistics ?? []) {
+      const keys = table.keys ?? [];
+      const at = (a: { stats?: string[] }, k: string) => {
+        const i = keys.indexOf(k);
+        return i >= 0 ? Number(String(a.stats?.[i] ?? "").split("-")[0]) : NaN;
+      };
+      for (const a of table.athletes ?? []) {
+        const name = a.athlete?.displayName;
+        if (!name || a.didNotPlay || !a.stats?.length) continue;
+        const r = { pts: at(a, "points"), reb: at(a, "rebounds"), ast: at(a, "assists"), threes: at(a, "threePointFieldGoalsMade-threePointFieldGoalsAttempted") };
+        if (Object.values(r).every(Number.isFinite)) out.set(nameKey(name), r);
       }
     }
   }
@@ -120,16 +145,16 @@ export function gradeGame(
   g: PropsGame,
   players: EspnBoxTeam[],
   alts: { rw?: { [id: string]: number }; espn?: { [id: string]: number }; david?: { [id: string]: number } } = {},
+  league: League = "nfl",
 ): GradedGame {
-  const box = boxStats(players);
+  const box: Map<string, { [s in Stat]?: number }> = league === "nba" ? nbaBoxStats(players) : boxStats(players);
   let voids = 0;
   const markets: GradedMarket[] = g.markets.map((m) => {
-    const r = m.stat ? box.get(nameKey(m.player)) : undefined;
-    if (!m.stat || !r) {
+    const actual = m.stat ? box.get(nameKey(m.player))?.[m.stat] : undefined;
+    if (actual === undefined) {
       voids++;
       return { id: m.id, actual: null, play: null, lean: null };
     }
-    const actual = r[m.stat];
     const r2 = alts.rw?.[m.id];
     const e2 = alts.espn?.[m.id];
     const d2 = alts.david?.[m.id];
