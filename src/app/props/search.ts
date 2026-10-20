@@ -4,7 +4,7 @@
 import { isPlay } from "@/lib/props/grade";
 import type { PropMarket } from "@/lib/props/parse";
 import type { PropsView } from "@/lib/props/store";
-import { davidSide, davidSliceSide, samOn, type DavidGame } from "@/lib/props/david";
+import { davidSide, davidSliceSide, isDavidSlice, samOn, type DavidGame } from "@/lib/props/david";
 import { fairAmerican } from "@/lib/firsttd/parse";
 import type { FirstTdView } from "@/lib/firsttd/store";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
@@ -98,7 +98,7 @@ export function propsSearchIndex(v: PropsView | null, ftd: FirstTdView | null): 
         const price = d === "over" ? p.over : d === "under" ? p.under : null;
         const r = res.get(p.id);
         // Same test as the David rows on the cards: an active David slice this prop falls in.
-        const inSystem = v.active.some((id) => (id.startsWith("dboard:") || id.startsWith("h2h:")) && davidSliceSide(id, p, samOn(samMap, p)) !== null);
+        const inSystem = v.active.some((id) => isDavidSlice(id) && davidSliceSide(id, p, samOn(samMap, p)) !== null);
         const text = `${inSystem ? "In the system: " : ""}${d ? `${side(d)} ${p.line}` : `At ${p.line}`} ${DSTAT[p.market]} · his ${p.projection}${price !== null ? ` (${am(price)} DK)` : ""}${
           r && r.actual !== null && r.actual !== undefined ? ` · went ${r.actual}` : ""
         }`;

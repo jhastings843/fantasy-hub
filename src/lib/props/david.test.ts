@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { agreeEdge, davidBox, davidFor, davidSliceSide, davidTrends, gradeDavid, parseDavidSlate, type DavidProp } from "./david";
+import { agreeEdge, davidBox, davidEdge, davidFor, davidSliceSide, davidTrends, gradeDavid, isDavidPlay, isDavidSlice, parseDavidSlate, type DavidProp } from "./david";
 import { gradeGame, type EspnBoxTeam } from "./grade";
 import { parsePropsPage } from "./parse";
 import { propTrends } from "./trends";
@@ -134,5 +134,35 @@ describe("Both agree, by estimated edge", () => {
     expect(davidSliceSide("h2h:agree-edge-lo", strong, 57.2)).toBeNull();
     expect(davidSliceSide("h2h:agree-edge-lo", thin, 35)).toBe("over");
     expect(davidSliceSide("h2h:agree-edge-hi", thin, 30)).toBeNull();
+  });
+});
+
+describe("David's plays", () => {
+  const strong = prop({ market: "rushing_yards", projection: 57.5, line: 67.5, over: -111, under: -109, lower: 40, upper: 80 });
+  const thin = prop({}); // David 36 over 34.5 at -120
+
+  it("is his own chance off his 80% range, less the price, at a 10% bar", () => {
+    // Same numbers as the agree case with Sam out of it: 10 under, about 74% less -109's 52.2%.
+    expect(davidEdge(strong)).toBeCloseTo(0.217, 2);
+    expect(isDavidPlay(strong)).toBe(true);
+    expect(isDavidPlay(thin)).toBe(false);
+    expect(davidEdge(prop({ projection: 34.5 }))).toBeNull();
+  });
+
+  it("tracks plays as their own slices, graded from his board", () => {
+    // Darnold attempts 49.5 over 34.5 with a 25 to 45 range: far past the total, a play; Wilson barely over, not one.
+    const props = [prop({ id: "a", projection: 49.5 }), prop({ id: "b", player: "Emanuel Wilson", market: "rushing_yards", projection: 61, line: 60.5 })];
+    const games = [{ week: 6, gameId: "2026_06_SEA_DEN", kickoff: "", props, capturedAt: "", firstSeenAt: "", first: {}, updatedAt: "", result: gradeDavid(props, box) }];
+    const t = davidTrends(games, new Map([["2026_06_SEA_DEN|samdarnold|SEA|pass_attempts", 40]]));
+    const sl = (id: string) => t.slices.find((x) => x.id === id)!;
+    expect(sl("dplay:all")).toMatchObject({ group: "dplay", n: 1, w: 1 });
+    expect(sl("dplay:pass_attempts").n).toBe(1);
+    expect(sl("dplay:rushing_yards").n).toBe(0);
+    expect(sl("dplay:sam-agree").n).toBe(1);
+    expect(sl("dboard:all").n).toBe(2);
+    expect(t.plays).toHaveLength(1);
+    expect(t.plays[0]).toMatchObject({ week: 6, actual: 51, samProj: 40, bet: { side: "over", outcome: "W" } });
+    expect(isDavidSlice("dplay:all") && isDavidSlice("dboard:all") && isDavidSlice("h2h:agree")).toBe(true);
+    expect(isDavidSlice("play:all") || isDavidSlice("david:all")).toBe(false);
   });
 });

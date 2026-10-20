@@ -295,22 +295,47 @@ function phi(z: number) {
 
 /** Edge-band cut for the "both agree" slices and the Props page's Best bets ranking. */
 export const AGREE_EDGE_HI = 0.1;
+/**
+ * David's plays: props where his estimated edge is 10%+. His board has no pick
+ * flag of its own (it lists every prop), so this is the counterpart of Sam's
+ * plays: about 10 a game on the Week 6 board, near Sam's 4 to 10. The same bar
+ * as AGREE_EDGE_HI; the dplay slices test whether it holds up.
+ */
+export const DAVID_PLAY_EDGE = 0.1;
+
+/** Chance of clearing the total from `dist` units away, reading David's 80% range as a normal band (80% spans 2.563 sd). */
+const chanceFrom = (p: DavidProp, dist: number) =>
+  phi(dist / ((p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1)) / 2.563));
+
+/**
+ * David's estimated edge on his own side: his chance of clearing DraftKings'
+ * total minus the price's break-even. Null with no side or no price. An
+ * estimate for ranking, not a calibrated probability.
+ */
+export function davidEdge(p: DavidProp): number | null {
+  const side = davidSide(p);
+  const price = side === "over" ? p.over : side === "under" ? p.under : null;
+  if (!side || price === null) return null;
+  return chanceFrom(p, Math.abs(p.projection - p.line)) - implied(price);
+}
+
+export const isDavidPlay = (p: DavidProp) => (davidEdge(p) ?? -1) >= DAVID_PLAY_EDGE;
 
 /**
  * Estimated edge when Sam and David agree: the less confident model's chance of
- * clearing DraftKings' total, reading David's 80% range as a normal band (80%
- * spans 2.563 sd), minus the price's break-even. Null when they don't agree or
- * the side has no price. An estimate for ranking, not a calibrated probability.
+ * clearing DraftKings' total minus the price's break-even. Null when they don't
+ * agree or the side has no price.
  */
 export function agreeEdge(p: DavidProp, samProj: number | undefined): number | null {
   const side = davidSide(p);
   if (!side || sideAt(samProj, p.line) !== side) return null;
   const price = side === "over" ? p.over : p.under;
   if (price === null) return null;
-  const range = p.lower !== null && p.upper !== null && p.upper > p.lower ? p.upper - p.lower : Math.max(p.line, 1);
-  const win = phi(Math.min(Math.abs(p.projection - p.line), Math.abs(samProj! - p.line)) / (range / 2.563));
-  return win - implied(price);
+  return chanceFrom(p, Math.min(Math.abs(p.projection - p.line), Math.abs(samProj! - p.line))) - implied(price);
 }
+
+/** Slice ids graded from David's board (everything else is graded from Sam's markets). */
+export const isDavidSlice = (id: string) => id.startsWith("dboard:") || id.startsWith("dplay:") || id.startsWith("h2h:");
 
 const agree = (r: DRow) => !!r.david && !!r.sam && r.david.side === r.sam.side;
 const split = (r: DRow) => !!r.david && !!r.sam && r.david.side !== r.sam.side;
@@ -324,6 +349,11 @@ export const DAVID_SLICES: [string, string, (r: DRow) => DBet | null][] = [
   ["dboard:near", "David within 10% of the total", (r) => (reachD(r.p) < 0.1 ? r.david : null)],
   ["dboard:mid", "David 10% to 25% off the total", (r) => (reachD(r.p) >= 0.1 && reachD(r.p) < 0.25 ? r.david : null)],
   ["dboard:far", "David 25%+ off the total", (r) => (reachD(r.p) >= 0.25 ? r.david : null)],
+  ["dplay:all", "David's plays (est. edge 10%+)", (r) => (isDavidPlay(r.p) ? r.david : null)],
+  ...DAVID_MARKETS.map((m): [string, string, (r: DRow) => DBet | null] => [`dplay:${m}`, `David's plays: ${DAVID_LABEL[m].toLowerCase()}`, (r) => (r.p.market === m && isDavidPlay(r.p) ? r.david : null)]),
+  ["dplay:over", "David's plays on the over", (r) => (isDavidPlay(r.p) && r.david?.side === "over" ? r.david : null)],
+  ["dplay:under", "David's plays on the under", (r) => (isDavidPlay(r.p) && r.david?.side === "under" ? r.david : null)],
+  ["dplay:sam-agree", "David's plays, Sam on the same side", (r) => (isDavidPlay(r.p) && agree(r) ? r.david : null)],
   ["h2h:sam", "Sam's side, every shared prop", (r) => (r.david ? r.sam : null)],
   ["h2h:david", "David's side, every shared prop", (r) => (r.sam ? r.david : null)],
   ["h2h:agree", "Both agree", (r) => (agree(r) ? r.david : null)],
@@ -337,7 +367,7 @@ export const DAVID_SLICES: [string, string, (r: DRow) => DBet | null][] = [
 
 export interface DavidSlice {
   id: string;
-  group: "dboard" | "h2h";
+  group: "dboard" | "dplay" | "h2h";
   label: string;
   n: number;
   w: number;
@@ -379,6 +409,16 @@ export interface DavidTrends {
   slices: DavidSlice[];
   accuracy: DavidAccuracy[];
   h2h: H2hAccuracy[];
+  /** Every graded David play, oldest first, for the results table. */
+  plays: DavidPlayResult[];
+}
+
+export interface DavidPlayResult {
+  week: number;
+  p: DavidProp;
+  bet: DBet;
+  actual: number;
+  samProj?: number;
 }
 
 function rowsOf(games: DavidWeekGame[], sam: SamIndex): DRow[] {
@@ -416,7 +456,7 @@ export function davidTrends(games: DavidWeekGame[], sam: SamIndex): DavidTrends 
     const move = moved.length ? moved.reduce((a, x) => a + (x.b.side === "over" ? x.r.p.line - x.r.first! : x.r.first! - x.r.p.line), 0) / moved.length : null;
     return {
       id,
-      group: id.startsWith("h2h:") ? "h2h" : "dboard",
+      group: id.startsWith("h2h:") ? "h2h" : id.startsWith("dplay:") ? "dplay" : "dboard",
       label,
       n: decided.length,
       w,
@@ -460,7 +500,11 @@ export function davidTrends(games: DavidWeekGame[], sam: SamIndex): DavidTrends 
       },
     ];
   });
-  return { games: games.filter((g) => g.result).length, props: rows.length, shared: rows.filter((r) => r.samProj !== undefined).length, slices, accuracy, h2h };
+  const plays = rows
+    .filter((r) => r.david && isDavidPlay(r.p))
+    .map((r) => ({ week: r.week, p: r.p, bet: r.david!, actual: r.actual, samProj: r.samProj }))
+    .sort((a, b) => a.week - b.week || a.p.kickoff.localeCompare(b.p.kickoff));
+  return { games: games.filter((g) => g.result).length, props: rows.length, shared: rows.filter((r) => r.samProj !== undefined).length, slices, accuracy, h2h, plays };
 }
 
 /** A slice's bets with their weeks, for the system's out-of-sample record. */

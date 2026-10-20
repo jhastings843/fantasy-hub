@@ -5,7 +5,7 @@ import { parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./pa
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
 import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
-import { davidFor, davidSliceBets, davidTrends, fetchDavidSlate, gradeDavid, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
+import { davidFor, davidSliceBets, davidTrends, fetchDavidSlate, gradeDavid, isDavidSlice, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
 import { MIN_BETS, propTrends, sliceBets, SLICES, Z_RETIRE, type GradedPropsGame, type PropTrends } from "./trends";
 
 // The props tracker's memory, built like the first TD tracker: Sam keeps only
@@ -369,7 +369,7 @@ export async function getPropsView(season: number): Promise<PropsView> {
   const sam = samIndex([...graded, ...Object.values(current)]);
   const samGraded = samIndex(graded.filter((x) => !x.late));
   const system = sys.map((e) => {
-    const all = e.id.startsWith("dboard:") || e.id.startsWith("h2h:") ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
+    const all = isDavidSlice(e.id) ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
     const bets = all.filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week));
     const w = bets.filter((b) => b.bet.outcome === "W").length;
     const l = bets.filter((b) => b.bet.outcome === "L").length;
@@ -416,7 +416,7 @@ export async function propsWeeks(season: number): Promise<PropsWeek[]> {
     }
   }
   for (const e of sys) {
-    const all = e.id.startsWith("dboard:") || e.id.startsWith("h2h:") ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
+    const all = isDavidSlice(e.id) ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
     for (const b of all.filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week))) {
       const w = wk(b.week);
       w.system += b.bet.net;
