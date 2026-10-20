@@ -16,7 +16,9 @@
 //
 // A totals rule is chosen exactly as the spread rule is (10+ decided games,
 // past 52.4%, highest low end of the 90% range) and until one qualifies the
-// totals are shown, never emailed as plays. Cut thresholds were fixed before
+// totals are shown, never emailed as plays. As on the spread side, only the
+// built-in agreement cut competes until the strategy review activates a
+// refinement on games after it registered (learning/model.ts "totals-cut"). Cut thresholds were fixed before
 // any grading: both models at least 3 points off the total in the NFL (a
 // field goal) and 5 in college, where totals run higher and swing wider.
 
@@ -154,6 +156,8 @@ export function totalsBacktest(
   /** ESPN opening and closing totals by game key. */
   market: Map<string, { open: number | null; close: number | null }>,
   keyOf: (g: { week: number; home: string; away: string }) => string,
+  /** Cuts allowed to be the rule: "t-agree" plus refinements the strategy review activated (policy.totalsAllowed). All when absent. */
+  allowed?: Set<string>,
 ): TotalsBacktest {
   const graded = seen.filter((g) => finals.has(keyOf(g)));
   const cuts = totalsCuts(league).map((cut) => {
@@ -163,7 +167,7 @@ export function totalsBacktest(
   });
   const rule =
     cuts
-      .filter((c) => decided(c.record) >= MIN_SAMPLE && c.record.pct > BREAK_EVEN)
+      .filter((c) => (!allowed || allowed.has(c.id)) && decided(c.record) >= MIN_SAMPLE && c.record.pct > BREAK_EVEN)
       .sort((a, b) => b.record.lo - a.record.lo || decided(b.record) - decided(a.record))[0] ?? null;
 
   const results: Result[] = [];

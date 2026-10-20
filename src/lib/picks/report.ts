@@ -24,6 +24,7 @@ import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
 import { type PicksCore, type PicksReport, type Quotes, type SizedCandidate, compose, exposureFrom, heldCandidates } from "./compose";
 import { loadActivePolicy } from "./policy-store";
+import { suInForce, totalsAllowed } from "./policy";
 import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
 import { archiveForecasts, loadForecasts } from "./forecasts";
@@ -325,7 +326,10 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     });
   }
   const s = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates) });
-  const su = suRecords(league, j.graded);
+  // Straight up uses the method in force (policy.suInForce), which only the
+  // strategy review changes, on games after registration; not this season's best record.
+  const suAll = suRecords(league, j.graded);
+  const su = { ...suAll, best: suAll.methods.find((m) => m.id === suInForce(policy, league)) ?? suAll.best };
   const rule = s.rule;
   const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));
   const totalsMarket = new Map([...closes].map(([k, c]) => [k, { open: c.totalOpen, close: c.totalClose }]));
@@ -375,7 +379,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     clvModels: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
     research: researchRows(j.graded, s.cuts, closes),
     pemCompare: league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null,
-    totalsBacktest: totalsBacktest(league, seen, points, sam, totalsMarket, key),
+    totalsBacktest: totalsBacktest(league, seen, points, sam, totalsMarket, key, totalsAllowed(policy, league)),
     totalsEdge: TOTALS_EDGE[league],
     totalsArchived: seen.length,
     posted,

@@ -8,10 +8,11 @@
 //   cut as a rule candidate, including the neighbours it generates itself
 //   (Jack, 2026-10-20: "allow it to implement things on its own so long as it
 //   is best"); change staking parameters (kind, Kelly scale,
-//   prior) inside the protected envelope (limits.ts).
+//   prior) inside the protected envelope (limits.ts); activate a totals
+//   refinement as a totals rule candidate; switch the straight-up method
+//   (both added 2026-10-20 so every Picks market learns the same way).
 //   REPORTS ONLY (a proposal for a person): send timing, parlays (the
-//   envelope forbids enabling them), totals cut choice, straight-up method,
-//   PEM's weight. Those either live in code a review must not edit, or
+//   envelope forbids enabling them), PEM's weight. Those either live in code a review must not edit, or
 //   already select themselves on forward evidence.
 //   NEVER: raise limits, change grading or accounting, rewrite issued
 //   history or old stakes, or weaken CRITERIA (pinned by learning.test.ts).
@@ -23,7 +24,8 @@
 // same quotes, the same prices.
 
 import { MAX_KELLY_SCALE, MAX_STAKE, MIN_PRIOR_GAMES, MIN_STAKE } from "../limits";
-import { BASELINE_POLICY, envelopeViolations, type PicksPolicy, type StakingPolicy } from "../policy";
+import { BASELINE_POLICY, SU_DEFAULT, envelopeViolations, suInForce, type PicksPolicy, type StakingPolicy } from "../policy";
+import { type TotalsTest, gradeTotal, readTotal, totalsCuts, totalsMatches } from "../totals";
 import { type CutTest, type Result, STEPPABLE, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
 import type { IssuedRecord } from "../issued";
@@ -63,7 +65,7 @@ export const CRITERIA = {
 
 // --------------------------------------------------------------- hypotheses
 
-export type HypothesisKind = "ats-cut" | "stake-policy" | "timing" | "parlay" | "su-method" | "pem";
+export type HypothesisKind = "ats-cut" | "totals-cut" | "stake-policy" | "timing" | "parlay" | "su-method" | "pem";
 
 export interface Hypothesis {
   id: string;
@@ -72,6 +74,7 @@ export interface Hypothesis {
   /** Frozen at registration; a change is a new hypothesis. */
   definition:
     | { kind: "ats-cut"; cutId: string; label: string; test: CutTest; parentId: string; parentTest: CutTest }
+    | { kind: "totals-cut"; cutId: string; label: string; test: TotalsTest; parentId: string; parentTest: TotalsTest }
     | { kind: "stake-policy"; staking: StakingPolicy; label: string }
     | { kind: "timing"; label: string }
     | { kind: "parlay"; label: string; minEdge: number }
@@ -120,6 +123,37 @@ export function seedHypotheses(registeredAt: string): Hypothesis[] {
  * games already seen.
  */
 export function laterHypotheses(registeredAt: string): Hypothesis[] {
+  const markets: Hypothesis[] = (["nfl", "cfb"] as const).flatMap((league) => {
+    const cuts = totalsCuts(league);
+    const parent = cuts.find((c) => c.id === "t-agree")!;
+    const totals = cuts
+      .filter((c) => c.id !== parent.id)
+      .map(
+        (c): Hypothesis => ({
+          id: `${league}:ou:${c.id}`,
+          kind: "totals-cut",
+          league,
+          definition: { kind: "totals-cut", cutId: c.id, label: c.label, test: c.test, parentId: parent.id, parentTest: parent.test },
+          actionable: true,
+          registeredAt,
+          status: "collecting",
+          origin: "Jack, 2026-10-20: every market on the same loop; a totals refinement vs both models agreeing",
+        }),
+      );
+    const su = SU_METHODS.map(
+      (m): Hypothesis => ({
+        id: `${league}:su:${m.id}`,
+        kind: "su-method",
+        league,
+        definition: { kind: "su-method", method: m.id, vs: "in-force", label: `${m.label} vs the method in force, straight up` },
+        actionable: true,
+        registeredAt,
+        status: "collecting",
+        origin: "Jack, 2026-10-20: every market on the same loop; a straight-up method vs the one in force",
+      }),
+    );
+    return [...totals, ...su];
+  });
   return [
     {
       id: "both:stake:kelly025",
@@ -131,6 +165,7 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
       status: "collecting",
       origin: "Jack, 2026-10-10: live sizing went flat 1u; quarter Kelly runs in shadow and needs forward results plus calibration to come back",
     },
+    ...markets,
   ];
 }
 
@@ -433,12 +468,42 @@ export function sizingComparison(x: SizingInputs, challenger: StakingPolicy, inc
   };
 }
 
+/** Ways of picking a straight-up winner that pick every game (engine.suRecords' "full" methods). */
+export const SU_METHODS = [
+  { id: "avg", label: "Models' average" },
+  { id: "sam", label: "Sam's winner" },
+  { id: "david", label: "David's winner" },
+  { id: "vegas", label: "Vegas favorite" },
+] as const;
+
+/** A totals cut at one snapshot, 1u risked at the quoted over/under price. */
+export function scoreTotal(test: TotalsTest, s: ForecastSnapshot, o: Opportunity): Scored {
+  const line = s.ref?.total;
+  if (line === undefined || s.samTotal === undefined || s.davidTotal === undefined || !o.final) return none;
+  const r = readTotal(line, s.samTotal, s.davidTotal);
+  if (!totalsMatches(r, test) || !r.side) return none;
+  const price = r.side === "over" ? s.ref?.overPrice : s.ref?.underPrice;
+  if (price === undefined) return none;
+  const result = gradeTotal(o.final.home + o.final.away, line, r.side);
+  return { bet: true, units: payout(result, 1, price), risked: 1, result };
+}
+
+/** A straight-up method's call at the last pregame snapshot: +1 right, -1 wrong (pool scoring), nothing on a tie. */
+export function scoreSu(method: string, o: Opportunity): Scored {
+  const p = suPick(method, o.last.sam, o.last.david, o.last.ref?.line);
+  if (!p || !o.final || o.final.home === o.final.away) return none;
+  const right = (p.side === "home") === o.final.home > o.final.away;
+  return { bet: true, units: right ? 1 : -1, risked: 1, result: right ? "W" : "L" };
+}
+
 export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
   const opps = after(h, x.opps).filter((o) => h.league === "both" || o.league === h.league);
   const d = h.definition;
   switch (d.kind) {
     case "ats-cut":
       return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) }))) };
+    case "totals-cut":
+      return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) }))) };
     case "timing": {
       const t = x.ruleTest[h.league as League];
       if (!t) return { id: h.id, note: "no rule in force" };
@@ -478,6 +543,11 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       return { id: h.id, comparison: compare(pairs), note: "estimated parlay payouts (product of quoted leg prices)" };
     }
     case "su-method": {
+      if (d.vs === "in-force") {
+        const inc = suInForce(x.active, h.league as "nfl" | "cfb");
+        if (inc === d.method) return { id: h.id, note: "this is the method in force" };
+        return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreSu(d.method, o), inc: scoreSu(inc, o) }))), note: `vs ${inc}, +1 right / -1 wrong per game` };
+      }
       // Accuracy and confidence-pool points (rank by margin within the week), challenger vs incumbent method.
       const pts = (method: string, os: Opportunity[]) => {
         const picks = os.flatMap((o) => {
@@ -577,6 +647,14 @@ export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, a
     // League-scoped: the same research id can mean different cuts per league.
     const scoped = `${h.league}:${d.cutId}`;
     return { ...active, id, createdAt: at, atsCandidates: [...new Set([...active.atsCandidates, scoped])], summary: `${active.summary} + ${h.league.toUpperCase()} candidate cut ${d.label}` };
+  }
+  if (d.kind === "totals-cut") {
+    const scoped = `${h.league}:${d.cutId}`;
+    return { ...active, id, createdAt: at, totalsCandidates: [...new Set([...(active.totalsCandidates ?? []), scoped])], summary: `${active.summary} + ${h.league.toUpperCase()} totals candidate ${d.label}` };
+  }
+  if (d.kind === "su-method" && d.vs === "in-force") {
+    const league = h.league as "nfl" | "cfb";
+    return { ...active, id, createdAt: at, suMethod: { ...SU_DEFAULT, ...active.suMethod, [league]: d.method }, summary: `${active.summary}; ${league.toUpperCase()} straight up by ${d.method}` };
   }
   if (d.kind === "stake-policy") {
     return { ...active, id, createdAt: at, staking: { ...d.staking }, summary: `${d.label}; ${active.atsCandidates.length ? `candidates: ${active.atsCandidates.join(", ")}` : "built-in cuts only"}; parlays off` };

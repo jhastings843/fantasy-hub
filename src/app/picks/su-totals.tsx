@@ -33,7 +33,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
           {r.week ? `Week ${r.week} straight-up picks` : "Straight-up picks"}
         </h2>
         <p className={s.p}>
-          {`${r.league === "nfl" ? "For the Weekly payout pool, use the entry above. This list is ranked" : "Ranked"} for a confidence pool, most sure first. Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l}, its best record)` : ""}. Pick'em only: no stake, and not counted in units. Bands describe the projected margin, not a probability.`}
+          {`${r.league === "nfl" ? "For the Weekly payout pool, use the entry above. This list is ranked" : "Ranked"} for a confidence pool, most sure first. Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l} this season), the method in force: it changes only when another method beats it on later games at the Tuesday review` : ""}. Pick'em only: no stake, and not counted in units. Bands describe the projected margin, not a probability.`}
         </p>
       </div>
       {upcoming.length === 0 && (

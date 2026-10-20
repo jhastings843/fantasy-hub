@@ -6,7 +6,7 @@ import type { League } from "../parse";
 import type { CutTest } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
 import type { IssuedRecord } from "../issued";
-import { DEFAULT_POLICY, type PicksPolicy } from "../policy";
+import { DEFAULT_POLICY, suInForce, type PicksPolicy } from "../policy";
 import {
   CRITERIA,
   type Comparison,
@@ -24,6 +24,8 @@ import {
   opportunities,
   propose,
   scoreCut,
+  scoreSu,
+  scoreTotal,
   seedHypotheses,
   shouldRollBack,
   sizingComparison,
@@ -195,6 +197,15 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
         const own = since.filter((o) => o.league === h.league);
         c = compare(own.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) })));
       }
+    } else if ((active.totalsCandidates ?? []).some((id) => !(before.totalsCandidates ?? []).includes(id)) && prev.activatedFrom) {
+      const h = hs.find((y) => y.id === prev.activatedFrom);
+      if (h?.definition.kind === "totals-cut") {
+        const d = h.definition;
+        c = compare(since.filter((o) => o.league === h.league).map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) })));
+      }
+    } else if ((["nfl", "cfb"] as const).some((l) => suInForce(active, l) !== suInForce(before, l))) {
+      const l = (["nfl", "cfb"] as const).find((y) => suInForce(active, y) !== suInForce(before, y))!;
+      c = compare(since.filter((o) => o.league === l).map((o) => ({ o, ch: scoreSu(suInForce(active, l), o), inc: scoreSu(suInForce(before, l), o) })));
     } else if (JSON.stringify(active.staking) !== JSON.stringify(before.staking)) {
       // The same replay as promotion: what each sizing would actually have
       // bet through the limits since activation. Rollback keeps the plain

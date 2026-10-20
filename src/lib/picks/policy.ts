@@ -29,7 +29,23 @@ export interface PicksPolicy {
   parlays: { enabled: false };
   /** Research cuts the review has activated as ATS rule candidates, league-scoped ("nfl:dog-band-a"). */
   atsCandidates: string[];
+  /** Totals refinements the review has activated as rule candidates, league-scoped ("nfl:t-under"). "t-agree" is always one. */
+  totalsCandidates?: string[];
+  /** The straight-up method the review switched to, per league; absent = SU_DEFAULT. */
+  suMethod?: { nfl?: string; cfb?: string };
 }
+
+/**
+ * The straight-up method in force when straight up joined the learning loop
+ * (2026-10-20): each league's best season record then (NFL the models'
+ * average, college the Vegas favorite). From here a method changes only when a
+ * challenger beats it on games after registration.
+ */
+export const SU_DEFAULT = { nfl: "avg", cfb: "vegas" } as const;
+export const suInForce = (p: PicksPolicy, league: "nfl" | "cfb"): string => p.suMethod?.[league] ?? SU_DEFAULT[league];
+/** Totals cuts allowed to be the rule: the built-in agreement cut plus activated refinements. */
+export const totalsAllowed = (p: PicksPolicy, league: "nfl" | "cfb"): Set<string> =>
+  new Set(["t-agree", ...(p.totalsCandidates ?? []).filter((x) => x.startsWith(`${league}:`)).map((x) => x.slice(league.length + 1))]);
 
 export const BASELINE_POLICY: PicksPolicy = {
   id: "p1",

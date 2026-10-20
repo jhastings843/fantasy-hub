@@ -21,8 +21,8 @@ function marketOf(id: string): Market {
 
 const EMPTY: { [k in Market]: string } = {
   ats: "",
-  su: "No straight-up hypotheses are registered yet.",
-  ou: "No totals hypotheses yet: totals are tracking only until a cut has 10+ decided games and a winning rate.",
+  su: "Straight-up hypotheses register at the next Tuesday review: each method against the one in force, on later games.",
+  ou: "Totals hypotheses register at the next Tuesday review: each refinement against both models agreeing, on later games.",
 };
 
 export async function LearningPanel({ league, market }: { league: League; market: Market }) {
@@ -134,6 +134,9 @@ export async function LearningPanel({ league, market }: { league: League; market
           <Link href={href(league, "ats", "research")}>Spreads research</Link>.
         </p>
       )}
+      <p className={s.thin}>
+        <Link href="/learning">Every section&apos;s learning on one page</Link>, Picks and Props.
+      </p>
     </section>
   );
 }

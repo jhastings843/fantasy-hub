@@ -1,5 +1,13 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## Every section accounted for: totals and straight up join the Picks loop, /learning overview (2026-10-20)
+- Jack: "make sure all sections are accounted for". Audit: spreads (NFL, CFB, NBA), NBA totals and all props sections already learned forward; football TOTALS (rule picked in sample from 4 cuts) and football STRAIGHT UP (method = season's best record) did not.
+- Picks review (learning/model.ts): new kind "totals-cut", ids `<league>:ou:<t-over|t-under|t-both-N>` vs `t-agree`, scored by `scoreTotal` at the first pregame snapshot's total and over/under price; `su-method` with `vs: "in-force"`, ids `<league>:su:<avg|sam|david|vegas>`, `scoreSu` +1/-1 at the last pregame snapshot. Both actionable, registered by `laterHypotheses` at the next Tuesday review (Oct 27), same CRITERIA. Promotion writes `policy.totalsCandidates` / `policy.suMethod` (optional fields; old policies read as before). Rollback (review.ts) also covers a new totals candidate and a changed SU method.
+- Behavior: `report.ts` su.best = `suInForce(policy)` (SU_DEFAULT nfl avg, cfb vegas = the in-sample best on 2026-10-20, so nothing changed today); totals rule only from `totalsAllowed` (t-agree + activated). No totals rule had qualified, so nothing changed today either.
+- NBA straight up: record only on purpose (nothing consumes it: no pool, no moneyline bets). NBA first basket: listed as not built, waiting on Sam.
+- `/learning` (src/app/learning/page.tsx): one card per section (16) with its loop, what's live, what's testing, last review. Linked from props LearningBlock and the Picks LearningPanel. Not in the nav.
+- Astra reviewed the diff: no bugs found.
+
 ## Learning: one engine for props-style sections (2026-10-20, 7c7d1da, deployed)
 - Jack's question: should every section learn on its own or bunched by sport? Answer: own evidence per section, one shared engine. Astra reviewed the plan and pushed back (gates must be per section; props are correlated within a game; First TD is sparse; don't rewrite stored data; staged). Jack: build in full on those terms.
 - `src/lib/learning/engine.ts` (pure) + `store.ts` (Redis `learn:v1:<section>:<season>:state` and `:journal`). Sections: `nfl-props`, `nba-props` (props/learn.ts, `propCandidates`, `parentOf`), `nfl-firsttd` (firsttd/learn.ts, the `MARKET_SLICES` money checks at Kalshi's ask; count-vs-chances checks stay report-only). Football and NBA picks keep their own loop in lib/picks/learning.

@@ -2,6 +2,7 @@
 // (NFL props, NBA props, First TD): the gate in words, what is live, what is
 // closest, and the journal.
 
+import Link from "next/link";
 import type { SectionView } from "@/lib/learning/engine";
 import { whenEt } from "../picks/ui";
 import s from "../picks/picks.module.css";
@@ -21,6 +22,9 @@ export function LearningBlock({ v, unit = "bets" }: { v: SectionView; unit?: str
     <>
       <div className={s.sectionHead}>
         <h3 className={s.h3}>Learning</h3>
+        <Link href="/learning" className={s.dim} style={{ fontSize: 13 }}>
+          Every section&apos;s learning on one page
+        </Link>
         <p className={s.p}>
           {`Every slice below is tracked from the day it was first seen, on later games only. One goes live when it has ${g.minGames}+ games over ${g.minWeeks}+ weeks and ${g.minBets}+ ${unit}${
             g.minWins ? `, ${g.minWins}+ winners` : ""
