@@ -941,7 +941,6 @@ function PropsPanel({ sp }: { sp: Sports }) {
 
 function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const p = v.snapshot?.phil;
-  const k = v.snapshot?.kalshi;
   const kp = v.snapshot?.kalshiPhil;
   const wx = v.snapshot?.weather;
   const books = v.snapshot?.books ?? [];
@@ -1011,13 +1010,6 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
             {kp.settled > 0
               ? philChart(kp, 230, 360)
               : <span className={m.sub}>{`No settled bets yet. ${kp.open.length} open, ${usd(kp.cash)} cash. ${kp.health}.`}</span>}
-          </div>
-        )}
-        {k && !k.error && (
-          <div className={m.panel}>
-            <div className={m.panelHead}><h2 className={m.panelTitle}>Phil&apos;s Kalshi shadow</h2><Link className={m.panelLink} href={href("kalshi")}>What it&apos;s tracking</Link></div>
-            <span className={m.big}>{k.open}</span>
-            <span className={m.sub}>{`open calls, ${k.settled} settled${k.settledBets ? `, shadow P&L ${usd(k.pnl, true)}` : ""}. Nothing placed; kept apart from Phil's Polymarket record.`}</span>
           </div>
         )}
         {v.sports && <PicksPanel sp={v.sports} />}
