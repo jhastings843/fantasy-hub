@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { VIEWS, type View } from "../picks/ui";
 import { FirstTdResearch, FirstTdResults, FirstTdWeek } from "./firsttd";
-import { NbaPropsWeek, PropsResearch, PropsResults, PropsWeek } from "./playerprops";
+import {
+  NbaPropsWeek,
+  PropsResearch,
+  PropsResults,
+  PropsWeek,
+} from "./playerprops";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
 import { getFirstTdView } from "@/lib/firsttd/store";
@@ -14,12 +19,13 @@ import s from "../picks/picks.module.css";
 // here is tracked and graded until a slice earns its way into the system.
 
 export type PropsMarket = "pp" | "ftd" | "nba";
+// NFL markets; NBA is its own sport tab (player props only).
 const MARKETS: { id: PropsMarket; label: string }[] = [
   { id: "pp", label: "Player props" },
   { id: "ftd", label: "First TD" },
-  { id: "nba", label: "NBA props" },
 ];
-export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" ? x : "pp");
+export const parsePropsMarket = (x: unknown): PropsMarket =>
+  x === "ftd" || x === "nba" ? x : "pp";
 
 function href(m: PropsMarket, v: View) {
   const q = new URLSearchParams();
@@ -30,33 +36,77 @@ function href(m: PropsMarket, v: View) {
 }
 
 /** The NFL season a date belongs to: January to July is the season before. */
-const seasonOf = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
+const seasonOf = (d: Date) =>
+  d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear();
 
-export default async function PropsView({ market, view }: { market: PropsMarket; view: View }) {
+export default async function PropsView({
+  market,
+  view,
+}: {
+  market: PropsMarket;
+  view: View;
+}) {
   const season = seasonOf(new Date());
-  const [pv, fv] = await Promise.all([getPropsView(season).catch(() => null), getFirstTdView(season).catch(() => null)]);
+  const [pv, fv] = await Promise.all([
+    getPropsView(season).catch(() => null),
+    getFirstTdView(season).catch(() => null),
+  ]);
   const entries = propsSearchIndex(pv, fv);
   return (
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.header}>
           <div className={s.headRow}>
-            <span className={s.eyebrow}>{market === "nba" ? `NBA ${season}-${String(season + 1).slice(2)}` : `NFL ${season}`}</span>
+            <nav className={s.subnav} aria-label="Sport">
+              <Link
+                href={href("pp", view)}
+                aria-current={market !== "nba" ? "page" : undefined}
+              >
+                NFL
+              </Link>
+              <Link
+                href={href("nba", view)}
+                aria-current={market === "nba" ? "page" : undefined}
+              >
+                NBA
+              </Link>
+            </nav>
+            <span className={s.eyebrow}>
+              {market === "nba"
+                ? `NBA ${season}-${String(season + 1).slice(2)}`
+                : `NFL ${season}`}
+            </span>
           </div>
           <h1 className={s.h1}>Props</h1>
           {market !== "nba" && entries.length > 0 && (
-            <WeekSearch entries={entries} label="Search this week: Sam's props, David's board and first TD" placeholder="Player or team, e.g. Kelce or Chiefs" />
+            <WeekSearch
+              entries={entries}
+              label="Search this week: Sam's props, David's board and first TD"
+              placeholder="Player or team, e.g. Kelce or Chiefs"
+            />
           )}
-          <nav className={s.tabs} aria-label="Market">
-            {MARKETS.map((m) => (
-              <Link key={m.id} href={href(m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.tab}>
-                {m.label}
-              </Link>
-            ))}
-          </nav>
+          {market !== "nba" && (
+            <nav className={s.tabs} aria-label="Market">
+              {MARKETS.map((m) => (
+                <Link
+                  key={m.id}
+                  href={href(m.id, view)}
+                  aria-current={m.id === market ? "page" : undefined}
+                  className={s.tab}
+                >
+                  {m.label}
+                </Link>
+              ))}
+            </nav>
+          )}
           <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
             {VIEWS.map((v) => (
-              <Link key={v.id} href={href(market, v.id)} aria-current={v.id === view ? "page" : undefined} className={s.tab}>
+              <Link
+                key={v.id}
+                href={href(market, v.id)}
+                aria-current={v.id === view ? "page" : undefined}
+                className={s.tab}
+              >
                 {v.label}
               </Link>
             ))}
@@ -64,19 +114,39 @@ export default async function PropsView({ market, view }: { market: PropsMarket;
         </header>
 
         {market === "pp" && view === "week" && <PropsWeek season={season} />}
-        {market === "pp" && view === "results" && <PropsResults season={season} />}
-        {market === "pp" && view === "research" && <PropsResearch season={season} />}
+        {market === "pp" && view === "results" && (
+          <PropsResults season={season} />
+        )}
+        {market === "pp" && view === "research" && (
+          <PropsResearch season={season} />
+        )}
         {market === "ftd" && view === "week" && <FirstTdWeek season={season} />}
-        {market === "ftd" && view === "results" && <FirstTdResults season={season} />}
-        {market === "ftd" && view === "research" && <FirstTdResearch season={season} />}
-        {market === "nba" && view === "week" && <NbaPropsWeek season={season} />}
-        {market === "nba" && view === "results" && <PropsResults season={season} league="nba" />}
-        {market === "nba" && view === "research" && <PropsResearch season={season} league="nba" />}
+        {market === "ftd" && view === "results" && (
+          <FirstTdResults season={season} />
+        )}
+        {market === "ftd" && view === "research" && (
+          <FirstTdResearch season={season} />
+        )}
+        {market === "nba" && view === "week" && (
+          <NbaPropsWeek season={season} />
+        )}
+        {market === "nba" && view === "results" && (
+          <PropsResults season={season} league="nba" />
+        )}
+        {market === "nba" && view === "research" && (
+          <PropsResearch season={season} league="nba" />
+        )}
 
         <footer className={s.footer}>
           <span>
-            Sources: <a href="https://samthemodelman.smmodel.workers.dev/nfl/">Sam&apos;s Models</a> (NFL and NBA props pages, first TD pages), Rotowire projections via
-            Sleeper, ESPN projections and DraftKings lines via ESPN, Kalshi first TD prices, ESPN box scores and scoring plays. Model output and a record of it, not betting advice.
+            Sources:{" "}
+            <a href="https://samthemodelman.smmodel.workers.dev/nfl/">
+              Sam&apos;s Models
+            </a>{" "}
+            (NFL and NBA props pages, first TD pages), Rotowire projections via
+            Sleeper, ESPN projections and DraftKings lines via ESPN, Kalshi
+            first TD prices, ESPN box scores and scoring plays. Model output and
+            a record of it, not betting advice.
           </span>
         </footer>
       </div>

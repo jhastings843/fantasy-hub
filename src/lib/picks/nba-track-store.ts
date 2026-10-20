@@ -1,9 +1,15 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
 import { nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
-import { getNbaBoard, NBA_SOURCES, type NbaBoard } from "./nba-store";
+import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard } from "./nba-store";
 import { parseNbaScoreboard } from "./nba";
 import {
+  allocateNbaDay,
+  nbaBets,
+  nbaRoom,
+  nbaStake,
+  tierOf,
+  type NbaRoom,
   cutRecord,
   NBA_CUTS,
   nbaGate,
@@ -91,6 +97,40 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
     report.saved.push(`${t.away}@${t.home}`);
   }
 
+  // 1b. Stakes, only once NBA is live: each game day's untipped tier bets are
+  // re-allocated inside the running window and the daily cap; a game keeps
+  // the stake it had at its last pregame copy.
+  try {
+    const all = [...have.values()];
+    const rows = settledRows(all);
+    const hyps = await loadHyps(season);
+    const rule = nbaRule(rows, "ats", hyps.filter((h) => h.status === "active").map((h) => h.id));
+    const live = nbaGate(rule).live;
+    const open = all.filter((g) => new Date(g.tip) > now);
+    for (const day of [...new Set(open.map((g) => g.day))].sort()) {
+      const todays = open.filter((g) => g.day === day);
+      const cands = todays.flatMap((g) => {
+        const b = nbaBets(g).find((x) => x.market === "ats");
+        const tier = b ? tierOf(b, rule) : null;
+        const rec = tier === 1 ? rule.tier1 : tier === 2 ? rule.tier2 : null;
+        const stake = live && b && rec ? nbaStake(rec, b.price) : null;
+        return stake ? [{ id: g.id, stake, edge: b!.edge }] : [];
+      });
+      const room = nbaRoom(all, day, todays.map((g) => g.id));
+      const got = allocateNbaDay(cands, room.room);
+      for (const g of todays) {
+        const stake = got.get(g.id);
+        if ((g.stake ?? undefined) === stake) continue;
+        const t: NbaTracked = { ...g, stake };
+        if (stake === undefined) delete t.stake;
+        await redis.hset(gamesKey(season), { [g.id]: t });
+        have.set(g.id, t);
+      }
+    }
+  } catch (e) {
+    report.problems.push(`NBA stakes: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   // 2. Finals, from ESPN's scoreboard for each day with an unsettled game that has tipped.
   const days = [...new Set([...have.values()].filter((g) => !g.final && new Date(g.tip) < now).map((g) => g.day))];
   for (const day of days) {
@@ -148,6 +188,8 @@ export interface NbaPicksView {
   hyps: (NbaHypothesis & { label: string; parentLabel: string; cmp: NbaComparison })[];
   journal: NbaJournalEntry[];
   lastReviewAt: string | null;
+  /** Today's room under the running window and the daily cap (Eastern date). */
+  room: NbaRoom & { day: string };
 }
 
 /** Everything the NBA Results and Research views show, from Redis only. */
@@ -175,5 +217,6 @@ export async function getNbaPicksView(season = nbaSeasonOfDate(new Date())): Pro
       .sort((a, b) => a.id.localeCompare(b.id)),
     journal: jr ?? [],
     lastReviewAt: state?.lastReviewAt ?? null,
+    room: { ...nbaRoom(games, etDay(new Date())), day: etDay(new Date()) },
   };
 }

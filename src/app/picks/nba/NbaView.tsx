@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard, type NbaBoardGame } from "@/lib/picks/nba-store";
 import { getNbaPicksView, type NbaPicksView } from "@/lib/picks/nba-track-store";
-import { nbaBets, nbaStake, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord } from "@/lib/picks/nba-track";
+import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord } from "@/lib/picks/nba-track";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
 import { href, kickoffEt, line, price, rec, units, VIEWS, whenEt, type View } from "../ui";
@@ -56,7 +56,8 @@ function GameCard({ g, v }: { g: NbaBoardGame; v: NbaPicksView | null }) {
   const bet = boardBet(g);
   const tier = bet && v && g.state === "pre" ? tierOf(bet, v.ats) : null;
   const tierRec = tier === 1 ? v?.ats.tier1 : tier === 2 ? v?.ats.tier2 : null;
-  const stake = tier && tierRec && v?.gate.live ? nbaStake(tierRec, bet?.price) : null;
+  // The stake the running window gave it (set only once NBA is live).
+  const stake = tier && tierRec && v?.gate.live ? (v.games.find((x) => x.id === g.id)?.stake ?? null) : null;
   const pickTeam = r ? (r.side === "home" ? g.home : g.away) : null;
   const pickLine = r && g.line ? (r.side === "home" ? g.line.home : -g.line.home) : null;
   const pickPrice = r && g.line ? (r.side === "home" ? g.line.homePrice : g.line.awayPrice) : undefined;
@@ -245,8 +246,14 @@ function NbaResearch({ v }: { v: NbaPicksView }) {
         </table>
       </div>
       <p className={`${s.notice} ${s.dim}`}>
-        {`Set Oct 19, before any NBA record existed. Once live, NBA has its own limits, separate from football's 30u: ${NBA_LIMITS.MIN_STAKE}u to ${NBA_LIMITS.MAX_STAKE}u a bet (under ${NBA_LIMITS.MIN_STAKE}u is not a bet), ${NBA_LIMITS.PER_GAME}u a game, ${NBA_LIMITS.WEEKLY}u a week, quarter Kelly on the tier record pulled toward 50% over ${NBA_LIMITS.SHRINK_GAMES} games. Gate: ${NBA_GO_LIVE.MIN_GAMES}+ games over ${NBA_GO_LIVE.MIN_WEEKS}+ weeks.`}
+        {`Set Oct 19, before any NBA record existed. Once live, NBA has its own limits, separate from football's 30u: ${NBA_LIMITS.MIN_STAKE}u to ${NBA_LIMITS.MAX_STAKE}u a bet (under ${NBA_LIMITS.MIN_STAKE}u is not a bet), ${NBA_LIMITS.PER_GAME}u a game, ${NBA_LIMITS.DAILY}u a day, and ${NBA_LIMITS.WINDOW_UNITS}u across any running ${NBA_LIMITS.WINDOW_DAYS} days (a bet's units come back a week after its game, not all at once on Monday, so a strong Sunday isn't left with nothing; when a day's room is short the biggest edges go first), quarter Kelly on the tier record pulled toward 50% over ${NBA_LIMITS.SHRINK_GAMES} games. Gate: ${NBA_GO_LIVE.MIN_GAMES}+ games over ${NBA_GO_LIVE.MIN_WEEKS}+ weeks.`}
       </p>
+
+      {v.gate.live && (
+        <p className={s.notice}>
+          {`Today: ${v.room.today}u of ${NBA_LIMITS.DAILY}u used, ${v.room.window + v.room.today}u of ${NBA_LIMITS.WINDOW_UNITS}u in the running ${NBA_LIMITS.WINDOW_DAYS} days, ${v.room.room}u left today.${v.room.frees ? ` The oldest stake frees up ${v.room.frees.slice(4, 6)}/${v.room.frees.slice(6)}.` : ""}`}
+        </p>
+      )}
 
       <CutTable title="Spreads: every cut" rows={by("ats")} v={v} />
       <CutTable title="Totals: every cut" rows={by("ou")} v={v} />

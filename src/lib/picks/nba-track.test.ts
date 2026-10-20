@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareCut, cutRecord, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
+import { allocateNbaDay, compareCut, cutRecord, nbaRoom, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
 
 const snap = (x: Partial<NbaSnap> = {}): NbaSnap => ({ at: "2026-10-20T12:00:00Z", line: -4.5, homePrice: -110, awayPrice: -110, total: 230.5, overPrice: -110, underPrice: -110, mlHome: -190, mlAway: 160, model: -7, modelTotal: 226, ...x });
 const game = (i: number, x: Partial<NbaTracked> = {}, s: Partial<NbaSnap> = {}): NbaTracked => ({
@@ -111,5 +111,40 @@ describe("the NBA learning review", () => {
     expect(reviewDue(undefined, now)).toBe(true);
     expect(reviewDue("2026-10-24T12:00:00Z", now)).toBe(false);
     expect(reviewDue("2026-10-20T12:00:00Z", now)).toBe(true);
+  });
+});
+
+describe("NBA's running week", () => {
+  const placed = (day: string, stake: number, id = day) => ({ id, day, stake });
+
+  it("caps any running 7 days at 10u and any day at 4u", () => {
+    // Mon-Wed Oct 19-21: 4u, 4u, 2u. Thursday has nothing left.
+    const p = [placed("20261019", 4), placed("20261020", 4), placed("20261021", 2)];
+    expect(nbaRoom(p, "20261022")).toMatchObject({ window: 10, room: 0, frees: "20261026" });
+    // The next Monday the Oct 19 stake has rolled off: 4u back (not all 10u, as a calendar week would give).
+    expect(nbaRoom(p, "20261026")).toMatchObject({ window: 6, room: 4 });
+  });
+
+  it("leaves a quiet week's Sunday its full day", () => {
+    const p = [placed("20261019", 1), placed("20261021", 2)];
+    expect(nbaRoom(p, "20261025").room).toBe(4);
+  });
+
+  it("re-allocates the day's untipped games instead of counting them", () => {
+    const p = [placed("20261025", 3, "g1"), placed("20261025", 1, "g2")];
+    expect(nbaRoom(p, "20261025").room).toBe(0);
+    expect(nbaRoom(p, "20261025", ["g1", "g2"]).room).toBe(4);
+  });
+
+  it("gives short room to the biggest edges, never rounding a bet up to 1u", () => {
+    const got = allocateNbaDay(
+      [
+        { id: "a", stake: 2, edge: 1.5 },
+        { id: "b", stake: 2, edge: 4 },
+        { id: "c", stake: 2, edge: 3 },
+      ],
+      3.5,
+    );
+    expect(Object.fromEntries(got)).toEqual({ b: 2, c: 1.5 });
   });
 });

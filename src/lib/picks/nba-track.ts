@@ -40,6 +40,8 @@ export interface NbaSnap {
 }
 
 export interface NbaTracked {
+  /** Units staked, set only once NBA is live, frozen at the last pregame copy. Counts toward the running window. */
+  stake?: number;
   /** ESPN event id. */
   id: string;
   /** Eastern game date, YYYYMMDD. */
@@ -249,12 +251,19 @@ export const NBA_GO_LIVE = {
  * NBA's own envelope once live, separate from football's: nothing here
  * counts against the 30u weekly or outstanding caps, and football never
  * counts against these.
+ *
+ * The 10u is a RUNNING week (Jack, 2026-10-19), not Monday to Sunday: at most
+ * WINDOW_UNITS staked on games in any WINDOW_DAYS days, so a bet's units come
+ * back a week after its game instead of all at once on Monday. DAILY caps a
+ * single day, so a busy Tuesday can't spend what a strong Sunday needs.
  */
 export const NBA_LIMITS = {
   MIN_STAKE: 1, // a cutoff: anything sizing under 1u is not a bet
   MAX_STAKE: 3,
   PER_GAME: 3,
-  WEEKLY: 10,
+  WINDOW_UNITS: 10,
+  WINDOW_DAYS: 7,
+  DAILY: 4,
   KELLY: 0.25,
   /** Tier record pulled toward 50% over this many games, as football's p1 does. */
   SHRINK_GAMES: 100,
@@ -292,6 +301,59 @@ export function nbaStake(tier: NbaCutRecord, price: number | undefined): number 
   const raw = f * NBA_LIMITS.KELLY * 100; // 1u = 1% of the bankroll
   if (raw < NBA_LIMITS.MIN_STAKE) return null;
   return Math.min(NBA_LIMITS.MAX_STAKE, NBA_LIMITS.PER_GAME, Math.floor(raw * 4) / 4);
+}
+
+/** YYYYMMDD plus or minus whole days. */
+const shiftDay = (day: string, by: number) => {
+  const d = new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)) + by));
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+};
+
+export interface NbaRoom {
+  /** Units staked on games in the running window that ends with `day`, not counting `day` itself. */
+  window: number;
+  /** Units already staked on `day`. */
+  today: number;
+  /** What `day` can still take: the smaller of the daily and running-window room. */
+  room: number;
+  /** When the oldest stake in the window drops out (YYYYMMDD), if any. */
+  frees: string | null;
+}
+
+/**
+ * Room for one game day under the running window and the daily cap.
+ * `placed` is every staked game; games in `reopen` (that day's not-yet-tipped
+ * games, about to be re-allocated) don't count against it.
+ */
+export function nbaRoom(placed: { id: string; day: string; stake?: number }[], day: string, reopen: string[] = []): NbaRoom {
+  const start = shiftDay(day, -(NBA_LIMITS.WINDOW_DAYS - 1));
+  const staked = placed.filter((p) => (p.stake ?? 0) > 0 && !reopen.includes(p.id) && p.day >= start && p.day <= day);
+  const window = staked.filter((p) => p.day < day).reduce((a, p) => a + p.stake!, 0);
+  const today = staked.filter((p) => p.day === day).reduce((a, p) => a + p.stake!, 0);
+  const oldest = staked.map((p) => p.day).sort()[0];
+  return {
+    window,
+    today,
+    room: Math.max(0, Math.min(NBA_LIMITS.DAILY - today, NBA_LIMITS.WINDOW_UNITS - window - today)),
+    frees: oldest ? shiftDay(oldest, NBA_LIMITS.WINDOW_DAYS) : null,
+  };
+}
+
+/**
+ * One day's stakes inside the room: biggest edge first, each bet at most its
+ * own Kelly stake, cut to quarter units; a bet the leftover room can't cover
+ * at MIN_STAKE is dropped, never rounded up.
+ */
+export function allocateNbaDay(cands: { id: string; stake: number; edge: number }[], room: number): Map<string, number> {
+  const out = new Map<string, number>();
+  let left = room;
+  for (const c of [...cands].sort((a, b) => b.edge - a.edge || a.id.localeCompare(b.id))) {
+    const s = Math.floor(Math.min(c.stake, left) * 4) / 4;
+    if (s < NBA_LIMITS.MIN_STAKE) continue;
+    out.set(c.id, s);
+    left -= s;
+  }
+  return out;
 }
 
 /* -------------------------------------------------------------- learning -- */
