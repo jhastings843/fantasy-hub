@@ -2,6 +2,9 @@
 
 
 
+## NBA first basket: waiting on Sam (2026-10-20)
+- Jack wants a First Basket section under NBA props, like First TD. Sam's NBA board shows "FIRST BASKET — LOCKED" (span.bdbtn.lk, no href) on every game; /nba/firstbasket/, /nba/fb/, /nba/first/ all 404. Jack: don't build until the page is live. Then: parse from the real markup, save pregame copies (pages likely vanish like NFL firsttd), grade from ESPN play-by-play.
+
 ## Picks learning: generated cuts act on their own (2026-10-20, 22c398f)
 - Jack: "allow it to implement things on its own so long as it is best." Neighbour cuts the Tuesday review generates (`propose`, e.g. `cfb:ats:both-edge-3~minBothEdge2`) are now `actionable: true` and pass through the same frozen CRITERIA as built-in research cuts (30+ matched games, 3+ weeks, t >= 1.645, CLV and drawdown checks, auto rollback). `engine.derivedCut` rebuilds them from their id (`<research cut>~<minLine|maxLine|minBothEdge|minAvgEdge><value>`, chains allowed), so activation needs no code change. Generated cuts already collecting are flipped at the next review (journal "can now go live on its own"). Unchanged: limits, parlays, grading, CRITERIA, and the other report-only questions (timing, SU method, PEM, Harris tracker). NBA has no proposal step.
 - "Every cut tested" rows: record column 62 -> 84px (76px on phones) and no wrapping.
