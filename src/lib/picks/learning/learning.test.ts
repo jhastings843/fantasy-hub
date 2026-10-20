@@ -179,3 +179,26 @@ describe("live sizing is flat 1u, quarter Kelly in shadow (2026-10-10)", () => {
     expect(d.why).toMatch(/calibrated/);
   });
 });
+
+describe("generated cuts can go live on their own (2026-10-20)", () => {
+  it("rebuilds a generated cut from its id, chained steps included, and refuses anything else", async () => {
+    const { derivedCut, cutsFor } = await import("../engine");
+    const base = cutsFor("cfb", false).find((c) => c.id === "both-edge-3")!;
+    const d = derivedCut("cfb", false, "both-edge-3~minBothEdge2")!;
+    expect(d.test).toEqual({ ...base.test, minBothEdge: 2 });
+    expect(d.group).toBe("Research");
+    expect(derivedCut("cfb", false, "both-edge-3~minBothEdge2~minBothEdge1")!.test.minBothEdge).toBe(1);
+    expect(derivedCut("cfb", false, "both-edge-3~minLine2")).toBeUndefined(); // base has no minLine
+    expect(derivedCut("cfb", false, "agree~minBothEdge2")).toBeUndefined(); // not a research cut
+    expect(derivedCut("cfb", false, "nope~minBothEdge2")).toBeUndefined();
+  });
+
+  it("registers generated neighbours as actionable", async () => {
+    const { propose, seedHypotheses } = await import("./model");
+    const hs = seedHypotheses("2026-10-01T00:00:00Z");
+    const h = hs.find((y) => y.id === "cfb:ats:both-edge-3")!;
+    const out = propose(hs, [{ id: h.id, comparison: { n: 18, meanDiff: 0.175 } } as never], "2026-10-20T11:00:00Z");
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((y) => y.actionable)).toBe(true);
+  });
+});

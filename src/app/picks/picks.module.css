@@ -88,7 +88,7 @@
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--mute); padding: 10px 0 4px; }
 .legend i { display: inline-block; width: 14px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
 .grp { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); padding: 18px 0 6px; border-bottom: 1px solid var(--rule); }
-.srow { display: grid; grid-template-columns: minmax(150px, 1.5fr) 62px minmax(120px, 2fr) 44px 62px; gap: 12px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--rule); border-radius: 4px; }
+.srow { display: grid; grid-template-columns: minmax(150px, 1.5fr) 84px minmax(120px, 2fr) 44px 62px; gap: 12px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--rule); border-radius: 4px; }
 .srow:hover, .srow:focus { background: var(--surface2); outline: none; }
 .star { background: var(--accent-soft); }
 .second { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
@@ -96,6 +96,7 @@
 .pill { font-family: var(--font-plex-mono), monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; background: var(--accent); color: var(--surface); padding: 2px 6px; border-radius: 3px; margin-left: 6px; white-space: nowrap; }
 .pillSoft { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
 .right { font-size: 13px; text-align: right; }
+.srow .right { white-space: nowrap; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 .track { position: relative; height: 14px; background: var(--track); border-radius: 3px; }
@@ -106,7 +107,7 @@
 .be { position: absolute; left: 52.4%; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
 .thin { font-size: 12px; color: var(--mute); }
 @media (max-width: 620px) {
-  .srow { grid-template-columns: 1fr 56px 52px; gap: 4px 10px; }
+  .srow { grid-template-columns: 1fr 76px 52px; gap: 4px 10px; }
   .sbar { grid-column: 1 / -1; order: 5; }
   .hideSm { display: none; }
 }

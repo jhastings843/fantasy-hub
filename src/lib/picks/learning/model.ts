@@ -5,7 +5,9 @@
 //
 // What it can change, and what it cannot:
 //   CAN, automatically, after validation: activate a registered ATS research
-//   cut as a rule candidate; change staking parameters (kind, Kelly scale,
+//   cut as a rule candidate, including the neighbours it generates itself
+//   (Jack, 2026-10-20: "allow it to implement things on its own so long as it
+//   is best"); change staking parameters (kind, Kelly scale,
 //   prior) inside the protected envelope (limits.ts).
 //   REPORTS ONLY (a proposal for a person): send timing, parlays (the
 //   envelope forbids enabling them), totals cut choice, straight-up method,
@@ -22,7 +24,7 @@
 
 import { MAX_KELLY_SCALE, MAX_STAKE, MIN_PRIOR_GAMES, MIN_STAKE } from "../limits";
 import { BASELINE_POLICY, envelopeViolations, type PicksPolicy, type StakingPolicy } from "../policy";
-import { type CutTest, type Result, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
+import { type CutTest, type Result, STEPPABLE, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
 import type { IssuedRecord } from "../issued";
 import { clvPoints } from "../closing";
@@ -631,7 +633,7 @@ export function propose(hs: Hypothesis[], evals: Evaluation[], at: string): Hypo
     const e = evals.find((x) => x.id === h.id)?.comparison;
     if (!e || e.n < 15 || e.meanDiff <= 0) continue;
     const d = h.definition;
-    for (const field of ["minLine", "maxLine", "minBothEdge", "minAvgEdge"] as const) {
+    for (const field of STEPPABLE) {
       const v = d.test[field];
       if (v === undefined) continue;
       for (const step of [-1, 1]) {
@@ -639,7 +641,7 @@ export function propose(hs: Hypothesis[], evals: Evaluation[], at: string): Hypo
         const def = { ...d, cutId: `${d.cutId}~${field}${v + step}`, label: `${d.label} (${field} ${v + step})`, test };
         if (known.has(sig(h.league, def)) || out.length >= room) continue;
         known.add(sig(h.league, def));
-        out.push({ id: `${h.league}:ats:${def.cutId}`, kind: "ats-cut", league: h.league, definition: def, actionable: false, registeredAt: at, status: "collecting", origin: `generated from ${h.id} (n=${e.n}, +${e.meanDiff}u per game); report-only until a person adds the cut to the code` });
+        out.push({ id: `${h.league}:ats:${def.cutId}`, kind: "ats-cut", league: h.league, definition: def, actionable: true, registeredAt: at, status: "collecting", origin: `generated from ${h.id} (n=${e.n}, +${e.meanDiff}u per game); goes live on its own if it passes the same test as any research cut` });
       }
     }
   }

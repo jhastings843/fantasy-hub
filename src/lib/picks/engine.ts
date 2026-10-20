@@ -428,6 +428,23 @@ export function pickSecond(games: GradedGame[], rule: Cut, cuts: CutResult[]): S
   return options[0] ?? null;
 }
 
+/** The thresholds the strategy review may step when it generates a neighbour of a research cut. */
+export const STEPPABLE = ["minLine", "maxLine", "minBothEdge", "minAvgEdge"] as const;
+
+/**
+ * A research cut the strategy review generated: a built-in research cut with
+ * one threshold moved ("both-edge-3~minBothEdge2", steps can chain). Undefined
+ * for anything that isn't exactly that shape.
+ */
+export function derivedCut(league: "nfl" | "cfb", withPem: boolean, id: string): Cut | undefined {
+  const m = id.match(/^(.+)~(minLine|maxLine|minBothEdge|minAvgEdge)(-?\d+(?:\.\d+)?)$/);
+  if (!m) return undefined;
+  const base = cutsFor(league, withPem).find((c) => c.id === m[1]) ?? derivedCut(league, withPem, m[1]);
+  if (!base || base.group !== "Research" || base.test[m[2] as (typeof STEPPABLE)[number]] === undefined) return undefined;
+  const v = Number(m[3]);
+  return { ...base, id, label: `${base.label} (${m[2]} ${v})`, test: { ...base.test, [m[2]]: v } };
+}
+
 export function strategies(
   league: "nfl" | "cfb",
   games: GradedGame[],
@@ -466,7 +483,16 @@ export function strategies(
   // activated them on forward, pregame evidence (see learning/). Here they
   // then compete on the same source-line record as every other cut.
   const activated = new Set(opts.activated ?? []);
-  const promoted: CutResult[] = cuts
+  // Cuts the review generated itself ("both-edge-3~minBothEdge2") aren't in
+  // cutsFor; they're rebuilt from their id, so activating one needs no code change.
+  const builtIn = new Set(cuts.map((c) => c.id));
+  const derived: CutResult[] = [...activated].filter((id) => !builtIn.has(id)).flatMap((id) => {
+    const cut = derivedCut(league, withPem, id);
+    if (!cut) return [];
+    const hits = games.filter((g) => cutResult(g, cut) !== undefined);
+    return [{ ...cut, record: tally(hits.map((g) => cutResult(g, cut) as Result)), games: hits.length, weeks: [...new Set(hits.map((g) => g.week))].sort((a, b) => a - b) }];
+  });
+  const promoted: CutResult[] = [...cuts, ...derived]
     .filter((c) => c.group === "Research" && activated.has(c.id))
     .map((c) => ({ ...c, candidate: true, activated: true }));
   const pool = [...cuts.filter((x) => x.candidate), ...promoted];

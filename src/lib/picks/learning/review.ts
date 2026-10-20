@@ -155,6 +155,15 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     await write({ at, kind: "register", title: `Registered ${h.id}`, why: h.origin });
   }
 
+  // Generated cuts were report-only until 2026-10-20 (Jack: let it act on its own when it's best).
+  // Ones already collecting become actionable; their sample and definition are unchanged.
+  for (const h of hs.filter((y) => y.kind === "ats-cut" && !y.actionable && y.status === "collecting" && y.origin.startsWith("generated from"))) {
+    const next = { ...h, actionable: true, origin: h.origin.replace(/; report-only until a person adds the cut to the code$/, "; goes live on its own if it passes the same test as any research cut") };
+    if (!opts.dryRun) await store.putHypothesis(next);
+    hs = hs.map((y) => (y.id === h.id ? next : y));
+    await write({ at, kind: "register", title: `${h.id} can now go live on its own`, why: "Generated cuts are held to the same test as the built-in research cuts and activate automatically when they pass it." });
+  }
+
   // Settle and score.
   const opps = x.forecasts.flatMap((f) =>
     opportunities(f.league, f.snaps, x.finals.find((m) => m.league === f.league)?.map ?? new Map(), x.closes.find((m) => m.league === f.league)?.map ?? new Map()),
