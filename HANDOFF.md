@@ -1,5 +1,17 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## Learning: one engine for props-style sections (2026-10-20, 7c7d1da, deployed)
+- Jack's question: should every section learn on its own or bunched by sport? Answer: own evidence per section, one shared engine. Astra reviewed the plan and pushed back (gates must be per section; props are correlated within a game; First TD is sparse; don't rewrite stored data; staged). Jack: build in full on those terms.
+- `src/lib/learning/engine.ts` (pure) + `store.ts` (Redis `learn:v1:<section>:<season>:state` and `:journal`). Sections: `nfl-props`, `nba-props` (props/learn.ts, `propCandidates`, `parentOf`), `nfl-firsttd` (firsttd/learn.ts, the `MARKET_SLICES` money checks at Kalshi's ask; count-vs-chances checks stay report-only). Football and NBA picks keep their own loop in lib/picks/learning.
+- Rules: candidates register at first review, only games kicking off after that count (kickoff, else the pregame copy's capturedAt); evidence per GAME (bets summed per game, t on per-game nets); a slice with a parent must beat it game by game (paired t 1.645); line move toward >= against once 20+ moved; drawdown <= 3 sqrt(bets) + slack; max activations per review; a slice whose parent is live is skipped; rollback at t <= -1.645 over 20 (FTD 30) games since going live. Review once per section week, inside runProps / runNbaProps / runFirstTd. Gates pinned in engine.test.ts: PROPS_GATE 30 games / 3 weeks / 100 bets / t 2.33 / max 2; FTD_GATE 60 games / 4 weeks / 60 bets / 12 winners / t 2.33 / max 1.
+- Old `props:v1:<season>:system` and `props:v1:nba:<season>:system` hashes were empty and are no longer written. `PropsView.system` / `active` now come from the engine (`systemOf`), so card marks, search and the Money chart (`liveBets`) work unchanged. Research pages: `LearningBlock` (src/app/props/learning.tsx): gate in words, Live table, Closest to going live, journal.
+- First run: NBA props registered 22 slices 2026-10-20 17:59Z (hand-triggered nba-props workflow). NFL props and First TD register at their next scheduled run; first countable NFL games are Week 7. Nothing can go live before about Week 9 (NFL props) or Week 10+ (First TD).
+
+## Props: David's plays level with Sam's (2026-10-20, 0a56353, deployed)
+- David's board has no pick flag, so a David play = est. edge 10%+ (`DAVID_PLAY_EDGE`, `davidEdge`: his chance from his 80% range read as a normal band, minus DK break-even). About 3 to 24 a game on Week 6. Game cards list all of each model's plays; Results has a David's plays tile and table; Research a `dplay:*` slice table. Week 6: Sam's plays 43-33 +2.0u, David's plays 66-62 -4.1u. If "Inside his 80%" runs well under 80%, raise the bar.
+- `isDavidSlice(id)` (dboard/dplay/h2h) replaces the prefix checks in store, search and the page.
+- Astra fix logged in ~/.claude/CLAUDE.md: background `codex exec` needs `< /dev/null` or it hangs on stdin.
+
 
 
 ## NBA first basket: waiting on Sam (2026-10-20)
