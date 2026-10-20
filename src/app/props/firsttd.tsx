@@ -5,6 +5,7 @@ import type { Graded } from "@/lib/firsttd/grade";
 import { getFirstTdView, type FirstTdView, type StoredGame } from "@/lib/firsttd/store";
 import { MIN_GAMES, kalshiCost, kalshiFor, type PriceSlice, type Slice, type Verdict } from "@/lib/firsttd/trends";
 import { whenEt } from "../picks/ui";
+import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
 
 const SAM_FTD = "https://samthemodelman.smmodel.workers.dev/nfl/";
@@ -435,6 +436,7 @@ export async function FirstTdResearch({ season }: { season: number }) {
         </p>
       )}
       <PriceTable rows={t.market} games={t.kalshiGames} />
+      <LearningBlock v={v.learning} unit="contracts" />
       <SliceTable title="The headline checks" rows={t.headline} unit="Games" />
       <SliceTable title="Where the scorer sat in Sam's list" rows={t.rank} unit="Games" />
       <SliceTable title="By the size of Sam's number" rows={t.price} unit="Players" />

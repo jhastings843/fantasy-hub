@@ -25,6 +25,43 @@ export interface GradedGame {
   game: FtdGame;
   result: Graded;
   kalshi?: KalshiGame;
+  kickoff?: string;
+  /** When the pregame copy was saved: the learning engine's date for a game with no kickoff. */
+  capturedAt?: string;
+}
+
+type Keep = (p: FtdPlayer & { p: number }, cost: number, g: FtdGame) => boolean;
+
+/** The money checks at Kalshi's ask, in page order. Ids are stable: the learning engine keeps them. */
+export const MARKET_SLICES: [string, string, Keep][] = [
+  ["k-value", "Sam's chance above Kalshi's cost", (p, c) => p.p > c],
+  ["k-value3", "Above Kalshi's cost by 3+ points", (p, c) => p.p >= c + 0.03],
+  ["k-pick", "Sam's pick, bought at Kalshi's ask", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team],
+  ["k-short", "Kalshi priced 10% or less, Sam above cost", (p, c) => c <= 0.1 && p.p > c],
+  // By probability, value or not: which tier of Sam's list (if any) beats Kalshi's price.
+  ["k-top2", "Sam's two most likely in each game", (p, _c, g) => pricedPlayers(g).slice(0, 2).some((x) => x.key === p.key)],
+  ["k-p12", "Sam 12% or more, every one", (p) => p.p >= 0.12],
+  ["k-p8", "Sam 8% to 12%, every one", (p) => p.p >= 0.08 && p.p < 0.12],
+  ["k-p4", "Sam 4% to 8%, every one", (p) => p.p >= 0.04 && p.p < 0.08],
+  ["k-p0", "Sam under 4%, every one", (p) => p.p < 0.04],
+  ["k-p8-value", "Sam 8% or more and above Kalshi's cost", (p, c) => p.p >= 0.08 && p.p > c],
+];
+
+/** One contract per priced player a slice keeps, at Kalshi's ask (fee in). Games without Kalshi prices are skipped. */
+export function marketBets(list: GradedGame[], keep: Keep): { game: FtdGame; kickoff?: string; cost: number; win: boolean; net: number }[] {
+  const out: { game: FtdGame; kickoff?: string; cost: number; win: boolean; net: number }[] = [];
+  for (const { game, result, kalshi, kickoff, capturedAt } of list) {
+    if (!kalshi) continue;
+    for (const p of pricedPlayers(game)) {
+      const k = kalshiFor(kalshi, p.name);
+      if (!k?.ask) continue;
+      const cost = kalshiCost(k.ask);
+      if (cost >= 1 || !keep(p, cost, game)) continue;
+      const win = isPlayer(result, p);
+      out.push({ game, kickoff: kickoff ?? capturedAt, cost, win, net: win ? (1 - cost) / cost : -1 });
+    }
+  }
+  return out;
 }
 
 /** A bet slice at Kalshi's ask: money, not just counts. */
@@ -196,27 +233,12 @@ export function trends(list: GradedGame[]): Trends {
 
   // Money: every priced player whose Sam chance beats Kalshi's cost, bought at the ask.
   const withK = list.filter((x) => x.kalshi);
-  const priceSlice = (id: string, label: string, keep: (p: FtdPlayer & { p: number }, cost: number, g: FtdGame) => boolean): PriceSlice => {
-    let bets = 0;
-    let w = 0;
-    let units = 0;
-    let needed = 0;
-    let variance = 0;
-    for (const { game, result, kalshi } of withK) {
-      for (const p of pricedPlayers(game)) {
-        const k = kalshiFor(kalshi, p.name);
-        if (!k?.ask) continue;
-        const cost = kalshiCost(k.ask);
-        if (cost >= 1 || !keep(p, cost, game)) continue;
-        bets++;
-        needed += cost;
-        variance += cost * (1 - cost);
-        if (isPlayer(result, p)) {
-          w++;
-          units += (1 - cost) / cost;
-        } else units -= 1;
-      }
-    }
+  const priceSlice = (id: string, label: string, keep: Keep): PriceSlice => {
+    const bs = marketBets(withK, keep);
+    const w = bs.filter((x) => x.win).length;
+    const units = bs.reduce((t, x) => t + x.net, 0);
+    const needed = bs.reduce((t, x) => t + x.cost, 0);
+    const variance = bs.reduce((t, x) => t + x.cost * (1 - x.cost), 0);
     const z = variance > 0 ? (w - needed) / Math.sqrt(variance) : null;
     let verdict: Verdict = "in-line";
     if (withK.length < MIN_GAMES) verdict = "early";
@@ -224,21 +246,9 @@ export function trends(list: GradedGame[]): Trends {
     else if (z !== null && z <= -Z_TREND) verdict = "under";
     else if (z !== null && z >= Z_LEAN) verdict = "lean-over";
     else if (z !== null && z <= -Z_LEAN) verdict = "lean-under";
-    return { id, label, bets, w, units: Math.round(units * 100) / 100, needed: Math.round(needed * 100) / 100, z: z === null ? null : Math.round(z * 100) / 100, verdict };
+    return { id, label, bets: bs.length, w, units: Math.round(units * 100) / 100, needed: Math.round(needed * 100) / 100, z: z === null ? null : Math.round(z * 100) / 100, verdict };
   };
-  const market = [
-    priceSlice("k-value", "Sam's chance above Kalshi's cost", (p, c) => p.p > c),
-    priceSlice("k-value3", "Above Kalshi's cost by 3+ points", (p, c) => p.p >= c + 0.03),
-    priceSlice("k-pick", "Sam's pick, bought at Kalshi's ask", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team),
-    priceSlice("k-short", "Kalshi priced 10% or less, Sam above cost", (p, c) => c <= 0.1 && p.p > c),
-    // By probability, value or not: which tier of Sam's list (if any) beats Kalshi's price.
-    priceSlice("k-top2", "Sam's two most likely in each game", (p, _c, g) => pricedPlayers(g).slice(0, 2).some((x) => x.key === p.key)),
-    priceSlice("k-p12", "Sam 12% or more, every one", (p) => p.p >= 0.12),
-    priceSlice("k-p8", "Sam 8% to 12%, every one", (p) => p.p >= 0.08 && p.p < 0.12),
-    priceSlice("k-p4", "Sam 4% to 8%, every one", (p) => p.p >= 0.04 && p.p < 0.08),
-    priceSlice("k-p0", "Sam under 4%, every one", (p) => p.p < 0.04),
-    priceSlice("k-p8-value", "Sam 8% or more and above Kalshi's cost", (p, c) => p.p >= 0.08 && p.p > c),
-  ];
+  const market = MARKET_SLICES.map(([id, label, keep]) => priceSlice(id, label, keep));
 
   const findings = [...headline, ...rank, ...price, ...usage]
     .filter((x) => x.verdict === "over" || x.verdict === "under")

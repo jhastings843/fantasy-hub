@@ -9,9 +9,10 @@
 // Props come in volume (about 28 markets a game), so slices fill fast and many
 // are checked at once. With ~30 slices, one will clear a 90% bar by luck most
 // weeks. So the bar to call a slice "profitable" is stricter than the Picks
-// tab's: MIN_BETS decided bets and z >= 1.96 (95%, one-sided 97.5%). And a
-// slice that clears it only joins the system for the weeks AFTER it qualified
-// (store.ts keeps that record), so the money it shows is out of sample.
+// tab's: MIN_BETS decided bets and z >= 1.96 (95%, one-sided 97.5%). These
+// verdicts are the season-to-date read on the page; what goes live is decided
+// by the shared learning engine (lib/learning, props/learn.ts) on games after
+// each slice registered, judged per game.
 
 import { STAT_LABEL, type League, type PropMarket, type PropsGame, type Stat } from "./parse";
 import type { GradedBet, GradedGame, GradedMarket } from "./grade";
@@ -19,8 +20,6 @@ import type { GradedBet, GradedGame, GradedMarket } from "./grade";
 export const MIN_BETS = 100;
 const Z_EARN = 1.96;
 const Z_LEAN = 1;
-/** A slice in the system is retired when its full-season z falls under this. */
-export const Z_RETIRE = 1;
 
 export interface GradedPropsGame {
   week: number;
@@ -41,6 +40,8 @@ export interface GradedPropsGame {
   late?: string;
   /** Kickoff as saved with the copy; dates the week on the Money page's chart. */
   kickoff?: string;
+  /** When the pregame copy was saved: the learning engine's date for a game with no kickoff. */
+  capturedAt?: string;
 }
 
 export type Verdict = "early" | "flat" | "lean-up" | "lean-down" | "profitable" | "losing";

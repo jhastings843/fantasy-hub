@@ -4,6 +4,9 @@ import { parseBoardLinks, parseFirstTdPage, parseSlug, type FtdGame } from "./pa
 import { firstTouchdown, grade, samTeam, type EspnScoringPlay, type Graded } from "./grade";
 import { trends, type GradedGame, type Trends } from "./trends";
 import { kalshiFirstTd, type KalshiGame } from "./kalshi";
+import { FTD_SECTION, ftdCandidates } from "./learn";
+import { FTD_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
+import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 
 // The first TD tracker's memory. Sam only keeps the current week online, so
 // each game's page is saved before kickoff (the latest pregame copy wins, as
@@ -83,12 +86,14 @@ export interface RunReport {
   /** Not published yet: Sam releases the Sunday and Monday pages on Saturday. */
   waiting: string[];
   graded: string[];
+  /** What the learning review did, when it ran. */
+  learning: string[];
   problems: string[];
 }
 
 /** Save this week's pregame pages and grade anything final. Safe to call any time. */
 export async function runFirstTd(now = new Date()): Promise<RunReport> {
-  const report: RunReport = { week: null, captured: [], kept: [], missed: [], waiting: [], graded: [], problems: [] };
+  const report: RunReport = { week: null, captured: [], kept: [], missed: [], waiting: [], graded: [], learning: [], problems: [] };
   let slugs: string[] = [];
   try {
     slugs = parseBoardLinks(await get(SAM_BOARD));
@@ -179,7 +184,26 @@ export async function runFirstTd(now = new Date()): Promise<RunReport> {
     }
     if (changed) await saveWeek(w);
   }
+
+  // Learning: the shared engine's weekly review on the money checks (FTD_GATE).
+  try {
+    const current = first?.week ?? weeks.at(-1) ?? 0;
+    const graded = await gradedGames(season);
+    for (const j of await reviewIfDue(FTD_SECTION, season, current, FTD_GATE, ftdCandidates(graded), now)) if (j.kind !== "registered") report.learning.push(j.text);
+  } catch (e) {
+    report.problems.push(`learning: ${e instanceof Error ? e.message : String(e)}`);
+  }
   return report;
+}
+
+async function gradedGames(season: number): Promise<(GradedGame & { slug: string; week: number })[]> {
+  const nums = ((await redis.smembers(weeksKey(season))) ?? []).map(Number);
+  const weeks = await Promise.all(nums.map((n) => loadWeek(season, n)));
+  return weeks
+    .flatMap((w) =>
+      Object.entries(w.games).flatMap(([slug, g]) => (g.result ? [{ slug, week: w.week, game: g.game, result: g.result, kalshi: g.kalshi, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])),
+    )
+    .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
 
 export interface FirstTdView {
@@ -188,16 +212,15 @@ export interface FirstTdView {
   weeks: StoredWeek[];
   graded: (GradedGame & { slug: string; week: number })[];
   trends: Trends;
+  /** The shared learning engine's view of First TD. */
+  learning: SectionView;
 }
 
 /** Everything the tab shows, read from Redis only. */
 export async function getFirstTdView(season: number): Promise<FirstTdView> {
   const nums = ((await redis.smembers(weeksKey(season))) ?? []).map(Number).sort((a, b) => b - a);
   const weeks = (await Promise.all(nums.map((n) => loadWeek(season, n)))).filter((w) => Object.keys(w.games).length);
-  const graded = weeks
-    .flatMap((w) =>
-      Object.entries(w.games).flatMap(([slug, g]) => (g.result ? [{ slug, week: w.week, game: g.game, result: g.result, kalshi: g.kalshi }] : [])),
-    )
-    .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
-  return { season, current: weeks[0] ?? null, weeks, graded, trends: trends(graded) };
+  const graded = await gradedGames(season);
+  const [state, journal] = await Promise.all([loadSection(FTD_SECTION, season), loadJournal(FTD_SECTION, season)]);
+  return { season, current: weeks[0] ?? null, weeks, graded, trends: trends(graded), learning: sectionView(FTD_GATE, state, ftdCandidates(graded), journal) };
 }

@@ -508,12 +508,12 @@ export function davidTrends(games: DavidWeekGame[], sam: SamIndex): DavidTrends 
 }
 
 /** A slice's bets with their weeks, for the system's out-of-sample record. */
-export function davidSliceBets(games: DavidWeekGame[], sam: SamIndex, id: string): { week: number; bet: DBet }[] {
+export function davidSliceBets(games: DavidWeekGame[], sam: SamIndex, id: string): { week: number; bet: DBet; p: DavidProp; first?: number }[] {
   const pick = DAVID_SLICES.find((x) => x[0] === id)?.[2];
   if (!pick) return [];
   return rowsOf(games, sam).flatMap((r) => {
     const b = pick(r);
-    return b ? [{ week: r.week, bet: b }] : [];
+    return b ? [{ week: r.week, bet: b, p: r.p, first: r.first }] : [];
   });
 }
 

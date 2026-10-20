@@ -11,6 +11,7 @@ import { getNbaPropsView } from "@/lib/props/nba-props";
 import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
 import { DAVID_LABEL, DAVID_PLAY_EDGE, DAVID_URL, agreeEdge, davidEdge, davidSide, davidSliceSide, isDavidPlay, isDavidSlice, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
+import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
 
@@ -874,7 +875,7 @@ export async function PropsResearch({ season, league = "nfl" }: { season: number
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-research">{nba ? "Where Sam's NBA props make money" : "Where the prop models make money"}</h2>
         <p className={s.p}>
-          {nba ? `The NFL props' research, on Sam's NBA pages. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better. One that clears it joins the NBA system the week after and counts money only from then; it leaves when its full record falls back under z 1. Line move is how far the consensus moved toward the bet between the first and last pregame copy.` : `Sam and David on the same footing. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. A slice is called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Either model's slices can earn a place in the system. Line move is how far the line moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
+          {nba ? `The NFL props' research, on Sam's NBA pages. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. The read in each row is season to date, called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better. Whether a slice goes live is the learning block's call, on its own evidence and NBA games only. Line move is how far the consensus moved toward the bet between the first and last pregame copy.` : `Sam and David on the same footing. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. The read in each row is season to date, called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Whether a slice goes live is the learning block's call, below, and either model's slices can. Line move is how far the line moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
         </p>
       </div>
       {findings.length > 0 ? (
@@ -889,39 +890,7 @@ export async function PropsResearch({ season, league = "nfl" }: { season: number
         </p>
       )}
 
-      <div className={s.tw}>
-        <table className={s.table}>
-          <caption className={s.caption}>The system: slices that earned a place, money counted only from the week after</caption>
-          <thead>
-            <tr>
-              <th>Slice</th>
-              <th>Since</th>
-              <th>Record since</th>
-              <th>Units since</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {v.system.length ? (
-              v.system.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.label}</td>
-                  <td className={s.num}>{`Wk ${e.since}`}</td>
-                  <td className={s.num}>{`${e.w}-${e.l}${e.p ? `-${e.p}` : ""}`}</td>
-                  <td className={`${s.num} ${e.units > 0 ? s.pos : e.units < 0 ? s.neg : ""}`}>{u(e.units)}</td>
-                  <td className={e.retired ? s.neg : s.pos}>{e.retired ? `retired Wk ${e.retired.week}` : "active"}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} className={s.dim}>
-                  Empty. A slice joins when its record through last week clears the bar, and leaves when its full record falls back under z 1.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <LearningBlock v={v.learning} />
 
       {!nba && <SliceTable title="Head to head: the props both cover, both sides at DraftKings' line and price" rows={dgroup("h2h")} active={v.active} />}
       {!nba && dt.h2h.length > 0 && (

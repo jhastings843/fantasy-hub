@@ -5,8 +5,11 @@ import { parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./pa
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
 import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
-import { davidFor, davidSliceBets, davidTrends, fetchDavidSlate, gradeDavid, isDavidSlice, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
-import { MIN_BETS, propTrends, sliceBets, SLICES, Z_RETIRE, type GradedPropsGame, type PropTrends } from "./trends";
+import { davidFor, davidTrends, fetchDavidSlate, gradeDavid, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
+import { MIN_BETS, propTrends, SLICES, type GradedPropsGame, type PropTrends } from "./trends";
+import { PROPS_SECTION, propCandidates } from "./learn";
+import { PROPS_GATE, activeIds, liveBets, sectionView, type SectionView } from "@/lib/learning/engine";
+import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 
 // The props tracker's memory, built like the first TD tracker: Sam keeps only
 // the current week online, so each game's props page is saved before kickoff
@@ -24,7 +27,6 @@ const UA = { "user-agent": "Mozilla/5.0 (fantasy-hub props tracker)" };
 
 const weekKey = (season: number, week: number) => `props:v1:${season}:w${week}`;
 const weeksKey = (season: number) => `props:v1:${season}:weeks`;
-const systemKey = (season: number) => `props:v1:${season}:system`;
 // David Sasser's own board: one hash per week (field = game id), and its weeks.
 const davidKey = (season: number, week: number) => `props:v1:${season}:david:w${week}`;
 const davidWeeksKey = (season: number) => `props:v1:${season}:david:weeks`;
@@ -101,9 +103,24 @@ async function saveGame(season: number, week: number, slug: string, g: StoredPro
   await redis.hset(weekKey(season, week), { [slug]: g });
   await redis.sadd(weeksKey(season), String(week));
 }
-export async function loadSystem(season: number): Promise<SystemEntry[]> {
-  const h = (await redis.hgetall<{ [id: string]: SystemEntry }>(systemKey(season))) ?? {};
-  return Object.values(h).sort((a, b) => a.since - b.since || a.id.localeCompare(b.id));
+/** Slices that went live on the learning engine, in the old system's shape (the old props:...:system hash is no longer written). */
+export function systemOf(v: SectionView): SystemRecord[] {
+  return v.entries
+    .filter((e) => e.activatedAt)
+    .map((e) => ({
+      id: e.id,
+      label: e.label,
+      since: e.activeWeek ?? 0,
+      at: e.activatedAt!,
+      z: e.activation?.t ?? 0,
+      n: e.activation?.games ?? 0,
+      ...(e.status === "rolled-back" ? { retired: { week: e.endedWeek ?? 0, at: e.endedAt ?? "", z: e.ev?.t ?? 0 } } : {}),
+      w: e.live?.w ?? 0,
+      l: e.live?.l ?? 0,
+      p: e.live?.p ?? 0,
+      units: e.live?.units ?? 0,
+    }))
+    .sort((a, b) => a.since - b.since || a.id.localeCompare(b.id));
 }
 
 export async function loadDavidWeek(season: number, week: number): Promise<{ [gameId: string]: DavidGame }> {
@@ -290,33 +307,17 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
     }
   }
 
-  // The system. A slice joins when its record on weeks BEFORE the current one
-  // clears the bar; its money counts from the current week on. It leaves when
-  // its full record falls back under Z_RETIRE. Never rewritten otherwise.
+  // Learning: the shared engine's weekly review (lib/learning). Every slice is
+  // a candidate; only games after it registered count; judged per game; at
+  // most two go live a week; a live slice that loses is rolled back.
   try {
     const current = Math.max(report.week ?? weeks.at(-1) ?? 0, report.david.week ?? 0);
-    // Late copies are shown and graded but never help a slice qualify.
-    const graded = (await gradedList(season)).filter((x) => !x.late);
+    const graded = await gradedList(season);
     const dGames = await davidGames(season);
-    const sam = samIndex(graded);
-    const before = [...propTrends(graded.filter((x) => x.week < current)).slices, ...davidTrends(dGames.filter((x) => x.week < current), sam).slices];
-    const all = { slices: [...propTrends(graded).slices, ...davidTrends(dGames, sam).slices] };
-    const sys = new Map((await loadSystem(season)).map((e) => [e.id, e]));
-    for (const sl of before) {
-      if (sl.verdict !== "profitable" || sys.has(sl.id) || !current) continue;
-      const e: SystemEntry = { id: sl.id, label: sl.label, since: current, at: now.toISOString(), z: sl.z ?? 0, n: sl.n };
-      if (await redis.hsetnx(systemKey(season), sl.id, e)) report.system.push(`joined: ${sl.label}`);
-    }
-    for (const e of sys.values()) {
-      if (e.retired) continue;
-      const sl = all.slices.find((x) => x.id === e.id);
-      if (sl && sl.z !== null && sl.z < Z_RETIRE) {
-        await redis.hset(systemKey(season), { [e.id]: { ...e, retired: { week: current, at: now.toISOString(), z: sl.z } } });
-        report.system.push(`retired: ${e.label}`);
-      }
-    }
+    const cands = propCandidates(graded, "nfl", dGames, samIndex(graded.filter((x) => !x.late)));
+    for (const j of await reviewIfDue(PROPS_SECTION.nfl, season, current, PROPS_GATE, cands, now)) if (j.kind !== "registered") report.system.push(j.text);
   } catch (e) {
-    report.problems.push(`system: ${e instanceof Error ? e.message : String(e)}`);
+    report.problems.push(`learning: ${e instanceof Error ? e.message : String(e)}`);
   }
   return report;
 }
@@ -333,7 +334,7 @@ async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
     .flatMap(([week, games]) =>
-      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, david: g.david, dk: g.dk, kickoff: g.kickoff, ...(g.late ? { late: g.late } : {}) }] : [])),
+      Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, rw: g.rw, espn: g.espn, david: g.david, dk: g.dk, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.late ? { late: g.late } : {}) }] : [])),
     )
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
@@ -356,6 +357,8 @@ export interface PropsView {
   active: string[];
   /** David Sasser's board: the latest week saved, his record and the head to head with Sam. */
   david: { week: number | null; games: DavidGame[]; trends: DavidTrends; sam: { [key: string]: number } };
+  /** The shared learning engine's view of this section. */
+  learning: SectionView;
 }
 
 /** Everything the page shows, read from Redis only. */
@@ -364,20 +367,15 @@ export async function getPropsView(season: number): Promise<PropsView> {
   const week = nums[0] ?? null;
   const current = week ? await loadWeek(season, week) : {};
   const graded = await gradedList(season);
-  const sys = await loadSystem(season);
   const dGames = await davidGames(season);
   const sam = samIndex([...graded, ...Object.values(current)]);
   const samGraded = samIndex(graded.filter((x) => !x.late));
-  const system = sys.map((e) => {
-    const all = isDavidSlice(e.id) ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
-    const bets = all.filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week));
-    const w = bets.filter((b) => b.bet.outcome === "W").length;
-    const l = bets.filter((b) => b.bet.outcome === "L").length;
-    return { ...e, w, l, p: bets.length - w - l, units: Math.round(bets.reduce((a, b) => a + b.bet.net, 0) * 100) / 100 };
-  });
+  const [state, journal] = await Promise.all([loadSection(PROPS_SECTION.nfl, season), loadJournal(PROPS_SECTION.nfl, season)]);
+  const learning = sectionView(PROPS_GATE, state, propCandidates(graded, "nfl", dGames, samGraded), journal);
+  const system = systemOf(learning);
   const dWeek = dGames.reduce<number | null>((a, g) => (a === null || g.week > a ? g.week : a), null);
   const david = { week: dWeek, games: dGames.filter((g) => g.week === dWeek), trends: davidTrends(dGames, sam), sam: Object.fromEntries(sam) };
-  return { season, week, current, graded, trends: propTrends(graded), system, active: sys.filter((e) => !e.retired).map((e) => e.id), david };
+  return { season, week, current, graded, trends: propTrends(graded), system, active: activeIds(state), david, learning };
 }
 
 /** One week of prop results for the Money page's chart, in units (1u risked per bet). */
@@ -394,7 +392,7 @@ export interface PropsWeek {
 }
 
 export async function propsWeeks(season: number): Promise<PropsWeek[]> {
-  const [graded, sys, dGames] = await Promise.all([gradedList(season), loadSystem(season), davidGames(season)]);
+  const [graded, state, dGames] = await Promise.all([gradedList(season), loadSection(PROPS_SECTION.nfl, season), davidGames(season)]);
   const samGraded = samIndex(graded.filter((x) => !x.late));
   const weeks = new Map<number, PropsWeek>();
   const wk = (n: number) => {
@@ -415,13 +413,10 @@ export async function propsWeeks(season: number): Promise<PropsWeek[]> {
       w.samBets++;
     }
   }
-  for (const e of sys) {
-    const all = isDavidSlice(e.id) ? davidSliceBets(dGames, samGraded, e.id) : sliceBets(graded, e.id);
-    for (const b of all.filter((b) => b.week >= e.since && (!e.retired || b.week < e.retired.week))) {
-      const w = wk(b.week);
-      w.system += b.bet.net;
-      w.systemBets++;
-    }
+  for (const b of liveBets(state, propCandidates(graded, "nfl", dGames, samGraded))) {
+    const w = wk(b.week);
+    w.system += b.net;
+    w.systemBets++;
   }
   return [...weeks.values()].filter((w) => w.samBets || w.systemBets).sort((a, b) => a.week - b.week);
 }
