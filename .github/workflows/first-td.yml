@@ -21,6 +21,9 @@ on:
     - cron: "30 22 * * 0"
     # Monday 6:30pm ET.
     - cron: "30 22 * * 1"
+    # Tuesday, Wednesday and Friday 6:30pm ET: picks up the new week soon after
+    # Sam posts it (the daily 8am snapshot is the other pass).
+    - cron: "30 22 * * 2,3,5"
   workflow_dispatch:
 
 jobs:

@@ -11,6 +11,7 @@ import { getNbaPropsView } from "@/lib/props/nba-props";
 import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
 import { DAVID_LABEL, DAVID_PLAY_EDGE, DAVID_URL, agreeEdge, davidEdge, davidSide, davidSliceSide, isDavidPlay, isDavidSlice, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
+import { boardWeek } from "@/lib/picks/finished";
 import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
@@ -456,10 +457,26 @@ function GameCard({ gameId, sam, david, v, samOf }: { gameId: string; sam?: Stor
   );
 }
 
+/** The week turns over at 4am ET Tuesday, as on Picks, whether or not Sam has posted the new one. */
+function Awaiting({ id, week, what }: { id: string; week: number; what: string }) {
+  return (
+    <section className={s.section} aria-labelledby={id}>
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id={id}>{`Week ${week} ${what}`}</h2>
+      </div>
+      <p className={s.calm}>
+        {`Nothing saved for Week ${week} yet. Sam posts the Thursday game first and the Sunday and Monday pages on Saturday; the tracker picks them up at 8am and 6:30pm ET and before each kickoff. Week ${week - 1} is graded under Results.`}
+      </p>
+    </section>
+  );
+}
+
 export async function PropsWeek({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <Unavailable />;
   const week = Math.max(v.week ?? 0, v.david.week ?? 0) || null;
+  const cal = boardWeek("nfl", week, new Date(renderedAt())).week;
+  if (week && cal && cal > week) return <Awaiting id="pp-week" week={cal} what="player props" />;
   const samGames = v.week === week ? Object.values(v.current) : [];
   const dGames = v.david.week === week ? v.david.games : [];
   const ids = [...new Set([...samGames.map((g) => g.game.slug), ...dGames.map((g) => g.gameId)])];

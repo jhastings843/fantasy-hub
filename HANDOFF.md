@@ -1,5 +1,9 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## Props week turnover (2026-10-20)
+- Jack noticed NFL props/First TD still on Week 6 on Tuesday. Cause: captures only on game days + the 8am snapshot; Sam posted Week 7 after it. Ran first-td.yml by hand (props Week 7: NE at CHI saved; First TD 1 saved, 13 waiting for Saturday). NFL props learning registered 68 slices on that run.
+- first-td.yml gains 22:30 UTC Tue/Wed/Fri. PropsWeek and FirstTdWeek use `boardWeek("nfl", ...)` (Tuesday 4am ET turnover, as Picks): when the calendar week is ahead of the last saved week they show "Nothing saved for Week N yet" instead of last week's cards.
+
 ## PEM and Harris: added or dropped by the review on forward evidence (2026-10-20)
 - Jack: "it should be analyzing if pem or harris provide any value and can add/drop them at any time"; Harris tracker becomes a collapsed panel below PEM, above the game log.
 - `policy.sources` {pem, harris}: `out` (ignored) | `cuts` (its agreement cuts compete for the rule, no veto) | `veto` (as cuts, plus a rule bet it disagrees with is skipped). `SOURCE_DEFAULT` = pem cuts, harris out (today's behavior). `sourcesChangedAt` restarts each test.
