@@ -277,6 +277,51 @@ export function nbaWeek(at: Date, season: number): number {
   return Math.floor((day - monday) / (7 * 86_400_000)) + 1;
 }
 
+/** An NBA play needs Sam this far off the market's consensus, as a share of it, and at least NBA_MIN_DIFF in the stat. */
+export const NBA_MIN_EDGE = 0.15;
+export const NBA_MIN_DIFF = 0.5;
+/**
+ * And a price no worse than this: comparing numbers can't see juice, and a
+ * line hung at -200 already means the market sits well past it (Over 0.5
+ * threes at -210 is not "Sam 60% off the market").
+ */
+export const NBA_MAX_JUICE = -150;
+
+/**
+ * NBA plays are Sam's projection against the market's number (Jack,
+ * 2026-10-19), not his page's pick of an off-market book: the side is where
+ * his number sits from the consensus (median of every book's line), priced at
+ * the best price among books posting that consensus line (else the nearest
+ * line on the bet's side), and `gap` holds his edge as a share of the
+ * consensus. His page's own play and win row are dropped.
+ */
+export function samVsMarket(m: PropMarket): PropMarket {
+  const diff = m.model - m.consensus;
+  const side: Side | null = diff > 0 ? "over" : diff < 0 ? "under" : null;
+  const edge = Math.round((Math.abs(diff) / Math.max(m.consensus, 1)) * 1000) / 1000;
+  const books = m.books.map((b) => ({ ...b, win: false }));
+  if (side) {
+    const atCons = books.filter((b) => b.line === m.consensus && b[side] !== null);
+    // No book on the consensus itself (an even count of books): the nearest line on the bet's side.
+    const pool = atCons.length
+      ? atCons
+      : books.filter((b) => b[side] !== null && (side === "over" ? b.line <= m.consensus : b.line >= m.consensus)).sort((a, b) => Math.abs(a.line - m.consensus) - Math.abs(b.line - m.consensus));
+    const near = pool.length ? pool.filter((b) => b.line === pool[0].line) : [];
+    const best = near.sort((a, b) => implied(a[side]!) - implied(b[side]!))[0];
+    if (best) best.win = true;
+  }
+  const w = books.find((b) => b.win);
+  return {
+    ...m,
+    books,
+    line: w?.line ?? m.consensus,
+    gap: edge,
+    clears: !!side && !!w && edge >= NBA_MIN_EDGE && Math.abs(diff) >= NBA_MIN_DIFF && implied(w[side]!) <= implied(NBA_MAX_JUICE),
+    side,
+    lean: side,
+  };
+}
+
 /**
  * One NBA props page. Same template as the NFL pages; the teams come from the
  * title ("BOS at DET") and the week from the tip date (see nba-props.ts).
@@ -286,7 +331,7 @@ export function parseNbaPropsPage(gameId: string, html: string, week: number): P
   const t = html.match(/<title>\s*([A-Z]{2,4}) at ([A-Z]{2,4})/);
   if (season === null || !t) return null;
   // NBA pages put the book count ("4 bk") where the NFL pages put the team.
-  const markets = parseMarkets(html).map((m) => (/\bbk$/.test(m.team) ? { ...m, team: "" } : m));
+  const markets = parseMarkets(html).map((m) => samVsMarket(/\bbk$/.test(m.team) ? { ...m, team: "" } : m));
   if (!markets.length) return null;
   const be = html.match(/<b>([\d.]+)<\/b>\s*breaks even/);
   return { season, week, slug: gameId, away: t[1], home: t[2], breakEven: be ? Number(be[1]) : null, favorites: parseFavorites(html), markets };

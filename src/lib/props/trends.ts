@@ -259,13 +259,23 @@ export const SLICES: [string, string][] = [
  * Rotowire, ESPN, David or DraftKings feed covers them, so those slices are
  * left out. Ids share the NFL's shape but live in the NBA's own system hash.
  */
+// NBA plays are Sam vs the consensus (parse.ts samVsMarket), so the NFL's
+// gap bands (his page's win probability) and agree/against (his play vs his
+// projection, now the same thing) and off-market book slices don't apply; the
+// edge bands are his distance from the consensus as a share of it.
 export const NBA_SLICES: [string, string][] = SLICES.filter(([id]) => {
   const [g, k] = id.split(":");
-  return (g === "play" || g === "lean") && !STATS.includes(k as Stat) && !/rw|espn|david|all3|dk-/.test(k);
+  return (g === "play" || g === "lean") && !STATS.includes(k as Stat) && !/rw|espn|david|all3|dk-|^gap-|^agree$|^against$|^off$/.test(k);
 }).flatMap((x): [string, string][] => {
-  if (x[0] === "play:all") return [x, ...NBA_STATS.map((st): [string, string] => [`play:${st}`, `Plays: ${STAT_LABEL[st].toLowerCase()}`])];
-  if (x[0] === "lean:all") return [x, ...NBA_STATS.map((st): [string, string] => [`lean:${st}`, `Lean: ${STAT_LABEL[st].toLowerCase()}`])];
-  if (x[0] === "play:off") return [["play:off", "Playing book 1+ off the consensus"]];
+  if (x[0] === "play:all")
+    return [
+      [x[0], "Every Sam play (15%+ off the market)"],
+      ...NBA_STATS.map((st): [string, string] => [`play:${st}`, `Plays: ${STAT_LABEL[st].toLowerCase()}`]),
+      ["play:edge-lo", "Sam 15% to 25% off the market"],
+      ["play:edge-mid", "Sam 25% to 40% off the market"],
+      ["play:edge-hi", "Sam 40%+ off the market"],
+    ];
+  if (x[0] === "lean:all") return [[x[0], "Sam vs the market, every prop"], ...NBA_STATS.map((st): [string, string] => [`lean:${st}`, `Lean: ${STAT_LABEL[st].toLowerCase()}`])];
   return [x];
 });
 
@@ -314,6 +324,9 @@ export function matches(id: string, r: Row, list: GradedPropsGame[]): boolean {
     return key === "dk-toward" ? toward : !toward;
   }
   if (group === "play") {
+    if (key === "edge-lo") return (m.gap ?? 0) < 0.25;
+    if (key === "edge-mid") return (m.gap ?? 0) >= 0.25 && (m.gap ?? 0) < 0.4;
+    if (key === "edge-hi") return (m.gap ?? 0) >= 0.4;
     if (key === "gap-lo") return (m.gap ?? 0) < 0.035;
     if (key === "gap-mid") return (m.gap ?? 0) >= 0.035 && (m.gap ?? 0) < 0.06;
     if (key === "gap-hi") return (m.gap ?? 0) >= 0.06;

@@ -95,7 +95,7 @@ function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: 
       <div className={`${s.ppMeta} ${s.num}`}>
         {[
           price !== null && w ? `${am(price)} ${w.book}` : null,
-          m.gap !== null ? `gap ${m.gap.toFixed(3)}` : null,
+          m.gap !== null ? (m.team === "" ? `Sam ${Math.round(m.gap * 100)}% off the market` : `gap ${m.gap.toFixed(3)}`) : null,
           `Sam ${m.model}`,
           david !== undefined ? `David ${david}${rwSide(m, david) === m.side ? " (agrees)" : rwSide(m, david) ? " (splits)" : ""}` : null,
           `market ${m.consensus}`,
@@ -529,7 +529,7 @@ function NbaGameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
               ))}
             </ol>
           ) : (
-            <p className={pp.ppNone}>No play clears the vig on his page.</p>
+            <p className={pp.ppNone}>Sam isn&apos;t 15% off the market on any prop.</p>
           )}
           <details className={s.ppAll}>
             <summary>{`Every prop (${g.markets.length})`}</summary>
@@ -586,7 +586,7 @@ export async function NbaPropsWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="nba-pp-week">{`Week ${v.week} NBA player props`}</h2>
         <p className={s.p}>
-          {`Sam's NBA props, saved before each tip and graded from ESPN's box score. A play is a market where his page says the price clears the vig. ${
+          {`Sam's NBA props, saved before each tip and graded from ESPN's box score. A play is a prop where Sam's projection sits 15%+ off the market's number (the middle of every book's line), bet at the best price posted on that number, never worse than -150. ${
             live.length
               ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the NBA system; plays that fall in one are marked.`
               : "Nothing has earned a place in the NBA system yet, so all of it is tracking, not money."
@@ -986,7 +986,7 @@ export async function PropsResearch({ season, league = "nfl" }: { season: number
       )}
       {nba ? (
         <p className={`${s.notice} ${s.dim}`}>
-          {"Sam's play is his own pick of side and book: a book off the consensus, nudged by his projection at the weight his page states (0% until this season has games behind it). The lean grades the side his projection points to on every market. A player who sat (ESPN's did-not-play) voids the prop. Sources: "}
+          {"An NBA play is Sam's projection against the market's number: the side his number sits from the consensus (the median of every book's line), at the best price posted on that line, when he is 15%+ and at least half a unit off it and the price is -150 or better (a number comparison can't see heavy juice). His page's own pick of an off-market book is not used. The lean grades the same comparison on every prop. A player who sat (ESPN's did-not-play) voids the prop. Sources: "}
           <a href={SAM_NBA}>Sam&apos;s Models</a> NBA props pages, ESPN scoreboard and box scores.
         </p>
       ) : (
