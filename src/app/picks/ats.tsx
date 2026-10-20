@@ -112,6 +112,7 @@ function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           <dt>Tier</dt>
           <dd>
             <TierChip t={g.tier} /> {g.read?.agree ? `avg edge ${g.read.avgEdge.toFixed(1)}` : ""}
+            {g.vetoedBy ? ` · skipped: ${g.vetoedBy} disagrees (veto)` : ""}
           </dd>
           {g.p !== undefined && (
             <>
@@ -277,6 +278,7 @@ function FinishedDetails({ g, r }: { g: BoardGame; r: PicksReport }) {
         <dd>
           <TierChip t={g.tier} /> {g.side ? pickText(g, name) : g.read && !g.read.agree ? "Sam and David split" : g.play}
           {g.read?.agree ? <span className={s.muted}>{` · avg edge ${g.read.avgEdge.toFixed(1)}, models ${g.read.modelGap.toFixed(1)} apart`}</span> : null}
+          {g.vetoedBy ? <span className={s.muted}>{` · fits the rule, skipped: ${g.vetoedBy} disagrees and the review made ${g.vetoedBy === "PEM" ? "PEM" : "him"} a veto`}</span> : null}
         </dd>
         <dt>Cuts</dt>
         <dd>
@@ -634,7 +636,8 @@ export function AtsResults({ r }: { r: PicksReport }) {
   );
 }
 
-export function AtsResearch({ r }: { r: PicksReport }) {
+/** `harris`: the college John Harris panel, placed between PEM and the game log. */
+export function AtsResearch({ r, harris }: { r: PicksReport; harris?: React.ReactNode }) {
   const st = r.strategies;
   const name = (k: string) => r.names[k] ?? k;
   const groups = [...new Set(st.cuts.filter((c) => c.group !== "Research").map((c) => c.group))];
@@ -780,6 +783,7 @@ export function AtsResearch({ r }: { r: PicksReport }) {
           </div>
         </details>
       )}
+      {harris}
       <details className={s.details}>
         <summary>{`Game log: all ${r.graded.length} graded games`}</summary>
         <div className={s.tw}>

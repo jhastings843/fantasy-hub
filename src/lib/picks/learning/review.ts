@@ -110,6 +110,8 @@ export interface ReviewInputs {
   decisions?: DecisionRecord[];
   /** Send keys of mornings that reached a decision (day markers). */
   decisionDays?: string[];
+  /** John Harris's sheet line per college game key (source hypotheses). */
+  harris?: Map<string, number>;
 }
 
 export interface ReviewResult {
@@ -236,7 +238,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
 
   // Evaluate and decide.
   const collecting = hs.filter((h) => h.status === "collecting");
-  const evaluations = collecting.map((h) => evaluate(h, { opps, issued: bets, active, ruleTest: x.ruleTest, sizing }));
+  const evaluations = collecting.map((h) => evaluate(h, { opps, issued: bets, active, ruleTest: x.ruleTest, sizing, harris: x.harris }));
   const decisions = collecting.map((h, i) => decide(h, evaluations[i], { calibration: cal, active }));
   for (const d of decisions.filter((y) => y.verdict === "reject")) {
     const h = hs.find((y) => y.id === d.id)!;
@@ -253,7 +255,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   if (promos.length && !rolledBack) {
     const h = hs.find((y) => y.id === promos[0].y.id)!;
     // Ids are unique by time, so a rollback can never lead to a reused id.
-    const next = applyPromotion(active, h, `p${at.replace(/[-:]/g, "").slice(0, 13)}`, at);
+    const next = applyPromotion(active, h, `p${at.replace(/[-:]/g, "").slice(0, 13)}`, at, promos[0].y.to);
     const historyAfter = await x.history();
     const fails = validate({ policy: next, replay: await x.replay(next), historyBefore, historyAfter });
     if (fails.length) {
@@ -263,7 +265,8 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
       if (!opts.dryRun) {
         await store.putVersion(next);
         await store.setActive(next);
-        await store.putHypothesis({ ...h, status: "promoted" });
+        // A source question never closes: it keeps testing from the switch, so the source can come back or go.
+        if (h.kind !== "source") await store.putHypothesis({ ...h, status: "promoted" });
       }
       await write({ at, kind: "activate", title: `Activated ${next.id} (${h.id})`, why: promos[0].y.why, policyBefore: active.id, policyAfter: next.id, rollbackTarget: active.id, evidence: evaluations.find((e) => e.id === h.id)?.comparison });
       active = next;

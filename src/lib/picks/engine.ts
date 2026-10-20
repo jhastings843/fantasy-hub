@@ -448,10 +448,11 @@ export function derivedCut(league: "nfl" | "cfb", withPem: boolean, id: string):
 export function strategies(
   league: "nfl" | "cfb",
   games: GradedGame[],
-  opts: { activated?: string[] } = {},
+  /** noPem: the strategy review dropped PEM (policy source "out"), so its cuts can't be the rule. */
+  opts: { activated?: string[]; noPem?: boolean } = {},
 ): StrategyBoard {
   const agreed = games.filter((g) => g.read.agree && g.result);
-  const withPem = games.some((g) => g.pem);
+  const withPem = !opts.noPem && games.some((g) => g.pem);
   const cuts: CutResult[] = cutsFor(league, withPem).map((cut) => {
     const hits = games.filter((g) => cutResult(g, cut) !== undefined);
     return {
@@ -545,6 +546,8 @@ export interface BoardGame {
   david?: ModelLine;
   read?: Read;
   tier: Tier;
+  /** A rule bet skipped because a veto source (PEM, Harris) disagreed. */
+  vetoedBy?: "PEM" | "Harris";
   /** "TB +8.5", or each model's side on a split. */
   play: string;
   /**
@@ -621,9 +624,11 @@ function withoutPem(t: CutTest): CutTest {
 
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; ref?: RefLine; started?: boolean }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; started?: boolean }[],
   s: StrategyBoard,
   suMethod = "avg",
+  /** Sources the strategy review made vetoes (policy source "veto"): a rule bet one disagrees with is skipped. */
+  veto: { pem?: boolean; harris?: boolean } = {},
 ): BoardGame[] {
   return rows.map((row) => {
     // A game that has kicked off is never actionable, whatever the cache says.
@@ -646,6 +651,9 @@ export function tierBoard(
       ...row, basis, read: r, tier: "wait", missing: "PEM", waitFor, play, su,
     });
 
+    // Veto sources: Harris's side at the line the board reads (PEM's comes from the read).
+    const at = row.ref?.line ?? (row.sam.market + row.david.market) / 2;
+    const harrisSide = row.harris === undefined || row.harris === at ? undefined : row.harris < at ? "home" : "away";
     if (!r.agree || !r.side || r.line === undefined) {
       const splitPlay = `Sam: ${team(r.samSide)} · David: ${team(r.davidSide)}`;
       const pemTier: "t1" | "t2" | null =
@@ -657,6 +665,8 @@ export function tierBoard(
         const m = r.pemSide === r.samSide ? row.sam : row.david;
         const homeLine = row.ref ? row.ref.line : m.market;
         const l = r.pemSide === "home" ? homeLine : -homeLine;
+        // PEM's own side can't be vetoed by PEM; Harris can veto it.
+        if (veto.harris && harrisSide && harrisSide !== r.pemSide) return { ...row, basis, read: r, tier: "split", play: splitPlay, su, vetoedBy: "Harris" };
         return {
           ...row, basis, read: r, tier: pemTier, play: `${team(r.pemSide)} ${fmt(l)}`, su, pemPick: true,
           side: r.pemSide, homeLine,
@@ -669,6 +679,10 @@ export function tierBoard(
     const play = `${team(r.side)} ${fmt(r.line)}`;
     const homeLine = r.side === "home" ? r.line : -r.line;
     const base = { ...row, basis, read: r, play, su, side: r.side, homeLine };
+    // A veto source that disagrees turns a rule bet into a pass, saying who.
+    const vetoedBy = veto.pem && r.pemSide && r.pemSide !== r.side ? "PEM" : veto.harris && harrisSide && harrisSide !== r.side ? "Harris" : undefined;
+    const isBet = (s.rule && matches(r, s.rule.test)) || (s.second && matches(r, s.second.test));
+    if (vetoedBy && isBet) return { ...base, tier: r.dog ? "pass" : "fav", vetoedBy };
     if (s.rule && matches(r, s.rule.test)) return { ...base, tier: "t1" };
     if (waiting(s.rule)) return { ...wait("t1", play), side: r.side, homeLine };
     if (s.second && matches(r, s.second.test)) return { ...base, tier: "t2" };

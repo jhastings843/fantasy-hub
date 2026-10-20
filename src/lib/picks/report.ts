@@ -24,7 +24,8 @@ import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
 import { type PicksCore, type PicksReport, type Quotes, type SizedCandidate, compose, exposureFrom, heldCandidates } from "./compose";
 import { loadActivePolicy } from "./policy-store";
-import { suInForce, totalsAllowed } from "./policy";
+import { sourceState, suInForce, totalsAllowed } from "./policy";
+import { harrisWeeks } from "./harris";
 import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
 import { archiveForecasts, loadForecasts } from "./forecasts";
@@ -274,14 +275,18 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   const davidLive = db.week === week ? db.rows : [];
   const dmap = new Map(davidLive.map((r) => [`${r.away}@${r.home}`, r]));
   const pemNow = (home: string, away: string) => (week ? pemLines.get(key({ week, home, away })) : undefined);
+  // John Harris's sheet lines this week (college, verified sheets only): used only when the review made him a veto.
+  const harrisLines = new Map<string, number>();
+  if (league === "cfb" && week) for (const w of await harrisWeeks(season).catch(() => [])) if (w.week === week && w.verified) for (const r of w.rows) harrisLines.set(`${r.away}@${r.home}`, r.model);
+  const harrisNow = (home: string, away: string) => harrisLines.get(`${away}@${home}`);
   const posted = week ? await notePosted(league, season, week, sb.week === week, db.week === week, pem.some((w) => w.week === week && w.verified)) : {};
   const rows: PicksCore["rows"] = samLive.map((r) => {
     const d = dmap.get(`${r.away}@${r.home}`);
     dmap.delete(`${r.away}@${r.home}`);
-    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), samTotal: r.modelTotal, davidTotal: d?.modelTotal };
+    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), harris: harrisNow(r.home, r.away), samTotal: r.modelTotal, davidTotal: d?.modelTotal };
   });
   for (const d of dmap.values()) {
-    rows.push({ home: d.home, away: d.away, david: d.line, pem: pemNow(d.home, d.away), davidTotal: d.modelTotal });
+    rows.push({ home: d.home, away: d.away, david: d.line, pem: pemNow(d.home, d.away), harris: harrisNow(d.home, d.away), davidTotal: d.modelTotal });
   }
 
   const seen = await loadTotalsSeen(league, season);
@@ -322,10 +327,10 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
       reviewAt: reviewState.lastReviewAt,
       policyId: policy.id,
       throughWeek: priorWeeks.length ? Math.max(...priorWeeks.map((g) => g.week)) : null,
-      board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates) }),
+      board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" }),
     });
   }
-  const s = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates) });
+  const s = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" });
   // Straight up uses the method in force (policy.suInForce), which only the
   // strategy review changes, on games after registration; not this season's best record.
   const suAll = suRecords(league, j.graded);

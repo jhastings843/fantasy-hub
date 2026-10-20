@@ -33,7 +33,26 @@ export interface PicksPolicy {
   totalsCandidates?: string[];
   /** The straight-up method the review switched to, per league; absent = SU_DEFAULT. */
   suMethod?: { nfl?: string; cfb?: string };
+  /** Outside sources (college): how each is used, as the review last set it; absent = SOURCE_DEFAULT. */
+  sources?: { pem?: SourceState; harris?: SourceState };
+  /** When the review last switched each source: its value test restarts then. */
+  sourcesChangedAt?: { pem?: string; harris?: string };
 }
+
+/**
+ * How an outside source feeds the college rule.
+ *   out    ignored: none of its cuts can be the rule, it vetoes nothing.
+ *   cuts   its agreement cuts compete for the rule (PEM's "All three agree"...); no veto.
+ *   veto   as cuts, and a rule bet it disagrees with is skipped.
+ * The strategy review moves a source between these on forward evidence only
+ * (learning/model.ts "source"): a clear gain from skipping its disagreements
+ * adds the veto; a clear loss drops it to out.
+ */
+export type SourceState = "out" | "cuts" | "veto";
+export type Source = "pem" | "harris";
+/** As of 2026-10-20: PEM's cuts compete (no veto), Harris is tracked only. */
+export const SOURCE_DEFAULT: { [s in Source]: SourceState } = { pem: "cuts", harris: "out" };
+export const sourceState = (p: PicksPolicy, s: Source): SourceState => p.sources?.[s] ?? SOURCE_DEFAULT[s];
 
 /**
  * The straight-up method in force when straight up joined the learning loop

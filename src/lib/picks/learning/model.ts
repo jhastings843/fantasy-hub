@@ -10,7 +10,9 @@
 //   is best"); change staking parameters (kind, Kelly scale,
 //   prior) inside the protected envelope (limits.ts); activate a totals
 //   refinement as a totals rule candidate; switch the straight-up method
-//   (both added 2026-10-20 so every Picks market learns the same way).
+//   (both added 2026-10-20 so every Picks market learns the same way); add
+//   or drop an outside source (PEM, John Harris) as a veto on college rule
+//   bets, on whether skipping its disagreements gains or loses.
 //   REPORTS ONLY (a proposal for a person): send timing, parlays (the
 //   envelope forbids enabling them), PEM's weight. Those either live in code a review must not edit, or
 //   already select themselves on forward evidence.
@@ -24,7 +26,7 @@
 // same quotes, the same prices.
 
 import { MAX_KELLY_SCALE, MAX_STAKE, MIN_PRIOR_GAMES, MIN_STAKE } from "../limits";
-import { BASELINE_POLICY, SU_DEFAULT, envelopeViolations, suInForce, type PicksPolicy, type StakingPolicy } from "../policy";
+import { BASELINE_POLICY, SU_DEFAULT, envelopeViolations, sourceState, suInForce, type PicksPolicy, type Source, type SourceState, type StakingPolicy } from "../policy";
 import { type TotalsTest, gradeTotal, readTotal, totalsCuts, totalsMatches } from "../totals";
 import { type CutTest, type Result, STEPPABLE, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
@@ -65,7 +67,7 @@ export const CRITERIA = {
 
 // --------------------------------------------------------------- hypotheses
 
-export type HypothesisKind = "ats-cut" | "totals-cut" | "stake-policy" | "timing" | "parlay" | "su-method" | "pem";
+export type HypothesisKind = "ats-cut" | "totals-cut" | "stake-policy" | "timing" | "parlay" | "su-method" | "pem" | "source";
 
 export interface Hypothesis {
   id: string;
@@ -79,7 +81,8 @@ export interface Hypothesis {
     | { kind: "timing"; label: string }
     | { kind: "parlay"; label: string; minEdge: number }
     | { kind: "su-method"; method: string; vs: string; label: string }
-    | { kind: "pem"; label: string };
+    | { kind: "pem"; label: string }
+    | { kind: "source"; source: Source; label: string };
   /** Activatable automatically, or a report/proposal only. */
   actionable: boolean;
   registeredAt: string;
@@ -152,7 +155,22 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
         origin: "Jack, 2026-10-20: every market on the same loop; a straight-up method vs the one in force",
       }),
     );
-    return [...totals, ...su];
+    const sources =
+      league === "cfb"
+        ? (["pem", "harris"] as const).map(
+            (src): Hypothesis => ({
+              id: `cfb:source:${src}`,
+              kind: "source",
+              league,
+              definition: { kind: "source", source: src, label: `${src === "pem" ? "PEM" : "John Harris"}: does skipping the rule bets it disagrees with gain?` },
+              actionable: true,
+              registeredAt,
+              status: "collecting",
+              origin: "Jack, 2026-10-20: keep checking whether PEM and Harris add value, and add or drop them at any time",
+            }),
+          )
+        : [];
+    return [...totals, ...su, ...sources];
   });
   return [
     {
@@ -438,6 +456,8 @@ export interface EvalInputs {
   ruleTest: { nfl?: CutTest; cfb?: CutTest };
   /** Recorded send decisions and what they need to be checked and scored (stake-policy hypotheses). */
   sizing?: SizingInputs;
+  /** John Harris's sheet line per college game key (home side), from his verified sheets. */
+  harris?: Map<string, number>;
 }
 
 export interface SizingInputs {
@@ -496,12 +516,45 @@ export function scoreSu(method: string, o: Opportunity): Scored {
   return { bet: true, units: right ? 1 : -1, risked: 1, result: right ? "W" : "L" };
 }
 
+/** A source's side on a game at the last pregame snapshot's line; null when it has no number or sits on the line. */
+export function sourceSide(src: Source, o: Opportunity, harris?: Map<string, number>): "home" | "away" | null {
+  const s = o.last;
+  if (!s.ref || !s.sam || !s.david) return null;
+  if (src === "pem") return readAt(s.ref.line, s.sam, s.david, s.pem).pemSide ?? null;
+  const h = harris?.get(o.key);
+  return h === undefined || h === s.ref.line ? null : h < s.ref.line ? "home" : "away";
+}
+
+/**
+ * A source's value, per game: the rule's bet at the last pregame snapshot
+ * (PEM posts midweek, after most first snapshots), and the same bet skipped
+ * when the source disagrees. Challenger = with the veto. Games where the
+ * source has no number score the same on both sides.
+ */
+export function sourcePairs(src: Source, rule: CutTest, opps: Opportunity[], harris?: Map<string, number>): { o: Opportunity; ch: Scored; inc: Scored }[] {
+  return opps.map((o) => {
+    const inc = scoreCut(rule, o.last, o);
+    if (!inc.bet) return { o, ch: inc, inc };
+    const r = readAt(o.last.ref!.line, o.last.sam!, o.last.david!, o.last.pem);
+    const side = rule.pemSplit ? r.pemSide : r.side;
+    const theirs = sourceSide(src, o, harris);
+    return { o, ch: theirs && side && theirs !== side ? none : inc, inc };
+  });
+}
+
 export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
   const opps = after(h, x.opps).filter((o) => h.league === "both" || o.league === h.league);
   const d = h.definition;
   switch (d.kind) {
     case "ats-cut":
       return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) }))) };
+    case "source": {
+      const t = x.ruleTest.cfb;
+      if (!t) return { id: h.id, note: "no rule in force" };
+      const since = [h.registeredAt, x.active.sourcesChangedAt?.[d.source] ?? ""].sort().at(-1)!;
+      const own = x.opps.filter((o) => o.league === "cfb" && o.first.at >= since);
+      return { id: h.id, comparison: compare(sourcePairs(d.source, t, own, x.harris)), note: `${d.source} is ${sourceState(x.active, d.source)}; challenger = skip its disagreements` };
+    }
     case "totals-cut":
       return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) }))) };
     case "timing": {
@@ -599,6 +652,8 @@ export interface Decision {
   id: string;
   verdict: "promote" | "retain" | "reject" | "report";
   why: string;
+  /** Source decisions: the state a promotion moves it to. */
+  to?: string;
 }
 
 /** The acceptance test. Insufficient or failed evidence keeps the incumbent, with the reason. */
@@ -607,6 +662,7 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
     const c = e.comparison;
     return { id: h.id, verdict: "report", why: c ? `report only: n=${c.n}, mean difference ${c.meanDiff}u per game, t=${c.t}${e.note ? `; ${e.note}` : ""}` : e.note ?? "report only" };
   }
+  if (h.definition.kind === "source") return decideSource(h.definition.source, e, ctx.active, h.id);
   const c = e.comparison;
   if (h.definition.kind === "stake-policy" && (!c || !e.sizing?.decisions)) {
     // No replay, no promotion: an estimate without the limits can't size anything up.
@@ -640,9 +696,40 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
   return { id: h.id, verdict: "promote", why: `beat the incumbent on ${c.n} matched games over ${c.weeks.length} weeks: +${c.meanDiff}u per game, t=${c.t}; CLV ${c.challenger.clv ?? "n/a"} vs ${c.incumbent.clv ?? "n/a"}` };
 }
 
+/**
+ * Add or drop a source. Symmetric on purpose: the same paired test on the
+ * same bar, run again from every switch, so a source can come back.
+ *   gain (t >= MIN_T): skipping its disagreements helps -> veto
+ *   loss (t <= -MIN_T): its disagreements are the bets that win -> out
+ */
+function decideSource(src: Source, e: Evaluation, active: PicksPolicy, id: string): Decision {
+  const c = e.comparison;
+  const state = sourceState(active, src);
+  if (!c) return { id, verdict: "retain", why: e.note ?? "nothing to compare yet" };
+  const gaps: string[] = [];
+  if (c.n < CRITERIA.MIN_OPPORTUNITIES) gaps.push(`${c.n} of ${CRITERIA.MIN_OPPORTUNITIES} settled rule bets`);
+  if (c.weeks.length < CRITERIA.MIN_WEEKS) gaps.push(`${c.weeks.length} of ${CRITERIA.MIN_WEEKS} weeks`);
+  const read = `skipping its disagreements: ${c.meanDiff >= 0 ? "+" : ""}${c.meanDiff}u per game, t=${c.t}`;
+  if (gaps.length) return { id, verdict: "retain", why: `${src} stays ${state}; insufficient evidence: ${gaps.join(", ")} (${read})` };
+  if (c.t >= CRITERIA.MIN_T && state !== "veto") return { id, verdict: "promote", why: `adds value: ${read} over ${c.n} games, ${c.weeks.length} weeks`, to: "veto" };
+  if (c.t <= -CRITERIA.MIN_T && state !== "out") return { id, verdict: "promote", why: `costs money: ${read} over ${c.n} games, ${c.weeks.length} weeks`, to: "out" };
+  return { id, verdict: "retain", why: `${src} stays ${state}: ${read}` };
+}
+
 /** The policy a promotion would produce: a new frozen version, never an edit. */
-export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, at: string): PicksPolicy {
+export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, at: string, to?: string): PicksPolicy {
   const d = h.definition;
+  if (d.kind === "source" && to) {
+    const next = to as SourceState;
+    return {
+      ...active,
+      id,
+      createdAt: at,
+      sources: { ...active.sources, [d.source]: next },
+      sourcesChangedAt: { ...active.sourcesChangedAt, [d.source]: at },
+      summary: `${active.summary}; ${d.source === "pem" ? "PEM" : "Harris"} ${next === "veto" ? "added as a veto" : next === "out" ? "dropped" : "cuts only"}`,
+    };
+  }
   if (d.kind === "ats-cut") {
     // League-scoped: the same research id can mean different cuts per league.
     const scoped = `${h.league}:${d.cutId}`;

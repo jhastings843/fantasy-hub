@@ -1,5 +1,5 @@
 import "server-only";
-import { harrisReview } from "../harris";
+import { harrisReview, harrisWeeks } from "../harris";
 import { dropPicksCore, getPicksCore, getQuotes } from "../report";
 import { activatedFor } from "../report-scope";
 import { strategies } from "../engine";
@@ -12,7 +12,7 @@ import { unitReport } from "../units";
 import { confirmed } from "../issued";
 import { firstSends } from "../update";
 import type { League } from "../parse";
-import type { PicksPolicy } from "../policy";
+import { sourceState, type PicksPolicy } from "../policy";
 import { redisStore } from "./store";
 import { runReview, type ReviewInputs, type ReviewResult } from "./review";
 import { WEEKLY_CAP } from "../limits";
@@ -53,7 +53,7 @@ async function gather(now: Date): Promise<ReviewInputs> {
             // activated cut is actually exercised by the replay.
             // On the same games the weekly rule is chosen on (weeks before this one).
             const prior = core.week ? core.graded.filter((g) => g.week < core.week!) : core.graded;
-            const replayCore = { ...core, strategies: strategies(league, prior, { activated: activatedFor(league, policy.atsCandidates) }) };
+            const replayCore = { ...core, strategies: strategies(league, prior, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" }) };
             const r = compose({ core: replayCore, quotes, issued: recs, exposure: ex, policy });
             const stakes = [...r.board.map((g) => g.stake ?? 0), ...r.totals.board.map((g) => g.stake ?? 0)].filter((x) => x > 0);
             const unpriced = r.board.filter((g) => (g.stake ?? 0) > 0 && g.priceSource !== "quoted").length;
@@ -62,7 +62,10 @@ async function gather(now: Date): Promise<ReviewInputs> {
         ];
       }),
     );
-  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days };
+  // Harris's sheet lines, verified sheets only, keyed like every other college game.
+  const harris = new Map<string, number>();
+  for (const w of await harrisWeeks(season).catch(() => [])) if (w.verified) for (const r of w.rows) harris.set(`${w.week}:${r.away}@${r.home}`, r.model);
+  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days, harris };
 }
 
 export async function runStrategyReview(opts: { dryRun?: boolean; reason?: string; now?: Date } = {}): Promise<ReviewResult> {

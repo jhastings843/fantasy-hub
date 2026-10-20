@@ -13,7 +13,7 @@ import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
 import { summarize, type ClvRow } from "./closing";
 import { allocate, type Allocation, type Candidate, type Exposure } from "./allocate";
-import { BASELINE_POLICY, type PicksPolicy } from "./policy";
+import { BASELINE_POLICY, sourceState, type PicksPolicy } from "./policy";
 import { type IssuedRecord, type IssuedWeek, confirmed, gradeIssued, issuedClv } from "./issued";
 import { type UnitReport, unitReport } from "./units";
 import { firstSends } from "./update";
@@ -43,6 +43,8 @@ export interface CoreRow {
   sam?: ModelLine;
   david?: ModelLine;
   pem?: PemLine;
+  /** John Harris's sheet line, home side (college, verified sheets only). */
+  harris?: number;
   samTotal?: number;
   davidTotal?: number;
 }
@@ -167,7 +169,8 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   };
   const withRefs = core.rows.map((r) => ({ ...r, ...refOf(r.home, r.away) }));
   const s = core.strategies;
-  const tiered = tierBoard(core.league, withRefs, s, core.su.best?.id ?? "avg");
+  const veto = core.league === "cfb" ? { pem: sourceState(policy, "pem") === "veto", harris: sourceState(policy, "harris") === "veto" } : {};
+  const tiered = tierBoard(core.league, withRefs, s, core.su.best?.id ?? "avg", veto);
   const tierRec = (c: { record: { w: number; l: number }; activated?: boolean } | null) =>
     c ? { w: c.record.w, l: c.record.l, activated: c.activated } : undefined;
   const wanted = wantStakes(tiered, { t1: tierRec(s.rule), t2: tierRec(s.second) }, policy.staking);

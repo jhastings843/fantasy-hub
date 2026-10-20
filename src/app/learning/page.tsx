@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redisStore } from "@/lib/picks/learning/store";
 import { loadActivePolicy } from "@/lib/picks/policy-store";
-import { suInForce, type PicksPolicy } from "@/lib/picks/policy";
+import { sourceState, suInForce, type PicksPolicy, type Source } from "@/lib/picks/policy";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { loadSection } from "@/lib/learning/store";
 import { PROPS_SECTION } from "@/lib/props/learn";
@@ -55,6 +55,17 @@ function picksMarket(state: ReviewState | null, policy: PicksPolicy, league: "nf
   };
 }
 
+const STATE_TEXT = { out: "Not used", cuts: "Its agreement cuts can be the rule; no veto", veto: "Veto: a college rule bet it disagrees with is skipped" } as const;
+
+function sourceRow(state: ReviewState | null, policy: PicksPolicy, src: Source): Pick<Row, "live" | "collecting" | "last"> {
+  const d = state?.decisions?.find((x) => x.id === `cfb:source:${src}`);
+  return {
+    live: STATE_TEXT[sourceState(policy, src)],
+    collecting: d ? d.why : "Registers at the next Tuesday review",
+    last: state?.lastReviewAt ?? null,
+  };
+}
+
 function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> {
   const es = Object.values(st.entries);
   const live = es.filter((e) => e.status === "active");
@@ -97,6 +108,15 @@ export default async function LearningPage() {
           { name: `${L} straight up`, loop: `${PICKS} (+1 right, −1 wrong per game)`, href: `${base}?m=su&v=research`, ...picksMarket(state, policy, l, "su") },
         ];
       }),
+    },
+    {
+      title: "Outside sources (college)",
+      rows: (["pem", "harris"] as const).map((src) => ({
+        name: src === "pem" ? "PEM (@FansOfCFB)" : "John Harris (@jhnhrris)",
+        loop: "Picks review: does skipping the rule bets it disagrees with gain? Gain at t 1.645 over 30+ bets and 3+ weeks adds it as a veto; a loss on the same bar drops it. Retested from every switch.",
+        href: "/picks/cfb?v=research",
+        ...sourceRow(state, policy, src),
+      })),
     },
     {
       title: "NBA picks",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyPromotion, decide, evaluate, laterHypotheses, scoreSu, scoreTotal, type Hypothesis, type Opportunity } from "./model";
-import { BASELINE_POLICY, SU_DEFAULT, suInForce, totalsAllowed } from "../policy";
+import { applyPromotion, decide, evaluate, laterHypotheses, scoreSu, scoreTotal, sourcePairs, type Hypothesis, type Opportunity } from "./model";
+import { tierBoard } from "../engine";
+import { BASELINE_POLICY, SOURCE_DEFAULT, SU_DEFAULT, sourceState, suInForce, totalsAllowed } from "../policy";
 import { totalsBacktest } from "../totals";
 import type { ForecastSnapshot } from "../forecasts";
 
@@ -93,5 +94,64 @@ describe("totals rule only from allowed cuts", () => {
     const gated = totalsBacktest("nfl", seen, finals, [], new Map(), keyOf, new Set(["t-agree"]));
     expect(all.rule?.id).toBe("t-under");
     expect(gated.rule?.id).toBe("t-agree");
+  });
+});
+
+describe("PEM and Harris: added or dropped on forward evidence", () => {
+  const hs = laterHypotheses("2026-10-20T11:00:00Z");
+  const cmp = (t: number, meanDiff: number) => ({ n: 34, weeks: [8, 9, 10], meanDiff, t, challenger: { bets: 20, units: 2, risked: 20, roi: 0.1, clv: null, clvN: 0, drawdown: 2 }, incumbent: { bets: 34, units: -1, risked: 34, roi: 0, clv: null, clvN: 0, drawdown: 4 } });
+  const cal = { n: 0, meanP: 0, winRate: 0, brier: 0, calibrated: false };
+
+  it("registers a standing question for each, college only", () => {
+    expect(hs.filter((h) => h.kind === "source").map((h) => h.id).sort()).toEqual(["cfb:source:harris", "cfb:source:pem"]);
+    expect(SOURCE_DEFAULT).toEqual({ pem: "cuts", harris: "out" });
+  });
+
+  it("a clear gain from skipping its disagreements adds it as a veto; a clear loss drops it", () => {
+    const harris = hs.find((h) => h.id === "cfb:source:harris")!;
+    const add = decide(harris, { id: harris.id, comparison: cmp(2.1, 0.2) }, { calibration: cal, active: BASELINE_POLICY });
+    expect(add).toMatchObject({ verdict: "promote", to: "veto" });
+    const p = applyPromotion(BASELINE_POLICY, harris, "p9", "2026-11-10T00:00:00Z", add.to);
+    expect(sourceState(p, "harris")).toBe("veto");
+    expect(p.sourcesChangedAt?.harris).toBe("2026-11-10T00:00:00Z");
+    // Later, from veto, a clear loss drops him.
+    const drop = decide(harris, { id: harris.id, comparison: cmp(-1.9, -0.2) }, { calibration: cal, active: p });
+    expect(drop).toMatchObject({ verdict: "promote", to: "out" });
+    // A gain while already a veto changes nothing.
+    expect(decide(harris, { id: harris.id, comparison: cmp(2.1, 0.2) }, { calibration: cal, active: p }).verdict).toBe("retain");
+    // PEM starts at cuts: a loss drops it to out.
+    const pem = hs.find((h) => h.id === "cfb:source:pem")!;
+    expect(decide(pem, { id: pem.id, comparison: cmp(-2, -0.3) }, { calibration: cal, active: BASELINE_POLICY })).toMatchObject({ verdict: "promote", to: "out" });
+    // Too few games: no move either way.
+    expect(decide(pem, { id: pem.id, comparison: { ...cmp(-3, -0.5), n: 12 } }, { calibration: cal, active: BASELINE_POLICY }).verdict).toBe("retain");
+  });
+
+  it("scores the veto per rule bet: a disagreement is skipped, the rest bet as before", () => {
+    // Sam -9 and David -8 against -6: both on home. PEM -2: away. Harris -10: home.
+    const s = snap({ sam: { model: -9, market: -6 }, david: { model: -8, market: -6 }, pem: { model: -2, market: -6 } });
+    const o = { ...opp({ home: 20, away: 17 }, s), league: "cfb" as const };
+    const [pair] = sourcePairs("pem", {}, [o]);
+    expect(pair.inc.bet).toBe(true);
+    expect(pair.ch.bet).toBe(false);
+    const [h] = sourcePairs("harris", {}, [o], new Map([[o.key, -10]]));
+    expect(h.ch.bet).toBe(true);
+  });
+
+  it("the board skips a rule bet a veto source disagrees with, and says who", () => {
+    const row = { home: "KC", away: "LV", sam: { model: -9, market: -6 }, david: { model: -8, market: -6 }, pem: { model: -2, market: -6 }, harris: -10 };
+    const s = { rule: { id: "agree", label: "Both agree", test: {}, record: { w: 10, l: 2, p: 0, pct: 0.8, lo: 0.6, hi: 0.9, units: 7 } }, second: null } as unknown as Parameters<typeof tierBoard>[2];
+    expect(tierBoard("cfb", [row], s)[0].tier).toBe("t1");
+    expect(tierBoard("cfb", [row], s, "avg", { pem: true })[0]).toMatchObject({ vetoedBy: "PEM" });
+    expect(tierBoard("cfb", [row], s, "avg", { harris: true })[0].tier).toBe("t1");
+  });
+});
+
+describe("Harris veto on a PEM split pick (Astra, 2026-10-20)", () => {
+  it("skips PEM's side when Harris is a veto and disagrees", () => {
+    // Sam home, David away; PEM home. Harris away.
+    const row = { home: "KC", away: "LV", sam: { model: -9, market: -6 }, david: { model: -2, market: -6 }, pem: { model: -10, market: -6 }, harris: -1 };
+    const s = { rule: { id: "pem-split", label: "PEM's side", test: { pemSplit: true }, record: { w: 10, l: 2, p: 0, pct: 0.8, lo: 0.6, hi: 0.9, units: 7 } }, second: null } as unknown as Parameters<typeof tierBoard>[2];
+    expect(tierBoard("cfb", [row], s)[0].tier).toBe("t1");
+    expect(tierBoard("cfb", [row], s, "avg", { harris: true })[0]).toMatchObject({ tier: "split", vetoedBy: "Harris" });
   });
 });
