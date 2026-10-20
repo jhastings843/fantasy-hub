@@ -106,6 +106,19 @@ const THIN_GAIN_CAP_SHARE = 0.1;
 const COMPARABLE_WITHIN = 2;
 
 /**
+ * Depth is a dollar when the pool can replace him.
+ *
+ * A player who does not crack your lineup this week is insurance, and in a
+ * guillotine room insurance gets cheaper every week: each chop dumps another
+ * roster onto waivers while there is one fewer team to start anybody. Week 7
+ * priced Hurts, Daniels and Burrow at $17 to $19 as quarterback depth, in a
+ * room where quarterbacks went for $1, $5 and $1 in weeks 4 to 6 and nobody
+ * alive would start two of them. When another free player at his position
+ * projects within this share of his season rate, the depth bid is the minimum.
+ */
+const DEPTH_REPLACEABLE_SHARE = 0.9;
+
+/**
  * What a bid adds on top of the market price to actually win it.
  *
  * The research is blunt about this: the ideal win is a dollar over second
@@ -234,6 +247,16 @@ export function comparableSupply(player: PoolPlayer, candidates: PoolPlayer[]): 
       c.position === player.position &&
       Math.abs(c.weekPoints - player.weekPoints) <= COMPARABLE_WITHIN,
   ).length;
+}
+
+/** Another free player at his position whose season rate is nearly as good. */
+export function hasFreeReplacement(player: PoolPlayer, candidates: PoolPlayer[]): boolean {
+  return candidates.some(
+    (c) =>
+      c.playerId !== player.playerId &&
+      c.position === player.position &&
+      c.rosPoints >= player.rosPoints * DEPTH_REPLACEABLE_SHARE,
+  );
 }
 
 /**
@@ -516,11 +539,13 @@ export function buildBidCard(input: RecommendInput): BidCard {
       const contested = contestedBy(player, rivals, market.estimates[tier].expected);
       const supply = comparableSupply(player, candidates);
       competition.set(player.playerId, { contested: contested.length, supply });
-      const price = priceTarget(tier, gain, market, budget, posture, {
+      const priced = priceTarget(tier, gain, market, budget, posture, {
         quality: qualityFactor(player, bars),
         plays,
         demand: demandPressure(contested.length, supply, rivals.length > 0),
       });
+      const replaceable = gain <= 0 && hasFreeReplacement(player, candidates);
+      const price = replaceable ? { ...priced, bid: MIN_BID, walkAway: MIN_BID } : priced;
 
       const target: BidTarget = {
         player,
@@ -535,11 +560,15 @@ export function buildBidCard(input: RecommendInput): BidCard {
           : null,
         slot,
         ...price,
-        reason: reasonFor(player, tier, gain, displacedPlayer?.name ?? null, {
-          contested,
-          supply,
-          rivalsKnown: rivals.length > 0,
-        }),
+        reason:
+          reasonFor(player, tier, gain, displacedPlayer?.name ?? null, {
+            contested,
+            supply,
+            rivalsKnown: rivals.length > 0,
+          }) +
+          (replaceable
+            ? ` Depth only: another ${player.position} about as good is still free, and every chop adds more, so this is a minimum bid.`
+            : ""),
       };
       return target;
     })

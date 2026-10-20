@@ -7,6 +7,7 @@ import {
   priceTarget,
   startersByPosition,
   strictlyDescending,
+  hasFreeReplacement,
 } from "./recommend";
 import type { RecommendInput } from "./recommend";
 import { buildMarket } from "./market";
@@ -803,5 +804,15 @@ describe("isFillIn", () => {
 
   it("does not mark a starter with a good matchup", () => {
     expect(isFillIn(player("wr", "WR", 15, { rosPoints: 12 }))).toBe(false);
+  });
+});
+
+describe("hasFreeReplacement", () => {
+  const qb = (id: string, ros: number) => ({ playerId: id, position: "QB", rosPoints: ros }) as never;
+  it("finds a free player at the position nearly as good", () => {
+    expect(hasFreeReplacement(qb("a", 18.3), [qb("a", 18.3), qb("b", 17.0)])).toBe(true);
+  });
+  it("says no when he is the only one left at that level", () => {
+    expect(hasFreeReplacement(qb("a", 18.3), [qb("a", 18.3), qb("b", 12.0)])).toBe(false);
   });
 });
