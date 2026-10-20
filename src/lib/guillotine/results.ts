@@ -42,10 +42,13 @@ export function actualsFor(results: WeekResult[], rosterId: number): number[] {
 
 /** Where a roster finished in one week. Null when it did not score that week. */
 export function standingFor(result: WeekResult, rosterId: number): LastWeek | null {
-  const mine = result.scores.find((s) => s.rosterId === rosterId);
-  if (!mine || result.scores.length === 0) return null;
+  // Chopped teams keep their roster slot on Sleeper and score exactly 0 every
+  // week after, so a zero is a team already gone, not the week's low score.
+  const live = result.scores.filter((s) => s.points > 0);
+  const mine = live.find((s) => s.rosterId === rosterId);
+  if (!mine) return null;
 
-  const ascending = [...result.scores].sort((a, b) => a.points - b.points);
+  const ascending = [...live].sort((a, b) => a.points - b.points);
   const lowest = ascending[0].points;
   const rankFromBottom = ascending.findIndex((s) => s.rosterId === rosterId) + 1;
 
@@ -53,7 +56,7 @@ export function standingFor(result: WeekResult, rosterId: number): LastWeek | nu
     week: result.week,
     score: mine.points,
     rankFromBottom,
-    teams: result.scores.length,
+    teams: live.length,
     lowest,
     margin: mine.points - lowest,
   };

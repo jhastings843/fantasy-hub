@@ -56,6 +56,15 @@ describe("standingFor", () => {
   it("returns null for a roster that did not play", () => {
     expect(standingFor(week2, 1)).toBeNull();
   });
+  it("skips chopped teams, which score 0 on an empty roster", () => {
+    const week = { week: 5, scores: [{ rosterId: 1, points: 0 }, { rosterId: 2, points: 0 }, { rosterId: 3, points: 58.2 }, { rosterId: 4, points: 130.4 }] };
+    const s = standingFor(week, 4)!;
+    expect(s.lowest).toBe(58.2);
+    expect(s.margin).toBeCloseTo(72.2);
+    expect(s.rankFromBottom).toBe(2);
+    expect(s.teams).toBe(2);
+    expect(standingFor(week, 1)).toBeNull();
+  });
 });
 
 describe("lastWeekFor", () => {
