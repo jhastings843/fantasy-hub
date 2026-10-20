@@ -85,8 +85,9 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-19",
+  "last_worked": "2026-10-20",
   "notes": [
+    "2026-10-20: Strategy review's generated cuts can now activate on their own under the same evidence test; cut-row spacing fixed.",
     "2026-10-19: NBA props (/props?m=nba) and NBA picks (/picks/nba) tracked like football: saved pregame, graded, same results/research/learning; NBA picks unstaked until a go-live gate, then own limits.",
     "2026-10-19: Whole site restyled to the Picks ledger look, dark always (src/app/ledger-look.css remaps Tailwind zinc/amber/emerald/rose + fonts; .dark class on <html>). Backup: git tag pre-ledger-look; undo = git revert 1ca630b.",
     "2026-10-19: Money > Phil: pilot tracks replaced by a learner log of Phil's retros (lessons, playbook changes, notes).",

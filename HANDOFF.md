@@ -2,6 +2,10 @@
 
 
 
+## Picks learning: generated cuts act on their own (2026-10-20, 22c398f)
+- Jack: "allow it to implement things on its own so long as it is best." Neighbour cuts the Tuesday review generates (`propose`, e.g. `cfb:ats:both-edge-3~minBothEdge2`) are now `actionable: true` and pass through the same frozen CRITERIA as built-in research cuts (30+ matched games, 3+ weeks, t >= 1.645, CLV and drawdown checks, auto rollback). `engine.derivedCut` rebuilds them from their id (`<research cut>~<minLine|maxLine|minBothEdge|minAvgEdge><value>`, chains allowed), so activation needs no code change. Generated cuts already collecting are flipped at the next review (journal "can now go live on its own"). Unchanged: limits, parlays, grading, CRITERIA, and the other report-only questions (timing, SU method, PEM, Harris tracker). NBA has no proposal step.
+- "Every cut tested" rows: record column 62 -> 84px (76px on phones) and no wrapping.
+
 ## Money > Phil: learner log replaces pilot tracks (2026-10-19, deployed 2026-10-19)
 - Phil and Kalshi Phil tabs: "Pilot tracks" removed; "Learner log" shows the newest 10 retros (journal/retros/RETRO-*.md in trade-bot/phil and kalshi-phil). Headline = the retro's commit subject; tags lesson / changed / noted / review. Split by venue (2026-10-19): Phil tab = Polymarket half only; Kalshi tab = Kalshi Phil's own retros plus "Shadow learner log" (Kalshi sections of Phil's retros, only retros where a shadow decision settled). All logs are closed folds. Parsed in trade-bot `money_export.parse_retro` (free-form markdown: "Lesson ..." paragraphs and sections with "lesson" in the heading, bullets under Edits/Playbook edit, other sections as noted with their Verdict line or first sentence). `Phil.learner?: PhilLearn[]` in types.ts. If retros change shape and items go missing, fix the parser there.
 
