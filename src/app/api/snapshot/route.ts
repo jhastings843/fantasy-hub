@@ -8,6 +8,7 @@ import { settleFinishedWeeks, snapshotWeek } from "@/lib/scorecard/run";
 import { runFirstTd } from "@/lib/firsttd/store";
 import { runProps } from "@/lib/props/store";
 import { runNbaProps } from "@/lib/props/nba-props";
+import { runNbaPicks } from "@/lib/picks/nba-track-store";
 
 export const dynamic = "force-dynamic";
 
@@ -161,6 +162,18 @@ export async function GET(request: Request) {
       failures.push(`nba props: ${message}`);
     }
 
+    // NBA game picks: pregame reads, finals, the weekly review.
+    let nbaPicks: unknown;
+    try {
+      const r = await runNbaPicks();
+      nbaPicks = r;
+      for (const p of r.problems) failures.push(`nba picks: ${p}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      nbaPicks = { error: message };
+      failures.push(`nba picks: ${message}`);
+    }
+
     return Response.json({
       ok: failures.length === 0,
       failures,
@@ -169,6 +182,7 @@ export async function GET(request: Request) {
       firstTd,
       props,
       nbaProps,
+      nbaPicks,
       jingles,
       thursday,
       scorecard,

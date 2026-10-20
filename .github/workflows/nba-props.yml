@@ -1,5 +1,6 @@
-name: NBA props capture
+name: NBA props and picks capture
 
+# Also saves Sam's NBA game picks (/api/picks/nba) on the same slots.
 # Sam posts an NBA player props page per game and only keeps the current
 # slate online, so the tracker saves each page before tip and grades it from
 # ESPN once final. NBA games are daily: the early slot (noon ET) grades last
@@ -28,4 +29,8 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nba")
           echo "HTTP $status"
           jq -r '.report | "NBA props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' nba.json | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$status" = "200" ]
+          pkstatus=$(curl -sS -o picks.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/picks/nba")
+          echo "picks HTTP $pkstatus"
+          jq -r '.report | "NBA picks: saved \(.saved | length), settled \(.settled | length)", (if .review then "review: \(.review)" else empty end), (.problems[]? | "problem: \(.)")' picks.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ] && [ "$pkstatus" = "200" ]

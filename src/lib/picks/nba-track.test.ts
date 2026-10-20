@@ -1,0 +1,115 @@
+import { describe, expect, it } from "vitest";
+import { compareCut, cutRecord, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
+
+const snap = (x: Partial<NbaSnap> = {}): NbaSnap => ({ at: "2026-10-20T12:00:00Z", line: -4.5, homePrice: -110, awayPrice: -110, total: 230.5, overPrice: -110, underPrice: -110, mlHome: -190, mlAway: 160, model: -7, modelTotal: 226, ...x });
+const game = (i: number, x: Partial<NbaTracked> = {}, s: Partial<NbaSnap> = {}): NbaTracked => ({
+  id: `g${i}`,
+  day: "20261020",
+  week: 1,
+  tip: "2026-10-20T23:00:00Z",
+  home: "NY",
+  away: "PHI",
+  first: snap(s),
+  last: snap(s),
+  ...x,
+});
+
+describe("Sam's NBA bets", () => {
+  it("reads his side, edge and the dog from the saved copy", () => {
+    const b = nbaBets(game(1));
+    // Book NY -4.5, Sam NY -7: NY by 2.5 more than the book.
+    expect(b.find((x) => x.market === "ats")).toMatchObject({ side: "home", line: -4.5, edge: 2.5, dog: false, price: -110 });
+    expect(b.find((x) => x.market === "su")).toMatchObject({ side: "home", price: -190, dog: false });
+    expect(b.find((x) => x.market === "ou")).toMatchObject({ side: "under", line: 230.5, edge: 4.5 });
+    // Sam OKC (road) +2.5 vs Sam's SA -0.3: the road dog.
+    expect(nbaBets(game(2, {}, { line: -2.5, model: -0.3 })).find((x) => x.market === "ats")).toMatchObject({ side: "away", line: 2.5, edge: 2.2, dog: true });
+  });
+
+  it("grades at the saved number and price", () => {
+    const b = nbaBets(game(1, { final: { home: 110, away: 104 } }));
+    expect(b.find((x) => x.market === "ats")).toMatchObject({ result: "W", net: 0.909 }); // NY by 6 covers 4.5
+    expect(b.find((x) => x.market === "ou")).toMatchObject({ result: "W" }); // 214 under 230.5
+    expect(nbaBets(game(1, { final: { home: 108, away: 104 } })).find((x) => x.market === "ats")).toMatchObject({ result: "L", net: -1 });
+  });
+
+  it("makes no spread bet when Sam is on the number", () => {
+    expect(nbaBets(game(1, {}, { model: -4.5 })).some((x) => x.market === "ats")).toBe(false);
+  });
+});
+
+// n wins then m losses, all NY -4.5 with Sam at -7 (edge 2.5), each its own week if spread.
+const record = (w: number, l: number, weeks = 1, s: Partial<NbaSnap> = {}) =>
+  Array.from({ length: w + l }, (_, i) => game(i, { week: 1 + (i % weeks), final: i < w ? { home: 110, away: 100 } : { home: 100, away: 110 } }, s));
+
+describe("the NBA rule", () => {
+  it("needs the football minimum and a rate past break-even, ranked by the low end", () => {
+    expect(nbaRule(settledRows(record(5, 3)), "ats", []).tier1).toBeNull(); // 8 games: under MIN_SAMPLE
+    const r = nbaRule(settledRows(record(14, 6)), "ats", []);
+    expect(r.tier1).not.toBeNull();
+    expect(r.tier1!.w + r.tier1!.l).toBe(20);
+  });
+
+  it("keeps research cuts out until the review activates them", () => {
+    const rows = settledRows(record(14, 6));
+    const pool = (act: string[]) => [nbaRule(rows, "ats", act).tier1?.id, nbaRule(rows, "ats", act).tier2?.id];
+    expect(pool([])).not.toContain("ats:small");
+    expect(cutRecord(NBA_CUT.get("ats:small")!, rows).w).toBe(14);
+  });
+
+  it("marks an upcoming bet with its tier", () => {
+    const r = nbaRule(settledRows(record(14, 6)), "ats", []);
+    expect(tierOf(nbaBets(game(99))[0], r)).toBe(1);
+  });
+});
+
+describe("the go-live gate and NBA's own limits", () => {
+  it("stays shut on a short record and opens on a strong long one", () => {
+    expect(nbaGate(nbaRule(settledRows(record(14, 6)), "ats", [])).live).toBe(false);
+    const g = nbaGate(nbaRule(settledRows(record(75, 45, 5)), "ats", []));
+    expect(g.checks.map((c) => c.ok)).toEqual([true, true, true, true]);
+    expect(g.live).toBe(true);
+  });
+
+  it("sizes inside 1u to 3u, and under 1u is no bet", () => {
+    const strong = cutRecord(NBA_CUTS[0], settledRows(record(120, 60, 5)));
+    const s = nbaStake(strong, -110)!;
+    expect(s).toBeGreaterThanOrEqual(1);
+    expect(s).toBeLessThanOrEqual(3);
+    expect(nbaStake(cutRecord(NBA_CUTS[0], settledRows(record(11, 9))), -110)).toBeNull();
+    expect(nbaStake(strong, undefined)).toBeNull();
+  });
+});
+
+describe("the NBA learning review", () => {
+  it("registers every research cut once, starting its sample now", () => {
+    const h = registerNew([], "2026-10-20T00:00:00Z");
+    expect(h.length).toBe(NBA_CUTS.filter((c) => c.research).length);
+    expect(registerNew(h, "2026-10-27T00:00:00Z")).toEqual([]);
+  });
+
+  it("counts only games first seen after registration, paired against the parent", () => {
+    // ats:small (spread under 5) vs ats:all: every game is under 5, so they bet the same games.
+    const rows = settledRows(record(14, 6));
+    expect(compareCut(rows, "ats:small", "2026-10-21T00:00:00Z").n).toBe(0);
+    expect(compareCut(rows, "ats:small", "2026-10-19T00:00:00Z")).toMatchObject({ n: 20, mean: 0 });
+  });
+
+  it("activates a cut that clears the football criteria, and only one per review", () => {
+    // Small spreads win, big spreads lose: ats:small beats ats:all.
+    const small = Array.from({ length: 40 }, (_, i) => game(i, { week: 1 + (i % 4), final: { home: 110, away: 100 } }));
+    const big = Array.from({ length: 40 }, (_, i) => game(100 + i, { week: 1 + (i % 4), final: { home: 100, away: 110 } }, { line: -12.5, model: -15 }));
+    const rows = settledRows([...small, ...big]);
+    const hyps = registerNew([], "2026-10-19T00:00:00Z");
+    const r = reviewNba(rows, hyps, "2026-11-20T00:00:00Z");
+    const active = r.hyps.filter((h) => h.status === "active");
+    expect(active).toHaveLength(1);
+    expect(r.journal.some((j) => j.kind === "activate")).toBe(true);
+  });
+
+  it("runs weekly", () => {
+    const now = new Date("2026-10-27T12:00:00Z");
+    expect(reviewDue(undefined, now)).toBe(true);
+    expect(reviewDue("2026-10-24T12:00:00Z", now)).toBe(false);
+    expect(reviewDue("2026-10-20T12:00:00Z", now)).toBe(true);
+  });
+});
