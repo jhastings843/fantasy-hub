@@ -1,7 +1,8 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
+import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, TrendGraded, TrendPick, Trends, TrendStats, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { BrierGauge, DeskHero, DeskTable, LearnerLog, MoneyHero, MoneyLogSection, Stats, WeatherBrake, booksLog, booksTotals, desks, moneyLog, retroLog } from "./desks";
 import { Background } from "../picks/board";
@@ -15,7 +16,7 @@ import m from "./money.module.css";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books" | "weather";
+export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books" | "trends" | "weather";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -25,6 +26,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "phil", label: "Phil" },
   { id: "kalshi", label: "Kalshi" },
   { id: "books", label: "Stock books" },
+  { id: "trends", label: "Trends" },
   { id: "weather", label: "Weather" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
@@ -382,7 +384,7 @@ function BookHoldings({ b }: { b: Book }) {
               <li key={p.symbol} className={m.hold}>
                 <span className={s.play}>{p.symbol}</span>
                 <span className={`${s.num} ${g !== null ? tone(g) : s.muted}`}>{g !== null ? pct(g) : "n/a"}</span>
-                <span className={m.why}>{`${p.shares} sh at ${p.entryPrice.toFixed(2)}${p.last !== null ? `, now ${p.last.toFixed(2)}` : ""}. ${p.reason}`}</span>
+                <span className={m.why}>{`${p.shares} sh at ${p.entryPrice.toFixed(2)}${p.last !== null ? `, now ${p.last.toFixed(2)}` : ""}. ${p.reason.replace(/^\[[^\]]+\] /, "")}`}</span>
               </li>
             ))}
           </ul>
@@ -395,7 +397,7 @@ function BookHoldings({ b }: { b: Book }) {
                 <li key={i} className={m.hold}>
                   <span className={s.play}>{`${f.side === "buy" ? "Bought" : "Sold"} ${f.symbol}`}</span>
                   <span className={`${s.num} ${s.muted}`}>{f.day}</span>
-                  <span className={m.why}>{`${f.shares} sh at ${f.price.toFixed(2)}. ${f.reason}`}</span>
+                  <span className={m.why}>{`${f.shares} sh at ${f.price.toFixed(2)}. ${f.reason.replace(/^\[[^\]]+\] /, "")}`}</span>
                 </li>
               ))}
             </ul>
@@ -546,6 +548,248 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
       {(log.length > 0 || (grades && grades.books.length > 0)) && (
         <Background title="Every grade and learn entry in full">
           <LearnLog log={log} grades={grades} books={books} />
+        </Background>
+      )}
+    </section>
+  );
+}
+
+/* ----------------------------------------------------------- trends ---- */
+
+// The trend book (trade-bot tradebot/trends.py): each morning Claude reads
+// Google's trending searches and Wikipedia's most-read pages and picks listed
+// companies riding them. Kept apart from the stock books (Jack, 2026-10-21):
+// no backtest, judged pick by pick, and it learns into its own playbook.
+
+const BUCKET_TITLE: Record<string, string> = {
+  link: "Direct vs second-order", conviction: "By conviction", horizon: "By hold", run_up: "Already moved before the pick?", source: "Where the trend showed up",
+};
+
+const statLine = (r?: TrendStats) =>
+  !r || !r.n ? "No picks graded yet" : `${r.n} graded, ${pct(r.mean ?? 0)} vs SPY on average, ${Math.round((r.hit ?? 0) * 100)}% beat SPY`;
+
+function PickRow({ p }: { p: TrendPick }) {
+  return (
+    <li className={m.hold}>
+      <span className={s.play}>
+        {p.ticker}
+        <span className={m.why} style={{ marginLeft: 8 }}>{p.topic}</span>
+      </span>
+      <span className={`${s.num} ${p.bought ? s.pos : s.muted}`}>{p.bought ? "bought" : "graded only"}</span>
+      <span className={m.why}>
+        <span className={`${m.tag} ${p.link === "direct" ? m.tagOpen : m.tagIdea}`}>{p.link}</span>
+        <span className={m.tag}>{`conviction ${p.conviction}`}</span>
+        <span className={m.tag}>{`${p.horizon} sessions`}</span>
+        {p.why}
+        {p.catalyst ? ` Catalyst: ${p.catalyst}.` : ""}
+        {p.pricedIn ? ` Priced in? ${p.pricedIn}` : ""}
+      </span>
+    </li>
+  );
+}
+
+function GradedRow({ o }: { o: TrendGraded }) {
+  return (
+    <tr>
+      <td>
+        <div className={s.play}>{o.ticker}</div>
+        <div className={m.why}>{`${o.topic ?? ""} · ${o.link}, c${o.conviction}, ${o.horizon}d · picked ${shortDay(o.day)}${o.bought ? " · bought" : ""}`}</div>
+      </td>
+      <td className={`${s.num} ${tone(o.ret)}`}>{pct(o.ret)}</td>
+      <td className={`${s.num} ${s.muted}`}>{pct(o.spy)}</td>
+      <td className={`${s.num} ${tone(o.excess)}`}>{pct(o.excess)}</td>
+    </tr>
+  );
+}
+
+/** The playbook and review are short markdown; headings, bullets and bold are all they use. */
+function Md({ text }: { text: string }) {
+  const bold = (x: string) => x.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
+  const blocks: ReactNode[] = [];
+  let list: string[] = [];
+  const flush = () => {
+    if (list.length) blocks.push(<ul key={blocks.length} className={m.mdList}>{list.map((x, i) => <li key={i}>{bold(x)}</li>)}</ul>);
+    list = [];
+  };
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd();
+    if (/^\s*- /.test(line)) { list.push(line.replace(/^\s*- /, "")); continue; }
+    if (/^\s{2,}\S/.test(line) && list.length) { list[list.length - 1] += ` ${line.trim()}`; continue; }
+    flush();
+    if (!line.trim() || /^# /.test(line)) continue;
+    if (/^#{2,} /.test(line)) blocks.push(<h4 key={blocks.length} className={m.mdHead}>{line.replace(/^#+ /, "")}</h4>);
+    else blocks.push(<p key={blocks.length} className={m.sub}>{bold(line)}</p>);
+  }
+  flush();
+  return <div className={m.md}>{blocks}</div>;
+}
+
+function TrendsHero({ tr }: { tr: Trends }) {
+  const b = tr.book;
+  const ret = b ? b.equity / b.start - 1 : null;
+  const spy = b && b.spyEquity !== null ? b.spyEquity / b.start - 1 : null;
+  return (
+    <DeskHero
+      eyebrow="Trend themes · Claude picks companies riding what's trending · paper"
+      title={
+        ret !== null && spy !== null && b!.curve.length > 1 ? (
+          <>
+            {"Trend themes: "}
+            <span className={ret >= spy ? s.up : s.down}>{`${pct(ret - spy)} vs SPY`}</span>
+          </>
+        ) : (
+          "Trend themes: first picks pending"
+        )
+      }
+      sub={`${statLine(tr.record)}.${(tr.record?.n ?? 0) < 30 ? " Under 30 graded picks is noise; it needs a few months." : ""}`}
+    />
+  );
+}
+
+function TrendsTab({ tr }: { tr: Trends }) {
+  const b = tr.book ?? null;
+  const latest = tr.latest ?? null;
+  const ret = b ? b.equity / b.start - 1 : null;
+  const spy = b && b.spyEquity !== null ? b.spyEquity / b.start - 1 : null;
+  const benched = tr.benched ?? [];
+  const dims = ["link", "conviction", "horizon", "run_up"].filter((d) => (tr.buckets?.[d] ?? []).length > 0);
+  return (
+    <section className={s.section}>
+      <Stats
+        label="Trend themes at a glance"
+        items={[
+          { k: "Book", v: ret !== null ? pct(ret) : "·", sub: b ? `${usd(b.equity)} of ${usd(b.start)}` : "opens on its first run", tone: ret === null ? undefined : ret >= 0 ? "up" : "down" },
+          { k: "SPY, same days", v: spy !== null ? pct(spy) : "·", sub: "the same money left in SPY" },
+          { k: "Picks graded", v: `${tr.record?.n ?? 0}`, sub: tr.record?.n ? `${Math.round((tr.record.hit ?? 0) * 100)}% beat SPY` : "each one, bought or not" },
+          { k: "Benched", v: `${benched.length}`, sub: benched.length ? benched.join(", ") : "kinds of bet it stopped buying", small: benched.length > 0 },
+        ]}
+      />
+      <p className={m.sub}>
+        Every trading morning Claude reads Google&apos;s trending searches and Wikipedia&apos;s most-read pages, searches for what is coming up, and picks up to 5 listed
+        companies riding a trend. The book buys them at the open, $10,000 a slot, and sells at the pick&apos;s horizon, on a 15% drop, or when the story is over. Every pick
+        is graded against SPY, and each Saturday a review rewrites the playbook the picker follows.
+      </p>
+      <div className={m.panels}>
+        {b && (
+          <Link href={`/money/book/${encodeURIComponent(b.id)}`} target="_blank" rel="noopener" className={m.cardLink} aria-label="Trend themes: open the full chart in a new window">
+            <BookCard b={b} />
+          </Link>
+        )}
+        <div className={m.panel}>
+          <div className={m.panelHead}>
+            <h2 className={m.panelTitle}>{latest ? `Picks on ${shortDay(latest.day)}'s close` : "Today's picks"}</h2>
+            <span className={m.foldMeta}>{latest ? `${latest.picks.length} picked, ${latest.passed.length} passed` : ""}</span>
+          </div>
+          {!latest && <span className={m.sub}>The picker runs at 6:30am before the paper run. Nothing yet.</span>}
+          {latest && latest.picks.length === 0 && (
+            <span className={m.sub}>No picks: nothing trending had a listed company with a clear, unpriced link. That is a normal day.</span>
+          )}
+          {latest && latest.picks.length > 0 && <ul className={m.holdList}>{latest.picks.map((p) => <PickRow key={p.id} p={p} />)}</ul>}
+          {latest && latest.exits.length > 0 && <span className={m.why}>{`Selling: ${latest.exits.map((e) => `${e.ticker} (${e.why})`).join("; ")}`}</span>}
+          {latest && latest.rejected.length > 0 && (
+            <span className={m.why}>{`Thrown out by the checks: ${latest.rejected.map((r) => `${r.ticker ?? "?"} (${r.why})`).join("; ")}`}</span>
+          )}
+          {latest && latest.passed.length > 0 && (
+            <details className={m.inner}>
+              <summary>{`Trends it passed on (${latest.passed.length})`}</summary>
+              <ul className={m.holdList}>
+                {latest.passed.map((x, i) => (
+                  <li key={i} className={m.hold}>
+                    <span className={s.play}>{x.topic}</span>
+                    <span className={m.why}>{x.why}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      </div>
+
+      <div className={s.section}>
+        <div className={s.sectionHead}>
+          <h3 className={s.h2}>What it has learned</h3>
+          <p className={s.p}>
+            {`Every graded pick, split by the kind of bet. A kind of bet with ${tr.bench?.n ?? 20}+ picks averaging worse than ${pct(tr.bench?.excess ?? -0.01)} vs SPY is benched: still picked and graded, no longer bought, until it recovers.`}
+          </p>
+        </div>
+        {dims.length === 0 ? (
+          <p className={s.calm}>The first picks are graded 1 to 4 weeks after they are made. The split by kind of bet starts then.</p>
+        ) : (
+          <div className={m.panels}>
+            {dims.map((d) => (
+              <div key={d} className={m.panel}>
+                <div className={m.panelHead}><h2 className={m.panelTitle}>{BUCKET_TITLE[d] ?? d}</h2></div>
+                <table className={s.table}>
+                  <thead><tr><th>Bet</th><th className={s.num}>Picks</th><th className={s.num}>vs SPY</th><th className={s.num}>Beat SPY</th></tr></thead>
+                  <tbody>
+                    {(tr.buckets?.[d] ?? []).map((x) => (
+                      <tr key={x.bucket}>
+                        <td>
+                          {x.bucket}
+                          {benched.includes(`${d}=${x.bucket}`) && <span className={`${m.tag} ${m.tagRetire}`} style={{ marginLeft: 8 }}>benched</span>}
+                        </td>
+                        <td className={s.num}>{x.n}</td>
+                        <td className={`${s.num} ${tone(x.mean ?? 0)}`}>{x.mean !== null ? pct(x.mean) : "n/a"}</td>
+                        <td className={`${s.num} ${s.muted}`}>{x.hit !== null ? `${Math.round(x.hit * 100)}%` : "n/a"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {(tr.graded ?? []).length > 0 && (
+        <details className={`${m.panel} ${m.fold}`}>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>Graded picks</h2>
+            <span className={m.foldMeta}>{`latest ${tr.graded!.length}`}</span>
+          </summary>
+          <table className={s.table}>
+            <thead><tr><th>Pick</th><th className={s.num}>Stock</th><th className={s.num}>SPY</th><th className={s.num}>vs SPY</th></tr></thead>
+            <tbody>{tr.graded!.map((o) => <GradedRow key={o.id} o={o} />)}</tbody>
+          </table>
+        </details>
+      )}
+      {b && (
+        <details className={`${m.panel} ${m.fold}`}>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>Holdings and trades</h2>
+            <span className={m.foldMeta}>{`${b.positions.filter((p) => p.symbol !== "SPY").length} picks held`}</span>
+          </summary>
+          <div className={m.rows}><BookHoldings b={b} /></div>
+        </details>
+      )}
+      {tr.playbook && (
+        <details className={`${m.panel} ${m.fold}`}>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>Playbook</h2>
+            <span className={m.foldMeta}>what the picker follows</span>
+          </summary>
+          <Md text={tr.playbook} />
+        </details>
+      )}
+      {tr.review && (
+        <details className={`${m.panel} ${m.fold}`}>
+          <summary className={m.foldHead}>
+            <h2 className={m.panelTitle}>Latest weekly review</h2>
+            <span className={m.foldMeta}>{shortDay(tr.review.day)}</span>
+          </summary>
+          <Md text={tr.review.text} />
+        </details>
+      )}
+      {(tr.history ?? []).length > 1 && (
+        <Background title="Every morning's picks">
+          <ul className={m.holdList}>
+            {tr.history!.map((h) => (
+              <li key={h.day} className={m.hold}>
+                <span className={s.play}>{shortDay(h.day)}</span>
+                <span className={`${s.num} ${s.muted}`}>{h.tickers.length ? h.tickers.join(", ") : "none"}</span>
+              </li>
+            ))}
+          </ul>
         </Background>
       )}
     </section>
@@ -977,6 +1221,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const p = v.snapshot?.phil;
   const kp = v.snapshot?.kalshiPhil;
   const wx = v.snapshot?.weather;
+  const tb = v.snapshot?.trends && !v.snapshot.trends.error ? v.snapshot.trends.book : null;
   const books = v.snapshot?.books ?? [];
   const bookStart = books.reduce((a, b) => a + b.start, 0);
   // All the books on one line: summed by day.
@@ -1024,6 +1269,26 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
             {wx.record.settled > 0
               ? weatherChart(wx, 230, 360)
               : <span className={m.sub}>{`No settled bets yet. ${wx.open.length} open on tomorrow's highs, ${usd(wx.cash)} cash. Trusts its own forecast ${Math.round(wx.trust.w * 100)}%, the market the rest.`}</span>}
+          </div>
+        )}
+        {tb && (
+          <div className={m.panel}>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Trend themes</h2><Link className={m.panelLink} href={href("trends")}>Picks and record</Link></div>
+            {tb.curve.length > 1 ? (
+              <LineChart
+                series={[
+                  { label: "Trend themes", points: tb.curve.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
+                  { label: "SPY held", points: tb.curve.filter((c) => c.spy !== null).map((c) => ({ x: t(c.day), y: c.spy! })) },
+                ]}
+                baseline={tb.start}
+                format={(y) => `$${(y / 1000).toFixed(0)}k`}
+                height={230}
+                width={360}
+                ariaLabel="The trend book against SPY"
+              />
+            ) : (
+              <span className={m.sub}>Opened, first marks pending. The chart starts after a couple of trading days.</span>
+            )}
           </div>
         )}
         {books.length > 0 && (
@@ -1172,6 +1437,10 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The weather desk hasn&apos;t posted yet.</p>)}
         {v && tab === "books" && snap && snap.books.length > 0 && <BooksHero books={snap.books} />}
         {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} />}
+        {v && tab === "trends" && snap?.trends && !snap.trends.error && <TrendsHero tr={snap.trends} />}
+        {v && tab === "trends" && snap && (snap.trends
+          ? (snap.trends.error ? <p className={s.error}>{snap.trends.error}</p> : <TrendsTab tr={snap.trends} />)
+          : <p className={s.calm}>The trend book hasn&apos;t posted yet. It reports after the next 6:30am run.</p>)}
 
         <footer className={s.footer}>
           <span>

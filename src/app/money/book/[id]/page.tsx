@@ -38,7 +38,9 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const v = await getMoneyView().catch(() => null);
   const snap = v?.snapshot;
-  const b = snap?.books.find((x) => x.id === id);
+  // The trend book is posted on its own (snap.trends), apart from the stock books.
+  const tb = snap?.trends && !snap.trends.error ? snap.trends.book ?? null : null;
+  const b = snap?.books.find((x) => x.id === id) ?? (tb?.id === id ? tb : undefined);
   if (!snap || !b) {
     return (
       <main className={s.page}>
@@ -55,18 +57,19 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const spy = b.spyEquity !== null ? b.spyEquity / b.start - 1 : null;
   const grade = snap.grades?.books.find((g) => g.book === b.id);
   const log = booksLog((snap.learnLog ?? []).map((e) => ({ ...e, decisions: e.decisions.filter((d) => d.book === b.id || d.book === b.label) }))).filter((e) => !/no changes/.test(e.title));
+  const isTrend = b === tb;
   const invested = b.positions.reduce((a, p) => a + p.shares * (p.last ?? p.entryPrice), 0);
   const days = b.curve.length;
   const trades = b.fills.map((f) => ({ day: f.day, text: `${f.side === "buy" || /buy/i.test(f.side) ? "Bought" : "Sold"} ${f.symbol}` }));
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <Link href="/money?v=books" className={s.linkA} style={{ fontSize: 14 }}>
-          ‹ Stock books
+        <Link href={isTrend ? "/money?v=trends" : "/money?v=books"} className={s.linkA} style={{ fontSize: 14 }}>
+          {isTrend ? "‹ Trends" : "‹ Stock books"}
         </Link>
         <section className={s.section} aria-labelledby="book">
           <Hero
-            eyebrow={`Stock book · paper · started ${day(b.started)}${b.retired ? ` · retired ${day(b.retired)}` : ""}`}
+            eyebrow={`${isTrend ? "Trend book" : "Stock book"} · paper · started ${day(b.started)}${b.retired ? ` · retired ${day(b.retired)}` : ""}`}
             title={
               <span id="book">
                 {`${b.label}: `}

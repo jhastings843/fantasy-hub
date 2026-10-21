@@ -203,6 +203,69 @@ export interface MoneySnapshot {
   grades?: Grades | null;
   /** The weather desk (~/Projects/weather-desk). Missing before 2026-10-19. */
   weather?: Weather | null;
+  /** The trend book, tracked apart from the stock books (trade-bot tradebot/trends.py). Missing before 2026-10-21. */
+  trends?: Trends | null;
+}
+
+/** n graded picks, average return vs SPY, share that beat SPY, t-stat. */
+export interface TrendStats {
+  n: number;
+  mean: number | null;
+  hit: number | null;
+  t: number | null;
+}
+
+export interface TrendPick {
+  id: string;
+  ticker: string;
+  topic: string | null;
+  link: "direct" | "second-order";
+  conviction: 1 | 2 | 3;
+  horizon: number;
+  source: string | null;
+  catalyst: string | null;
+  why: string | null;
+  pricedIn: string | null;
+  bought: boolean;
+}
+
+export interface TrendGraded {
+  id: string;
+  day: string;
+  ticker: string;
+  topic: string | null;
+  link: string;
+  conviction: number;
+  horizon: number;
+  ret: number;
+  spy: number;
+  excess: number;
+  through: string;
+  bought: boolean;
+}
+
+/** trade-bot money_export.trend_desk(): a Claude picker's paper book, graded pick by pick. */
+export interface Trends {
+  error?: string;
+  /** The paper book, same shape as a stock book. Null until its first run. */
+  book?: Book | null;
+  record?: TrendStats;
+  /** The record split by kind of bet: link, conviction, horizon, source, run_up. */
+  buckets?: Record<string, (TrendStats & { bucket: string })[]>;
+  /** Buckets the fixed rule stopped buying, like "link=second-order". */
+  benched?: string[];
+  bench?: { n: number; excess: number; t: number };
+  latest?: {
+    day: string;
+    picks: TrendPick[];
+    rejected: { ticker: string | null; why: string }[];
+    passed: { topic: string | null; why: string | null }[];
+    exits: { ticker: string; why: string }[];
+  } | null;
+  history?: { day: string; tickers: string[] }[];
+  graded?: TrendGraded[];
+  playbook?: string | null;
+  review?: { day: string; text: string } | null;
 }
 
 /** One paper bet on a Kalshi daily-high bracket. */

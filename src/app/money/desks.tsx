@@ -126,6 +126,25 @@ export function desks(v: View): Desk[] {
       href: "/money?v=books",
     });
   }
+  const tb = snap?.trends && !snap.trends.error ? snap.trends.book : null;
+  if (tb) {
+    const ret = tb.equity / tb.start - 1;
+    const spy = tb.spyEquity !== null ? tb.spyEquity / tb.start - 1 : null;
+    const r = snap!.trends!.record;
+    out.push({
+      id: "trends",
+      name: "Trend themes",
+      what: "Claude picks trending companies",
+      result: pct(ret),
+      rec: r?.n ? `${r.n} picks graded` : "No picks graded yet",
+      tone: toneOf(ret),
+      ours: `Book ${pct(ret)}`,
+      yard: spy !== null ? `SPY ${pct(spy)} same days` : "SPY, same days",
+      read: !r?.n || r.n < 30 ? "Too early" : spy !== null && ret > spy ? "Ahead of SPY" : "Behind SPY",
+      readTone: !r?.n || r.n < 30 ? "neutral" : spy !== null && ret > spy ? "good" : "bad",
+      href: "/money?v=trends",
+    });
+  }
   if (snap?.kalshiPhil && !snap.kalshiPhil.error) out.push(philDesk(snap.kalshiPhil, "kalshi", "Kalshi Phil", "Claude agent, Kalshi", "/money?v=kalshi"));
   if (sp) {
     const e = sp.props.reduce((a, x) => ({ u: a.u + x.edges, n: a.n + x.edgeBets }), { u: 0, n: 0 });
