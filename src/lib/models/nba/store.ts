@@ -13,6 +13,7 @@ import { ROTATION_GAMES, ingest, rotation, type PlayerEntry, type SeasonSummary,
 import { ourGame, ourMarkets, type OurMarketExtra } from "./market";
 import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } from "./props";
 import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFb, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
+import { runKotc, type KotcGameInput } from "./kotc-store";
 import PARAMS from "./params.json";
 import FB_PARAMS from "./fb-params.json";
 
@@ -36,6 +37,9 @@ import FB_PARAMS from "./fb-params.json";
 //   props:v1:ours:nba:{season}:weeks   set of weeks
 
 const P = PARAMS as NbaParams;
+/** Players projected under this many minutes can't lead a night; left off the King of the Court list. */
+const KOTC_MIN_MINUTES = 8;
+const r1 = (x: number) => Math.round(x * 10) / 10;
 /** History a player needs before a market gets our number (this season, last season). */
 export const MIN_GAMES_NOW = 2;
 export const MIN_GAMES_PRIOR = 10;
@@ -63,6 +67,8 @@ export interface OurStoredProps extends StoredProps {
   home: string;
   /** Our First Basket board against DK's prices, when DK posted the market. */
   fb?: FbBoard;
+  /** Everyone's projected PRA, for King of the Court (boards saved from 2026-10-21 evening on). */
+  kotc?: KotcGameInput;
 }
 
 async function json<T>(url: string): Promise<T> {
@@ -71,7 +77,7 @@ async function json<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-interface SbGame {
+export interface SbGame {
   id: string;
   tip?: string;
   state: string;
@@ -143,6 +149,7 @@ export interface OurNbaReport {
   graded: string[];
   learning: string[];
   problems: string[];
+  kotc?: string[];
 }
 
 async function loadWeek(season: number, week: number): Promise<{ [id: string]: OurStoredProps }> {
@@ -228,6 +235,13 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
       const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
+      const starterOf = new Map(inputs.map((x) => [x.id, x.starter ?? x.games.at(-1)?.starter ?? false]));
+      const kotc: KotcGameInput = {
+        spread,
+        players: [...proj.values()]
+          .filter((x) => x.min >= KOTC_MIN_MINUTES)
+          .map((x) => ({ id: x.id, name: names.get(x.id)!.name, team: x.team, min: r1(x.min), pra: r1(x.mean.pts + x.mean.reb + x.mean.ast), starter: starterOf.get(x.id) ?? false })),
+      };
       const { markets, extra } = ourMarkets(lines, proj, names, P, new Map(inputs.map((x) => [x.id, x.games.length])), readMilestones(rows));
       // First Basket: DK's field is its probable starters; else each team's last starting five, less anyone Out.
       const fbDk = [...lines.values()].filter((l) => l.type === "First Basket" && l.current.over !== null).map((l) => ({ id: l.athlete, price: l.current.over! }));
@@ -254,6 +268,7 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
         away: away.abbr,
         home: home.abbr,
         ...(fb ? { fb } : {}),
+        kotc,
       };
       await redis.hset(K.week(season, week), { [g.id]: stored });
       await redis.sadd(K.weeks(season), String(week));
@@ -280,6 +295,14 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
         report.problems.push(`grade ${id}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+  }
+
+  try {
+    const recent = weeks.slice(-2);
+    const boards = (await Promise.all(recent.map((w) => loadWeek(season, w)))).flatMap((h) => Object.values(h));
+    report.kotc = await runKotc(season, now, games, boards);
+  } catch (e) {
+    report.problems.push(`King of the Court: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {

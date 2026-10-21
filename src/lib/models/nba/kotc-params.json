@@ -1,0 +1,12 @@
+{
+  "sims": 20000,
+  "sdMargin": 12,
+  "blowAt": 99,
+  "blow": 0.012,
+  "blowMax": 0.25,
+  "otBand": 0,
+  "ot": 0,
+  "sdGame": 0.04,
+  "sdMin": 0,
+  "phi": 3.5
+}

@@ -6,6 +6,7 @@ import { DavidResearch, DavidResults, DavidWeek } from "./davidprops";
 import { OurNflResults } from "./ournfl";
 import { OurFtdResults } from "./ourftd";
 import { OurFirstBasketResults, OurNbaResults } from "./ournba";
+import { KotcResults, KotcWeek } from "./kotc";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
 import { DAVID_URL } from "@/lib/props/david";
@@ -14,14 +15,14 @@ import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { propsSearchIndex } from "./search";
 import s from "../picks/picks.module.css";
 
-// The Props tab: our own models (NFL props and first TD, NBA props and first
-// basket) and David Sasser's NFL props board. Sam's props, first TD and NBA
+// The Props tab: our own models (NFL props and first TD, NBA props, first
+// basket and King of the Court) and David Sasser's NFL props board. Sam's props, first TD and NBA
 // pages went behind his paywall on 2026-10-21; Jack had his record taken off
 // the page (his saved data stays in Redis, untouched). Same shape as Picks
 // (market, then view, both in the URL), no stakes: everything here is
 // tracked and graded until a slice earns its way into the system.
 
-export type PropsMarket = "pp" | "ftd" | "nba" | "fb";
+export type PropsMarket = "pp" | "ftd" | "nba" | "fb" | "kotc";
 const MARKETS: { [sport in "nfl" | "nba"]: { id: PropsMarket; label: string }[] } = {
   nfl: [
     { id: "pp", label: "Player props" },
@@ -30,9 +31,10 @@ const MARKETS: { [sport in "nfl" | "nba"]: { id: PropsMarket; label: string }[] 
   nba: [
     { id: "nba", label: "Player props" },
     { id: "fb", label: "First Basket" },
+    { id: "kotc", label: "King of the Court" },
   ],
 };
-export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" ? x : "pp");
+export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" ? x : "pp");
 
 function href(m: PropsMarket, v: View) {
   const q = new URLSearchParams();
@@ -60,11 +62,12 @@ export default async function PropsView({
     getOurFtdView(season).catch(() => null),
   ]);
   const entries = propsSearchIndex(ov, pv, fv);
-  const sport = market === "nba" || market === "fb" ? "nba" : "nfl";
+  const sport = market === "nba" || market === "fb" || market === "kotc" ? "nba" : "nfl";
   // Only David's board has a Research view (NFL player props); our models keep theirs on Results and the Learner log.
   const base = sport === "nba" ? NBA_VIEWS : VIEWS;
-  const views = base.filter((v) => v.id !== "research" || market === "pp").concat(LOG_VIEW);
-  const shown: View = market !== "pp" && view === "research" ? "results" : view;
+  // King of the Court has no learner yet (its numbers are graded nightly and refit between seasons), so no log view.
+  const views = base.filter((v) => v.id !== "research" || market === "pp").concat(market === "kotc" ? [] : [LOG_VIEW]);
+  const shown: View = market === "kotc" && view === "log" ? "week" : market !== "pp" && view === "research" ? "results" : view;
   return (
     <main className={s.page}>
       <div className={s.wrap}>
@@ -101,8 +104,10 @@ export default async function PropsView({
           )}
         </header>
 
-        {shown === "week" && <PropTabWeek tab={market} season={season} />}
-        {shown === "log" && <PropsLog tab={market} season={season} />}
+        {shown === "week" && market !== "kotc" && <PropTabWeek tab={market} season={season} />}
+        {shown === "log" && market !== "kotc" && <PropsLog tab={market} season={season} />}
+        {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
+        {market === "kotc" && shown === "results" && <KotcResults season={season} />}
         {market === "pp" && shown === "week" && <DavidWeek season={season} />}
         {market === "pp" && shown === "results" && (
           <>
