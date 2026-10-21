@@ -19,7 +19,7 @@ const short: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", thr
 
 /** A saved board from any of our props models (NBA or NFL). */
 export type OurBoard = StoredProps & {
-  extra: { [id: string]: { over: number; under: number; min?: number; median?: number; price?: "espn" | "david" | "assumed" } };
+  extra: { [id: string]: { over: number; under: number; min?: number; median?: number; price?: "espn" | "odds-api" | "david" | "assumed" } };
   away: string;
   home: string;
 };
@@ -52,7 +52,7 @@ function EdgeRow({ m, g }: { m: PropMarket; g: OurBoard }) {
       </div>
       <div className={`${s.ppMeta} ${s.num}`}>
         {[
-          price !== null ? `${am(price)} DraftKings${g.extra[m.id]?.price === "assumed" ? " (assumed, no price posted)" : g.extra[m.id]?.price === "david" ? " (via David's board)" : ""}` : null,
+          price !== null ? `${am(price)} DraftKings${g.extra[m.id]?.price === "assumed" ? " (assumed, no price posted)" : g.extra[m.id]?.price === "david" ? " (via David's board)" : g.extra[m.id]?.price === "odds-api" ? " (game-day morning, via The Odds API)" : ""}` : null,
           ours !== undefined ? `our chance ${pct(ours)}` : null,
           fair !== null ? `DK ${pct(fair)} without the vig` : price !== null ? `breaks even at ${pct(implied(price))}` : null,
           g.extra[m.id]?.median !== undefined && m.stat !== "rec" ? `our median ${m.model}` : `ours ${m.model}`,

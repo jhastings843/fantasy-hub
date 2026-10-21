@@ -10,6 +10,7 @@ import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
 import { addTotals, ftdGame, impliedPoints, tdTotals, type FtdParams, type TdLine } from "./firsttd";
 import { nflverseRows } from "./store";
+import { morningOddsReads } from "./odds-api-store";
 import PARAMS from "./ftd-params.json";
 
 // Our NFL First TD model, live. Each run, for every game this week not yet
@@ -41,6 +42,8 @@ export interface OurFtdStored {
   kickoff?: string;
   espnId: string;
   kalshi?: KalshiGame;
+  /** DraftKings' First TD prices (American) by nameKey, from The Odds API's morning-of read. Shown only; money checks still read Kalshi. */
+  dk?: { at: string; prices: { [nameKey: string]: number } };
   result?: Graded;
   gradedAt?: string;
 }
@@ -103,6 +106,16 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
     } catch (e) {
       report.problems.push(`Kalshi: ${e instanceof Error ? e.message : String(e)}`);
     }
+    const { reads } = await morningOddsReads(
+      season,
+      pre.flatMap((e) => {
+        const cs = e.competitions?.[0]?.competitors ?? [];
+        const h = cs.find((c) => c.homeAway === "home")?.team?.abbreviation;
+        const a = cs.find((c) => c.homeAway === "away")?.team?.abbreviation;
+        return h && a && e.date ? [{ espnId: e.id, home: samTeam(h), away: samTeam(a), kickoff: e.date }] : [];
+      }),
+      now,
+    );
     for (const e of rows.length ? pre : []) {
       const cs = e.competitions?.[0]?.competitors ?? [];
       const home = cs.find((c) => c.homeAway === "home")?.team;
@@ -131,8 +144,10 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
         const game = ftdGame({ season, week, slug, away: A, home: H, when }, pts.home, pts.away, lists, P);
         const old = (await loadWeek(season, week))[slug];
         const k = kalshi.get(`${A}@${H}`) ?? old?.kalshi;
+        const read = reads.get(e.id);
+        const dk = read && Object.keys(read.firstTd).length ? { at: read.at, prices: read.firstTd } : old?.dk;
         await redis.hset(FK.week(season, week), {
-          [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}) } satisfies OurFtdStored,
+          [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}), ...(dk ? { dk } : {}) } satisfies OurFtdStored,
         });
         await redis.sadd(FK.weeks(season), String(week));
         report.saved.push(`${A}@${H} ${game.teams.reduce((a, t) => a + t.players.length, 0)} players${k ? ", Kalshi" : ""}`);

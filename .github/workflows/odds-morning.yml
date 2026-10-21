@@ -1,0 +1,32 @@
+name: Game-day morning prices
+
+# One read of DraftKings' NFL prop and First TD prices per game, the morning
+# of game day, from The Odds API (src/lib/models/nfl/odds-api.ts). The models'
+# own runs take the read: each game is read once, only on its Eastern date and
+# from 8am ET, so running these on a day with no games costs nothing.
+# 13:00 UTC is 9am EDT and 8am EST. Sunday's 8:30am first-td slot is earlier.
+# Thursday, Friday, Saturday, Sunday, Monday cover every NFL game day.
+
+on:
+  schedule:
+    - cron: "0 13 * * 0,1,4,5,6"
+  workflow_dispatch:
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Read today's games and save prices
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          ostatus=$(curl -sS -o ours.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nfl/ours")
+          echo "our NFL model HTTP $ostatus"
+          jq -r '.report | "saved \(.saved | length)", "odds: \(.odds // "nothing due")", (.problems[]? | "problem: \(.)")' ours.json | tee -a "$GITHUB_STEP_SUMMARY"
+          fstatus=$(curl -sS -o ourftd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd/ours")
+          echo "our first TD model HTTP $fstatus"
+          [ "$ostatus" = "200" ] && [ "$fstatus" = "200" ]

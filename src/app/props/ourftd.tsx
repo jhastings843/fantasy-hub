@@ -1,5 +1,6 @@
 // Our own NFL First TD model (lib/models/nfl/firsttd.ts): this week's boards
 // against Kalshi's prices, and the record, on the First TD tab.
+import { nameKey } from "@/lib/props/grade";
 import { getOurFtdView, type OurFtdStored, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { kalshiCost, kalshiFor, marketBets } from "@/lib/firsttd/trends";
 import { OUR_FTD_SLICES } from "@/lib/models/learn";
@@ -22,7 +23,8 @@ function Card({ g }: { g: OurFtdStored }) {
   const rows = players.map((p) => {
     const k = kalshiFor(g.kalshi, p.name);
     const cost = k?.ask ? kalshiCost(k.ask) : null;
-    return { p, cost, value: cost !== null && p.p > cost };
+    const dk = g.dk?.prices[nameKey(p.name)];
+    return { p, cost, dk, value: cost !== null && p.p > cost };
   });
   const values = rows.filter((r) => r.value).length;
   const r = g.result;
@@ -54,11 +56,12 @@ function Card({ g }: { g: OurFtdStored }) {
                   <th>Player</th>
                   <th>Ours</th>
                   <th>Kalshi cost</th>
+                  {g.dk && <th>DK</th>}
                   <th>Value</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ p, cost, value }) => (
+                {rows.map(({ p, cost, dk, value }) => (
                   <tr key={p.key}>
                     <td>
                       {`${p.name} `}
@@ -66,6 +69,7 @@ function Card({ g }: { g: OurFtdStored }) {
                     </td>
                     <td className={s.num}>{pct(p.p)}</td>
                     <td className={s.num}>{cost !== null ? `${Math.round(cost * 100)}¢` : "–"}</td>
+                    {g.dk && <td className={s.num}>{dk !== undefined ? (dk > 0 ? `+${dk}` : `${dk}`) : "–"}</td>}
                     <td className={value ? s.pos : s.dim}>{value ? `+${((p.p - cost!) * 100).toFixed(1)}` : "–"}</td>
                   </tr>
                 ))}
@@ -73,7 +77,7 @@ function Card({ g }: { g: OurFtdStored }) {
             </table>
           </div>
           <p className={`${s.ftdNote} ${s.dim}`}>
-            {`Any other player: ${g.game.teams.map((t) => `${t.team} ${pct(t.rest)}`).join(", ")}. No offensive TD first: ${pct(g.game.none)}. Kalshi cost is the ask plus its fee. Saved ${whenEt(g.capturedAt)}.`}
+            {`Any other player: ${g.game.teams.map((t) => `${t.team} ${pct(t.rest)}`).join(", ")}. No offensive TD first: ${pct(g.game.none)}. Kalshi cost is the ask plus its fee.${g.dk ? ` DK is DraftKings' price the morning of the game (The Odds API), shown for comparison.` : ""} Saved ${whenEt(g.capturedAt)}.`}
           </p>
         </div>
       </details>

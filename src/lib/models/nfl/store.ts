@@ -12,6 +12,8 @@ import { OUR_SECTION, ourPropCandidates } from "../learn";
 import { readStats, type NflRow } from "./data";
 import { NflRunning, type NflSummary } from "./history";
 import { ourNflMarkets, type NflMarketExtra } from "./market";
+import { oddsPrice } from "./odds-api";
+import { morningOddsReads } from "./odds-api-store";
 import { projectNflGame, type NflParams, type NflPlayerInput, type NflProjection, type NflStat } from "./props";
 import PARAMS from "./params.json";
 
@@ -22,7 +24,8 @@ import PARAMS from "./params.json";
 // 2. For every game this week not yet started: projects each team's recent
 //    regulars and anyone DraftKings posts a line for, less anyone ESPN lists
 //    Out (an Out regular's share is handed to the rest), against DK's lines
-//    from ESPN's odds feed; prices from ESPN, else David's board, else -110.
+//    from ESPN's odds feed; prices from ESPN, else DK via The Odds API (read
+//    the morning of game day), else David's board, else -110.
 // 3. Grades saved games from ESPN's box score once final.
 // 4. Runs the learning review on our own section (nfl-props-ours).
 //
@@ -72,6 +75,8 @@ export interface OurNflReport {
   graded: string[];
   learning: string[];
   problems: string[];
+  /** The Odds API's morning reads this run, and credits used. */
+  odds?: string | null;
 }
 
 async function loadWeek(season: number, week: number): Promise<{ [id: string]: OurNflStored }> {
@@ -120,6 +125,21 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
       const d = david?.props.find((x) => x.market === DAVID_MARKET[stat] && x.line === line && nameKey(x.player) === nameKey(name));
       return d && d.over !== null && d.under !== null ? { over: d.over, under: d.under } : null;
     };
+    const teamsOf = (e: SbEvent) => {
+      const cs = e.competitions?.[0]?.competitors ?? [];
+      const h = cs.find((c) => c.homeAway === "home")?.team?.abbreviation;
+      const a = cs.find((c) => c.homeAway === "away")?.team?.abbreviation;
+      return h && a ? { home: samTeam(h), away: samTeam(a) } : null;
+    };
+    const { reads, note } = await morningOddsReads(
+      season,
+      pre.flatMap((e) => {
+        const t = teamsOf(e);
+        return t ? [{ espnId: e.id, ...t, kickoff: e.date! }] : [];
+      }),
+      now,
+    );
+    report.odds = note;
     for (const e of run ? pre : []) {
       const cs = e.competitions?.[0]?.competitors ?? [];
       const home = cs.find((c) => c.homeAway === "home")?.team;
@@ -182,7 +202,12 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
           const eid = espnOf.get(x.id);
           if (eid) proj.set(eid, x);
         }
-        const { markets, extra } = ourNflMarkets(lines, proj, names, davidPrice, P);
+        const read = reads.get(e.id);
+        const price = (name: string, stat: NflStat, line: number) => {
+          const o = oddsPrice(read, name, stat, line);
+          return o ? { ...o, source: "odds-api" as const } : davidPrice(name, stat, line);
+        };
+        const { markets, extra } = ourNflMarkets(lines, proj, names, price, P);
         if (!markets.length) continue;
         const week = report.week!;
         const old = (await loadWeek(season, week))[e.id];

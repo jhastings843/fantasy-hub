@@ -1,9 +1,10 @@
 // Our NFL projections against DraftKings' lines, in the props tracker's
 // shape (as nba/market.ts does for the NBA). ESPN's feed carries DK's NFL
 // lines but, so far, no NFL prices: a price comes from ESPN when it has one,
-// else from David Sasser's board when his DK line is the same number, else
-// -110 both ways, marked as assumed (grading already treats a missing price
-// as -110).
+// else from DK itself via The Odds API's morning-of read (odds-api.ts), else
+// from David Sasser's board when his DK line is the same number, else -110
+// both ways, marked as assumed (grading already treats a missing price as
+// -110). Each fallback is used only when its line equals ESPN's DK line.
 
 import { STAT_LABEL, implied, type PropMarket, type Side } from "@/lib/props/parse";
 import type { LiveLine } from "../lines";
@@ -23,7 +24,7 @@ export interface NflMarketExtra {
   /** Our median (yardage lines are priced from it, not the mean). */
   median: number;
   /** Where the price came from. */
-  price: "espn" | "david" | "assumed";
+  price: "espn" | "odds-api" | "david" | "assumed";
 }
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
@@ -33,7 +34,7 @@ export function ourNflMarkets(
   lines: Map<string, LiveLine>,
   proj: Map<string, NflProjection>,
   names: Map<string, { name: string; team: string }>,
-  david: (name: string, stat: NflStat, line: number) => { over: number; under: number } | null,
+  david: (name: string, stat: NflStat, line: number) => { over: number; under: number; source?: "odds-api" | "david" } | null,
   p: NflParams,
 ): { markets: PropMarket[]; extra: { [id: string]: NflMarketExtra } } {
   const markets: PropMarket[] = [];
@@ -47,7 +48,7 @@ export function ourNflMarkets(
     const d = l.current.over !== null && l.current.under !== null ? null : david(who.name, stat, line);
     const over = l.current.over ?? d?.over ?? -110;
     const under = l.current.under ?? d?.under ?? -110;
-    const source: NflMarketExtra["price"] = l.current.over !== null ? "espn" : d ? "david" : "assumed";
+    const source: NflMarketExtra["price"] = l.current.over !== null ? "espn" : d ? (d.source ?? "david") : "assumed";
     const mean = pr.mean[stat];
     const ch = nflOverUnder(stat, Math.max(mean, 0.1), line, p);
     const fair = noVig(over, under);
