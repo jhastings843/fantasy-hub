@@ -39,9 +39,13 @@ jobs:
           status=$(curl -sS -o response.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd")
           echo "HTTP $status"
-          jq -r '.report | "week \(.week): saved \(.captured | length), waiting \(.waiting | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.problems[]? | "problem: \(.)")' response.json | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.report | "week \(.week): saved \(.captured | length), waiting \(.waiting | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length), paywalled \(.paywalled // [] | length)", (.problems[]? | "problem: \(.)")' response.json | tee -a "$GITHUB_STEP_SUMMARY"
           pstatus=$(curl -sS -o props.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props")
           echo "props HTTP $pstatus"
-          jq -r '.report | "props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' props.json | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$status" = "200" ] && [ "$pstatus" = "200" ]
+          jq -r '.report | "props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length), paywalled \(.paywalled // [] | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' props.json | tee -a "$GITHUB_STEP_SUMMARY"
+          lstatus=$(curl -sS -o lines.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/lines")
+          echo "lines HTTP $lstatus"
+          jq -r '.report | "line archive: saved \(.saved | length), closed \(.closed | length), Kalshi games nfl \(.kalshi.nfl) nba \(.kalshi.nba)", (.problems[]? | "problem: \(.)")' lines.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ] && [ "$pstatus" = "200" ] && [ "$lstatus" = "200" ]

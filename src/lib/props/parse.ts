@@ -132,6 +132,9 @@ export function parsePropsLinks(html: string): string[] {
   return out;
 }
 
+/** Is this one of Sam's members-only pages? Props, first TD and gaps went behind his paywall on 2026-10-21. */
+export const isMembersPage = (html: string) => /<title>[^<]*\bmembers\b/i.test(html);
+
 /** American price to implied probability (with the vig). */
 export function implied(price: number): number {
   return price < 0 ? -price / (-price + 100) : 100 / (price + 100);

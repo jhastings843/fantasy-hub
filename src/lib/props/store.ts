@@ -1,7 +1,7 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
 import { samTeam } from "@/lib/firsttd/grade";
-import { parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./parse";
+import { isMembersPage, parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
 import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
@@ -162,12 +162,14 @@ export interface PropsRunReport {
   system: string[];
   /** David's board: games saved and graded this run. */
   david: { week: number | null; saved: string[]; graded: string[] };
+  /** Pages behind Sam's members paywall (since 2026-10-21): skipped, not a problem. */
+  paywalled?: string[];
   problems: string[];
 }
 
 /** Save this week's pregame props pages, grade finals, update the system. Safe to call any time. */
 export async function runProps(now = new Date()): Promise<PropsRunReport> {
-  const report: PropsRunReport = { week: null, captured: [], kept: [], missed: [], graded: [], system: [], david: { week: null, saved: [], graded: [] }, problems: [] };
+  const report: PropsRunReport = { week: null, captured: [], kept: [], missed: [], graded: [], system: [], david: { week: null, saved: [], graded: [] }, paywalled: [], problems: [] };
   let slate: DavidSlate | null = null;
   try {
     slate = await fetchDavidSlate();
@@ -215,7 +217,12 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
         continue;
       }
       try {
-        const g = parsePropsPage(slug, await get(SAM_PAGE(slug)));
+        const html = await get(SAM_PAGE(slug));
+        if (isMembersPage(html)) {
+          report.paywalled!.push(slug);
+          continue;
+        }
+        const g = parsePropsPage(slug, html);
         if (!g) throw new Error("page did not read");
         const firstLines = { ...Object.fromEntries(g.markets.map((m) => [m.id, m.consensus])), ...old?.first };
         const rw = rwIdx ? projectionsFor(g.markets, rwIdx) : old?.rw;

@@ -619,7 +619,7 @@ export async function NbaPropsWeek({ season }: { season: number }) {
           }`}
         </p>
       </div>
-      {!byDay.has(today) && <p className={s.calm}>{"Nothing saved for today yet. Sam's pages are saved at the afternoon and evening runs before tip."}</p>}
+      {!byDay.has(today) && <p className={s.calm}>{"Nothing from Sam for today: his NBA props pages went behind his members paywall on October 21, so they can no longer be saved. Games he posted before then stay below and on Results."}</p>}
       {days.map((day) => (
         <div key={day}>
           <h3 className={pp.bbH}>{label(day)}</h3>

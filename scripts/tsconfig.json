@@ -1,0 +1,10 @@
+{
+  "//": "For running scripts/*.mts with tsx: same as the app, plus server-only mapped to the test stub (Next normally supplies it).",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["../src/*"],
+      "server-only": ["../test/server-only-stub.ts"]
+    }
+  }
+}

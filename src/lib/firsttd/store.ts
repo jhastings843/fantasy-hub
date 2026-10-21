@@ -4,6 +4,7 @@ import { parseBoardLinks, parseFirstTdPage, parseSlug, type FtdGame } from "./pa
 import { firstTouchdown, grade, samTeam, type EspnScoringPlay, type Graded } from "./grade";
 import { trends, type GradedGame, type Trends } from "./trends";
 import { kalshiFirstTd, type KalshiGame } from "./kalshi";
+import { isMembersPage } from "@/lib/props/parse";
 import { FTD_SECTION, ftdCandidates } from "./learn";
 import { FTD_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
@@ -88,12 +89,14 @@ export interface RunReport {
   graded: string[];
   /** What the learning review did, when it ran. */
   learning: string[];
+  /** Pages behind Sam's members paywall (since 2026-10-21): skipped, not a problem. */
+  paywalled: string[];
   problems: string[];
 }
 
 /** Save this week's pregame pages and grade anything final. Safe to call any time. */
 export async function runFirstTd(now = new Date()): Promise<RunReport> {
-  const report: RunReport = { week: null, captured: [], kept: [], missed: [], waiting: [], graded: [], learning: [], problems: [] };
+  const report: RunReport = { week: null, captured: [], kept: [], missed: [], waiting: [], graded: [], learning: [], paywalled: [], problems: [] };
   let slugs: string[] = [];
   try {
     slugs = parseBoardLinks(await get(SAM_BOARD));
@@ -131,6 +134,10 @@ export async function runFirstTd(now = new Date()): Promise<RunReport> {
       }
       try {
         const html = await get(SAM_PAGE(slug));
+        if (isMembersPage(html)) {
+          report.paywalled.push(slug);
+          continue;
+        }
         if (/Not out yet/i.test(html) && !/class="ftd-pick"/.test(html)) {
           if (!have) report.waiting.push(slug);
           continue;

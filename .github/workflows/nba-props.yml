@@ -1,6 +1,7 @@
 name: NBA props and picks capture
 
-# Also saves Sam's NBA game picks (/api/picks/nba) on the same slots.
+# Also saves Sam's NBA game picks (/api/picks/nba) and archives DraftKings prop lines
+# (/api/lines, NBA and NFL) on the same slots.
 # Sam posts an NBA player props page per game and only keeps the current
 # slate online, so the tracker saves each page before tip and grades it from
 # ESPN once final. NBA games are every day with no weekly reset, so the
@@ -38,9 +39,13 @@ jobs:
           status=$(curl -sS -o nba.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nba")
           echo "HTTP $status"
-          jq -r '.report | "NBA props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' nba.json | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.report | "NBA props week \(.week): saved \(.captured | length), kept \(.kept | length), missed \(.missed | length), graded \(.graded | length), paywalled \(.paywalled // [] | length)", (.system[]? | "system: \(.)"), (.problems[]? | "problem: \(.)")' nba.json | tee -a "$GITHUB_STEP_SUMMARY"
           pkstatus=$(curl -sS -o picks.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/picks/nba")
           echo "picks HTTP $pkstatus"
           jq -r '.report | "NBA picks: saved \(.saved | length), settled \(.settled | length)", (if .review then "review: \(.review)" else empty end), (.problems[]? | "problem: \(.)")' picks.json | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$status" = "200" ] && [ "$pkstatus" = "200" ]
+          lstatus=$(curl -sS -o lines.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/lines")
+          echo "lines HTTP $lstatus"
+          jq -r '.report | "line archive: saved \(.saved | length), closed \(.closed | length), Kalshi games nfl \(.kalshi.nfl) nba \(.kalshi.nba)", (.problems[]? | "problem: \(.)")' lines.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ] && [ "$pkstatus" = "200" ] && [ "$lstatus" = "200" ]

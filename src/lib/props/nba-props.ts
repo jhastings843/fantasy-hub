@@ -1,6 +1,6 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { etDate, nbaSeasonOf, nbaSeasonOfDate, nbaWeek, parseNbaPropsLinks, parseNbaPropsPage } from "./parse";
+import { etDate, isMembersPage, nbaSeasonOf, nbaSeasonOfDate, nbaWeek, parseNbaPropsLinks, parseNbaPropsPage } from "./parse";
 import { gradeGame, type EspnBoxTeam } from "./grade";
 import { davidTrends } from "./david";
 import { propTrends, type GradedPropsGame } from "./trends";
@@ -80,7 +80,7 @@ async function saveGame(season: number, week: number, gameId: string, g: StoredP
 
 /** Save today's pregame NBA props pages, grade finals, update the NBA system. Safe to call any time. */
 export async function runNbaProps(now = new Date()): Promise<PropsRunReport> {
-  const report: PropsRunReport = { week: null, captured: [], kept: [], missed: [], graded: [], system: [], david: { week: null, saved: [], graded: [] }, problems: [] };
+  const report: PropsRunReport = { week: null, captured: [], kept: [], missed: [], graded: [], system: [], david: { week: null, saved: [], graded: [] }, paywalled: [], problems: [] };
   let ids: string[] = [];
   try {
     ids = parseNbaPropsLinks(await get(SAM_BOARD));
@@ -99,6 +99,11 @@ export async function runNbaProps(now = new Date()): Promise<PropsRunReport> {
   for (const id of ids) {
     try {
       const html = await get(SAM_PAGE(id));
+      // Members only since 2026-10-21: the page has no teams to read, so say so instead of "no ESPN game".
+      if (isMembersPage(html)) {
+        report.paywalled!.push(id);
+        continue;
+      }
       const t = html.match(/<title>\s*([A-Z]{2,4}) at ([A-Z]{2,4})/);
       const ev = t ? findGame(espn, t[1], t[2]) : undefined;
       if (!ev?.tip) {

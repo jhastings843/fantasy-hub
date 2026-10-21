@@ -155,3 +155,14 @@ this project).
 - No em dashes in UI text or docs.
 - No new paid service without asking Jack (The Odds API is the likely ask if ESPN's NFL
   prices never fill in).
+
+## Build log
+
+### Phase 0: line archive (2026-10-21)
+- `src/lib/models/lines.ts` (pure) reads ESPN's DK propBets into one entry per (athlete, market); `src/lib/models/archive.ts` stores one value per game at `lines:v1:{league}:{season}:{espnEventId}` plus a set `lines:v1:{league}:{season}:events`. Each market keeps DK's own opening number (`dkOpen`), our first read (`first`) and the latest pregame read (`last`); the first capture after the start sets `closedAt`, so `last` is the close.
+- Over/under order: the first of the two rows is the over. Checked 14 of 14 on ATL at ORL (2026-10-21): the matching "Points Milestones" price at ceil(line) sits next to the first row every time.
+- Kept types: NBA points, rebounds, assists, threes, PRA and the three pairs, steals, blocks, double double, First Basket; NFL pass/rush/rec yards, receptions, attempts, completions, carries, pass TDs, rush+rec yards, First TD Scorer, Anytime TD. Milestones and quarter markets are left out (size).
+- Kalshi: KXNFLFIRSTTD (13 games open on 10-21) and KXNBAFIRSTBASKET (series exists, no events yet; the matcher assumes the NFL's "AAA vs BBB" sub-title) are saved with each game, first and latest read.
+- First run from this Mac on 2026-10-21 11:50 ET: 13 NBA games (52 to 141 markets each, all priced), 14 NFL games (lines only, 0 priced; ESPN still has no NFL prices).
+- `/api/lines` runs on the NBA props workflow (6 daily slots) and the first TD workflow (NFL slots).
+- Sam's members pages (title "... members") are now reported as `paywalled` by the NBA props, NFL props and first TD captures instead of "no ESPN game for this page" or "page did not read".

@@ -1,6 +1,6 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
-## Guillotine learning: the room's record feeds the bid card (2026-10-21)
+## Guillotine learning: the room's record feeds the bid card (2026-10-21, ff1140c, deployed dpl_GTcg2b3Se21DmsjxasZBWa8peDbo)
 - Jack: "add a learning system for the guillotine league based on our strategy, leaguemates' moves, team needs, market data." Before this the FAAB tool stored nothing about its own decisions; everything was recomputed live.
 - Sleeper keeps every waiver bid, losing ones included (`/league/{id}/transactions/{leg}`, status failed + complete), every chop (`type: chopped`) and per-player points (`matchups.players_points`). So auctions, rival habits, our bid results and chop outcomes are re-read, never stored. Leg semantics: waivers processed during week W+1 are leg W; a card built for report week W resolves in leg W-1; players first play for the buyer in leg+1.
 - `src/lib/guillotine/learn.ts` (pure, tested): `auctionsFrom` (a losing bid above the price is dropped: Sleeper rejected it for money/room), `rivalProfiles` (head-to-head aggression = shrunk geo mean of bid / auction median, prior 4 bids), `typicalTop`, `roomFactor` (clamp 0.85-1.25), `gradeOurBids` / `summarizeOurBids` (contested overpay vs unopposed extra, near misses, started points per $), `gradeChopCalls`, `gradeShadows` (4 report-only bid rules replayed against real bids, 3-week horizon).
@@ -281,3 +281,19 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 ## Pool tiebreaker: models' average (2026-10-20, a749980, deployed dpl_9QmGGuLorY7NMEHfqsUv3WZabVvQ)
 
 The pool page showed the market total of the week's last game; Jack's 10/17 rule (already in /pickem) is the average of Sam's and David's totals. `tiebreakTotal` in pool.ts (falls back to one model, then market), pool-store reads `getPicksCore("nfl")` rows, cache key bumped to picks:v3:pool. Jack deployed it himself after auto mode blocked the deploy.
+
+## NBA picks: Sam's posted side, graded at DK (2026-10-21, 8c278f4, live as dpl_HyJHH7NBoYxWH8syZaigAkwnsojX)
+- Jack: "Sam flipped to the Thunder, our dashboard shows Spurs." Cause: the side was picked against the live DK line, not Sam's posted line. OKC at SA 10-20: Sam posted SA -2.5, model SA -0.3 (Thunder); DK moved to SA +1.5 so we tracked Spurs +1.5 (lost, OKC 116-104). Sam's model never changed in our copies.
+- Jack chose: Sam's side from his posted line, graded at DK. `samSpreadSide` in nba.ts; `NbaSnap.samLine` saved on each pregame copy; edge measured at DK, negative with `crossed` when DK moved through his model (crossed sides drop out of edge cuts and get no stake). Card says "DK crossed Sam's number" and shows "vs his posted X". Old copies without samLine fall back to DK.
+- Backfilled `last.samLine` on the three 10-20 games from Sam's game pages (nba/game/0022600001-3.html stay up after tip): DET +1, NY -4.5, SA -2.5. Only OKC at SA changed side.
+- Also seen: GitHub skipped the 21:30Z and 22:45Z NBA slots on 10-20; last pregame save was 1h49m before tip.
+- Git push did not trigger a Vercel build; Jack shipped it from the CLI himself.
+
+
+## Sam's props paywalled; building our own models (2026-10-21)
+- Sam put props, first TD and gaps pages behind a membership (boards and game pages stay free). Jack chose to build our own NBA props, NBA First Basket, NFL props and NFL First TD models. Research and plan: docs/superpowers/specs/2026-10-21-own-prop-models.md (committed). Nothing built yet; start at Phase 0 (line archive).
+
+## Own prop models, Phase 0: line archive (2026-10-21)
+- `/api/lines` (src/lib/models/archive.ts, pure parsing in lines.ts) saves DraftKings player prop lines from ESPN's odds feed for every NBA game yesterday to tomorrow and every NFL game this week, plus Kalshi first TD and first basket prices. Redis `lines:v1:{league}:{season}:{eventId}` and an `...:events` set. Open (DK's own), first, last; `closedAt` once the game starts.
+- Wired into nba-props.yml and first-td.yml. Run by hand: `npx tsx --tsconfig scripts/tsconfig.json --env-file=.env.local scripts/archive-lines.mts` (scripts/tsconfig.json maps server-only to the test stub so tsx can load server modules).
+- Sam's members pages now land in `report.paywalled` instead of the misleading capture errors. The NBA board's "nothing saved today" line says why.
