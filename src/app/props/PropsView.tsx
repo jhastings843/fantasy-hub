@@ -7,6 +7,7 @@ import { OurNflResults } from "./ournfl";
 import { OurFtdResults } from "./ourftd";
 import { OurFirstBasketResults, OurNbaResults } from "./ournba";
 import { KotcResults, KotcWeek } from "./kotc";
+import { NbaNewsResults, NbaNewsToday } from "./news";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
 import { DAVID_URL } from "@/lib/props/david";
@@ -117,7 +118,13 @@ export default async function PropsView({
         )}
         {market === "pp" && shown === "research" && <DavidResearch season={season} />}
         {market === "ftd" && shown === "results" && <OurFtdResults season={season} />}
-        {market === "nba" && shown === "results" && <OurNbaResults season={season} />}
+        {market === "nba" && shown === "week" && <NbaNewsToday season={season} />}
+        {market === "nba" && shown === "results" && (
+          <>
+            <NbaNewsResults season={season} />
+            <OurNbaResults season={season} />
+          </>
+        )}
         {market === "fb" && shown === "results" && <OurFirstBasketResults season={season} />}
 
         <footer className={s.footer}>

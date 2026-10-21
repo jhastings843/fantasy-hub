@@ -85,7 +85,7 @@ export interface SbGame {
   teams: { id: string; abbr: string; home: boolean }[];
 }
 
-async function scoreboard(now: Date, from: number, to: number): Promise<SbGame[]> {
+export async function scoreboard(now: Date, from: number, to: number): Promise<SbGame[]> {
   const out: SbGame[] = [];
   for (let i = from; i <= to; i++) {
     const d = etDate(new Date(now.getTime() + i * 86_400_000)).replace(/-/g, "");
@@ -152,12 +152,20 @@ export interface OurNbaReport {
   kotc?: string[];
 }
 
-async function loadWeek(season: number, week: number): Promise<{ [id: string]: OurStoredProps }> {
+export async function loadWeek(season: number, week: number): Promise<{ [id: string]: OurStoredProps }> {
   return (await redis.hgetall<{ [id: string]: OurStoredProps }>(K.week(season, week))) ?? {};
 }
 
+export interface RunOptions {
+  /** Only these ESPN event ids (a news reprice); grading, King of the Court and the review are skipped. */
+  only?: Set<string>;
+  /** Athlete ids to treat as Out, and as available, whatever the team roster page says (the injury feed can be ahead of it). */
+  extraOut?: Set<string>;
+  extraIn?: Set<string>;
+}
+
 /** Build tonight's boards, grade finals, review. Safe to call any time. */
-export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
+export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): Promise<OurNbaReport> {
   const report: OurNbaReport = { ingested: [], saved: [], graded: [], learning: [], problems: [] };
   const season = nbaSeasonOfDate(now);
   let games: SbGame[] = [];
@@ -166,14 +174,14 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
   } catch (e) {
     report.problems.push(`ESPN NBA scoreboard: ${e instanceof Error ? e.message : String(e)}`);
   }
-  report.ingested = await ingestFinals(season, games.filter((g) => g.completed).map((g) => g.id), report);
+  if (!opts.only) report.ingested = await ingestFinals(season, games.filter((g) => g.completed).map((g) => g.id), report);
 
   const prior = await redis.get<SeasonSummary>(K.prior(season));
   const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
   const fbTables = (await redis.get<FbTables>(K.fb)) ?? emptyTables();
   if (!prior) report.problems.push(`no prior season summary at ${K.prior(season)}: run scripts/seed-nba-models.mts`);
 
-  for (const g of games.filter((x) => x.state === "pre" && x.tip && new Date(x.tip) > now)) {
+  for (const g of games.filter((x) => x.state === "pre" && x.tip && new Date(x.tip) > now && (!opts.only || opts.only.has(x.id)))) {
     const home = g.teams.find((t) => t.home);
     const away = g.teams.find((t) => !t.home);
     if (!home || !away || !prior) continue;
@@ -196,7 +204,7 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
           if (!a.id) continue;
           names.set(a.id, { name: a.fullName ?? "", team: t.abbr });
           pos.set(a.id, a.position?.abbreviation ?? "");
-          if (a.injuries?.some((i) => i.status === "Out")) out.add(a.id);
+          if ((a.injuries?.some((i) => i.status === "Out") || opts.extraOut?.has(a.id)) && !opts.extraIn?.has(a.id)) out.add(a.id);
         }
       }
       // Available: who is likely to play, as the backtest had it (the players
@@ -228,13 +236,24 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
       const tIn = Object.fromEntries(
         [away.abbr, home.abbr].map((t) => [t, { team: t, poss: teams[t]?.poss ?? [], ...(prior.pace[t] !== undefined ? { priorPace: prior.pace[t] } : {}) }]),
       );
+      // Rotation players listed Out: the fit hands their minutes to whoever is left ("share"), as the backtest did.
+      const absent: PlayerInput[] = [];
+      for (const t of [away, home]) {
+        const rot = rotation(teams[t.abbr]);
+        const outIds = [...out].filter((id) => names.get(id)?.team === t.abbr && rot.includes(id));
+        const got = outIds.length ? ((await redis.hmget<{ [id: string]: PlayerEntry }>(K.players(season), ...outIds)) ?? {}) : {};
+        for (const id of outIds) {
+          const e = got[id];
+          absent.push({ id, team: t.abbr, pos: e?.pos ?? posOf(pos.get(id) ?? ""), games: e?.games ?? [], ...(prior.priors[id] ? { prior: prior.priors[id] } : {}) });
+        }
+      }
       const spread = await homeSpread(g.id);
       // Everyone counts toward the team's minutes, but a market only gets our
       // number when the player has real history: 2+ games this season or 10+
       // last season. A rookie or a player back from a lost season would
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
-      const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
+      const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P, absent).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
       const starterOf = new Map(inputs.map((x) => [x.id, x.starter ?? x.games.at(-1)?.starter ?? false]));
       const kotc: KotcGameInput = {
         spread,
@@ -277,6 +296,8 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
       report.problems.push(`${away?.abbr}@${home?.abbr}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+
+  if (opts.only) return report;
 
   // Grade saved games once final.
   const weeks = ((await redis.smembers(K.weeks(season))) ?? []).map(Number).sort((a, b) => a - b);
