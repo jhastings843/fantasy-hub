@@ -719,7 +719,7 @@ export function AtsResults({ r }: { r: PicksReport }) {
 }
 
 /** `harris`: the college John Harris panel, placed between PEM and the game log. */
-export function AtsResearch({ r, harris }: { r: PicksReport; harris?: React.ReactNode }) {
+export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactNode }) {
   const st = r.strategies;
   const name = (k: string) => r.names[k] ?? k;
   const groups = [...new Set(st.cuts.filter((c) => c.group !== "Research").map((c) => c.group))];
@@ -864,7 +864,7 @@ export function AtsResearch({ r, harris }: { r: PicksReport; harris?: React.Reac
           </div>
         </details>
       )}
-      {harris}
+      {panel}
       <details className={s.details}>
         <summary>{`Game log: all ${r.graded.length} graded games`}</summary>
         <div className={s.tw}>

@@ -29,6 +29,7 @@ import { harrisWeeks } from "./harris";
 import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
 import { archiveForecasts, loadForecasts } from "./forecasts";
+import { ourSpreadLines, type OurLine } from "@/lib/models/nfl/spread-live";
 import { fetchSplits } from "./splits-feed";
 import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
@@ -551,7 +552,12 @@ export async function runPicksData(league: League): Promise<string> {
     const feed = await fetchSplits(league);
     const priced = r.board.filter((g) => g.basis === "reference" && g.ref);
     splitsMatched = `${priced.filter((g) => matchSplits({ home: g.home, away: g.away, kickoff: g.ref?.kickoff, line: g.ref?.line }, feed)).length}/${priced.length}`;
-    forecasts = await archiveForecasts(league, r.season, r.week, r.board, core.rows, feed);
+    // Our own NFL spread model rides along, tracked only; a failure never stops the archive.
+    const ours =
+      league === "nfl"
+        ? await ourSpreadLines(r.season, priced.map((g) => ({ home: g.home, away: g.away, line: g.ref!.line }))).catch(() => new Map<string, OurLine>())
+        : new Map<string, OurLine>();
+    forecasts = await archiveForecasts(league, r.season, r.week, r.board, core.rows, feed, ours);
     const meet: TotalsSeen[] = r.totals.board.flatMap((g) =>
       g.sam !== undefined && g.david !== undefined && g.ref
         ? [{ week: r.week as number, home: g.home, away: g.away, sam: g.sam, david: g.david, line: g.ref.total, source: g.ref.source, seenAt: g.ref.fetchedAt }]

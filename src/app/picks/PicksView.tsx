@@ -7,6 +7,7 @@ import { AtsResearch, AtsResults, AtsWeek } from "./ats";
 import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWeek } from "./su-totals";
 import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
+import { OurSpreadCard } from "./ours";
 import { FOOTBALL_VIEWS, LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
 import { Background, Stats } from "./board";
 import { PicksLog } from "./log";
@@ -95,7 +96,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
 
         {market === "ats" && view === "week" && <AtsWeek r={r} />}
         {market === "ats" && view === "results" && <AtsResults r={r} />}
-        {market === "ats" && view === "research" && <AtsResearch r={r} harris={league === "cfb" ? <HarrisCard /> : undefined} />}
+        {market === "ats" && view === "research" && <AtsResearch r={r} panel={league === "cfb" ? <HarrisCard /> : <OurSpreadCard season={r.season} />} />}
         {market === "su" && view === "week" && league === "nfl" && <PoolCard />}
         {market === "su" && view === "week" && <SuWeek r={r} poolShares={poolShares} />}
         {market === "su" && view === "results" && <SuResults r={r} poolTrack={poolTrack} />}

@@ -4,6 +4,7 @@ import type { League, ModelLine } from "./parse";
 import { type BoardGame, type PemLine, type RefLine, key } from "./engine";
 import type { CoreRow } from "./compose";
 import { type SplitGame, type Splits, matchSplits, toSplits } from "./splits";
+import type { OurLine } from "@/lib/models/nfl/spread-live";
 
 // Immutable pregame evidence. Every data run appends a snapshot for each game
 // whose inputs changed since the last one: both models' lines and totals,
@@ -25,6 +26,8 @@ export interface ForecastSnapshot {
   ref?: RefLine;
   /** Public betting splits and the opening line at this read (splits.ts), when the feed had the game. */
   splits?: Splits;
+  /** Our own NFL spread model at this read (lib/models/nfl/spread.ts), tracked only. From 2026-10-21. */
+  ours?: OurLine;
 }
 
 const listKey = (league: League, season: number, week: number) => `picks:v2:${league}:${season}:forecast:w${week}`;
@@ -42,14 +45,14 @@ export function fingerprint(s: Omit<ForecastSnapshot, "at">): string {
   ]);
 }
 
-export async function archiveForecasts(league: League, season: number, week: number, board: BoardGame[], rows: CoreRow[], feed: SplitGame[] = []): Promise<number> {
+export async function archiveForecasts(league: League, season: number, week: number, board: BoardGame[], rows: CoreRow[], feed: SplitGame[] = [], ours: Map<string, OurLine> = new Map()): Promise<number> {
   const at = new Date().toISOString();
   const snaps: ForecastSnapshot[] = board
     .filter((g) => g.basis === "reference" && g.ref)
     .map((g) => {
       const row = rows.find((r) => r.home === g.home && r.away === g.away);
       const m = matchSplits({ home: g.home, away: g.away, kickoff: g.ref?.kickoff, line: g.ref?.line }, feed);
-      return { at, week, home: g.home, away: g.away, sam: g.sam, david: g.david, pem: g.pem, samTotal: row?.samTotal, davidTotal: row?.davidTotal, ref: g.ref, ...(m ? { splits: toSplits(m) } : {}) };
+      return { at, week, home: g.home, away: g.away, sam: g.sam, david: g.david, pem: g.pem, samTotal: row?.samTotal, davidTotal: row?.davidTotal, ref: g.ref, ...(m ? { splits: toSplits(m) } : {}), ...(ours.has(`${g.home}|${g.away}`) ? { ours: ours.get(`${g.home}|${g.away}`)! } : {}) };
     });
   if (!snaps.length) return 0;
   const prev = ((await redis.hgetall<Record<string, string>>(fpKey(league, season, week))) ?? {}) as Record<string, string>;
