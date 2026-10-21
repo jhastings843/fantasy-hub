@@ -290,6 +290,11 @@ function propRows(board: (OurStoredProps | OurNflStored)[], extraCol: (g: OurSto
   });
 }
 const noCol = () => "";
+/** When the board used DK's alternate line nearer -110 instead of the main line, say which. */
+const altNote = (g: OurStoredProps, m: PropMarket) => {
+  const x = g.extra[m.id]?.main;
+  return x ? `alt line; main ${x.line} at ${x.over !== null ? am(x.over) : "·"}/${x.under !== null ? am(x.under) : "·"}` : "";
+};
 
 async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; season: number }) {
   const now = nowMs();
@@ -305,6 +310,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
       ["Our mean", `${m.model}`],
       ["DK over / under", `${am(m.books[0].over ?? -110)} / ${am(m.books[0].under ?? -110)}`],
       ["Games this season", `${(g as OurStoredProps).extra[m.id]?.games ?? "·"}`],
+      ["Line used", altNote(g as OurStoredProps, m) || "DK's main line (nearest -110)"],
     ]);
     const keys = new Set(ahead.flatMap((g) => g.game.markets.filter((m) => settled(g, m)).map((m) => `${g.game.slug}|${m.id}`)));
     const edges = allEdges.filter((e) => keys.has(e.key));
@@ -328,9 +334,9 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
         <div className={s.section}>
           <div className={s.sectionHead}>
             <h3 className={s.h2}>Every game</h3>
-            <p className={s.p}>Open a game for every prop: the line, our number, our chance of the over and the edge.</p>
+            <p className={s.p}>Open a game for every prop: the line priced closest to -110 (DK&apos;s main line, or an alternate when the main one is lopsided), our number, our chance of the over and the edge.</p>
           </div>
-          <GameTable head={["Props", "Edges", "Top edge", "Graded"]} rows={propRows([...ahead, ...done], noCol)} />
+          <GameTable head={["Props", "Edges", "Top edge", "Graded"]} rows={propRows([...ahead, ...done], (g, m) => altNote(g as OurStoredProps, m))} />
         </div>
         <Gate learning={v.learning} label="NBA prop" />
       </section>

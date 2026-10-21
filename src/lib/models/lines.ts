@@ -189,3 +189,51 @@ export function lineCounts(g: ArchivedGame): { markets: number; priced: number; 
     moved: ms.filter((m) => !sameQuote(m.first, m.last)).length,
   };
 }
+
+/** DK's alternate lines per (athlete, main market type): "6+ assists" at +113 is an over at 5.5. Over-only. */
+export const MILESTONE_OF: { [main: string]: string } = {
+  "Total Points": "Points Milestones",
+  "Total Rebounds": "Rebounds Milestones",
+  "Total Assists": "Assists Milestones",
+  "Total 3-Point Field Goals": "3-Point Field Goals Milestones",
+};
+
+export function readMilestones(rows: PropBetRow[]): Map<string, { line: number; over: number }[][]> {
+  // DK can list more than one ladder under one type (a full-game one and a
+  // part-game one, 3+ rebounds at -107 next to 9+ at -110). Rows come ladder
+  // by ladder with N rising, so a fall in N starts a new ladder; the caller
+  // keeps the ladder that agrees with the main line (fullGameLadder).
+  const main = new Map(Object.entries(MILESTONE_OF).map(([k, v]) => [v, k]));
+  const out = new Map<string, { line: number; over: number }[][]>();
+  for (const r of rows) {
+    const type = main.get(r.type?.name ?? "");
+    const a = athleteOf(r);
+    const n = num(r.current?.target?.value);
+    const price = american(r.odds?.american?.value);
+    if (!type || !a || n === null || price === null) continue;
+    const k = `${a}|${type}`;
+    const ladders = out.get(k) ?? [];
+    const cur = ladders.at(-1);
+    if (!cur || n - 0.5 <= cur.at(-1)!.line) ladders.push([{ line: n - 0.5, over: price }]);
+    else cur.push({ line: n - 0.5, over: price });
+    out.set(k, ladders);
+  }
+  return out;
+}
+
+/** The ladder whose rung at the main line prices like the main line's over (the full-game one). Empty when none matches. */
+export function fullGameLadder(ladders: { line: number; over: number }[][], main: { line: number; over: number | null }): { line: number; over: number }[] {
+  if (main.over === null) return [];
+  const mo = implied(main.over);
+  let best: { d: number; l: { line: number; over: number }[] } | null = null;
+  for (const l of ladders) {
+    const rung = l.find((x) => x.line === main.line);
+    if (!rung) continue;
+    const d = Math.abs(implied(rung.over) - mo);
+    if (!best || d < best.d) best = { d, l };
+  }
+  // A rung more than 5 points of chance off the main over is a different market.
+  return best && best.d <= 0.05 ? best.l : [];
+}
+
+const implied = (p: number) => (p < 0 ? -p / (-p + 100) : 100 / (p + 100));

@@ -933,7 +933,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
         </h1>
         <p className={s.heroSub}>{`${away} at ${home} · ${kickoffEt(g.ref?.kickoff)}`}</p>
         <div className={s.chips} style={{ marginTop: 6 }}>
-          {st === "early" && <span className={s.lockChip}>{`Locks ${kickoffEt(g.held)}`}</span>}
+          {st === "early" && <span className={`${s.chip} ${s.chipLock}`}>{`Locks ${kickoffEt(g.held)}`}</span>}
           {(st === "bet" || st === "sent" || st === "early") && <span className={s.chip}>{`${st === "sent" ? g.issued!.units : g.stake}u at ${price(st === "sent" ? g.issued!.price : g.price)}`}</span>}
           {g.final && <span className={s.chip}>{`Final: ${away} ${g.final.away}, ${home} ${g.final.home}`}</span>}
         </div>

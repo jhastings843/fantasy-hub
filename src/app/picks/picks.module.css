@@ -524,3 +524,5 @@
 .gateBar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .gateBar i { display: block; height: 6px; background: var(--pos); }
 .suLine { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 16px; }
+.chipLock { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+.chips > span.chip { cursor: default; }

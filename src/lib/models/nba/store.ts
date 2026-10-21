@@ -6,7 +6,7 @@ import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learn
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import type { StoredProps } from "@/lib/props/store";
-import { readPropBets, type PropBetRow } from "../lines";
+import { readMilestones, readPropBets, type PropBetRow } from "../lines";
 import { OUR_SECTION, fbCandidates, ourPropCandidates, type FbGradedBoard } from "../learn";
 import { compactGame, type EspnNbaSummary, type NbaGame } from "./box";
 import { ROTATION_GAMES, ingest, rotation, type PlayerEntry, type SeasonSummary, type TeamEntry } from "./history";
@@ -228,7 +228,7 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
       const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
-      const { markets, extra } = ourMarkets(lines, proj, names, P, new Map(inputs.map((x) => [x.id, x.games.length])));
+      const { markets, extra } = ourMarkets(lines, proj, names, P, new Map(inputs.map((x) => [x.id, x.games.length])), readMilestones(rows));
       // First Basket: DK's field is its probable starters; else each team's last starting five, less anyone Out.
       const fbDk = [...lines.values()].filter((l) => l.type === "First Basket" && l.current.over !== null).map((l) => ({ id: l.athlete, price: l.current.over! }));
       const lastStarters: { [team: string]: { id: string; pos: string }[] } = {};

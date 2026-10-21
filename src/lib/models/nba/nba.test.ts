@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { compactGame, type EspnNbaSummary } from "./box";
 import { ingest, rotation, summarize, type PlayerEntry, type TeamEntry } from "./history";
 import { cdf, lgamma, nbPmf, overUnder, projectGame, shareMinutes, toTeamMinutes, type LeagueBase, type NbaParams, type PlayerInput } from "./props";
-import { noVig, ourMarkets } from "./market";
-import { readPropBets, type PropBetRow } from "../lines";
+import { nearestEven, noVig, ourMarkets } from "./market";
+import { fullGameLadder, readMilestones, readPropBets, type PropBetRow } from "../lines";
 import { ourPropCandidates } from "../learn";
 import PARAMS from "./params.json";
 
@@ -164,5 +164,51 @@ describe("our learning candidates", () => {
     expect(c.find((x) => x.id === "edge:pts")?.parent).toBe("edge:all");
     expect(c.find((x) => x.id === "lean:all")?.parent).toBeUndefined();
     expect(c.every((x) => x.bets.length === 0)).toBe(true);
+  });
+});
+
+describe("nearest-even line (Jack, 2026-10-21)", () => {
+  const rows = (JSON.parse(readFileSync("test/fixtures/models/espn-propbets-nba-401909834.json", "utf8")) as { items: PropBetRow[] }).items;
+  it("reads DK's alternates as over-only lines a half point under each N+", () => {
+    const m = readMilestones(rows).get("6478|Total Assists")!.flat();
+    expect(m).toContainEqual({ line: 2.5, over: 258 });
+    expect(m).toContainEqual({ line: 1.5, over: -114 });
+  });
+  it("keeps only the full-game ladder (the one that prices like the main line)", () => {
+    // Paolo Banchero, 2026-10-21: a part-game ladder (3+ at -107) next to the full-game one (9+ at -110), main 8.5 at -111.
+    const part = [{ line: 1.5, over: -311 }, { line: 2.5, over: -107 }, { line: 3.5, over: 229 }];
+    const full = [{ line: 7.5, over: -185 }, { line: 8.5, over: -110 }, { line: 9.5, over: 146 }];
+    expect(fullGameLadder([part, full], { line: 8.5, over: -111 })).toEqual(full);
+    expect(fullGameLadder([part], { line: 8.5, over: -111 })).toEqual([]);
+  });
+  it("keeps a main line whose nearer side is near -110", () => {
+    expect(nearestEven({ line: 8.5, over: -111, under: -119 }, [{ line: 9.5, over: 146 }]).alt).toBe(false);
+  });
+  it("keeps a main line already near -110", () => {
+    const x = nearestEven({ line: 8.5, over: -113, under: -113 }, [{ line: 9.5, over: 120 }]);
+    expect(x).toMatchObject({ line: 8.5, alt: false });
+    expect(x.fairOver).toBeCloseTo(0.5, 9);
+  });
+  it("moves off a lopsided main line to the alternate nearest even, over only", () => {
+    // Under 5.5 at -155 / over +118: the 5+ (4.5) alternate at -108 sits nearer -110.
+    const x = nearestEven({ line: 5.5, over: 118, under: -155 }, [{ line: 4.5, over: -108 }, { line: 6.5, over: 260 }]);
+    expect(x).toMatchObject({ line: 4.5, over: -108, under: null, alt: true });
+    // The over's implied chance with the main line's overround taken out.
+    expect(x.fairOver!).toBeLessThan(0.519);
+    expect(x.fairOver!).toBeGreaterThan(0.48);
+  });
+  it("prices only the over on an alternate", () => {
+    const lines = readPropBets(rows, "nba");
+    const k = [...lines.values()].find((l) => l.type === "Total Assists")!;
+    const names = new Map([[k.athlete, { name: "Test", team: "ORL" }]]);
+    const proj = new Map([[k.athlete, { id: k.athlete, team: "ORL", min: 30, mean: { pts: 10, reb: 4, ast: 0.5, threes: 1 } }]]);
+    const alts = new Map([[`${k.athlete}|Total Assists`, [[{ line: (k.current.line ?? 3.5) - 1, over: -110 }, { line: k.current.line ?? 3.5, over: 195 }]]]]);
+    const lop = new Map([[`${k.athlete}|Total Assists`, { ...k, current: { line: k.current.line, over: 200, under: -260 } }]]);
+    const { markets } = ourMarkets(lop as never, proj, names, P, new Map(), alts);
+    const m = markets.find((x) => x.stat === "ast")!;
+    expect(m.books[0].under).toBeNull();
+    // A tiny projection leans under, but there is no under price on an alternate: no edge.
+    expect(m.lean).toBe("under");
+    expect(m.side).toBeNull();
   });
 });

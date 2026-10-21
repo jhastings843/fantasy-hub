@@ -8,7 +8,7 @@
 // DK's no-vig chance, and `lean` is the side we make likelier.
 
 import { STAT_LABEL, implied, type PropMarket, type PropsGame, type Side } from "@/lib/props/parse";
-import type { LiveLine } from "../lines";
+import { fullGameLadder, type LiveLine } from "../lines";
 import { overUnder, type NbaParams, type NbaStat, type Projection } from "./props";
 
 export const DK_STAT: { [type: string]: NbaStat } = {
@@ -26,6 +26,38 @@ export interface OurMarketExtra {
   min: number;
   /** Games this season behind it (missing on boards saved before 2026-10-21 evening). */
   games?: number;
+  /** Set when an alternate line was nearer even money than the main line: the main line it replaced. */
+  main?: { line: number; over: number | null; under: number | null };
+}
+
+const EVEN = implied(-110);
+/** How far a line's price sits from -110: the nearer side on the main line (either can be bet), the over on an alternate. */
+const offEven = (over: number | null, under: number | null) =>
+  Math.min(over !== null ? Math.abs(implied(over) - EVEN) : 1, under !== null ? Math.abs(implied(under) - EVEN) : 1);
+
+/**
+ * Jack (2026-10-21): test against the line priced closest to -110. From DK's
+ * main line and its over-only alternates, keep whichever is nearest even
+ * money. On an alternate only the over can be bet, and its fair chance is
+ * the over's implied chance with the main line's overround taken out.
+ */
+export function nearestEven(
+  main: { line: number; over: number | null; under: number | null },
+  alts: { line: number; over: number }[],
+): { line: number; over: number | null; under: number | null; fairOver: number | null; alt: boolean } {
+  const fairMain = main.over !== null && main.under !== null ? noVig(main.over, main.under).over : null;
+  let best = { line: main.line, over: main.over, under: main.under, fairOver: fairMain, alt: false };
+  let d = offEven(main.over, main.under);
+  const round = main.over !== null && main.under !== null ? implied(main.over) + implied(main.under) : null;
+  for (const a of alts) {
+    if (a.line === main.line) continue;
+    const da = offEven(a.over, null);
+    if (da < d) {
+      d = da;
+      best = { line: a.line, over: a.over, under: null, fairOver: round ? Math.min(0.99, implied(a.over) / round) : null, alt: true };
+    }
+  }
+  return best;
 }
 
 /** DK's chance with the vig taken out (the two sides scaled to sum to 1). */
@@ -44,6 +76,7 @@ export function ourMarkets(
   names: Map<string, { name: string; team: string }>,
   p: NbaParams,
   games: Map<string, number> = new Map(),
+  alts: Map<string, { line: number; over: number }[][]> = new Map(),
 ): { markets: PropMarket[]; extra: { [id: string]: OurMarketExtra } } {
   const markets: PropMarket[] = [];
   const extra: { [id: string]: OurMarketExtra } = {};
@@ -51,11 +84,12 @@ export function ourMarkets(
     const stat = DK_STAT[l.type];
     const pr = proj.get(l.athlete);
     const who = names.get(l.athlete);
-    const { line, over, under } = l.current;
-    if (!stat || !pr || !who || line === null) continue;
+    if (!stat || !pr || !who || l.current.line === null) continue;
+    const pick = nearestEven({ line: l.current.line, over: l.current.over, under: l.current.under }, fullGameLadder(alts.get(`${l.athlete}|${l.type}`) ?? [], l.current as { line: number; over: number | null }));
+    const { line, over, under } = pick;
     const mean = pr.mean[stat];
     const ch = overUnder(stat, Math.max(mean, 0.01), line, p);
-    const fair = over !== null && under !== null ? noVig(over, under) : null;
+    const fair = pick.fairOver !== null ? { over: pick.fairOver, under: 1 - pick.fairOver } : null;
     // A side is a model edge when its chance beats DK's break-even at its own price.
     const ev = (s: Side) => {
       const price = s === "over" ? over : under;
@@ -80,7 +114,13 @@ export function ourMarkets(
       side,
       lean,
     });
-    extra[id] = { over: r3(ch.over), under: r3(ch.under), min: r1(pr.min), ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}) };
+    extra[id] = {
+      over: r3(ch.over),
+      under: r3(ch.under),
+      min: r1(pr.min),
+      ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}),
+      ...(pick.alt ? { main: { line: l.current.line, over: l.current.over, under: l.current.under } } : {}),
+    };
   }
   markets.sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1) || a.id.localeCompare(b.id));
   return { markets, extra };
