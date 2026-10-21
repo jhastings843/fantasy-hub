@@ -16,17 +16,12 @@ async function load(season: number): Promise<OurNflView | null> {
 export async function OurNflWeek({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return <p className={s.calm}>Our NFL model couldn&apos;t be read just now. Try again in a minute.</p>;
-  const priced = v.board.reduce((a, g) => a + Object.values(g.extra).filter((x) => x.price !== "assumed").length, 0);
-  const all = v.board.reduce((a, g) => a + g.game.markets.length, 0);
   return (
     <section className={s.section} aria-labelledby="our-nfl-week">
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="our-nfl-week">
           Our model{v.week ? ` · Week ${v.week}` : ""}
         </h2>
-        <p className={s.p}>
-          {`Our own projection for passing, rushing and receiving yards and receptions, from nflverse's weekly stats: each team's attempts and carries, each player's share of them and his yards per chance, all shrunk toward last season, then a skewed distribution priced against DraftKings' line (yardage reads from our median, not the mean). Tested on 2025's second half and 2026 weeks 1-6, where it beat season averages; on Sam's saved weeks 6-7 it trailed Sam and the market line on passing yards. ESPN carries DK's NFL lines but not its prices yet: ${priced} of ${all} props this week have a real price (David's board); the rest assume -110. QB rushing reads low (the position's yards per carry includes kneel-downs). Nothing is a bet until a slice clears our learning gate.`}
-        </p>
       </div>
       {v.board.length ? (
         <ol className={s.ftdGames}>
