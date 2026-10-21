@@ -242,3 +242,127 @@ export async function OurNbaResults({ season }: { season: number }) {
     </section>
   );
 }
+
+function FbCard({ g }: { g: OurStoredProps }) {
+  const b = g.fb!;
+  const edges = b.players.filter((x) => x.edge);
+  const tipTeam = b.tip >= 0.5 ? b.home : b.away;
+  const res = b.result;
+  const net = res !== undefined ? edges.reduce((a, x) => a + (res?.player === x.id ? (x.price! > 0 ? x.price! / 100 : 100 / -x.price!) : -1), 0) : null;
+  return (
+    <li>
+      <details className={s.ftdGame}>
+        <summary className={s.ftdSum}>
+          <span className={s.ftdWhen}>
+            <b>{`${b.away} at ${b.home}`}</b>
+            <span className={s.dim}>{g.kickoff ? whenEt(g.kickoff) : ""}</span>
+          </span>
+          <span className={s.ftdPick}>
+            <span className={s.ftdPickName}>{`${b.players[0].name} ${pct(b.players[0].p)}`}</span>
+            <span className={`${s.dim} ${s.num}`}>{`tip: ${tipTeam} ${pct(Math.max(b.tip, 1 - b.tip))}`}</span>
+          </span>
+          <span className={s.ftdOdds}>{edges.length ? `${edges.length} ${edges.length === 1 ? "edge" : "edges"}` : "No edges"}</span>
+          <span className={s.ftdFlags}>
+            {net !== null && edges.length > 0 && <span className={`${s.resChip} ${net > 0 ? s.resW : net < 0 ? s.resL : s.resP}`}>{u(net)}</span>}
+            <span className={s.chev} aria-hidden>
+              ›
+            </span>
+          </span>
+        </summary>
+        <div className={s.ftdBody}>
+          <div className={s.tw}>
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Ours</th>
+                  <th>DK no-vig</th>
+                  <th>DK price</th>
+                  <th>Edge</th>
+                </tr>
+              </thead>
+              <tbody>
+                {b.players.map((x) => (
+                  <tr key={x.id}>
+                    <td>
+                      {`${x.name} `}
+                      <span className={s.dim}>{x.team}</span>
+                      {res?.player === x.id && <span className={`${s.resChip} ${s.resW}`}> first basket</span>}
+                    </td>
+                    <td className={s.num}>{pct(x.p)}</td>
+                    <td className={s.num}>{x.fair !== null ? pct(x.fair) : "–"}</td>
+                    <td className={s.num}>{x.price !== null ? am(x.price) : "–"}</td>
+                    <td className={x.edge ? s.pos : s.dim}>{x.edge ? `+${((x.p - implied(x.price!)) * 100).toFixed(1)}` : "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className={`${s.ftdNote} ${s.dim}`}>
+            {`Starters from ${b.starters === "dk" ? "DraftKings' listed field" : "each team's last game"}. ${res === undefined ? "" : res === null ? "No first basket found in the play-by-play. " : ""}Saved ${whenEt(g.capturedAt)}.`}
+          </p>
+        </div>
+      </details>
+    </li>
+  );
+}
+
+export async function OurFirstBasket({ season }: { season: number }) {
+  const v = await load(season);
+  if (!v) return null;
+  const today = etDate(new Date(renderedAt()));
+  const games = v.board.filter((g) => g.fb && (!g.kickoff || etDate(new Date(g.kickoff)) >= today));
+  return (
+    <section className={s.section} aria-labelledby="our-fb">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id="our-fb">
+          First Basket
+        </h2>
+        <p className={s.p}>
+          Our chance each starter scores the game&apos;s first field goal (DraftKings&apos; rules: free throws don&apos;t count, non-starters are void). It comes from
+          the tip (each jumper&apos;s shrunk record; the team that wins it scored first 64% of the time over the last two seasons), then each starter&apos;s share of
+          his team&apos;s first baskets, shrunk toward his share of its field goals. Tested on the second half of last season: it picked the tip winner 64.9% of the
+          time and its chances were calibrated within a point, but the scorer itself is close to a coin toss among the starters. An edge beats DK&apos;s break-even
+          at its price; none is a bet until a slice clears the First Basket learning gate.
+        </p>
+      </div>
+      {games.length ? (
+        <ol className={s.ftdGames}>
+          {games.map((g) => (
+            <FbCard key={g.game.slug} g={g} />
+          ))}
+        </ol>
+      ) : (
+        <p className={s.calm}>No First Basket boards for today yet. They are built when DraftKings posts the market, usually the day before.</p>
+      )}
+    </section>
+  );
+}
+
+export async function OurFirstBasketResults({ season }: { season: number }) {
+  const v = await load(season);
+  if (!v) return null;
+  const bets = v.fb.graded.flatMap((b) => b.bets);
+  const w = bets.filter((x) => x.net > 0).length;
+  const units = bets.reduce((a, x) => a + x.net, 0);
+  const tipRight = v.fb.graded.filter((b) => b.board.result && (b.tip >= 0.5) === (b.board.result.team === b.home)).length;
+  return (
+    <section className={s.section} aria-labelledby="our-fb-results">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id="our-fb-results">
+          First Basket: results
+        </h2>
+        <p className={s.p}>Every edge on a graded board, 1 unit at DraftKings&apos; price.</p>
+      </div>
+      {v.fb.graded.length ? (
+        <div className={s.tiles}>
+          <Tile value={u(units)} label={`Every edge · ${w}-${bets.length - w}`} />
+          <Tile value={`${tipRight} of ${v.fb.graded.length}`} label="games our favored team scored first" />
+        </div>
+      ) : (
+        <p className={s.calm}>Nothing graded yet. Boards are graded from ESPN&apos;s play-by-play at the overnight run.</p>
+      )}
+      <LearningBlock v={v.fb.learning} />
+    </section>
+  );
+}

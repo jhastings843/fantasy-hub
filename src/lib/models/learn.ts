@@ -83,3 +83,34 @@ export function record(bets: { bet: GradedBet }[]): { w: number; l: number; p: n
   r.units = Math.round(r.units * 100) / 100;
   return r;
 }
+
+// First Basket: one market per game, long prices, so it runs on FTD_GATE.
+
+export interface FbGradedBoard {
+  event: string;
+  week: number;
+  at: string;
+  /** P(home wins the tip). */
+  tip: number;
+  home: string;
+  /** Our top player in the game. */
+  top: string;
+  bets: { id: string; team: string; price: number; net: number }[];
+}
+
+export const FB_SLICES: [string, string, (b: FbGradedBoard, x: FbGradedBoard["bets"][number]) => boolean][] = [
+  ["fb:all", "Every First Basket edge", () => true],
+  ["fb:tip", "Edges on the team we favor to win the tip", (b, x) => (b.tip >= 0.5 ? x.team === b.home : x.team !== b.home)],
+  ["fb:short", "Edges at +600 or shorter", (_, x) => x.price <= 600],
+  ["fb:long", "Edges longer than +600", (_, x) => x.price > 600],
+  ["fb:top", "Our top player in the game, when he is an edge", (b, x) => x.id === b.top],
+];
+
+export function fbCandidates(boards: FbGradedBoard[]): Candidate[] {
+  return FB_SLICES.map(([id, label, keep]) => ({
+    id,
+    label,
+    ...(id === "fb:all" ? {} : { parent: "fb:all" }),
+    bets: boards.flatMap((b) => b.bets.filter((x) => keep(b, x)).map((x): Bet => ({ game: b.event, week: b.week, at: b.at, net: x.net }))),
+  }));
+}

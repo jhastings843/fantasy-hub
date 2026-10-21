@@ -8,7 +8,8 @@
 //
 //   node scripts/check-first-basket.mjs
 //
-// Runs at 8:30am from ~/Library/LaunchAgents/com.jackh.first-basket-check.plist.
+// Retired 2026-10-21: our own First Basket model (lib/models/nba/firstbasket.ts)
+// replaced the wait for Sam's page; the launchd job was unloaded and its plist deleted.
 
 import { existsSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";

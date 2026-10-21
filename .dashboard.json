@@ -92,6 +92,7 @@
   ],
   "last_worked": "2026-10-21",
   "notes": [
+    "2026-10-21: Own prop models Phase 2: NBA First Basket (tip model, starter shares, DK no-vig field) on the NBA tab, own learning section; retired the first-basket launchd check.",
     "2026-10-21: Own prop models Phase 1: NBA props v1 (minutes, shrunk rates, pace, NB/normal), walk-forward fit on 2025-26, Our model board and results on the NBA tab, own learning section.",
     "2026-10-21: public betting splits + reverse line movement captured from Action Network for NFL, CFB, NBA; 6 report-only veto hypotheses on the Tuesday review.",
     "2026-10-21: Own prop models Phase 0: DraftKings prop line archive (ESPN, NBA and NFL, open/first/last/close) plus Kalshi first TD and first basket, /api/lines on both capture workflows; Sam's members pages now logged as paywalled.",

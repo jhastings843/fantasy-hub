@@ -2,17 +2,19 @@ import "server-only";
 import { redis } from "@/lib/redis/client";
 import { etDate, nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { gradeGame, type EspnBoxTeam } from "@/lib/props/grade";
-import { PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
+import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import type { StoredProps } from "@/lib/props/store";
 import { readPropBets, type PropBetRow } from "../lines";
-import { OUR_SECTION, ourPropCandidates } from "../learn";
+import { OUR_SECTION, fbCandidates, ourPropCandidates, type FbGradedBoard } from "../learn";
 import { compactGame, type EspnNbaSummary, type NbaGame } from "./box";
 import { ROTATION_GAMES, ingest, rotation, type PlayerEntry, type SeasonSummary, type TeamEntry } from "./history";
 import { ourGame, ourMarkets, type OurMarketExtra } from "./market";
 import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } from "./props";
+import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFb, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
 import PARAMS from "./params.json";
+import FB_PARAMS from "./fb-params.json";
 
 // Our NBA props model, live. Each run:
 // 1. Ingests finished games it hasn't seen (ESPN summaries) into the season's
@@ -34,6 +36,7 @@ import PARAMS from "./params.json";
 //   props:v1:ours:nba:{season}:weeks   set of weeks
 
 const P = PARAMS as NbaParams;
+const FBP = FB_PARAMS as FbParams;
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
 const PROPS = (ev: string, page: number) => `https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/${ev}/competitions/${ev}/odds/100/propBets?limit=1000&page=${page}`;
 const UA = { "user-agent": "Mozilla/5.0 (fantasy-hub NBA model)" };
@@ -46,6 +49,8 @@ export const K = {
   games: (s: number) => `models:v1:nba:${s}:games`,
   week: (s: number, w: number) => `props:v1:ours:nba:${s}:w${w}`,
   weeks: (s: number) => `props:v1:ours:nba:${s}:weeks`,
+  /** First Basket tables, cumulative across seasons (FbTables). */
+  fb: "models:v1:nba:fb",
 };
 
 export interface OurStoredProps extends StoredProps {
@@ -53,6 +58,8 @@ export interface OurStoredProps extends StoredProps {
   extra: { [id: string]: OurMarketExtra };
   away: string;
   home: string;
+  /** Our First Basket board against DK's prices, when DK posted the market. */
+  fb?: FbBoard;
 }
 
 async function json<T>(url: string): Promise<T> {
@@ -96,23 +103,26 @@ export async function ingestFinals(season: number, finals: string[], report: { p
   const todo = finals.filter((id) => !seen.has(id));
   if (!todo.length) return [];
   const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
+  const fb = (await redis.get<FbTables>(K.fb)) ?? emptyTables();
   const done: string[] = [];
   for (const id of todo) {
     try {
       const g = compactGame(id, await json<EspnNbaSummary>(`${SITE}/summary?event=${id}`));
       if (!g) continue;
-      await foldGame(season, g, teams);
+      await foldGame(season, g, teams, fb);
       done.push(id);
     } catch (e) {
       report.problems.push(`ingest ${id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   await redis.set(K.teams(season), teams);
+  await redis.set(K.fb, fb);
   return done;
 }
 
 /** One game into the player table, the team table (caller saves it) and the game hash. */
-export async function foldGame(season: number, g: NbaGame, teams: { [t: string]: TeamEntry }) {
+export async function foldGame(season: number, g: NbaGame, teams: { [t: string]: TeamEntry }, fb?: FbTables) {
+  if (fb) foldFb(fb, g);
   const ids = g.players.map((l) => l.id);
   const got = ids.length ? await redis.hmget<{ [id: string]: PlayerEntry }>(K.players(season), ...ids) : null;
   const players: { [id: string]: PlayerEntry } = {};
@@ -150,6 +160,7 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
 
   const prior = await redis.get<SeasonSummary>(K.prior(season));
   const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
+  const fbTables = (await redis.get<FbTables>(K.fb)) ?? emptyTables();
   if (!prior) report.problems.push(`no prior season summary at ${K.prior(season)}: run scripts/seed-nba-models.mts`);
 
   for (const g of games.filter((x) => x.state === "pre" && x.tip && new Date(x.tip) > now)) {
@@ -210,7 +221,17 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
       const spread = await homeSpread(g.id);
       const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).map((x) => [x.id, x]));
       const { markets, extra } = ourMarkets(lines, proj, names, P);
-      if (!markets.length) continue;
+      // First Basket: DK's field is its probable starters; else each team's last starting five, less anyone Out.
+      const fbDk = [...lines.values()].filter((l) => l.type === "First Basket" && l.current.over !== null).map((l) => ({ id: l.athlete, price: l.current.over! }));
+      const lastStarters: { [team: string]: { id: string; pos: string }[] } = {};
+      for (const t of [away, home]) {
+        const mine = rosterIds.filter((id) => names.get(id)!.team === t.abbr);
+        const lastDate = mine.flatMap((id) => (entries[id]?.games ?? []).filter((x) => x.team === t.abbr).map((x) => x.date)).sort().at(-1);
+        lastStarters[t.abbr] = mine.filter((id) => entries[id]?.games.some((x) => x.date === lastDate && x.team === t.abbr && x.starter)).map((id) => ({ id, pos: pos.get(id) ?? "" }));
+      }
+      const fbNames = new Map([...names].map(([id, v]) => [id, { ...v, pos: pos.get(id) ?? "" }]));
+      const fb = fbDk.length ? fbBoard(home.abbr, away.abbr, fbDk, lastStarters, fbNames, fbTables, FBP) : null;
+      if (!markets.length && !fb) continue;
       const week = nbaWeek(new Date(g.tip!), season);
       const old = (await loadWeek(season, week))[g.id];
       const stored: OurStoredProps = {
@@ -224,10 +245,11 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
         extra,
         away: away.abbr,
         home: home.abbr,
+        ...(fb ? { fb } : {}),
       };
       await redis.hset(K.week(season, week), { [g.id]: stored });
       await redis.sadd(K.weeks(season), String(week));
-      report.saved.push(`${away.abbr}@${home.abbr} ${markets.length} props, ${markets.filter((m) => m.clears).length} edges`);
+      report.saved.push(`${away.abbr}@${home.abbr} ${markets.length} props, ${markets.filter((m) => m.clears).length} edges${fb ? `, first basket ${fb.players.filter((x) => x.edge).length} edges` : ""}`);
     } catch (e) {
       report.problems.push(`${away?.abbr}@${home?.abbr}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -239,10 +261,12 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
     for (const [id, g] of Object.entries(await loadWeek(season, wk))) {
       if (g.result || !g.kickoff || new Date(g.kickoff) > now) continue;
       try {
-        const sum = await json<{ header?: { competitions?: { status?: { type?: { completed?: boolean } } }[] }; boxscore?: { players?: EspnBoxTeam[] } }>(`${SITE}/summary?event=${id}`);
+        const sum = await json<EspnNbaSummary & { boxscore?: { players?: EspnBoxTeam[] } }>(`${SITE}/summary?event=${id}`);
         if (!sum.header?.competitions?.[0]?.status?.type?.completed) continue;
         if (!sum.boxscore?.players?.length) throw new Error("no box score yet");
-        await redis.hset(K.week(season, wk), { [id]: { ...g, result: gradeGame(g.game, sum.boxscore.players, {}, "nba"), gradedAt: now.toISOString() } });
+        const box = compactGame(id, sum);
+        const fb = g.fb ? { ...g.fb, result: box ? firstBasketOf(box) : null } : undefined;
+        await redis.hset(K.week(season, wk), { [id]: { ...g, ...(fb ? { fb } : {}), result: gradeGame(g.game, sum.boxscore.players, {}, "nba"), gradedAt: now.toISOString() } });
         report.graded.push(id);
       } catch (e) {
         report.problems.push(`grade ${id}: ${e instanceof Error ? e.message : String(e)}`);
@@ -253,6 +277,7 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
   try {
     const cands = ourPropCandidates(await gradedList(season), ["pts", "reb", "ast", "threes"]);
     for (const j of await reviewIfDue(OUR_SECTION.nbaProps, season, nbaWeek(now, season), PROPS_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
+    for (const j of await reviewIfDue(OUR_SECTION.nbaFirstBasket, season, nbaWeek(now, season), FTD_GATE, fbCandidates(await fbGraded(season)), now)) if (j.kind !== "registered") report.learning.push(`First Basket: ${j.text}`);
   } catch (e) {
     report.problems.push(`learning: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -279,12 +304,28 @@ export async function gradedList(season: number): Promise<GradedPropsGame[]> {
     .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? "") || a.slug.localeCompare(b.slug));
 }
 
+/** Every graded First Basket board, newest first. */
+export async function fbGraded(season: number): Promise<(FbGradedBoard & { board: FbBoard })[]> {
+  const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
+  const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
+  return weeks
+    .flatMap(([week, games]) =>
+      Object.entries(games).flatMap(([event, g]) => {
+        if (!g.fb || g.fb.result === undefined) return [];
+        const bets = fbBets(g.fb).map((b) => ({ id: b.id, team: g.fb!.players.find((x) => x.id === b.id)?.team ?? "", price: b.price, net: b.net }));
+        return [{ event, week, at: g.kickoff ?? g.capturedAt, tip: g.fb.tip, home: g.fb.home, top: g.fb.players[0]?.id ?? "", bets, board: g.fb }];
+      }),
+    )
+    .sort((a, b) => b.at.localeCompare(a.at));
+}
+
 export interface OurNbaView {
   season: number;
   /** Saved games from yesterday on (Eastern), soonest first. */
   board: OurStoredProps[];
   graded: GradedPropsGame[];
   learning: SectionView;
+  fb: { graded: (FbGradedBoard & { board: FbBoard })[]; learning: SectionView };
 }
 
 export async function getOurNbaView(season: number, now = new Date()): Promise<OurNbaView> {
@@ -296,6 +337,18 @@ export async function getOurNbaView(season: number, now = new Date()): Promise<O
     .filter((g) => !g.kickoff || etDate(new Date(g.kickoff)) >= yesterday)
     .sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
   const graded = await gradedList(season);
-  const [state, journal] = await Promise.all([loadSection(OUR_SECTION.nbaProps, season), loadJournal(OUR_SECTION.nbaProps, season)]);
-  return { season, board, graded, learning: sectionView(PROPS_GATE, state, ourPropCandidates(graded, ["pts", "reb", "ast", "threes"]), journal) };
+  const [state, journal, fbState, fbJournal, fbList] = await Promise.all([
+    loadSection(OUR_SECTION.nbaProps, season),
+    loadJournal(OUR_SECTION.nbaProps, season),
+    loadSection(OUR_SECTION.nbaFirstBasket, season),
+    loadJournal(OUR_SECTION.nbaFirstBasket, season),
+    fbGraded(season),
+  ]);
+  return {
+    season,
+    board,
+    graded,
+    learning: sectionView(PROPS_GATE, state, ourPropCandidates(graded, ["pts", "reb", "ast", "threes"]), journal),
+    fb: { graded: fbList, learning: sectionView(FTD_GATE, fbState, fbCandidates(fbList), fbJournal) },
+  };
 }

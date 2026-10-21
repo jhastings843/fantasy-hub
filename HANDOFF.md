@@ -311,3 +311,7 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - "Our model" section on the NBA props tab (board and results) from `/api/props/nba/ours` (added to nba-props.yml). Model: `src/lib/models/nba/`; constants in `params.json`, fit by `scripts/fit-nba-props.mts` (results and every constant in the spec doc). Learning section `nba-props-ours`.
 - Data: `scripts/nba-history.mts 2024 2025 2026` caches ESPN games to `.cache/nba` (gitignored); `scripts/seed-nba-models.mts 2026` seeds Redis (prior season summary plus this season's finals). The live run ingests new finals itself.
 - Known weakness: early season role changes (e.g. a starter now coming off the bench) make big fake edges; the board says so. Fit a market blend once archived lines have 2+ weeks graded.
+
+## Own prop models, Phase 2: NBA First Basket (2026-10-21)
+- First Basket section under the NBA props tab (board, results, learning `nba-firstbasket-ours`), built in the same `/api/props/nba/ours` run. Model `src/lib/models/nba/firstbasket.ts`, constants `fb-params.json` from `scripts/fit-first-basket.mts`. Tables `models:v1:nba:fb` (seeded by `scripts/seed-nba-models.mts`, then grown by the live ingest).
+- launchd `com.jackh.first-basket-check` unloaded and its plist deleted (scripts/check-first-basket.mjs kept, marked retired).

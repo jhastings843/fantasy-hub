@@ -7,7 +7,7 @@ import {
   PropsResults,
   PropsWeek,
 } from "./playerprops";
-import { OurNbaResults, OurNbaWeek } from "./ournba";
+import { OurFirstBasket, OurFirstBasketResults, OurNbaResults, OurNbaWeek } from "./ournba";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
 import { getFirstTdView } from "@/lib/firsttd/store";
@@ -131,12 +131,14 @@ export default async function PropsView({
         {market === "nba" && view === "week" && (
           <>
             <OurNbaWeek season={season} />
+            <OurFirstBasket season={season} />
             <NbaPropsWeek season={season} />
           </>
         )}
         {market === "nba" && view === "results" && (
           <>
             <OurNbaResults season={season} />
+            <OurFirstBasketResults season={season} />
             <PropsResults season={season} league="nba" />
           </>
         )}

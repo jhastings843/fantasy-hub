@@ -194,3 +194,23 @@ Test results (second half of 2025-26):
 - Against Sam's three graded 10-20 games (`scripts/compare-sam-nba.mts`, small sample): MAE ours / Sam / market line: points 5.43 / 5.58 / 5.32, rebounds 2.03 / 2.01 / 1.82, assists 1.88 / 1.94 / 1.91, threes 1.35 / 1.40 / 1.44.
 
 Honest read: better than averages and calibrated, roughly level with Sam, not better than the market line yet. The first live board (10-21) flagged about 70% of props as edges, mostly players whose role changed over the summer (last season's minutes can't know). Next fit once 2+ weeks of archived lines are graded: blend our chance with DK's no-vig chance (weight fit walk-forward) and fit a minimum edge.
+
+### Phase 2: NBA First Basket (2026-10-21)
+Code: `src/lib/models/nba/firstbasket.ts` (tables, forecast, board, bets), wired into `/api/props/nba/ours`; section "First Basket" on the NBA tab (board and results), learning section `nba-firstbasket-ours` on FTD_GATE (one market per game, long prices). Tables `models:v1:nba:fb` are cumulative across seasons (2024-25, 2025-26 and this season seeded: 185 jumpers, 2,462 games) and grow with each ingested final. DK's First Basket field is used as the starters (its probable starters, voids otherwise); each team's last starting five stands in when DK lists fewer than four per team.
+
+Base rates (2024-25, 2025-26): the team that won the tip scored first 64.4% / 64.3%; a starter scored the first basket 99.9% / 100%.
+
+Walk-forward fit (`scripts/fit-first-basket.mts`): tables from 2024-25, then each 2025-26 game forecast before folding it in; actual starters used (lineups are out about 30 minutes before tip). Fit before 2026-01-15, tested after (638 games).
+
+| Constant | Fitted value | How |
+|---|---|---|
+| kTip (pseudo-jumps toward even) | 10 | grid {0.5..80}, tip log loss |
+| beta (tip logistic slope) | 1 | grid {0.25..1.5} |
+| kShare (pseudo-games toward field-goal share) | 50 | grid {0..1000}, scorer log loss |
+| a (tip team scores first) | counted from the tables (about 0.64) | data, Laplace-smoothed |
+
+Test results: tip log loss 0.6198 vs 0.6931 for a coin flip, tip winner picked 64.9%. Scorer log loss 2.2696 vs 2.3024 for ten even starters and 2.2709 for field-goal share alone. Per-player calibration, predicted vs happened: 0.049/0.050 (n 498), 0.077/0.085 (2,065), 0.104/0.097 (2,304), 0.135/0.137 (1,286), 0.174/0.169 (225).
+
+Not in v1: the spec's separate won-tip and lost-tip shares (too few first baskets per player to split); one share per starter is used for both.
+
+First live boards (10-21, 13 games): our chances sit within a few points of DK's no-vig numbers, 1 to 4 edges per game. The launchd job `com.jackh.first-basket-check` was unloaded and its plist deleted.
