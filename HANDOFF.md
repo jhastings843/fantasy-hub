@@ -1,5 +1,13 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## NBA injury news repricer (2026-10-21, 339e443, deployed)
+- Jack chose it from the research (pros like Calvin, Circles Off 08:51: price teammates' props the minute a player is ruled out, before the book moves).
+- `src/lib/models/nba/news.ts` (pure): `readFeed` (ESPN league injuries feed, id from the player link), `changes` (new Out, or back from Out; only "Out" counts), `affected` (teammate markets whose mean moved 0.3+, with DK price, no-vig chance, our chance, edge flag = clears + 3 games), `followup` (DK at the last pregame copy: line move our way, no-vig move our way, outcome).
+- `news-store.ts` `runNbaNews`: runs on EVERY pulse (src/lib/pulse/run.ts, alongside the tier jobs, not part of the tier's done check). Day's first read = baseline (`news:v1:nba:status:{date}`). Rotation player = 15+ min over last 5 (or last season). Reprices up to 3 games per run via `runOurNbaProps(now, { only, extraOut, extraIn })`, logs `news:v1:nba:{season}:events`, Pushover push for edges (top 3). Grades events after tip once the board has a result.
+- Fixed in store.ts: the live model now passes `absent` (rotation players listed Out) to projectGame, so their minutes go to teammates as in the backtest. Before 2026-10-21 evening live boards dropped those minutes.
+- Page: Props > NBA > Player props: "Injury news" block (today) and "Injury news record" on Results (DK moved our way X of N, edges record).
+- First baseline 2026-10-21 23:00Z: 40 out on 18 teams.
+
 ## NBA King of the Court (2026-10-21, df00829 + f74f67c, deployed)
 - Jack: build a King of the Court section (DK promo: tag a -200-or-longer player prop; the night's points+rebounds+assists leader's backers split a bonus-bet pool, $1M standard, $5M on 10/21 opening night, ties split, no per-winner cap, payouts to $2,174).
 - `src/lib/models/nba/kotc.ts` (pure): `simulateSlate` Monte Carlo (20k), per game margin around DK spread (blowout cut past `blowAt`, OT inside `otBand`), shared game pace `sdGame`, player noise Var = phi x mean, whole-number PRA so ties split; `kingsOf`, `kingLogLoss`. Params `kotc-params.json` from `scripts/fit-kotc.mts` (walk forward on 2025-26, nights = EASTERN date of the cached UTC tip time; first run grouped by tip time, fixed in f74f67c).
