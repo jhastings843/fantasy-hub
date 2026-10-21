@@ -3,7 +3,6 @@ import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
 import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
 import { LineChart } from "./Chart";
-import { Background } from "../picks/board";
 import { DeskHero, DeskTable, MoneyHero, MoneyLogSection, WeatherBrake, booksTotals, desks, moneyLog } from "./desks";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
@@ -973,8 +972,8 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
         </div>
         <DeskTable list={list} />
       </div>
-      <MoneyLogSection entries={moneyLog(v)} />
-      <Background title="Every desk's chart">
+      <div className={s.section}>
+        <h3 className={s.h2}>Every desk&apos;s chart</h3>
       <div className={m.panels}>
         {SHOW_BETS && (
           <div className={m.panel}>
@@ -1020,7 +1019,8 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           </div>
         )}
       </div>
-      </Background>
+      </div>
+      <MoneyLogSection entries={moneyLog(v)} />
     </section>
   );
 }
