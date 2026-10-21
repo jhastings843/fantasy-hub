@@ -164,6 +164,7 @@ function BetCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           david={g.david ? Math.round(g.david.model * 10) / 10 : undefined}
           pem={r.league === "cfb" && g.pem ? g.pem.model : undefined}
           fmt={(x) => `${home} ${line(x)}`}
+          pk={{ below: home, above: name(g.away) }}
         />
       )}
       <dl className={s.facts}>
@@ -956,7 +957,8 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
       {market !== undefined && (
         <div className={s.curveBox}>
           <h2 className={s.h2}>Market vs models</h2>
-          <MarketLine market={market} sam={g.sam ? Math.round(g.sam.model * 10) / 10 : undefined} david={g.david ? Math.round(g.david.model * 10) / 10 : undefined} pem={r.league === "cfb" && g.pem ? g.pem.model : undefined} fmt={(x) => `${home} ${line(x)}`} />
+          <MarketLine market={market} sam={g.sam ? Math.round(g.sam.model * 10) / 10 : undefined} david={g.david ? Math.round(g.david.model * 10) / 10 : undefined} pem={r.league === "cfb" && g.pem ? g.pem.model : undefined} fmt={(x) => `${home} ${line(x)}`}
+          pk={{ below: home, above: name(g.away) }} />
           {avg !== null && (
             <p className={s.p}>
               {`The models have ${proj(avg)}${models.length > 1 ? " on average" : ""}. The market has ${proj(market)}.${g.read?.agree && g.side ? ` So ${name(g.side === "home" ? g.home : g.away)} gets ${g.read.avgEdge.toFixed(1)} more points than the models think it needs.` : g.read && !g.read.agree ? " Sam and David are on different sides, so no spread bet." : ""}`}

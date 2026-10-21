@@ -46,8 +46,23 @@ export function Stats({ items, label }: { items: Stat[]; label: string }) {
  * any one number): the market as a tick, each model as a dot. The scale
  * pads the spread of values so close numbers don't sit on top of each other.
  */
-export function MarketLine({ market, sam, david, pem, fmt }: { market: number; sam?: number; david?: number; pem?: number; fmt: (x: number) => string }) {
-  const xs = [market, sam, david, pem].filter((x): x is number => x !== undefined);
+export function MarketLine({
+  market,
+  sam,
+  david,
+  pem,
+  fmt,
+  pk,
+}: {
+  market: number;
+  sam?: number;
+  david?: number;
+  pem?: number;
+  fmt: (x: number) => string;
+  /** Spreads: mark pick'em (0) and name who is favored on each side of it. */
+  pk?: { below: string; above: string };
+}) {
+  const xs = [market, sam, david, pem, ...(pk ? [0] : [])].filter((x): x is number => x !== undefined);
   const lo = Math.min(...xs);
   const hi = Math.max(...xs);
   const pad = Math.max(1.5, (hi - lo) * 0.2);
@@ -55,11 +70,23 @@ export function MarketLine({ market, sam, david, pem, fmt }: { market: number; s
   return (
     <div className={s.mline}>
       <div className={s.mtrack} role="img" aria-label={[`Market ${fmt(market)}`, sam !== undefined ? `Sam ${fmt(sam)}` : "", david !== undefined ? `David ${fmt(david)}` : "", pem !== undefined ? `PEM ${fmt(pem)}` : ""].filter(Boolean).join(", ")}>
+        {pk && <span className={s.mPk} style={{ left: at(0) }} aria-hidden />}
+        {pk && (
+          <span className={s.mPkLabel} style={{ left: at(0) }} aria-hidden>
+            PK
+          </span>
+        )}
         <span className={s.mMarket} style={{ left: at(market) }} />
         {pem !== undefined && <span className={`${s.mDot} ${s.mPem}`} style={{ left: at(pem) }} />}
         {david !== undefined && <span className={`${s.mDot} ${s.mDavid}`} style={{ left: at(david) }} />}
         {sam !== undefined && <span className={`${s.mDot} ${s.mSam}`} style={{ left: at(sam) }} />}
       </div>
+      {pk && (
+        <div className={s.mSides} aria-hidden>
+          <span>{`‹ ${pk.below} favored`}</span>
+          <span>{`${pk.above} favored ›`}</span>
+        </div>
+      )}
       <div className={s.mLabels}>
         <span>{`Market ${fmt(market)}`}</span>
         <span>

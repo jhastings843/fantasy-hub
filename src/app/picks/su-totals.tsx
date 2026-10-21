@@ -54,7 +54,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
                   <span className={s.lockChip}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
                 </div>
                 {market !== undefined && (
-                  <MarketLine market={market} sam={g.sam?.model} david={g.david?.model} fmt={(x) => `${name(g.home)} ${x > 0 ? "+" : ""}${Math.round(x * 10) / 10}`} />
+                  <MarketLine market={market} sam={g.sam?.model} david={g.david?.model} fmt={(x) => `${name(g.home)} ${x > 0 ? "+" : ""}${Math.round(x * 10) / 10}`} pk={{ below: name(g.home), above: name(g.away) }} />
                 )}
               </li>
             );

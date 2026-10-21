@@ -123,7 +123,7 @@ function NbaBetCard({ x }: { x: ReturnType<typeof readGame> }) {
         </div>
         <span className={s.lockChip}>{stake ? `Tier ${tier} bet` : `Tier ${tier} · tracking`}</span>
       </div>
-      {r && g.line && <MarketLine market={g.line.home} sam={r.model} fmt={(n) => `${g.home.short} ${line(Math.round(n * 10) / 10)}`} />}
+      {r && g.line && <MarketLine market={g.line.home} sam={r.model} fmt={(n) => `${g.home.short} ${line(Math.round(n * 10) / 10)}`} pk={{ below: g.home.short, above: g.away.short }} />}
       <dl className={s.facts}>
         <div>
           <dt>Sam vs market</dt>

@@ -526,3 +526,7 @@
 .suLine { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 16px; }
 .chipLock { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
 .chips > span.chip { cursor: default; }
+.mPk { position: absolute; top: 2px; width: 0; height: 26px; border-left: 1px dashed var(--mute); opacity: .7; }
+.mPkLabel { position: absolute; top: -12px; transform: translateX(-50%); font-family: var(--font-plex-mono), monospace; font-size: 9.5px; letter-spacing: .08em; color: var(--mute); }
+.mtrack { margin-top: 8px; }
+.mSides { display: flex; justify-content: space-between; font-size: 11px; color: var(--mute); letter-spacing: .02em; margin-top: -2px; }
