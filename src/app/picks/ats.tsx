@@ -3,11 +3,11 @@ import { needsPem, type BoardGame, type CutResult } from "@/lib/picks/engine";
 import { bettable, cutResult } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import type { BetRow } from "@/lib/picks/units";
-import { groupByDay } from "@/lib/picks/days";
-import { decimal, kelly, worstPrice } from "@/lib/picks/staking";
+import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
+import { Background, Curve, Hero, MarketKey, MarketLine } from "./board";
 import s from "./picks.module.css";
 
 export type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
@@ -64,103 +64,188 @@ function pricedWhy(g: BoardGame): string {
   return `At ${price(g.price)} the tier's estimated edge is too thin for a 1u bet. It would need ${need}.`;
 }
 
-/** One game as a card: the pick first, the reasons behind a disclosure. */
-function PickCard({ g, r }: { g: BoardGame; r: PicksReport }) {
+/** Every reason behind a game's call: the line, each model, tier, chance, price, stake or why no bet. */
+function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const home = r.names[g.home] ?? g.home;
+  const st = statusOf(g);
+  return (
+    <dl className={s.kv}>
+      <dt>Line now</dt>
+      <dd className={s.num}>{g.ref ? `${home} ${line(g.ref.line)} · ${g.ref.source}` : "none"}</dd>
+      <dt>Sam model</dt>
+      <dd className={s.num}>{g.sam ? `${home} ${line(Math.round(g.sam.model * 10) / 10)}` : "not posted"}</dd>
+      <dt>David model</dt>
+      <dd className={s.num}>{g.david ? `${home} ${line(Math.round(g.david.model * 10) / 10)}` : "not posted"}</dd>
+      {r.league === "cfb" && (
+        <>
+          <dt>PEM model</dt>
+          <dd className={s.num}>{g.pem ? `${home} ${line(g.pem.model)}` : "missing"}</dd>
+        </>
+      )}
+      <dt>Tier</dt>
+      <dd>
+        <TierChip t={g.tier} /> {g.read?.agree ? `avg edge ${g.read.avgEdge.toFixed(1)}` : ""}
+        {g.vetoedBy ? ` · skipped: ${g.vetoedBy} disagrees (veto)` : ""}
+      </dd>
+      {g.p !== undefined && (
+        <>
+          <dt>Win chance</dt>
+          <dd className={s.num}>
+            {`${(g.p * 100).toFixed(1)}% (estimate from the tier's record, not a calibrated probability)`}
+          </dd>
+        </>
+      )}
+      {g.price !== undefined && g.p !== undefined && (
+        <>
+          <dt>Price</dt>
+          <dd className={s.num}>{`${price(g.price)} quoted · estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit`}</dd>
+        </>
+      )}
+      {(st === "bet" || st === "early") && (
+        <>
+          <dt>Stake</dt>
+          <dd>{stakeWhy(g, r)}</dd>
+        </>
+      )}
+      {g.pemPick && (
+        <>
+          <dt>Note</dt>
+          <dd>Sam and David split; PEM breaks it.</dd>
+        </>
+      )}
+      {st === "priced" && (
+        <>
+          <dt>Why no bet</dt>
+          <dd>{pricedWhy(g)}</dd>
+        </>
+      )}
+      {st === "budget" && (
+        <>
+          <dt>Why no bet</dt>
+          <dd>{`Worth ${g.want}u, but ${g.limited ?? "the limits leave no room"}.`}</dd>
+        </>
+      )}
+      {st === "noquote" && (
+        <>
+          <dt>Why no bet</dt>
+          <dd>No current quote: judged at the sites&apos; own lines, research only.</dd>
+        </>
+      )}
+    </dl>
+  );
+}
+
+/** A bet (or an early look) as the big card: the pick, the market against the models, the three numbers that matter. */
+function BetCard({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const name = (k: string) => r.names[k] ?? k;
+  const st = statusOf(g);
+  const home = name(g.home);
+  const opp = g.side ? name(g.side === "home" ? g.away : g.home) : null;
+  const market = g.ref?.line ?? g.david?.market ?? g.sam?.market;
+  const stake = st === "sent" ? g.issued!.units : g.stake;
+  const at = st === "sent" ? g.issued!.price : g.price;
+  return (
+    <li className={s.betCard}>
+      <div className={s.betCardTop}>
+        <div>
+          <div className={s.betPickBig}>{pickText(g, name)}</div>
+          <div className={s.betWhen}>{`${opp ? `${g.side === "home" ? "vs" : "at"} ${opp}` : `${name(g.away)} at ${home}`} · ${kickoffEt(g.ref?.kickoff)}`}</div>
+        </div>
+        <span className={s.lockChip}>{st === "early" ? `Locks ${kickoffEt(g.held)}` : st === "sent" ? "Sent" : "Bet"}</span>
+      </div>
+      {market !== undefined && (
+        <MarketLine
+          market={market}
+          sam={g.sam ? Math.round(g.sam.model * 10) / 10 : undefined}
+          david={g.david ? Math.round(g.david.model * 10) / 10 : undefined}
+          pem={r.league === "cfb" && g.pem ? g.pem.model : undefined}
+          fmt={(x) => `${home} ${line(x)}`}
+        />
+      )}
+      <dl className={s.facts}>
+        <div>
+          <dt>Models vs market</dt>
+          <dd>{g.read?.agree ? `${g.read.avgEdge.toFixed(1)} pts` : "·"}</dd>
+        </div>
+        <div>
+          <dt>Price</dt>
+          <dd>{at !== undefined ? `${price(at)} DK` : "no price"}</dd>
+        </div>
+        <div>
+          <dt>Stake</dt>
+          <dd>{stake ? `${st === "early" ? "~" : ""}${stake}u` : "·"}</dd>
+        </div>
+      </dl>
+      <details className={s.why}>
+        <summary>Why this bet</summary>
+        <WhyList g={g} r={r} />
+      </details>
+    </li>
+  );
+}
+
+/** A close call: fits the rule, no bet right now, and what it would take. */
+function CloseCard({ g, r }: { g: BoardGame; r: PicksReport }) {
   const name = (k: string) => r.names[k] ?? k;
   const st = statusOf(g);
   const opp = g.side ? name(g.side === "home" ? g.away : g.home) : null;
-  const home = name(g.home);
+  const worst = g.p !== undefined ? worstPrice(g.p) : null;
+  const need = st === "priced" ? (worst === null ? "needs plus money" : `needs ${price(worst)}`) : STATUS_TEXT[st].toLowerCase();
   return (
-    <li className={`${s.card} ${st === "bet" ? s.cardBet : st === "early" ? s.cardEarly : ""}`}>
-      <div className={s.cardTop}>
-        <div>
-          <div className={s.cardPick}>{pickText(g, name)}</div>
-          <div className={s.cardMeta}>
-            {opp ? `vs ${opp} · ` : `${name(g.away)} at ${home} · `}
-            {kickoffEt(g.ref?.kickoff)}
-          </div>
-        </div>
-        {st === "bet" || st === "sent" ? (
-          <div className={s.stake}>
-            <b className={s.num}>{st === "sent" ? g.issued!.units : g.stake}u</b>
-            <span className={s.num}>{st === "sent" ? `sent ${price(g.issued!.price)}` : price(g.price)}</span>
-          </div>
-        ) : st === "early" ? (
-          <div className={s.stake}>
-            <span className={s.earlyChip}>Early look</span>
-            <span className={s.num}>{`~${g.stake}u · ${kickoffEt(g.held)}`}</span>
-          </div>
-        ) : (
-          <span className={s.statusChip}>{STATUS_TEXT[st]}</span>
-        )}
-      </div>
+    <li className={s.closeCard}>
+      <span className={s.closePick}>
+        {pickText(g, name)} <span>{opp ? `${g.side === "home" ? "vs" : "at"} ${opp} · ${kickoffEt(g.ref?.kickoff)}` : kickoffEt(g.ref?.kickoff)}</span>
+      </span>
+      <span className={`${s.num} ${s.statK}`}>{g.price !== undefined ? `Now ${price(g.price)} · ${need}` : need}</span>
       <details className={s.why}>
         <summary>Why</summary>
-        <dl className={s.kv}>
-          <dt>Line now</dt>
-          <dd className={s.num}>{g.ref ? `${home} ${line(g.ref.line)} · ${g.ref.source}` : "none"}</dd>
-          <dt>Sam model</dt>
-          <dd className={s.num}>{g.sam ? `${home} ${line(Math.round(g.sam.model * 10) / 10)}` : "not posted"}</dd>
-          <dt>David model</dt>
-          <dd className={s.num}>{g.david ? `${home} ${line(Math.round(g.david.model * 10) / 10)}` : "not posted"}</dd>
-          {r.league === "cfb" && (
-            <>
-              <dt>PEM model</dt>
-              <dd className={s.num}>{g.pem ? `${home} ${line(g.pem.model)}` : "missing"}</dd>
-            </>
-          )}
-          <dt>Tier</dt>
-          <dd>
-            <TierChip t={g.tier} /> {g.read?.agree ? `avg edge ${g.read.avgEdge.toFixed(1)}` : ""}
-            {g.vetoedBy ? ` · skipped: ${g.vetoedBy} disagrees (veto)` : ""}
-          </dd>
-          {g.p !== undefined && (
-            <>
-              <dt>Win chance</dt>
-              <dd className={s.num}>
-                {`${(g.p * 100).toFixed(1)}% (estimate from the tier's record, not a calibrated probability)`}
-              </dd>
-            </>
-          )}
-          {g.price !== undefined && g.p !== undefined && (
-            <>
-              <dt>Price</dt>
-              <dd className={s.num}>{`${price(g.price)} quoted · estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit`}</dd>
-            </>
-          )}
-          {(st === "bet" || st === "early") && (
-            <>
-              <dt>Stake</dt>
-              <dd>{stakeWhy(g, r)}</dd>
-            </>
-          )}
-          {g.pemPick && (
-            <>
-              <dt>Note</dt>
-              <dd>Sam and David split; PEM breaks it.</dd>
-            </>
-          )}
-          {st === "priced" && (
-            <>
-              <dt>Why no bet</dt>
-              <dd>{pricedWhy(g)}</dd>
-            </>
-          )}
-          {st === "budget" && (
-            <>
-              <dt>Why no bet</dt>
-              <dd>{`Worth ${g.want}u, but ${g.limited ?? "the limits leave no room"}.`}</dd>
-            </>
-          )}
-          {st === "noquote" && (
-            <>
-              <dt>Why no bet</dt>
-              <dd>No current quote: judged at the sites&apos; own lines, research only.</dd>
-            </>
-          )}
-        </dl>
+        <WhyList g={g} r={r} />
       </details>
     </li>
+  );
+}
+
+const READ: { [k in Status]?: [string, string] } = {
+  bet: ["Bet", s.readBet],
+  sent: ["Sent", s.readBet],
+  early: ["Best bet", s.readBet],
+  priced: ["Close call", ""],
+  budget: ["Close call", ""],
+  wait: ["Needs PEM", ""],
+  noquote: ["No line", s.readPass],
+  started: ["In progress", ""],
+  pass: ["Pass", s.readPass],
+};
+
+/** One game in the market-vs-models table; opens to the full reasons. */
+function GameRow({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const name = (k: string) => r.names[k] ?? k;
+  const st = statusOf(g);
+  const home = name(g.home);
+  const res = g.results?.issued ?? g.results?.pick;
+  const read: [string, string] = st === "final" ? (res ? [res === "W" ? "Won" : res === "L" ? "Lost" : "Push", res === "W" ? s.readW : res === "L" ? s.readL : ""] : ["Final", s.readPass]) : (READ[st] ?? ["", ""]);
+  const m = (x?: number) => (x === undefined ? "·" : `${home} ${line(Math.round(x * 10) / 10)}`);
+  return (
+    <details className={s.gRow}>
+      <summary>
+        <span className={s.gGame}>
+          {`${name(g.away)} at ${home}`}
+          <span>{kickoffEt(g.ref?.kickoff)}</span>
+        </span>
+        <span className={s.gNum} data-k="Market">{m(g.ref?.line)}</span>
+        <span className={`${s.gNum} ${s.cSam}`} data-k="Sam">{m(g.sam?.model)}</span>
+        <span className={`${s.gNum} ${s.cDavid}`} data-k="David">{m(g.david?.model)}</span>
+        <span className={s.gNum} data-k="Gap">{g.read ? g.read.avgEdge.toFixed(1) : "·"}</span>
+        <span className={`${s.readChip} ${read[1]}`}>{read[0]}</span>
+        <span className={s.chev} aria-hidden>
+          ›
+        </span>
+      </summary>
+      <div className={s.gBody}>
+        <div className={s.cardMeta}>{pickText(g, name)}</div>
+        {st === "final" ? <FinishedDetails g={g} r={r} /> : <WhyList g={g} r={r} />}
+      </div>
+    </details>
   );
 }
 
@@ -387,114 +472,89 @@ function ruleSetLine(r: PicksReport): string {
 
 export function AtsWeek({ r }: { r: PicksReport }) {
   const st = r.strategies;
-  const order = (g: BoardGame) =>
-    g.stake ? -(g.stake * 10 + (g.p && g.price ? kelly(g.p, g.price) : 0)) : 0;
-  const all = r.board.slice().sort((a, b) => order(a) - order(b) || (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
-  const bets = all.filter((g) => statusOf(g) === "bet" || statusOf(g) === "sent").sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""));
-  const near = all.filter((g) => ["priced", "budget", "wait", "noquote"].includes(statusOf(g)));
-  const rest = all.filter((g) => statusOf(g) === "pass");
-  const started = all.filter((g) => statusOf(g) === "started");
+  const byKick = (a: BoardGame, b: BoardGame) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? "");
+  const all = r.board.slice().sort(byKick);
+  const best = all.filter((g) => ["bet", "sent", "early"].includes(statusOf(g)));
+  const near = all.filter((g) => ["priced", "budget", "wait"].includes(statusOf(g)));
   const finished = all.filter((g) => statusOf(g) === "final");
-  const early = all.filter((g) => statusOf(g) === "early");
-  const days = groupByDay([...bets, ...early], (g) => g.ref?.kickoff, new Date());
-  const isBet = (g: BoardGame) => statusOf(g) !== "early";
-  const dayUnits = (gs: BoardGame[]) => gs.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
-  const dayLine = (b: BoardGame[], e: number) =>
-    [b.length ? `${b.length} bet${b.length === 1 ? "" : "s"} · ${u(dayUnits(b))}` : "", e ? `${e} early look${e === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
-  const u = (x: number) => `${x.toFixed(2).replace(/\.?0+$/, "")}u`;
-  const total = bets.reduce((t, g) => t + (g.issued?.units ?? g.stake ?? 0), 0);
+  const open = all.filter((g) => statusOf(g) !== "final");
   const name = (k: string) => r.names[k] ?? k;
   const firstT1 = all.find((g) => g.tier === "t1" && g.sam && g.david);
   const example =
     firstT1?.sam && firstT1.david
       ? { vegas: firstT1.ref?.line ?? firstT1.david.market, sam: firstT1.sam.model, david: firstT1.david.model, pem: firstT1.pem?.model, label: `${name(firstT1.away)} at ${name(firstT1.home)}` }
       : null;
+  const early = best.filter((g) => statusOf(g) === "early").length;
+  const title = best.length ? `${best.length} best bet${best.length === 1 ? "" : "s"} this week` : finished.length && !open.length ? "Week done" : "No spread bets this week";
+  const sub = !r.boardUpdated.sam && !r.boardUpdated.david
+    ? `Neither Sam nor David has posted ${r.week ? `Week ${r.week}` : "this week"} yet.`
+    : best.length
+    ? `${st.rule ? `${st.rule.label} (${rec(st.rule.record)})${st.second ? `, plus Tier 2: ${st.second.label.toLowerCase()}` : ""}.` : ""}${early ? ` Early looks lock at 9am on game day.` : ""}`
+    : "Nothing clears the rule at a price worth a stake. That's a normal week.";
   return (
     <section className={s.section} aria-labelledby="ats-week">
-      <div className={s.sectionHead}>
-        <h2 className={s.h2} id="ats-week">
-          {r.week ? `Week ${r.week} spreads` : "This week's spreads"}
-        </h2>
-        <p className={s.p}>
-          {st.rule
-            ? `${bets.length} bet${bets.length === 1 ? "" : "s"}, ${total.toFixed(2).replace(/\.?0+$/, "")}u${early.length ? `, plus ${early.length} early look${early.length === 1 ? "" : "s"} that become bets at 9am on game day` : ""}. Rule: ${st.rule.label.toLowerCase()} (${rec(st.rule.record)})${st.second ? `; Tier 2: ${st.second.label.toLowerCase()} (${rec(st.second.record)} on the games it adds)` : "; no Tier 2"}.`
-            : "No cut has a big enough winning record yet, so nothing is a bet this week."}
-          {` ${ruleSetLine(r)}`}
-        </p>
-      </div>
-      {!r.boardUpdated.sam && !r.boardUpdated.david ? (
-        <p className={s.notice}>{`Neither Sam nor David has posted ${r.week ? `Week ${r.week}` : "this week"} yet. Games appear here as soon as one does.`}</p>
-      ) : !r.boardUpdated.sam || !r.boardUpdated.david ? (
-        <p className={s.notice}>{`${!r.boardUpdated.sam ? "Sam" : "David"} hasn't posted this week's board yet, so games are single-model for now.`}</p>
-      ) : null}
-      {bets.length || early.length ? (
-        <div className={s.days} data-first-pick>
-          {days.map((d) => (
-            <div key={d.key} className={s.day}>
-              <div className={`${s.dayHead} ${d.label.startsWith("Today") ? s.dayToday : ""}`}>
-                <span>{d.label}</span>
-                <span className={s.num}>{dayLine(d.games.filter(isBet), d.games.length - d.games.filter(isBet).length)}</span>
-              </div>
-              <ul className={s.cards}>
-                {d.games.map((g) => (
-                  <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className={s.calm} data-first-pick>
-          {started.length || finished.length
-            ? "No spread bets left this week. Games underway and finished are below."
-            : !r.boardUpdated.sam && !r.boardUpdated.david
-            ? "No games on the board yet."
-            : "No spread bets this week. That's a normal outcome: nothing clears the rule at a price worth a stake."}
-        </p>
-      )}
-      {started.length > 0 && (
-        <details className={s.details}>
-          <summary>{`In progress (${started.length})`}</summary>
-          <ul className={`${s.cards} ${s.cardsInset}`}>
-            {started.map((g) => (
-              <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
+      <Hero eyebrow={`${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` · Week ${r.week}` : ""} · Spreads`} title={<span id="ats-week">{title}</span>} sub={sub} />
+      {best.length > 0 && (
+        <>
+          <ul className={s.betGrid} data-first-pick>
+            {best.map((g) => (
+              <BetCard key={`${g.away}@${g.home}`} g={g} r={r} />
             ))}
           </ul>
-        </details>
+          <MarketKey pem={r.league === "cfb"} />
+        </>
       )}
       {near.length > 0 && (
-        <details className={s.details}>
-          <summary>{`Close calls (${near.length}): fit the rule, no bet right now`}</summary>
-          <ul className={`${s.cards} ${s.cardsInset}`}>
+        <div className={s.section}>
+          <div className={s.sectionHead}>
+            <h3 className={s.h2}>Close calls</h3>
+            <p className={s.p}>Fit the rule, priced out. They become bets if the price comes back.</p>
+          </div>
+          <ul className={s.closeGrid}>
             {near.map((g) => (
-              <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
+              <CloseCard key={`${g.away}@${g.home}`} g={g} r={r} />
             ))}
           </ul>
-        </details>
-      )}
-      {rest.length > 0 && (
-        <details className={s.details}>
-          <summary>{`Every other game (${rest.length})`}</summary>
-          <ul className={`${s.cards} ${s.cardsInset}`}>
-            {rest.map((g) => (
-              <PickCard key={`${g.away}@${g.home}`} g={g} r={r} />
-            ))}
-          </ul>
-        </details>
-      )}
-      <details className={s.details}>
-        <summary>Check a moved line</summary>
-        <div className={s.detailsBody}>
-          <TierChecker
-            rule={st.rule ? { label: st.rule.label, test: st.rule.test, record: rec(st.rule.record) } : null}
-            second={st.second ? { label: st.second.label, test: st.second.test, record: `${rec(st.second.record)} on games outside Tier 1` } : null}
-            example={example}
-            pem={r.league === "cfb"}
-            pemNeeded={!!(st.rule && needsPem(st.rule.test)) || !!(st.second && needsPem(st.second.test))}
-          />
         </div>
-      </details>
-      {finished.length > 0 && <Finished games={finished} r={r} />}
+      )}
+      {all.length > 0 && (
+        <div className={s.section}>
+          <div className={s.sectionHead}>
+            <h3 className={s.h2}>Market vs models</h3>
+            <p className={s.p}>{`Every game, home spread. Open a game for the full breakdown.${finished.length ? ` ${finished.length} final, graded at the bottom.` : ""}`}</p>
+          </div>
+          <div className={s.gtable}>
+            <div className={s.gHead} aria-hidden>
+              <span>Game</span>
+              <span>Market</span>
+              <span>Sam</span>
+              <span>David</span>
+              <span>Gap</span>
+              <span>Read</span>
+              <span />
+            </div>
+            {[...open, ...finished].map((g) => (
+              <GameRow key={`${g.away}@${g.home}`} g={g} r={r} />
+            ))}
+          </div>
+        </div>
+      )}
+      <Background>
+        <p className={s.p}>{ruleSetLine(r)}</p>
+        <details className={s.details}>
+          <summary>Check a moved line</summary>
+          <div className={s.detailsBody}>
+            <TierChecker
+              rule={st.rule ? { label: st.rule.label, test: st.rule.test, record: rec(st.rule.record) } : null}
+              second={st.second ? { label: st.second.label, test: st.second.test, record: `${rec(st.second.record)} on games outside Tier 1` } : null}
+              example={example}
+              pem={r.league === "cfb"}
+              pemNeeded={!!(st.rule && needsPem(st.rule.test)) || !!(st.second && needsPem(st.second.test))}
+            />
+          </div>
+        </details>
+        {finished.length > 0 && <Finished games={finished} r={r} />}
+      </Background>
     </section>
   );
 }
@@ -520,13 +580,29 @@ export function AtsResults({ r }: { r: PicksReport }) {
   const clvSent = r.clv.plays.filter((x) => x.id !== "ou");
   return (
     <section className={s.section} aria-labelledby="ats-results">
-      <div className={s.sectionHead}>
-        <h2 className={s.h2} id="ats-results">Spread results</h2>
-        <p className={s.p}>
-          Returns on what the emails recommended, at the line and price each bet was sent with. These are recommendation
-          returns, not bets you confirmed placing.
-        </p>
-      </div>
+      <Hero
+        eyebrow={`${r.league === "nfl" ? "NFL" : "College"} ${r.season} · Spreads · every bet sent`}
+        title={
+          <span id="ats-results">
+            {ats.w + ats.l + ats.p ? (
+              <>
+                {ats.units >= 0 ? "Up " : "Down "}
+                <span className={ats.units >= 0 ? s.up : s.down}>{units(ats.units)}</span>
+                {` on ${rec(ats)}`}
+              </>
+            ) : (
+              "No bets settled yet"
+            )}
+          </span>
+        }
+        sub="1 unit risked per unit staked, at the line and price each bet was sent with. Recommendation returns, not bets you confirmed placing."
+      />
+      {u.byWeek.length > 0 && (
+        <div className={s.curveBox}>
+          <h3 className={s.h3} style={{ margin: 0 }}>Units over the season</h3>
+          <Curve points={u.byWeek.map((w) => ({ x: `Week ${w.week}`, v: w.ledger.units }))} label="Running units after each week" />
+        </div>
+      )}
       <div className={s.tiles}>
         <div className={`${s.tile} ${ats.w + ats.l ? (ats.units >= 0 ? s.good : s.bad) : ""}`}>
           <div className={`${s.tileV} ${s.num}`}>{ats.w + ats.l + ats.p ? units(ats.units) : "none yet"}</div>
@@ -644,12 +720,11 @@ export function AtsResearch({ r, harris }: { r: PicksReport; harris?: React.Reac
   const matchesRule = (g: PicksReport["graded"][number], rule: CutResult) => cutResult(g, rule) !== undefined;
   return (
     <section className={s.section} aria-labelledby="ats-research">
-      <div className={s.sectionHead}>
-        <h2 className={s.h2} id="ats-research">Spread research</h2>
-        <p className={s.p}>
-          {`Source-line backtest: ${r.graded.length} games both models graded, weeks ${r.weeksCovered.join(", ") || "none"}. Each model is judged at its own site's line here; this week's board judges every model at one current line.`}
-        </p>
-      </div>
+      <Hero
+        eyebrow={`${r.league === "nfl" ? "NFL" : "College"} spreads · ${r.graded.length} games through Week ${Math.max(0, ...r.weeksCovered)}`}
+        title={<span id="ats-research">What actually wins</span>}
+        sub="Each idea's record if you had bet every game it covers at -110. The shaded band is its 90% likely range; the line is break-even. Each model is judged at its own site's line here."
+      />
       {st.rule ? (
         <div className={s.rule}>
           <div>

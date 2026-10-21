@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { NBA_VIEWS, VIEWS, type View } from "../picks/ui";
+import { LOG_VIEW, NBA_VIEWS, VIEWS, type View } from "../picks/ui";
+import { PropsLog, PropsTop } from "./top";
 import { DavidResearch, DavidResults, DavidWeek } from "./davidprops";
 import { OurNflResults, OurNflWeek } from "./ournfl";
 import { OurFtdResults, OurFtdWeek } from "./ourftd";
@@ -54,70 +55,50 @@ export default async function PropsView({
     getOurFtdView(season).catch(() => null),
   ]);
   const entries = propsSearchIndex(ov, pv, fv);
-  // Our sections keep their research (slices and learning) on Results; only David's board has a Research view.
-  const views = market === "pp" ? VIEWS : NBA_VIEWS.filter((v) => v.id !== "research").map((v) => (market === "ftd" && v.id === "week" ? { ...v, label: "This week" } : v));
+  // Our sections keep their research (slices and learning) on Results and the Learner log; only David's board has a Research view.
+  const views = (market === "pp" ? VIEWS : NBA_VIEWS.filter((v) => v.id !== "research").map((v) => (market === "ftd" && v.id === "week" ? { ...v, label: "This week" } : v))).concat(LOG_VIEW);
   const shown: View = market !== "pp" && view === "research" ? "results" : view;
+  const sport = market === "nba" ? "nba" : "nfl";
   return (
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.header}>
-          <div className={s.headRow}>
-            <nav className={s.subnav} aria-label="Sport">
-              <Link
-                href={href("pp", view)}
-                aria-current={market !== "nba" ? "page" : undefined}
-              >
+          <h1 className={s.eyebrow} style={{ margin: 0 }}>
+            {`Props · ${market === "nba" ? `NBA ${season}-${String(season + 1).slice(2)}` : `NFL ${season}`}`}
+          </h1>
+          <div className={s.navRows}>
+            <nav className={s.chips} aria-label="Sport">
+              <Link className={s.chip} href={href("pp", view)} aria-current={market !== "nba" ? "page" : undefined}>
                 NFL
               </Link>
-              <Link
-                href={href("nba", view)}
-                aria-current={market === "nba" ? "page" : undefined}
-              >
+              <Link className={s.chip} href={href("nba", view)} aria-current={market === "nba" ? "page" : undefined}>
                 NBA
               </Link>
             </nav>
-            <span className={s.eyebrow}>
-              {market === "nba"
-                ? `NBA ${season}-${String(season + 1).slice(2)}`
-                : `NFL ${season}`}
-            </span>
+            {market !== "nba" && (
+              <nav className={s.chips} aria-label="Market">
+                {MARKETS.map((m) => (
+                  <Link key={m.id} href={href(m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
+                    {m.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
           </div>
-          <h1 className={s.h1}>Props</h1>
-          {market !== "nba" && entries.length > 0 && (
-            <WeekSearch
-              entries={entries}
-              label="Search this week: our props and first TD models, David's board"
-              placeholder="Player or team, e.g. Kelce or Chiefs"
-            />
-          )}
-          {market !== "nba" && (
-            <nav className={s.tabs} aria-label="Market">
-              {MARKETS.map((m) => (
-                <Link
-                  key={m.id}
-                  href={href(m.id, view)}
-                  aria-current={m.id === market ? "page" : undefined}
-                  className={s.tab}
-                >
-                  {m.label}
-                </Link>
-              ))}
-            </nav>
-          )}
           <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
             {views.map((v) => (
-              <Link
-                key={v.id}
-                href={href(market, v.id)}
-                aria-current={v.id === shown ? "page" : undefined}
-                className={s.tab}
-              >
+              <Link key={v.id} href={href(market, v.id)} aria-current={v.id === shown ? "page" : undefined} className={s.tab}>
                 {v.label}
               </Link>
             ))}
           </nav>
+          {market !== "nba" && shown === "week" && entries.length > 0 && (
+            <WeekSearch entries={entries} label="Search this week: our props and first TD models, David's board" placeholder="Player or team, e.g. Kelce or Chiefs" />
+          )}
         </header>
 
+        {shown === "week" && <PropsTop sport={sport} season={season} />}
+        {shown === "log" && <PropsLog sport={sport} season={season} />}
         {market === "pp" && shown === "week" && (
           <>
             <OurNflWeek season={season} />

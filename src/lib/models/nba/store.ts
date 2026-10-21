@@ -36,6 +36,9 @@ import FB_PARAMS from "./fb-params.json";
 //   props:v1:ours:nba:{season}:weeks   set of weeks
 
 const P = PARAMS as NbaParams;
+/** History a player needs before a market gets our number (this season, last season). */
+export const MIN_GAMES_NOW = 2;
+export const MIN_GAMES_PRIOR = 10;
 const FBP = FB_PARAMS as FbParams;
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
 const PROPS = (ev: string, page: number) => `https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/${ev}/competitions/${ev}/odds/100/propBets?limit=1000&page=${page}`;
@@ -219,7 +222,12 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
         [away.abbr, home.abbr].map((t) => [t, { team: t, poss: teams[t]?.poss ?? [], ...(prior.pace[t] !== undefined ? { priorPace: prior.pace[t] } : {}) }]),
       );
       const spread = await homeSpread(g.id);
-      const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).map((x) => [x.id, x]));
+      // Everyone counts toward the team's minutes, but a market only gets our
+      // number when the player has real history: 2+ games this season or 10+
+      // last season. A rookie or a player back from a lost season would
+      // otherwise get a bench player's guess and a fake edge.
+      const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
+      const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
       const { markets, extra } = ourMarkets(lines, proj, names, P);
       // First Basket: DK's field is its probable starters; else each team's last starting five, less anyone Out.
       const fbDk = [...lines.values()].filter((l) => l.type === "First Basket" && l.current.over !== null).map((l) => ({ id: l.athlete, price: l.current.over! }));

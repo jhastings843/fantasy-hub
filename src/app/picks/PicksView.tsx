@@ -5,10 +5,12 @@ import { OUTSTANDING_CAP, WEEKLY_CAP } from "@/lib/picks/limits";
 import { getPoolShares, getPoolTrack } from "@/lib/picks/pool-store";
 import { AtsResearch, AtsResults, AtsWeek } from "./ats";
 import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWeek } from "./su-totals";
-import { LearningPanel } from "./learning";
 import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
-import { LEAGUE_NAME, MARKETS, VIEWS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
+import { FOOTBALL_VIEWS, LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
+import { Background, Stats } from "./board";
+import { PicksLog } from "./log";
+import { redisStore } from "@/lib/picks/learning/store";
 import WeekSearch from "./WeekSearch";
 import { picksSearchIndex } from "./search";
 import s from "./picks.module.css";
@@ -30,15 +32,19 @@ export default async function PicksView({ league, market: asked, view }: { leagu
   const poolTrack = league === "nfl" && market === "su" && view === "results" ? ((await getPoolTrack().catch(() => null))?.value ?? null) : null;
 
   const sportNav = (
-    <nav className={s.subnav} aria-label="Sport">
+    <nav className={s.chips} aria-label="Sport">
       {(["nfl", "cfb"] as const).map((l) => (
-        <Link key={l} href={href(l, market, view)} aria-current={l === league ? "page" : undefined}>
+        <Link key={l} className={s.chip} href={href(l, market, view)} aria-current={l === league ? "page" : undefined}>
           {LEAGUE_NAME[l]}
         </Link>
       ))}
-      <Link href="/picks/nba">NBA</Link>
+      <Link className={s.chip} href="/picks/nba">
+        NBA
+      </Link>
     </nav>
   );
+  const review = await redisStore.state().catch(() => null);
+  const testing = (review?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && d.verdict === "retain").length;
 
   if (!r) {
     return (
@@ -58,39 +64,33 @@ export default async function PicksView({ league, market: asked, view }: { leagu
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.header}>
-          <div className={s.headRow}>
+          <h1 className={s.eyebrow} style={{ margin: 0 }}>{`Picks · ${LEAGUE_NAME[league]} ${r.season}${r.week ? ` · Week ${r.week}` : ""}`}</h1>
+          <div className={s.navRows}>
             {sportNav}
-            <span className={s.eyebrow}>{`${LEAGUE_NAME[league]} ${r.season}${r.week ? ` · Week ${r.week}` : ""}`}</span>
+            <nav className={s.chips} aria-label="Market">
+              {MARKETS.map((m) => (
+                <Link key={m.id} href={href(league, m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
+                  {m.label}
+                </Link>
+              ))}
+            </nav>
           </div>
-          <h1 className={s.h1}>Picks</h1>
-          <RiskStrip r={r} coreStale={fresh?.stale ?? false} coreAt={fresh?.at ?? r.generatedAt} />
-          {r.board.length > 0 && (
+          <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
+            {FOOTBALL_VIEWS.map((v) => (
+              <Link key={v.id} href={href(league, market, v.id)} aria-current={v.id === view ? "page" : undefined} className={s.tab}>
+                {v.label}
+              </Link>
+            ))}
+          </nav>
+          <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />
+          <Warnings r={r} coreStale={fresh?.stale ?? false} />
+          {r.board.length > 0 && view === "week" && (
             <WeekSearch
               entries={picksSearchIndex(r)}
               label={`Search ${r.week ? `Week ${r.week}` : "this week"}: spread, winner and total`}
               placeholder={league === "nfl" ? "Team, e.g. Bills or KC" : "Team, e.g. Ohio State"}
             />
           )}
-          {r.board.length > 0 && (
-            <p className={`${s.progress} ${s.num}`}>
-              {`${r.board.filter((g) => g.final).length}/${r.board.length} games have completed`}
-            </p>
-          )}
-          <Warnings r={r} coreStale={fresh?.stale ?? false} />
-          <nav className={s.tabs} aria-label="Market">
-            {MARKETS.map((m) => (
-              <Link key={m.id} href={href(league, m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.tab}>
-                {m.label}
-              </Link>
-            ))}
-          </nav>
-          <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {VIEWS.map((v) => (
-              <Link key={v.id} href={href(league, market, v.id)} aria-current={v.id === view ? "page" : undefined} className={s.tab}>
-                {v.label}
-              </Link>
-            ))}
-          </nav>
         </header>
 
         {market === "ats" && view === "week" && <AtsWeek r={r} />}
@@ -103,7 +103,12 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         {market === "ou" && view === "week" && <TotalsWeek r={r} />}
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
-        {view === "research" && <LearningPanel league={league} market={market} />}
+        {view === "log" && <PicksLog league={league} market={market} />}
+
+        <Background title="Budget and exposure">
+          <RiskStrip r={r} coreStale={fresh?.stale ?? false} coreAt={fresh?.at ?? r.generatedAt} />
+          {r.board.length > 0 && <p className={`${s.progress} ${s.num}`}>{`${r.board.filter((g) => g.final).length}/${r.board.length} games have completed`}</p>}
+        </Background>
 
         <footer className={s.footer}>
           <span>
@@ -117,6 +122,24 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         </footer>
       </div>
     </main>
+  );
+}
+
+/** The four numbers that matter, on every view: season, this week, the rule in force, the learner. */
+function TopStats({ r, testing, logHref }: { r: PicksReport; testing: number; logHref: string }) {
+  const u = r.units.total;
+  const wk = r.units.byWeek.find((w) => w.week === r.week)?.ledger;
+  const rule = r.strategies.rule;
+  return (
+    <Stats
+      label="Season, this week, rule and learner"
+      items={[
+        { k: `Season (${LEAGUE_NAME[r.league]})`, v: u.w + u.l + u.p ? units(u.units) : "0-0", sub: u.w + u.l + u.p ? `${rec(u)} at the price taken` : "no bets settled", tone: u.w + u.l ? (u.units >= 0 ? "up" : "down") : undefined },
+        { k: "This week", v: wk && wk.w + wk.l + wk.p ? rec(wk) : "0-0", sub: `${r.board.filter((g) => g.final).length} of ${r.board.length} games final` },
+        { k: "Rule in force", v: rule ? rule.label : "None yet", sub: rule ? `${rec(rule.record)} since tracking` : "nothing clears the bar", small: true },
+        { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={logHref}>Open the log</Link>, small: true },
+      ]}
+    />
   );
 }
 

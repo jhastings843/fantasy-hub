@@ -198,7 +198,10 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
         const teams = Object.fromEntries([A, H].map((t) => [t, run!.team(t, prior)]));
         const margin = await homeMargin(e.id);
         const proj = new Map<string, NflProjection>();
+        // A market only gets our number with real history: 2+ games this season or 4+ last season (as the fit judged).
+        const informed = new Set(players.filter((x) => x.games.length >= 2 || (x.prior?.games ?? 0) >= 4).map((x) => x.id));
         for (const x of projectNflGame(players, teams, H, margin, prior.base, P, absent)) {
+          if (!informed.has(x.id)) continue;
           const eid = espnOf.get(x.id);
           if (eid) proj.set(eid, x);
         }

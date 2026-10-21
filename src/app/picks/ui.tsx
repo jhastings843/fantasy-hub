@@ -6,7 +6,7 @@ import s from "./picks.module.css";
 export const LEAGUE_NAME: { [k in League]: string } = { nfl: "NFL", cfb: "College" };
 
 export type Market = "ats" | "su" | "ou";
-export type View = "week" | "results" | "research";
+export type View = "week" | "results" | "research" | "log";
 export const MARKETS: { id: Market; label: string }[] = [
   { id: "ats", label: "Spreads" },
   { id: "su", label: "Straight up" },
@@ -17,6 +17,9 @@ export const VIEWS: { id: View; label: string }[] = [
   { id: "results", label: "Results" },
   { id: "research", label: "Research" },
 ];
+/** Football picks and the props tabs add the learner's plain-language log. */
+export const LOG_VIEW: { id: View; label: string } = { id: "log", label: "Learner log" };
+export const FOOTBALL_VIEWS: { id: View; label: string }[] = [...VIEWS, LOG_VIEW];
 /** NBA plays every day, so its board is today's slate, not a week. */
 export const NBA_VIEWS: { id: View; label: string }[] = VIEWS.map((v) => (v.id === "week" ? { ...v, label: "Today" } : v));
 
@@ -47,7 +50,7 @@ export function parseMarket(x: unknown): Market {
   return x === "su" || x === "ou" ? x : "ats";
 }
 export function parseView(x: unknown): View {
-  return x === "results" || x === "research" ? x : "week";
+  return x === "results" || x === "research" || x === "log" ? x : "week";
 }
 
 const TIER_LABEL: { [t in Tier]: string } = {

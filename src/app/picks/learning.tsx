@@ -131,7 +131,7 @@ export async function LearningPanel({ league, market }: { league: League; market
         <p className={s.thin}>
           {mine.length === 0 ? `${EMPTY[market]} ` : ""}
           The review status, learning journal and scheduler health are under{" "}
-          <Link href={href(league, "ats", "research")}>Spreads research</Link>.
+          <Link href={href(league, "ats", "log")}>the Spreads learner log</Link>.
         </p>
       )}
       <p className={s.thin}>

@@ -94,6 +94,7 @@
   ],
   "last_worked": "2026-10-21",
   "notes": [
+    "2026-10-21: Picks and Props redesigned from the mock: steel blue accent, headline-first pages, best-bet cards with market vs models, game rows that open, Learner log view, background drawers; skip markets for players with no history.",
     "2026-10-21: Props pages show only our models (NBA props, First Basket, NFL props, First TD) and David's NFL board; Sam's record hidden (data kept). Money chart and Learning page switched to our models.",
     "2026-10-21: NFL prop prices via The Odds API, read the morning of game day (code done, awaiting key).",
     "2026-10-21: Own prop models Phase 4: NFL First TD (drive model from the market total and spread, shrunk TD shares) against Kalshi on the First TD tab, own learning section. All four models built; awaiting deploy.",
