@@ -333,3 +333,9 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Key: fantasy-hub's own (Jack's hastingsdigital account), in .env.local and Vercel production as ODDS_API_KEY. kalshi-phil keeps its separate key.
 - Test 10-21 on NE@CHI (not saved, so Thursday's morning read still runs): 5 credits a read, 35 props (pass 2, rush 5, rec yds 14, rec 14) and 27 First TD prices; Drake Maye 248.5 matched ESPN's line. Two test reads used 10 credits, 490 left.
 - Check: Thursday 9am ET 'Game-day morning prices' run summary says 'odds: NE@CHI: N props...'; /props NFL cards then show '(game-day morning, via The Odds API)'.
+
+## Props: Sam's record off the page, ours and David only (2026-10-21)
+- Jack: "remove sam's results for the sections we have just built models for only and start anew (nba props, first basket, first td, nfl props). track david if he continues nfl props."
+- NBA tab: our NBA props and First Basket only (Today, Results; their research is on Results). First TD tab: our model only. NFL player props: our model plus David's board, results and research (`src/app/props/davidprops.tsx`, David's slices only; the head to head with Sam and "Sam agrees" slices are hidden). Search box: our NFL props, David, our First TD.
+- Money page props chart: every edge our four models flagged plus their live slices (`src/lib/models/money.ts`), replacing Sam's plays. Learning page props rows: our four sections plus David.
+- Sam's saved data is untouched in Redis (props:v1:*, ftd:v1:*); his capture code still runs (pages log as paywalled) and `playerprops.tsx` / `firsttd.tsx` stay in the repo unrendered, so his sections can come back if he reopens. David is still captured by /api/props as before.

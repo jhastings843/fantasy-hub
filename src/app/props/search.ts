@@ -1,17 +1,16 @@
 // The week's props, flattened for the search box: one entry per player, with
-// Sam's prop calls, David's board and the first TD model side by side. Same
-// tests the cards use (isPlay, systemHits, davidSide), so they cannot disagree.
-import { isPlay } from "@/lib/props/grade";
+// our NFL props model, David's board and our first TD model side by side.
+// Same tests the cards use (clears, davidSide, Kalshi cost), so they cannot disagree.
 import type { PropMarket } from "@/lib/props/parse";
+import type { OurNflView } from "@/lib/models/nfl/store";
+import type { OurFtdView } from "@/lib/models/nfl/ftd-store";
 import type { PropsView } from "@/lib/props/store";
-import { davidSide, davidSliceSide, isDavidSlice, samOn, type DavidGame } from "@/lib/props/david";
+import { davidSide, davidSliceSide, isDavidSlice, type DavidGame } from "@/lib/props/david";
 import { fairAmerican } from "@/lib/firsttd/parse";
-import type { FirstTdView } from "@/lib/firsttd/store";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { NFL_TEAMS } from "@/lib/picks/teams";
 import { whenEt } from "../picks/ui";
 import type { SearchEntry, SearchRow } from "../picks/WeekSearch";
-import { systemHits } from "./playerprops";
 
 const FULL: Record<string, string> = Object.fromEntries(Object.entries(NFL_TEAMS).map(([full, abbr]) => [abbr, full]));
 const STAT: { [k: string]: string } = { pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
@@ -48,7 +47,7 @@ interface Player {
   rank: number;
 }
 
-export function propsSearchIndex(v: PropsView | null, ftd: FirstTdView | null): SearchEntry[] {
+export function propsSearchIndex(ours: OurNflView | null, v: PropsView | null, ftd: OurFtdView | null): SearchEntry[] {
   const players = new Map<string, Player>();
   const add = (team: string, name: string, game: { away: string; home: string; kickoff?: string }, row: SearchRow, rank: number) => {
     const k = playerKey(team, name);
@@ -64,32 +63,29 @@ export function propsSearchIndex(v: PropsView | null, ftd: FirstTdView | null): 
     p.rank = Math.min(p.rank, rank);
   };
 
-  if (v) {
-    // Sam's props: plays first, then where his number leans without a play.
-    for (const saved of Object.values(v.current)) {
-      const g = saved.game;
-      const where = { away: g.away, home: g.home, kickoff: saved.kickoff };
-      for (const m of g.markets as PropMarket[]) {
-        const stat = m.stat ? STAT[m.stat] : m.statLabel.toLowerCase();
-        const graded = saved.result?.markets.find((x) => x.id === m.id);
-        if (isPlay(m)) {
-          const w = m.books.find((b) => b.win);
-          const price = w && m.side ? w[m.side] : null;
-          const inSystem = systemHits(m, saved, v.active, v.graded).length > 0;
-          const out = graded?.play?.outcome;
-          const text = `${inSystem ? "In the system" : "Play"}: ${side(m.side!)} ${m.line} ${stat}${price !== null && w ? ` (${am(price)} ${w.book})` : ""} · Sam ${m.model}${
-            graded && graded.actual !== null ? ` · went ${graded.actual}` : ""
-          }`;
-          add(m.team, m.player, where, { market: "Sam", text, tone: out ?? (inSystem ? "bet" : "lean"), result: out }, inSystem ? 0 : 1);
-        } else if (m.lean) {
-          const text = `Leans ${m.lean} ${m.line} ${stat}, no play · Sam ${m.model}${graded && graded.actual !== null ? ` · went ${graded.actual}` : ""}`;
-          add(m.team, m.player, where, { market: "Sam", text, tone: "pass" }, 2);
-        }
+  // Our NFL model: its edges first, then where it leans without one.
+  for (const saved of ours?.board ?? []) {
+    const g = saved.game;
+    const where = { away: g.away, home: g.home, kickoff: saved.kickoff };
+    for (const m of g.markets as PropMarket[]) {
+      const stat = m.stat ? STAT[m.stat] : m.statLabel.toLowerCase();
+      const graded = saved.result?.markets.find((x) => x.id === m.id);
+      const went = graded && graded.actual !== null ? ` · went ${graded.actual}` : "";
+      if (m.clears && m.side) {
+        const dk = m.books[0];
+        const price = dk ? dk[m.side] : null;
+        const out = graded?.play?.outcome;
+        const text = `Edge: ${side(m.side)} ${m.line} ${stat}${price !== null ? ` (${am(price)} DK)` : ""} · ours ${m.model}${went}`;
+        add(m.team, m.player, where, { market: "Our model", text, tone: out ?? "lean", result: out }, 1);
+      } else if (m.lean) {
+        add(m.team, m.player, where, { market: "Our model", text: `Leans ${m.lean} ${m.line} ${stat}, no edge · ours ${m.model}${went}`, tone: "pass" }, 2);
       }
     }
+  }
+
+  if (v) {
     // David's board: tracking, unless one of his slices has earned a place in the system.
-    const davidNow: DavidGame[] = v.david.week !== null && (v.week === null || v.david.week >= v.week) ? v.david.games : [];
-    const samMap = new Map(Object.entries(v.david.sam ?? {}));
+    const davidNow: DavidGame[] = v.david.games;
     for (const g of davidNow) {
       const [, , away, home] = g.gameId.split("_");
       const res = new Map((g.result ?? []).map((r) => [r.id, r]));
@@ -98,7 +94,7 @@ export function propsSearchIndex(v: PropsView | null, ftd: FirstTdView | null): 
         const price = d === "over" ? p.over : d === "under" ? p.under : null;
         const r = res.get(p.id);
         // Same test as the David rows on the cards: an active David slice this prop falls in.
-        const inSystem = v.active.some((id) => isDavidSlice(id) && davidSliceSide(id, p, samOn(samMap, p)) !== null);
+        const inSystem = v.active.some((id) => isDavidSlice(id) && !id.includes("sam") && davidSliceSide(id, p, undefined) !== null);
         const text = `${inSystem ? "In the system: " : ""}${d ? `${side(d)} ${p.line}` : `At ${p.line}`} ${DSTAT[p.market]} · his ${p.projection}${price !== null ? ` (${am(price)} DK)` : ""}${
           r && r.actual !== null && r.actual !== undefined ? ` · went ${r.actual}` : ""
         }`;
@@ -107,23 +103,19 @@ export function propsSearchIndex(v: PropsView | null, ftd: FirstTdView | null): 
     }
   }
 
-  // First TD: Sam's chance for every priced player, his pick marked.
-  for (const saved of Object.values(ftd?.current?.games ?? {})) {
+  // First TD: our chance for every listed player, our likeliest marked.
+  for (const saved of ftd?.board ?? []) {
     const g = saved.game;
     const where = { away: g.away, home: g.home, kickoff: saved.kickoff };
     for (const t of g.teams) {
       for (const p of t.players) {
         const isPick = !!g.pick && g.pick.team === t.team && g.pick.name === p.name;
         const scored = saved.result ? saved.result.key === p.key : null;
-        if (p.out) {
-          add(t.team, p.name, where, { market: "First TD", text: "Ruled out on Sam's page", tone: "pass" }, 3);
-          continue;
-        }
         if (p.p === null) continue;
         const k = kalshiFor(saved.kalshi, p.name);
         const cost = k?.ask ? kalshiCost(k.ask) : null;
         const value = cost !== null && p.p > cost;
-        const text = `${isPick ? "Sam's pick · " : ""}${pct(p.p)} to score first (fair ${fairAmerican(p.p)})${
+        const text = `${isPick ? "Our likeliest · " : ""}${pct(p.p)} to score first (fair ${fairAmerican(p.p)})${
           cost !== null ? ` · Kalshi ${Math.round(cost * 100)}¢${value ? ", value" : ""}` : ""
         }${scored === true ? " · scored first" : ""}`;
         const result = saved.result && isPick ? (scored ? "W" : "L") : undefined;

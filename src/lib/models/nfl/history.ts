@@ -54,9 +54,11 @@ export function summarizeNfl(rows: NflRow[]): NflSummary {
     pl.games++;
     for (const k of ["att", "passYds", "car", "rushYds", "tgt", "rec", "recYds", "teamAtt", "teamCar", "teamTgt"] as const) pl[k] += g[k];
     const s = shares[pos];
-    if (t.tgt) (s.tgt[0] += r.tgt / t.tgt), s.tgt[1]++;
-    if (t.car) (s.car[0] += r.car / t.car), s.car[1]++;
-    if (t.att) (s.att[0] += r.att / t.att), s.att[1]++;
+    for (const k of ["tgt", "car", "att"] as const) {
+      if (!t[k]) continue;
+      s[k][0] += r[k] / t[k];
+      s[k][1]++;
+    }
     s.recYds += r.recYds;
     s.tgtN += r.tgt;
     s.rec += r.rec;

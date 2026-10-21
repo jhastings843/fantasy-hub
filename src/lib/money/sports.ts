@@ -5,7 +5,7 @@ import { confirmed } from "@/lib/picks/issued";
 import { unitReport } from "@/lib/picks/units";
 import { firstSends } from "@/lib/picks/update";
 import type { League } from "@/lib/picks/parse";
-import { propsWeeks, type PropsWeek } from "@/lib/props/store";
+import { ourPropsWeeks, type OurPropsWeek } from "@/lib/models/money";
 
 // The Money overview's two sports charts (Jack, 2026-10-19: "add a graph for
 // props and a graph for picks across all sports"). Read-only, from the same
@@ -24,7 +24,6 @@ export interface PicksWeek {
   p: number;
 }
 
-const seasonOf = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
 
 async function picksWeeks(league: League): Promise<PicksWeek[]> {
   const core = (await getPicksCore(league)).value;
@@ -39,7 +38,8 @@ async function picksWeeks(league: League): Promise<PicksWeek[]> {
 
 export interface SportsView {
   picks: PicksWeek[];
-  props: PropsWeek[];
+  /** Our props models (Sam's props record is no longer shown, Jack 2026-10-21). */
+  props: OurPropsWeek[];
   problems: string[];
 }
 
@@ -50,6 +50,6 @@ export async function getSportsView(now = new Date()): Promise<SportsView> {
       problems.push(`${what}: ${e instanceof Error ? e.message : String(e)}`);
       return [] as T[];
     });
-  const [nfl, cfb, props] = await Promise.all([safe("NFL picks", picksWeeks("nfl")), safe("college picks", picksWeeks("cfb")), safe("props", propsWeeks(seasonOf(now)))]);
+  const [nfl, cfb, props] = await Promise.all([safe("NFL picks", picksWeeks("nfl")), safe("college picks", picksWeeks("cfb")), safe("props", ourPropsWeeks(now))]);
   return { picks: [...nfl, ...cfb].sort((a, b) => a.at.localeCompare(b.at)), props, problems };
 }

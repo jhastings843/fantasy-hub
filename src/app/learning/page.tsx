@@ -6,7 +6,8 @@ import { sourceState, suInForce, type PicksPolicy, type Source } from "@/lib/pic
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { loadSection } from "@/lib/learning/store";
 import { PROPS_SECTION } from "@/lib/props/learn";
-import { FTD_SECTION } from "@/lib/firsttd/learn";
+import { OUR_SECTION } from "@/lib/models/learn";
+import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionState } from "@/lib/learning/engine";
 import type { ReviewState } from "@/lib/picks/learning/review";
 import { whenEt } from "../picks/ui";
@@ -79,14 +80,19 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
-  const [state, policy, nba, nflProps, nbaProps, ftd] = await Promise.all([
+  const nbaSeason = nbaSeasonOfDate(new Date());
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
     loadSection(PROPS_SECTION.nfl, season),
-    loadSection(PROPS_SECTION.nba, season),
-    loadSection(FTD_SECTION, season),
+    loadSection(OUR_SECTION.nbaProps, nbaSeason),
+    loadSection(OUR_SECTION.nbaFirstBasket, nbaSeason),
+    loadSection(OUR_SECTION.nflProps, season),
+    loadSection(OUR_SECTION.nflFirstTd, season),
   ]);
+  // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
+  const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
   const PICKS = "Picks review: Tuesday 7am, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
   const ENGINE = "Shared engine: weekly, judged per game, t 2.33, refinements must beat their parent, rollback";
   const nbaCount = (m: string) => (nba?.hyps ?? []).filter((h) => h.id.startsWith(`${m}:`));
@@ -151,18 +157,11 @@ export default async function LearningPage() {
     {
       title: "Props",
       rows: [
-        { name: "NFL player props (Sam and David)", loop: ENGINE, href: "/props?v=research", ...engineRow(nflProps) },
-        { name: "NFL first TD", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 2.33", href: "/props?m=ftd&v=research", ...engineRow(ftd) },
-        { name: "NBA player props (Sam)", loop: `${ENGINE}. Games are daily and graded overnight; the review runs once per Monday-to-Sunday week`, href: "/props?m=nba&v=research", ...engineRow(nbaProps) },
-        {
-          name: "NBA first basket",
-          loop: "Shared engine, First TD gate (planned)",
-          live: "Not built",
-          collecting: "Waiting on Sam's first basket page (locked on his board). Plugs into the engine as its own section once it posts.",
-          last: null,
-          href: "/props?m=nba",
-          waiting: true,
-        },
+        { name: "NFL player props (our model)", loop: ENGINE, href: "/props?v=results", ...engineRow(ourNflProps) },
+        { name: "NFL first TD (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 2.33", href: "/props?m=ftd&v=results", ...engineRow(ourFtd) },
+        { name: "NFL player props (David)", loop: ENGINE, href: "/props?v=research", ...engineRow(davidOnly) },
+        { name: "NBA player props (our model)", loop: `${ENGINE}. Games are daily and graded overnight; the review runs once per Monday-to-Sunday week`, href: "/props?m=nba&v=results", ...engineRow(ourNbaProps) },
+        { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 2.33", href: "/props?m=nba&v=results", ...engineRow(ourFb) },
       ],
     },
   ];

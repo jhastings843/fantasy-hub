@@ -910,9 +910,9 @@ function PicksPanel({ sp }: { sp: Sports }) {
 
 function PropsPanel({ sp }: { sp: Sports }) {
   const sys = sp.props.reduce((a, w) => a + w.system, 0);
-  const sam = sp.props.reduce((a, w) => a + w.sam, 0);
+  const edges = sp.props.reduce((a, w) => a + w.edges, 0);
   const nSys = sp.props.reduce((a, w) => a + w.systemBets, 0);
-  const nSam = sp.props.reduce((a, w) => a + w.samBets, 0);
+  const nEdges = sp.props.reduce((a, w) => a + w.edgeBets, 0);
   return (
     <div className={m.panel}>
       <div className={m.panelHead}><h2 className={m.panelTitle}>Props</h2><Link className={m.panelLink} href="/props">Props</Link></div>
@@ -922,21 +922,21 @@ function PropsPanel({ sp }: { sp: Sports }) {
           nSys
             ? [
                 { label: "System bets", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.system }))), tone: "auto" },
-                { label: "Every Sam play", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.sam }))) },
+                { label: "Every model edge", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.edges }))) },
               ]
-            : [{ label: "Every Sam play", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.sam }))), tone: "auto" }]
+            : [{ label: "Every model edge", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.edges }))), tone: "auto" }]
         }
         baseline={0}
         format={units}
         height={230}
         width={360}
-        empty="No graded props yet this season."
-        ariaLabel="Net units on prop bets by week: the system's bets and every play Sam's model made"
+        empty="No graded props from our models yet."
+        ariaLabel="Net units on prop bets by week: the system's bets and every edge our models flagged"
       />
       <span className={m.sub}>
-        {`Every play Sam's model made: ${units(Math.round(sam * 100) / 100)} on ${nSam}. ${
+        {`Every edge our four models flagged (NBA props, First Basket, NFL props, First TD): ${units(Math.round(edges * 100) / 100)} on ${nEdges}. ${
           nSys ? `The system's bets: ${units(Math.round(sys * 100) / 100)} on ${nSys}.` : "No system bets settled yet."
-        } 1 unit risked per bet, at the book's price.`}
+        } 1 unit risked per bet, at the saved price.`}
       </span>
     </div>
   );

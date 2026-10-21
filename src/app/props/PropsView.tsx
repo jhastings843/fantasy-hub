@@ -1,25 +1,23 @@
 import Link from "next/link";
 import { NBA_VIEWS, VIEWS, type View } from "../picks/ui";
-import { FirstTdResearch, FirstTdResults, FirstTdWeek } from "./firsttd";
-import {
-  NbaPropsWeek,
-  PropsResearch,
-  PropsResults,
-  PropsWeek,
-} from "./playerprops";
+import { DavidResearch, DavidResults, DavidWeek } from "./davidprops";
 import { OurNflResults, OurNflWeek } from "./ournfl";
 import { OurFtdResults, OurFtdWeek } from "./ourftd";
 import { OurFirstBasket, OurFirstBasketResults, OurNbaResults, OurNbaWeek } from "./ournba";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
-import { getFirstTdView } from "@/lib/firsttd/store";
+import { DAVID_URL } from "@/lib/props/david";
+import { getOurNflView } from "@/lib/models/nfl/store";
+import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { propsSearchIndex } from "./search";
 import s from "../picks/picks.module.css";
 
-// The Props tab: Sam's NFL player props and first touchdown models, and his
-// NBA player props (same tracker, own record and system). Same
-// shape as Picks (market, then view, both in the URL), no stakes: everything
-// here is tracked and graded until a slice earns its way into the system.
+// The Props tab: our own models (NFL props and first TD, NBA props and first
+// basket) and David Sasser's NFL props board. Sam's props, first TD and NBA
+// pages went behind his paywall on 2026-10-21; Jack had his record taken off
+// the page (his saved data stays in Redis, untouched). Same shape as Picks
+// (market, then view, both in the URL), no stakes: everything here is
+// tracked and graded until a slice earns its way into the system.
 
 export type PropsMarket = "pp" | "ftd" | "nba";
 // NFL markets; NBA is its own sport tab (player props only).
@@ -50,11 +48,15 @@ export default async function PropsView({
   view: View;
 }) {
   const season = seasonOf(new Date());
-  const [pv, fv] = await Promise.all([
+  const [ov, pv, fv] = await Promise.all([
+    getOurNflView(season).catch(() => null),
     getPropsView(season).catch(() => null),
-    getFirstTdView(season).catch(() => null),
+    getOurFtdView(season).catch(() => null),
   ]);
-  const entries = propsSearchIndex(pv, fv);
+  const entries = propsSearchIndex(ov, pv, fv);
+  // Our sections keep their research (slices and learning) on Results; only David's board has a Research view.
+  const views = market === "pp" ? VIEWS : NBA_VIEWS.filter((v) => v.id !== "research").map((v) => (market === "ftd" && v.id === "week" ? { ...v, label: "This week" } : v));
+  const shown: View = market !== "pp" && view === "research" ? "results" : view;
   return (
     <main className={s.page}>
       <div className={s.wrap}>
@@ -84,7 +86,7 @@ export default async function PropsView({
           {market !== "nba" && entries.length > 0 && (
             <WeekSearch
               entries={entries}
-              label="Search this week: Sam's props, David's board and first TD"
+              label="Search this week: our props and first TD models, David's board"
               placeholder="Player or team, e.g. Kelce or Chiefs"
             />
           )}
@@ -103,11 +105,11 @@ export default async function PropsView({
             </nav>
           )}
           <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {(market === "nba" ? NBA_VIEWS : VIEWS).map((v) => (
+            {views.map((v) => (
               <Link
                 key={v.id}
                 href={href(market, v.id)}
-                aria-current={v.id === view ? "page" : undefined}
+                aria-current={v.id === shown ? "page" : undefined}
                 className={s.tab}
               >
                 {v.label}
@@ -116,65 +118,42 @@ export default async function PropsView({
           </nav>
         </header>
 
-        {market === "pp" && view === "week" && (
+        {market === "pp" && shown === "week" && (
           <>
             <OurNflWeek season={season} />
-            <PropsWeek season={season} />
+            <DavidWeek season={season} />
           </>
         )}
-        {market === "pp" && view === "results" && (
+        {market === "pp" && shown === "results" && (
           <>
             <OurNflResults season={season} />
-            <PropsResults season={season} />
+            <DavidResults season={season} />
           </>
         )}
-        {market === "pp" && view === "research" && (
-          <PropsResearch season={season} />
-        )}
-        {market === "ftd" && view === "week" && (
-          <>
-            <OurFtdWeek season={season} />
-            <FirstTdWeek season={season} />
-          </>
-        )}
-        {market === "ftd" && view === "results" && (
-          <>
-            <OurFtdResults season={season} />
-            <FirstTdResults season={season} />
-          </>
-        )}
-        {market === "ftd" && view === "research" && (
-          <FirstTdResearch season={season} />
-        )}
-        {market === "nba" && view === "week" && (
+        {market === "pp" && shown === "research" && <DavidResearch season={season} />}
+        {market === "ftd" && shown === "week" && <OurFtdWeek season={season} />}
+        {market === "ftd" && shown === "results" && <OurFtdResults season={season} />}
+        {market === "nba" && shown === "week" && (
           <>
             <OurNbaWeek season={season} />
             <OurFirstBasket season={season} />
-            <NbaPropsWeek season={season} />
           </>
         )}
-        {market === "nba" && view === "results" && (
+        {market === "nba" && shown === "results" && (
           <>
             <OurNbaResults season={season} />
             <OurFirstBasketResults season={season} />
-            <PropsResults season={season} league="nba" />
           </>
-        )}
-        {market === "nba" && view === "research" && (
-          <PropsResearch season={season} league="nba" />
         )}
 
         <footer className={s.footer}>
           <span>
-            Sources:{" "}
-            <a href="https://samthemodelman.smmodel.workers.dev/nfl/">
-              Sam&apos;s Models
-            </a>{" "}
-            (NFL and NBA props pages, first TD pages), Rotowire projections via
-            Sleeper, ESPN projections and DraftKings lines via ESPN, Kalshi
-            first TD prices, ESPN box scores and scoring plays. Our own models:
-            ESPN box scores and play-by-play, DraftKings lines via ESPN. Model output and
-            a record of it, not betting advice.
+            Sources: our own models (ESPN box scores and play-by-play,
+            nflverse weekly stats, DraftKings lines via ESPN and The Odds API,
+            Kalshi first TD prices),{" "}
+            <a href={DAVID_URL}>David Sasser&apos;s props board</a>,
+            ESPN box scores and scoring plays. Model output and a record of
+            it, not betting advice.
           </span>
         </footer>
       </div>
