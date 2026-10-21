@@ -7,6 +7,7 @@ import {
   PropsResults,
   PropsWeek,
 } from "./playerprops";
+import { OurNflResults, OurNflWeek } from "./ournfl";
 import { OurFirstBasket, OurFirstBasketResults, OurNbaResults, OurNbaWeek } from "./ournba";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
@@ -114,9 +115,17 @@ export default async function PropsView({
           </nav>
         </header>
 
-        {market === "pp" && view === "week" && <PropsWeek season={season} />}
+        {market === "pp" && view === "week" && (
+          <>
+            <OurNflWeek season={season} />
+            <PropsWeek season={season} />
+          </>
+        )}
         {market === "pp" && view === "results" && (
-          <PropsResults season={season} />
+          <>
+            <OurNflResults season={season} />
+            <PropsResults season={season} />
+          </>
         )}
         {market === "pp" && view === "research" && (
           <PropsResearch season={season} />

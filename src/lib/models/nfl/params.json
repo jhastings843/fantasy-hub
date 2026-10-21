@@ -1,0 +1,27 @@
+{
+  "kTeam": 8,
+  "margin": {
+    "att": 0,
+    "car": 0
+  },
+  "kTgt": 100,
+  "kCar": 50,
+  "kAtt": 10,
+  "kYpt": 50,
+  "kCr": 25,
+  "kYpc": 800,
+  "kYpa": 400,
+  "share": false,
+  "disp": {
+    "rec": 100,
+    "rec_yds": 20.3092,
+    "rush_yds": 5.3798,
+    "pass_yds": 3.1623
+  },
+  "pow": {
+    "rec_yds": 1,
+    "rush_yds": 1.5,
+    "pass_yds": 1.5
+  },
+  "calib": 0.85
+}

@@ -214,3 +214,31 @@ Test results: tip log loss 0.6198 vs 0.6931 for a coin flip, tip winner picked 6
 Not in v1: the spec's separate won-tip and lost-tip shares (too few first baskets per player to split); one share per starter is used for both.
 
 First live boards (10-21, 13 games): our chances sit within a few points of DK's no-vig numbers, 1 to 4 edges per game. The launchd job `com.jackh.first-basket-check` was unloaded and its plist deleted.
+
+### Phase 3: NFL player props v1 (2026-10-21)
+Code: `src/lib/models/nfl/{data,history,props,market,store}.ts`, route `/api/props/nfl/ours` (on first-td.yml), "Our model" section on the NFL player props tab (`src/app/props/ournfl.tsx`, cards shared with the NBA board), learning section `nfl-props-ours` with PROPS_GATE. Data: nflverse `stats_player_week_{season}.csv` (the live run reads this season's gzipped file each run, about 0.4MB, so no copy is kept), last season's summary in Redis at `models:v1:nfl:{season}:prior` (`scripts/seed-nfl-models.mts`). ESPN rosters are matched to nflverse rows by name within the team. Prices: ESPN's when posted, else David's board when his DK line is the same number, else -110 marked "assumed" on the card.
+
+Deviation from the plan: yardage uses a closed-form gamma (variance phi x mean^pow) instead of Monte Carlo; same skewed CDF, priced from the median, deterministic.
+
+Walk-forward fit (`scripts/fit-nfl-props.mts`): 2025 week by week with 2024 as the prior; fit on weeks 1-9, tested on weeks 10-18 (137 games), and a second test on 2026 weeks 1-6 (93 games, 2025 as the prior). Players with a stat row stand in for who was active. Judged: 4+ targets a game (receptions, receiving yards), 8+ carries (rushing), QBs with 20+ attempts (passing).
+
+| Constant | Fitted value | How |
+|---|---|---|
+| kTeam (team volume shrink) | 8 games | grid {0..16}, team attempts and carries MSE |
+| Attempts / carries per point of expected margin | 0 / 0 | grid -1.2..0 and 0..1.2 (no gain from the spread) |
+| kTgt, kCar, kAtt (share shrink, team opportunities) | 100, 50, 10 | grids {0..800}, two coordinate passes |
+| kCr, kYpt, kYpc, kYpa (efficiency shrink) | 25, 50, 800, 400 | same |
+| Hand an Out regular's share to the rest | no | relative error 3.34 off vs 3.43 on |
+| Receptions NB size | 100 | over/under log loss at the naive line |
+| Yardage gamma variance | rec 20.3 x mean, rush 5.38 x mean^1.5, pass 3.16 x mean^1.5 | same objective; plain likelihood chased QBs who left early and put only 27-44% of passing games below our median |
+| Calibration slope | 0.85 | log loss |
+
+Test results, 2025 weeks 10-18 / 2026 weeks 1-6, MAE ours vs season average:
+- passing yards 69.88 vs 71.19 / 66.47 vs 66.74 (Brier 0.2496 / 0.2488 vs 0.25: no real skill)
+- rushing yards 26.41 vs 27.03 / 27.51 vs 27.57 (Brier 0.2448 / 0.2434)
+- receiving yards 25.74 vs 26.66 / 26.15 vs 28.36 (Brier 0.2322 / 0.2297)
+- receptions 1.74 vs 1.79 / 1.88 vs 2.01 (Brier 0.2331 / 0.2226)
+- Calibration 2026: 0.236/0.246 (n 272), 0.354/0.382 (587), 0.440/0.445 (458), 0.542/0.488 (168), 0.636/0.700 (30).
+- Against Sam's saved weeks 6-7 and David (`scripts/compare-sam-nfl.mts`), MAE ours / Sam / market line / David: passing 48.5 / 38.0 / 41.3 / 41.9 (n 23), rushing 16.4 / 15.2 / 14.8 / 16.6 (56), receiving 21.2 / 20.2 / 19.6 / 21.7 (114), receptions 1.7 all four. Right side of the line: ours 11, 30, 58, 65; Sam 14, 27, 53, 62.
+
+Honest read: receiving and receptions are the useful part; passing yards has no skill yet; QB rushing reads low (the QB yards-per-carry prior includes kneel-downs). The first live board (week 7) flags most props as edges, mostly unders, and most prices are assumed -110. Not a bet until a slice clears the gate.

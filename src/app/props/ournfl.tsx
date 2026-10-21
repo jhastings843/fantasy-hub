@@ -1,0 +1,95 @@
+// Our own NFL props model (lib/models/nfl): this week's board and its record,
+// on the NFL player props tab. Same cards as the NBA board (ournba.tsx).
+import { getOurNflView, type OurNflView } from "@/lib/models/nfl/store";
+import { ourPropSlices, ourSliceBets, record } from "@/lib/models/learn";
+import { GameCard, Tile } from "./ournba";
+import { LearningBlock } from "./learning";
+import s from "../picks/picks.module.css";
+
+const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
+const STATS = ["pass_yds", "rush_yds", "rec_yds", "rec"] as const;
+
+async function load(season: number): Promise<OurNflView | null> {
+  return getOurNflView(season).catch(() => null);
+}
+
+export async function OurNflWeek({ season }: { season: number }) {
+  const v = await load(season);
+  if (!v) return <p className={s.calm}>Our NFL model couldn&apos;t be read just now. Try again in a minute.</p>;
+  const priced = v.board.reduce((a, g) => a + Object.values(g.extra).filter((x) => x.price !== "assumed").length, 0);
+  const all = v.board.reduce((a, g) => a + g.game.markets.length, 0);
+  return (
+    <section className={s.section} aria-labelledby="our-nfl-week">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id="our-nfl-week">
+          Our model{v.week ? ` · Week ${v.week}` : ""}
+        </h2>
+        <p className={s.p}>
+          {`Our own projection for passing, rushing and receiving yards and receptions, from nflverse's weekly stats: each team's attempts and carries, each player's share of them and his yards per chance, all shrunk toward last season, then a skewed distribution priced against DraftKings' line (yardage reads from our median, not the mean). Tested on 2025's second half and 2026 weeks 1-6, where it beat season averages; on Sam's saved weeks 6-7 it trailed Sam and the market line on passing yards. ESPN carries DK's NFL lines but not its prices yet: ${priced} of ${all} props this week have a real price (David's board); the rest assume -110. QB rushing reads low (the position's yards per carry includes kneel-downs). Nothing is a bet until a slice clears our learning gate.`}
+        </p>
+      </div>
+      {v.board.length ? (
+        <ol className={s.ftdGames}>
+          {v.board.map((g) => (
+            <GameCard key={g.game.slug} g={g} />
+          ))}
+        </ol>
+      ) : (
+        <p className={s.calm}>Nothing projected yet this week. Boards are built at each NFL capture slot once DraftKings posts player props.</p>
+      )}
+    </section>
+  );
+}
+
+export async function OurNflResults({ season }: { season: number }) {
+  const v = await load(season);
+  if (!v) return null;
+  const rec = (id: string) => record(ourSliceBets(v.graded, id));
+  const all = rec("edge:all");
+  const lean = rec("lean:all");
+  return (
+    <section className={s.section} aria-labelledby="our-nfl-results">
+      <div className={s.sectionHead}>
+        <h2 className={s.h2} id="our-nfl-results">
+          Our model: results
+        </h2>
+        <p className={s.p}>Every saved prop once its game is final, against the board saved before kickoff, 1 unit risked at the price shown (-110 where none was posted).</p>
+      </div>
+      {v.graded.length ? (
+        <>
+          <div className={s.tiles}>
+            <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
+            <Tile value={u(lean.units)} label={`Every lean · ${lean.w}-${lean.l}${lean.p ? `-${lean.p}` : ""}`} />
+          </div>
+          <div className={s.tw}>
+            <table className={s.table}>
+              <caption className={s.caption}>Every slice our learning section tracks</caption>
+              <thead>
+                <tr>
+                  <th>Slice</th>
+                  <th>Record</th>
+                  <th>Units</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ourPropSlices([...STATS]).map(([id, label]) => {
+                  const r = rec(id);
+                  return (
+                    <tr key={id}>
+                      <td>{label}</td>
+                      <td className={s.num}>{`${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`}</td>
+                      <td className={`${s.num} ${r.units > 0 ? s.pos : r.units < 0 ? s.neg : ""}`}>{u(r.units)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <p className={s.calm}>Nothing graded yet. Boards are graded from ESPN&apos;s box scores after each game.</p>
+      )}
+      <LearningBlock v={v.learning} />
+    </section>
+  );
+}

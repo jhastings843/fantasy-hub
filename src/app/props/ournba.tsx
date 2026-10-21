@@ -3,6 +3,7 @@
 // against DraftKings' price. Its edges are model edges, not bets, until a
 // slice in our own learning section clears the gate.
 import { etDate, implied, type PropMarket } from "@/lib/props/parse";
+import type { StoredProps } from "@/lib/props/store";
 import { getOurNbaView, type OurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
 import { ourSliceBets, record, ourPropSlices } from "@/lib/models/learn";
 import { noVig } from "@/lib/models/nba/market";
@@ -14,7 +15,14 @@ import pp from "./props.module.css";
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const pct = (x: number) => `${Math.round(x * 100)}%`;
-const short: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes" };
+const short: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes", pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
+
+/** A saved board from any of our props models (NBA or NFL). */
+export type OurBoard = StoredProps & {
+  extra: { [id: string]: { over: number; under: number; min?: number; median?: number; price?: "espn" | "david" | "assumed" } };
+  away: string;
+  home: string;
+};
 const statShort = (m: PropMarket) => (m.stat ? short[m.stat] : m.statLabel.toLowerCase());
 const sideWord = (x: "over" | "under") => (x === "over" ? "Over" : "Under");
 /** How many edges a card lists before "every prop". */
@@ -25,7 +33,7 @@ async function load(season: number): Promise<OurNbaView | null> {
   return getOurNbaView(season).catch(() => null);
 }
 
-function EdgeRow({ m, g }: { m: PropMarket; g: OurStoredProps }) {
+function EdgeRow({ m, g }: { m: PropMarket; g: OurBoard }) {
   const dk = m.books[0];
   const side = m.side!;
   const price = dk[side];
@@ -44,11 +52,11 @@ function EdgeRow({ m, g }: { m: PropMarket; g: OurStoredProps }) {
       </div>
       <div className={`${s.ppMeta} ${s.num}`}>
         {[
-          price !== null ? `${am(price)} DraftKings` : null,
+          price !== null ? `${am(price)} DraftKings${g.extra[m.id]?.price === "assumed" ? " (assumed, no price posted)" : g.extra[m.id]?.price === "david" ? " (via David's board)" : ""}` : null,
           ours !== undefined ? `our chance ${pct(ours)}` : null,
           fair !== null ? `DK ${pct(fair)} without the vig` : price !== null ? `breaks even at ${pct(implied(price))}` : null,
-          `ours ${m.model}`,
-          g.extra[m.id] ? `${g.extra[m.id].min} min` : null,
+          g.extra[m.id]?.median !== undefined && m.stat !== "rec" ? `our median ${m.model}` : `ours ${m.model}`,
+          g.extra[m.id]?.min !== undefined ? `${g.extra[m.id].min} min` : null,
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -62,7 +70,7 @@ function EdgeRow({ m, g }: { m: PropMarket; g: OurStoredProps }) {
   );
 }
 
-function GameCard({ g }: { g: OurStoredProps }) {
+export function GameCard({ g }: { g: OurBoard }) {
   const edges = g.game.markets.filter((m) => m.clears && m.side);
   const net = g.result ? g.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
   const res = new Map((g.result?.markets ?? []).map((r) => [r.id, r]));
@@ -179,7 +187,7 @@ export async function OurNbaWeek({ season }: { season: number }) {
   );
 }
 
-function Tile({ value, label }: { value: string; label: string }) {
+export function Tile({ value, label }: { value: string; label: string }) {
   return (
     <div className={s.tile}>
       <span className={`${s.tileV} ${s.num}`}>{value}</span>

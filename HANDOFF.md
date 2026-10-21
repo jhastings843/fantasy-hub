@@ -315,3 +315,7 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 ## Own prop models, Phase 2: NBA First Basket (2026-10-21)
 - First Basket section under the NBA props tab (board, results, learning `nba-firstbasket-ours`), built in the same `/api/props/nba/ours` run. Model `src/lib/models/nba/firstbasket.ts`, constants `fb-params.json` from `scripts/fit-first-basket.mts`. Tables `models:v1:nba:fb` (seeded by `scripts/seed-nba-models.mts`, then grown by the live ingest).
 - launchd `com.jackh.first-basket-check` unloaded and its plist deleted (scripts/check-first-basket.mjs kept, marked retired).
+
+## Own prop models, Phase 3: NFL props v1 (2026-10-21)
+- "Our model" section on the NFL player props tab (board and results) from `/api/props/nfl/ours` (added to first-td.yml). Model `src/lib/models/nfl/`, constants `params.json` from `scripts/fit-nfl-props.mts`; data cache `.cache/nfl` (nflverse stats_player_week_2024..2026, games.csv). Prior seeded with `scripts/seed-nfl-models.mts 2026`. Learning section `nfl-props-ours`.
+- Weak spots, written on the page: passing yards no better than a coin flip at a naive line, QB rushing low, ESPN posts no NFL prices so most are -110 assumed (David's prices fill in where his line matches).
