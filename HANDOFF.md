@@ -347,3 +347,4 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Props: same header; `src/app/props/top.tsx` puts a headline, top edges per model (ours vs market bars) and gate progress above the boards; Learner log view per sport.
 - Model fix: a market only gets our number with real history (NBA 2+ games this season or 10+ last; NFL 2+ or 4+). Rookies and players back from a lost season were showing 98-99% fake edges.
 - Not redone yet: straight-up and totals week bodies (new header only), NBA picks page (accent only).
+- Follow-up same day: straight up (headline, three surest as cards, ranked list), totals (headline, bet cards, both-models-lean cards, market vs models table with open-able rows) and the NBA picks page (chips, stat strip, rule-tier cards, market vs Sam table, last night) moved to the same layout; results and research views got headlines.
