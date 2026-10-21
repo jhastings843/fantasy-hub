@@ -519,16 +519,37 @@ async function FirstTdWeek({ season }: { season: number }) {
   if (!v) return <p className={s.calm}>Our First TD model couldn&apos;t be read just now.</p>;
   const now = nowMs();
   const ahead = v.board.filter((g) => !g.kickoff || Date.parse(g.kickoff) > now);
-  const cost = (g: OurFtdStored, name: string) => {
+  const kalshi = (g: OurFtdStored, name: string) => {
     const k = kalshiFor(g.kalshi, name);
     return k?.ask ? kalshiCost(k.ask) : null;
   };
+  // DraftKings' First TD price (The Odds API, read the morning of game day), keyed by the full name squashed:
+  // "J.Chase" matches the one key that starts with "j" and ends with "chase".
+  const dkPrice = (g: OurFtdStored, name: string): number | null => {
+    if (!g.dk) return null;
+    const [ini, ...rest] = name.split(".");
+    const last = nameKey(rest.join(" "));
+    const hits = Object.keys(g.dk.prices).filter((k) => k.startsWith(ini.toLowerCase()) && k.endsWith(last));
+    return hits.length === 1 ? g.dk.prices[hits[0]] : null;
+  };
+  /** The cheaper of Kalshi's cost and DraftKings' break-even, and where it is. */
+  const best = (g: OurFtdStored, name: string): { cost: number; where: string } | null => {
+    const k = kalshi(g, name);
+    const d = dkPrice(g, name);
+    const dc = d !== null ? implied(d) : null;
+    if (k === null && dc === null) return null;
+    return dc !== null && (k === null || dc < k) ? { cost: dc, where: `${am(d!)} DK` } : { cost: k!, where: `${Math.round(k! * 100)}¢ Kalshi` };
+  };
+  const cost = (g: OurFtdStored, name: string) => best(g, name)?.cost ?? null;
   const edges: Edge[] = ahead
     .flatMap((g) =>
       pricedPlayers(g.game).flatMap((p): Edge[] => {
-        const c = cost(g, p.name);
+        const b = best(g, p.name);
+        const c = b?.cost ?? null;
         if (c === null || p.p <= c) return [];
         const team = g.game.teams.find((t) => t.team === p.team)!;
+        const k = kalshi(g, p.name);
+        const d = dkPrice(g, p.name);
         return [
           {
             key: `${g.game.slug}|${p.key}`,
@@ -538,10 +559,12 @@ async function FirstTdWeek({ season }: { season: number }) {
             bet: `First TD · ${p.team}`,
             ours: p.p,
             mkt: c,
-            mktLabel: "Kalshi cost",
-            price: `${Math.round(c * 100)}¢ Kalshi`,
+            mktLabel: "Cheapest price",
+            price: b!.where,
             gap: p.p - c,
             more: [
+              ["Kalshi cost (fee in)", k !== null ? `${Math.round(k * 100)}¢` : "no market"],
+              ["DraftKings", d !== null ? `${am(d)} (breaks even at ${pct(implied(d))})` : g.dk ? "not listed" : "read the morning of game day"],
               [`${p.team} scores first`, pct(team.pFirst)],
               ["Touches, TDs (this season and last)", `${p.touches}, ${p.tds}`],
               ["No offensive TD first", pct(g.game.none)],
@@ -582,7 +605,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       cells: [
         ["Scores first", fav ? `${fav.team} ${pct(fav.pFirst)}` : "·"],
         ["Likeliest", g.game.pick ? `${g.game.pick.name} ${pct(g.game.pick.p)}` : "·"],
-        ["Values", g.kalshi ? `${vals.length}` : "no Kalshi"],
+        ["Values", g.kalshi || g.dk ? `${vals.length}` : "no prices"],
         ["First TD", r ? (r.first.kind === "offense" ? r.first.scorer : "none") : "·"],
       ],
       read: r ? (vals.some((p) => p.key === r.key) ? ["Hit", s.readW] : ["Missed", vals.length ? s.readL : s.readPass]) : vals.length ? ["Values", s.readBet] : ["No values", s.readPass],
@@ -594,17 +617,21 @@ async function FirstTdWeek({ season }: { season: number }) {
                 <th>Player</th>
                 <th>Ours</th>
                 <th>Kalshi cost</th>
+                <th>DraftKings</th>
                 <th>Value</th>
               </tr>
             </thead>
             <tbody>
               {pricedPlayers(g.game).map((p) => {
                 const c = cost(g, p.name);
+                const k = kalshi(g, p.name);
+                const d = dkPrice(g, p.name);
                 return (
                   <tr key={p.key}>
                     <td>{`${p.name} `}<span className={s.dim}>{p.team}</span>{r?.key === p.key && <b className={s.pos}> · scored first</b>}</td>
                     <td className={s.num}>{pct(p.p)}</td>
-                    <td className={s.num}>{c !== null ? `${Math.round(c * 100)}¢` : "·"}</td>
+                    <td className={s.num}>{k !== null ? `${Math.round(k * 100)}¢` : "·"}</td>
+                    <td className={s.num}>{d !== null ? am(d) : "·"}</td>
                     <td className={`${s.num} ${c !== null && p.p > c ? s.pos : s.dim}`}>{c !== null && p.p > c ? `+${((p.p - c) * 100).toFixed(1)}` : "·"}</td>
                   </tr>
                 );
@@ -612,6 +639,7 @@ async function FirstTdWeek({ season }: { season: number }) {
               <tr>
                 <td className={s.dim}>{`Any other player · No offensive TD first`}</td>
                 <td className={s.num}>{`${pct(g.game.teams.reduce((a, t) => a + t.rest, 0))} · ${pct(g.game.none)}`}</td>
+                <td />
                 <td />
                 <td />
               </tr>
@@ -624,9 +652,9 @@ async function FirstTdWeek({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="ftd-week">
       <Hero
-        eyebrow={`NFL First TD${v.week ? ` · Week ${v.week}` : ""} · against Kalshi`}
+        eyebrow={`NFL First TD${v.week ? ` · Week ${v.week}` : ""} · Kalshi and DraftKings`}
         title={<span id="ftd-week">{v.learning.entries.some((e) => e.status === "active") ? "First TD bets live" : "No First TD bets yet"}</span>}
-        sub={`Which team scores first comes from the market's total and spread, drive by drive; the scorer from each team's TD shares. ${edges.length ? `${edges.length} players priced above Kalshi's cost.` : "Nobody is priced above Kalshi's cost right now."}`}
+        sub={`Which team scores first comes from the market's total and spread, drive by drive; the scorer from each team's TD shares. Priced against Kalshi and, from the morning of game day, DraftKings. ${edges.length ? `${edges.length} players beat the cheaper price.` : "Nobody beats the cheaper price right now."}`}
       />
       <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=ftd&v=log" unit="on games still to play" />
       {edges.length > 0 && (
@@ -639,7 +667,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>Every game</h3>
-          <p className={s.p}>Open a game for every player: our chance against what one Kalshi contract costs with its fee.</p>
+          <p className={s.p}>Open a game for every player: our chance against Kalshi&apos;s cost (fee in) and DraftKings&apos; price, which is read the morning of game day. A value beats the cheaper of the two.</p>
         </div>
         <GameTable head={["Scores first", "Likeliest", "Values", "First TD"]} rows={rows} />
       </div>
