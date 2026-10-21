@@ -77,7 +77,7 @@ export async function PoolCard() {
             <div className={`${s.tileV} ${s.num}`}>{v.tiebreaker.total}</div>
             <div
               className={s.tileK}
-            >{`Tiebreaker: total points, ${v.tiebreaker.game} (the market total)`}</div>
+            >{`Tiebreaker: total points, ${v.tiebreaker.game} (${tiebreakBasis(v.tiebreaker)})`}</div>
           </div>
         )}
       </div>
@@ -163,4 +163,12 @@ export async function PoolCard() {
       </p>
     </section>
   );
+}
+
+function tiebreakBasis(t: NonNullable<PoolView["tiebreaker"]>): string {
+  const mkt = t.market !== undefined ? `, market ${t.market}` : "";
+  if (t.basis === "models") return `models' average: Sam ${t.sam}, David ${t.david}${mkt}`;
+  if (t.basis === "sam") return `Sam's total, David has none yet${mkt}`;
+  if (t.basis === "david") return `David's total, Sam has none yet${mkt}`;
+  return "the market total, no model totals yet";
 }

@@ -399,7 +399,7 @@ export function TotalsResearch({ r }: { r: PicksReport }) {
       <h3 className={s.h3}>Tiebreak check: closest total</h3>
       <p className={s.p}>
         {bt.miss?.games
-          ? `Average points missed on the same ${bt.miss.games} graded games. The pool tiebreak uses the market total; switch only if the models' average is clearly closer over 50+ games. Models' average closer in ${bt.miss.averageCloser}, market closer in ${bt.miss.marketCloser}.`
+          ? `Average points missed on the same ${bt.miss.games} graded games. The pool tiebreak uses the models' average (Jack, 2026-10-17); this shows whether that keeps holding up against the market. Models' average closer in ${bt.miss.averageCloser}, market closer in ${bt.miss.marketCloser}.`
           : "No graded games yet."}
       </p>
       {bt.miss && bt.miss.games > 0 && (

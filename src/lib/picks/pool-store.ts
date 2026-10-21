@@ -4,7 +4,8 @@ import { cachedWithFallback } from "@/lib/redis/cached";
 import { getSeasonGames } from "@/lib/survivor/odds";
 import { getLegPicks } from "@/lib/survivor/sleeper-pool";
 import { SEASON } from "@/lib/survivor/report";
-import { entryRecords, estimatedPublicHome, gradeTeams, optimizeStandings, type EntryWeek, type LiveGame, type Rival, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
+import { getPicksCore } from "./report";
+import { tiebreakTotal, entryRecords, estimatedPublicHome, gradeTeams, optimizeStandings, type EntryWeek, type LiveGame, type Rival, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
 
 // Jack's Sleeper "Weekly payout" pick'em: straight up, no spread, no
 // confidence points, a winner each week (ties go to a tiebreaker). Its
@@ -15,7 +16,8 @@ import { entryRecords, estimatedPublicHome, gradeTeams, optimizeStandings, type 
 //   win odds: the market's no-vig moneyline (ESPN), games not yet started;
 //   field: the pool's real pick shares when Sleeper lets us read them,
 //   otherwise an estimate (people back favorites harder than the odds);
-//   tiebreaker: the market total of the week's last game.
+//   tiebreaker: the average of Sam's and David's totals for the week's last
+//   game (Jack, 2026-10-17), the market total beside it.
 
 export const POOL = { leagueId: "1407350265954263040", name: "Weekly payout" } as const;
 const BASE = "https://api.sleeper.app/v1/league";
@@ -29,7 +31,7 @@ export interface PoolView {
   fieldNote: string;
   games: (PoolGame & { pick: "home" | "away" })[];
   result: PoolResult;
-  tiebreaker: { game: string; total: number } | null;
+  tiebreaker: ({ game: string } & NonNullable<ReturnType<typeof tiebreakTotal>>) | null;
   started: number;
   /** Mid-week: the entry was solved from the real scores and picks so far. */
   standings?: { mine: number; leader: number; rivals: number };
@@ -128,6 +130,9 @@ export async function buildPoolView(): Promise<PoolView | null> {
   const at = new Date().toISOString();
   await saveEntry(week, entryRecords(games, result.picks, at, canon));
   const last = slate.slice().sort((a, b) => b.kickoff.localeCompare(a.kickoff))[0];
+  const core = last ? await getPicksCore("nfl").catch(() => null) : null;
+  const row = core?.value?.rows.find((r) => canon(r.home) === canon(last.home) && canon(r.away) === canon(last.away));
+  const tb = last ? tiebreakTotal(row ? { sam: row.samTotal, david: row.davidTotal } : null, last.overUnder ?? null) : null;
   return {
     week,
     name: POOL.name,
@@ -139,7 +144,7 @@ export async function buildPoolView(): Promise<PoolView | null> {
       : `this week's picks aren't visible yet; estimated from this pool's habit of backing favorites (lean ${FITTED_LEAN}, fitted on Weeks 3-4)`,
     games: games.map((g, i) => ({ ...g, pick: result.picks[i] })),
     result,
-    tiebreaker: last?.overUnder != null ? { game: `${last.away} at ${last.home}`, total: Math.round(last.overUnder) } : null,
+    tiebreaker: tb ? { game: `${last.away} at ${last.home}`, ...tb } : null,
     started: slate.length - open.length,
     ...(live ? { standings: { mine: live.myBase, leader: live.leader, rivals: live.rivals.length } } : {}),
     at,
@@ -149,7 +154,7 @@ export async function buildPoolView(): Promise<PoolView | null> {
 /** Fifteen minutes fresh; the simulation takes a second or two. */
 export function getPoolView() {
   return cachedWithFallback<PoolView | null>({
-    key: `picks:v2:pool:${POOL.leagueId}`,
+    key: `picks:v3:pool:${POOL.leagueId}`,
     ttlSeconds: 15 * 60,
     fetcher: buildPoolView,
     isComplete: (v) => !!v && v.games.length > 0,
@@ -164,7 +169,7 @@ export function getPoolView() {
  */
 export function getPoolShares(week: number) {
   return cachedWithFallback<{ entries: number; shares: Record<string, number> } | null>({
-    key: `picks:v2:pool:${POOL.leagueId}:shares:w${week}`,
+    key: `picks:v3:pool:${POOL.leagueId}:shares:w${week}`,
     ttlSeconds: 15 * 60,
     fetcher: async () => {
       const f = await fieldPicks(week);
@@ -179,7 +184,7 @@ export function getPoolShares(week: number) {
  * The entry's pick per game, saved on every refresh until kickoff, so a
  * finished game can be graded on what the entry said. Kept for a season.
  */
-const ENTRY_KEY = (week: number) => `picks:v2:pool:${POOL.leagueId}:entry:w${week}`;
+const ENTRY_KEY = (week: number) => `picks:v3:pool:${POOL.leagueId}:entry:w${week}`;
 
 async function saveEntry(week: number, picks: Record<string, EntryPick>): Promise<void> {
   if (!Object.keys(picks).length) return;
@@ -277,7 +282,7 @@ async function buildPoolTrack(): Promise<PoolTrack> {
  */
 export function getPoolTrack() {
   return cachedWithFallback<PoolTrack | null>({
-    key: `picks:v2:pool:${POOL.leagueId}:track`,
+    key: `picks:v3:pool:${POOL.leagueId}:track`,
     ttlSeconds: 15 * 60,
     fetcher: buildPoolTrack,
     isComplete: (v) => !!v,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryRecords, estimatedPublicHome, gradeTeams,
+import { entryRecords, estimatedPublicHome, gradeTeams, tiebreakTotal,
   optimizeStandings, optimizePool, type PoolGame } from "./pool";
 
 const game = (i: number, pHome: number, publicHome = estimatedPublicHome(pHome)): PoolGame => ({ key: `g${i}`, home: `H${i}`, away: `A${i}`, pHome, publicHome });
@@ -117,5 +117,18 @@ describe("optimizeStandings", () => {
     const r = optimizeStandings(games, 5, [{ base: 5, picks: ["home", "home"] }], { trials: 4000 });
     expect(r.picks[0]).toBe("away");
     expect(r.upsets.map((u) => u.key)).not.toContain("BUF@LAR");
+  });
+});
+
+describe("tiebreakTotal", () => {
+  it("averages Sam and David and keeps the market beside it", () => {
+    // Week 7 Monday night, DAL at PHI: Sam 48.3, David 45, market 44.5.
+    expect(tiebreakTotal({ sam: 48.3, david: 45 }, 44.5)).toEqual({ total: 47, basis: "models", sam: 48.3, david: 45, market: 44.5 });
+  });
+  it("falls back to one model, then the market", () => {
+    expect(tiebreakTotal({ sam: 50 }, 44.5)?.basis).toBe("sam");
+    expect(tiebreakTotal({ david: 41.6 }, null)).toEqual({ total: 42, basis: "david", david: 41.6, market: undefined });
+    expect(tiebreakTotal(null, 44.5)).toEqual({ total: 45, basis: "market", market: 44.5 });
+    expect(tiebreakTotal(null, null)).toBeNull();
   });
 });

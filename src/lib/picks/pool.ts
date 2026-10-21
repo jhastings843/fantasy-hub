@@ -326,3 +326,22 @@ export function gradeTeams(
     })
     .filter((x) => x.graded > 0);
 }
+
+/**
+ * The pool tiebreaker: the average of Sam's and David's projected totals for
+ * the week's last game, rounded (Jack's rule, 2026-10-17, same as /pickem).
+ * Falls back to one model, then the market, and says which it used.
+ */
+export function tiebreakTotal(
+  models: { sam?: number; david?: number } | null,
+  market: number | null,
+): { total: number; basis: "models" | "sam" | "david" | "market"; sam?: number; david?: number; market?: number } | null {
+  const sam = models?.sam;
+  const david = models?.david;
+  const mkt = market ?? undefined;
+  if (sam !== undefined && david !== undefined) return { total: Math.round((sam + david) / 2), basis: "models", sam, david, market: mkt };
+  if (sam !== undefined) return { total: Math.round(sam), basis: "sam", sam, market: mkt };
+  if (david !== undefined) return { total: Math.round(david), basis: "david", david, market: mkt };
+  if (mkt !== undefined) return { total: Math.round(mkt), basis: "market", market: mkt };
+  return null;
+}
