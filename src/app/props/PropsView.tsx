@@ -7,6 +7,7 @@ import {
   PropsResults,
   PropsWeek,
 } from "./playerprops";
+import { OurNbaResults, OurNbaWeek } from "./ournba";
 import WeekSearch from "../picks/WeekSearch";
 import { getPropsView } from "@/lib/props/store";
 import { getFirstTdView } from "@/lib/firsttd/store";
@@ -128,10 +129,16 @@ export default async function PropsView({
           <FirstTdResearch season={season} />
         )}
         {market === "nba" && view === "week" && (
-          <NbaPropsWeek season={season} />
+          <>
+            <OurNbaWeek season={season} />
+            <NbaPropsWeek season={season} />
+          </>
         )}
         {market === "nba" && view === "results" && (
-          <PropsResults season={season} league="nba" />
+          <>
+            <OurNbaResults season={season} />
+            <PropsResults season={season} league="nba" />
+          </>
         )}
         {market === "nba" && view === "research" && (
           <PropsResearch season={season} league="nba" />
@@ -145,7 +152,8 @@ export default async function PropsView({
             </a>{" "}
             (NFL and NBA props pages, first TD pages), Rotowire projections via
             Sleeper, ESPN projections and DraftKings lines via ESPN, Kalshi
-            first TD prices, ESPN box scores and scoring plays. Model output and
+            first TD prices, ESPN box scores and scoring plays. Our own models:
+            ESPN box scores and play-by-play, DraftKings lines via ESPN. Model output and
             a record of it, not betting advice.
           </span>
         </footer>

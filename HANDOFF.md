@@ -306,3 +306,8 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Stored: `ForecastSnapshot.splits` (NFL + CFB, every data run; fingerprint buckets splits to 5 pts) and `NbaSnap.splits` (NBA pregame copies). Data run summary line now says "N/M with splits". Live check 10-21: NFL 14/14, CFB 30/30 of games with splits (23 small games had none yet), NBA 11/11.
 - Learning: `laterHypotheses` adds report-only `{nfl,cfb}:mkt:{rlm-against,public-ours,sharp-against}` (kind "market"): the rule bet vs the same bet skipped when the signal fires, at the last pregame snapshot. Registers at the Tue Oct 27 review, so samples start then. /learning has a "Public betting and line moves (report only)" group. NBA has no market hypotheses yet (its line moves are mostly injury news); add them to the NBA review once a few weeks of splits exist.
 - To make one live later: flip `actionable` to true and add a veto path like sources (decideSource). Jack decides; not automatic.
+
+## Own prop models, Phase 1: NBA props v1 (2026-10-21)
+- "Our model" section on the NBA props tab (board and results) from `/api/props/nba/ours` (added to nba-props.yml). Model: `src/lib/models/nba/`; constants in `params.json`, fit by `scripts/fit-nba-props.mts` (results and every constant in the spec doc). Learning section `nba-props-ours`.
+- Data: `scripts/nba-history.mts 2024 2025 2026` caches ESPN games to `.cache/nba` (gitignored); `scripts/seed-nba-models.mts 2026` seeds Redis (prior season summary plus this season's finals). The live run ingests new finals itself.
+- Known weakness: early season role changes (e.g. a starter now coming off the bench) make big fake edges; the board says so. Fit a market blend once archived lines have 2+ weeks graded.

@@ -1,0 +1,23 @@
+{
+  "halfLife": 3,
+  "kMin": 2,
+  "minScale": 0.93,
+  "k": {
+    "pts": 100,
+    "reb": 400,
+    "ast": 100,
+    "threes": 400
+  },
+  "kPrior": 100,
+  "kPace": 5,
+  "blowout": 0.005,
+  "normalize": "share",
+  "pace": true,
+  "phiPts": 3.5,
+  "nb": {
+    "reb": 20,
+    "ast": 20,
+    "threes": 12
+  },
+  "calib": 0.95
+}

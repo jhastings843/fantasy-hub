@@ -166,3 +166,31 @@ this project).
 - First run from this Mac on 2026-10-21 11:50 ET: 13 NBA games (52 to 141 markets each, all priced), 14 NFL games (lines only, 0 priced; ESPN still has no NFL prices).
 - `/api/lines` runs on the NBA props workflow (6 daily slots) and the first TD workflow (NFL slots).
 - Sam's members pages (title "... members") are now reported as `paywalled` by the NBA props, NFL props and first TD captures instead of "no ESPN game for this page" or "page did not read".
+
+### Phase 1: NBA player props v1 (2026-10-21)
+Code: `src/lib/models/nba/{box,history,props,market,store}.ts`, `src/lib/models/learn.ts`, route `/api/props/nba/ours` (on nba-props.yml), page section "Our model" on the NBA tab (`src/app/props/ournba.tsx`). History: `scripts/nba-history.mts` cached 1,234 games of 2024-25 and 1,235 of 2025-26 from ESPN summaries (0 unreadable); `scripts/seed-nba-models.mts` loaded the 2025-26 summary as this season's prior. Redis: `models:v1:nba:{season}:*` and `props:v1:ours:nba:{season}:w{week}`; learning section `nba-props-ours` with PROPS_GATE.
+
+Walk-forward fit (`scripts/fit-nba-props.mts`): 2025-26, each game projected from games before its tip plus 2024-25 as the prior. Constants fit on games before 2026-01-15 (596 games, 7,582 judged player-games), tested on the rest (639 games, 7,881). Judged: players averaging 20+ minutes coming in. Who played stands in for the pregame injury report.
+
+| Constant | Fitted value | How |
+|---|---|---|
+| Minutes half-life | 3 games | grid {2,3,5,8,12,20}, minutes MSE |
+| kMin (prior pseudo-games) | 2 | grid {0,1,2,4,8,16} |
+| Blowout cut (starter minutes per point of spread) | 0.005 | grid 0 to 0.015 |
+| Absent minutes | "share" (to all teammates in proportion) | none 5.725, share 5.648, sharePos 5.862 train RMSE; "scale to 240" scored 5.483 but was excluded because the backtest tells it how many players appeared |
+| Minutes scale | 0.93 | grid 0.90 to 1.05 (a player's average only counts nights he played) |
+| k (rate shrink, pseudo-minutes) | pts 100, reb 400, ast 100, threes 400 | grid {0..3200} per stat |
+| kPrior (last season toward position rate) | 100 minutes | grid {0..800} |
+| Pace | on, kPace 5 games | on/off and {0..80}, summed relative MSE |
+| Points dispersion phi (var = phi x mean) | 3.5 | max likelihood |
+| NB size r | reb 20, ast 20, threes 12 | max likelihood |
+| Calibration slope | 0.95 | log loss at the naive line |
+
+Test results (second half of 2025-26):
+- MAE ours vs season average so far: points 5.23 vs 5.44, rebounds 2.01 vs 2.04, assists 1.58 vs 1.62, threes 1.04 vs 1.04. Minutes MAE 4.55.
+- Brier at a naive line (the player's average, to the half point): points 0.2376, rebounds 0.2414, assists 0.2404, threes 0.2179, vs 0.2500 for a coin flip.
+- Calibration of P(over), predicted vs happened: 0.087/0.103 (n 844), 0.265/0.288, 0.357/0.365, 0.450/0.442, 0.544/0.521, 0.641/0.613, 0.740/0.732, 0.833/0.754 (n 118). Good through 0.8, overconfident above.
+- Bias by tier (minutes, points): 20-28 min +0.61, -0.15; 28-33 min -0.06, -0.31; 33+ min +0.07, +0.53.
+- Against Sam's three graded 10-20 games (`scripts/compare-sam-nba.mts`, small sample): MAE ours / Sam / market line: points 5.43 / 5.58 / 5.32, rebounds 2.03 / 2.01 / 1.82, assists 1.88 / 1.94 / 1.91, threes 1.35 / 1.40 / 1.44.
+
+Honest read: better than averages and calibrated, roughly level with Sam, not better than the market line yet. The first live board (10-21) flagged about 70% of props as edges, mostly players whose role changed over the summer (last season's minutes can't know). Next fit once 2+ weeks of archived lines are graded: blend our chance with DK's no-vig chance (weight fit walk-forward) and fit a minimum edge.

@@ -29,7 +29,7 @@ on:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Save pregame NBA props pages and grade finished games
         env:
@@ -48,4 +48,8 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/lines")
           echo "lines HTTP $lstatus"
           jq -r '.report | "line archive: saved \(.saved | length), closed \(.closed | length), Kalshi games nfl \(.kalshi.nfl) nba \(.kalshi.nba)", (.problems[]? | "problem: \(.)")' lines.json | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$status" = "200" ] && [ "$pkstatus" = "200" ] && [ "$lstatus" = "200" ]
+          ostatus=$(curl -sS -o ours.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nba/ours")
+          echo "our model HTTP $ostatus"
+          jq -r '.report | "our NBA model: ingested \(.ingested | length), saved \(.saved | length), graded \(.graded | length)", (.learning[]? | "learning: \(.)"), (.problems[]? | "problem: \(.)")' ours.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ] && [ "$pkstatus" = "200" ] && [ "$lstatus" = "200" ] && [ "$ostatus" = "200" ]
