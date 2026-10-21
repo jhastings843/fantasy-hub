@@ -3,6 +3,8 @@ import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
 import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
 import { LineChart } from "./Chart";
+import { Background } from "../picks/board";
+import { DeskHero, DeskTable, MoneyHero, MoneyLogSection, WeatherBrake, booksTotals, desks, moneyLog } from "./desks";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 
@@ -950,8 +952,6 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const wx = v.snapshot?.weather;
   const books = v.snapshot?.books ?? [];
   const bookStart = books.reduce((a, b) => a + b.start, 0);
-  const bookNow = books.reduce((a, b) => a + b.equity, 0);
-  const spyNow = books.reduce((a, b) => a + (b.spyEquity ?? b.start), 0);
   // All the books on one line: summed by day.
   const days = [...new Set(books.flatMap((b) => b.curve.map((c) => c.day)))].sort();
   const combined = days.map((d) => ({
@@ -962,36 +962,19 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
     x: t(d),
     y: books.reduce((a, b) => a + ([...b.curve].reverse().find((c) => c.day <= d && c.spy !== null)?.spy ?? b.start), 0),
   }));
+  const list = desks(v);
   return (
     <section className={s.section}>
-      <div className={s.tiles}>
-        {SHOW_BETS && (
-          <div className={`${s.tile} ${v.summary.net > 0 ? s.good : v.summary.net < 0 ? s.bad : ""}`}>
-            <span className={s.tileV}>{units(v.summary.net)}</span>
-            <span className={s.tileK}>{`my bets, ${v.summary.wins}-${v.summary.losses}`}</span>
-          </div>
-        )}
-        <div className={`${s.tile} ${p && p.equity > p.bankroll ? s.good : p && p.equity < p.bankroll ? s.bad : ""}`}>
-          <span className={s.tileV}>{p && !p.error ? usd(p.equity - p.bankroll, true) : "n/a"}</span>
-          <span className={s.tileK}>Phil, paper</span>
+      <MoneyHero list={list} />
+      <div className={s.section}>
+        <div className={s.sectionHead}>
+          <h3 className={s.h2}>Each desk vs its yardstick</h3>
+          <p className={s.p}>Blue bar: the desk. Grey bar: what it has to beat. For Brier scores the shorter bar wins.</p>
         </div>
-        {kp && !kp.error && (
-          <div className={`${s.tile} ${kp.equity > kp.bankroll ? s.good : kp.equity < kp.bankroll ? s.bad : ""}`}>
-            <span className={s.tileV}>{usd(kp.equity - kp.bankroll, true)}</span>
-            <span className={s.tileK}>Kalshi Phil, paper</span>
-          </div>
-        )}
-        {wx && (
-          <div className={`${s.tile} ${wx.equity > wx.start ? s.good : wx.equity < wx.start ? s.bad : ""}`}>
-            <span className={s.tileV}>{usd(wx.equity - wx.start, true)}</span>
-            <span className={s.tileK}>Weather desk, paper</span>
-          </div>
-        )}
-        <div className={`${s.tile} ${bookNow > bookStart ? s.good : bookNow < bookStart ? s.bad : ""}`}>
-          <span className={s.tileV}>{books.length ? pct(bookNow / bookStart - 1) : "n/a"}</span>
-          <span className={s.tileK}>{books.length ? `stock books, all ${books.length} · SPY ${pct(spyNow / bookStart - 1)} same days` : "stock books"}</span>
-        </div>
+        <DeskTable list={list} />
       </div>
+      <MoneyLogSection entries={moneyLog(v)} />
+      <Background title="Every desk's chart">
       <div className={m.panels}>
         {SHOW_BETS && (
           <div className={m.panel}>
@@ -1037,7 +1020,61 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           </div>
         )}
       </div>
+      </Background>
     </section>
+  );
+}
+
+/* ------------------------------------------------------- desk heads ---- */
+
+function PhilHero({ p, who, venue }: { p: Phil; who: string; venue: string }) {
+  const brier = p.brierPhil !== null && p.brierMarket !== null;
+  return (
+    <DeskHero
+      eyebrow={`${who} · a Claude agent paper-trading ${venue}`}
+      title={
+        p.settled ? (
+          <>
+            {`${who}: `}
+            <span className={p.equity >= p.bankroll ? s.up : s.down}>{usd(p.equity - p.bankroll, true)}</span>
+            {` on ${p.wins}-${p.settled - p.wins}`}
+          </>
+        ) : (
+          `${who}: no bets settled yet`
+        )
+      }
+      sub={
+        brier
+          ? `Brier ${p.brierPhil!.toFixed(3)} against the market's ${p.brierMarket!.toFixed(3)} on the same bets (lower wins).${p.settled < 30 ? ` ${p.settled} settled is too few to call.` : p.brierPhil! < p.brierMarket! ? " Its probabilities are beating the prices it paid." : " The prices it paid were better than its probabilities."}`
+          : `${p.open.length} open, ${usd(p.cash)} cash. It is scored once bets settle.`
+      }
+    />
+  );
+}
+
+function WeatherHero({ w }: { w: Weather }) {
+  const stop = w.brake?.level === "stop";
+  const slow = w.brake?.level === "slow";
+  return (
+    <>
+      <DeskHero
+        eyebrow="Weather desk · daily highs on Kalshi · paper"
+        title={stop ? <>Brake on: <span className={s.down}>no new bets</span></> : slow ? "Brake on: quarter stakes" : <>{"Weather desk: "}<span className={w.equity >= w.start ? s.up : s.down}>{usd(w.equity - w.start, true)}</span></>}
+        sub={stop || slow ? "The market out-forecast the desk last week, so it keeps forecasting and scoring but bets small or not at all until its week beats the market's." : `${w.record.won}-${w.record.settled - w.record.won} settled, trusting its own forecast ${Math.round(w.trust.w * 100)}% and the market the rest.`}
+      />
+      <WeatherBrake w={w} />
+    </>
+  );
+}
+
+function BooksHero({ books }: { books: Book[] }) {
+  const b = booksTotals(books);
+  return (
+    <DeskHero
+      eyebrow="Stock books · paper, against SPY"
+      title={`${b.ahead} of ${b.live} books ahead of SPY`}
+      sub={`All books ${pct(b.now / b.start - 1)}, SPY ${pct(b.spy / b.start - 1)} over the same days.`}
+    />
   );
 }
 
@@ -1058,17 +1095,16 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
       <div className={s.wrap}>
         <header className={s.header}>
           <div className={s.headRow}>
-            <span className={s.eyebrow}>Paper and units, no real balances</span>
+            <h1 className={s.eyebrow} style={{ margin: 0 }}>Money · paper and units, no real balances</h1>
             {snap && (
               <span className={`${s.eyebrow} ${age !== null && age > 3 ? m.stale : ""}`}>
-                {`Phil, Kalshi Phil and books updated ${when(snap.generatedAt)}`}
+                {`Desks updated ${when(snap.generatedAt)}`}
               </span>
             )}
           </div>
-          <h1 className={s.h1}>Money</h1>
-          <nav className={s.tabs} aria-label="Money">
+          <nav className={s.chips} aria-label="Desk">
             {TABS.map((x) => (
-              <Link key={x.id} href={href(x.id)} aria-current={x.id === tab ? "page" : undefined} className={s.tab}>
+              <Link key={x.id} href={href(x.id)} aria-current={x.id === tab ? "page" : undefined} className={s.chip}>
                 {x.label}
               </Link>
             ))}
@@ -1083,9 +1119,11 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
 
         {v && tab === "overview" && <Overview v={v} />}
         {SHOW_BETS && v && tab === "bets" && <BetsTab v={v} />}
+        {v && tab === "phil" && snap?.phil && !snap.phil.error && <PhilHero p={snap.phil} who="Phil" venue="Polymarket" />}
         {v && tab === "phil" && snap?.phil && (snap.phil.error ? <p className={s.error}>{snap.phil.error}</p> : <PhilTab p={snap.phil} />)}
         {v && tab === "kalshi" && snap && (
           <>
+            {snap.kalshiPhil && !snap.kalshiPhil.error && <PhilHero p={snap.kalshiPhil} who="Kalshi Phil" venue="Kalshi" />}
             <div className={m.venueHead}>
               <h2 className={s.h2}>Kalshi Phil</h2>
               <span className={m.foldMeta}>Its own agent and paper book on Kalshi</span>
@@ -1102,7 +1140,9 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
               : <p className={s.calm}>The shadow check has not reported yet. It posts with Phil after his next cycle.</p>}
           </>
         )}
+        {v && tab === "weather" && snap?.weather && <WeatherHero w={snap.weather} />}
         {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The weather desk hasn&apos;t posted yet.</p>)}
+        {v && tab === "books" && snap && snap.books.length > 0 && <BooksHero books={snap.books} />}
         {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} />}
 
         <footer className={s.footer}>

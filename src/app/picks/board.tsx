@@ -168,12 +168,12 @@ export function GoLiveSteps({ games }: { games: string }) {
 
 export interface LogEntry {
   at: string;
-  kind: "live" | "new" | "back" | "test";
+  kind: "live" | "new" | "back" | "test" | "brake";
   title: string;
   detail?: string;
 }
 
-const KIND: { [k in LogEntry["kind"]]: [string, string] } = { live: ["Live", s.kLive], new: ["New", s.kNew], back: ["Rolled back", s.kBack], test: ["Testing", ""] };
+const KIND: { [k in LogEntry["kind"]]: [string, string] } = { live: ["Live", s.kLive], new: ["New", s.kNew], back: ["Rolled back", s.kBack], test: ["Testing", ""], brake: ["Brake on", s.kBack] };
 
 export function LearnerLog({ entries, empty }: { entries: LogEntry[]; empty: string }) {
   if (!entries.length) return <p className={s.calm}>{empty}</p>;
