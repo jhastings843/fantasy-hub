@@ -156,9 +156,15 @@ export class Ratings {
 export function rateAll(games: SpreadGame[], p: RatingParams): Rated[] {
   const r = new Ratings(p);
   const out: Rated[] = [];
-  for (const g of [...games].sort((a, b) => a.gameday.localeCompare(b.gameday) || a.id.localeCompare(b.id))) {
-    if (g.line !== null && g.homeScore !== null) out.push({ game: g, x: r.features(g, g.line) });
-    r.add(g);
+  const sorted = [...games].sort((a, b) => a.gameday.localeCompare(b.gameday) || a.id.localeCompare(b.id));
+  // A whole day's features before any of that day's results, so an early kickoff never informs a later one.
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j < sorted.length && sorted[j].gameday === sorted[i].gameday) j++;
+    const day = sorted.slice(i, j);
+    for (const g of day) if (g.line !== null && g.homeScore !== null) out.push({ game: g, x: r.features(g, g.line) });
+    for (const g of day) r.add(g);
+    i = j;
   }
   return out;
 }

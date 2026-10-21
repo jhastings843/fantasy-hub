@@ -75,8 +75,8 @@ export function trackedGames(snaps: ForecastSnapshot[], closes: ClosingLine[]): 
   const first = new Map<string, ForecastSnapshot>();
   const last = new Map<string, ForecastSnapshot>();
   for (const s of [...snaps].sort((a, b) => a.at.localeCompare(b.at))) {
-    if (!s.ref) continue;
-    if (s.ref.kickoff && s.at >= s.ref.kickoff) continue;
+    // Only a snapshot known to be before kickoff counts; no kickoff on file, no price.
+    if (!s.ref?.kickoff || s.at >= s.ref.kickoff) continue;
     last.set(gk(s), s);
     if (s.ours && !first.has(gk(s))) first.set(gk(s), s);
   }

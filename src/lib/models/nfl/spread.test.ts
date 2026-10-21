@@ -24,6 +24,12 @@ const game = (o: Partial<SpreadGame>): SpreadGame => ({
 });
 
 describe("ratings", () => {
+  it("same-day games don't see each other's results", () => {
+    const a = game({ id: "a", home: "KC", away: "BUF", homeScore: 50, awayScore: 0 });
+    const b = game({ id: "b", home: "KC", away: "DEN" });
+    const both = rateAll([a, b], RP);
+    expect(both.find((x) => x.game.id === "b")!.x).toEqual(rateAll([b], RP)[0].x);
+  });
   it("a game's features never see its own result", () => {
     const a = rateAll([game({ homeScore: 40, awayScore: 0 })], RP)[0].x;
     const b = rateAll([game({ homeScore: 0, awayScore: 40 })], RP)[0].x;
@@ -88,7 +94,9 @@ describe("forward test", () => {
     expect(lean.verdict).toBe("collecting");
   });
 
-  it("ignores snapshots after kickoff", () => {
+  it("ignores snapshots after kickoff or with no kickoff", () => {
     expect(trackedGames([snap("2026-10-25T18:00:00Z", -3, -3.5)], [])).toHaveLength(0);
+    const s = snap("2026-10-20T12:00:00Z", -3, -3.5);
+    expect(trackedGames([{ ...s, ref: { ...s.ref!, kickoff: undefined } }], [])).toHaveLength(0);
   });
 });
