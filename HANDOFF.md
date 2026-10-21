@@ -1,5 +1,15 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## Guillotine learning: the room's record feeds the bid card (2026-10-21)
+- Jack: "add a learning system for the guillotine league based on our strategy, leaguemates' moves, team needs, market data." Before this the FAAB tool stored nothing about its own decisions; everything was recomputed live.
+- Sleeper keeps every waiver bid, losing ones included (`/league/{id}/transactions/{leg}`, status failed + complete), every chop (`type: chopped`) and per-player points (`matchups.players_points`). So auctions, rival habits, our bid results and chop outcomes are re-read, never stored. Leg semantics: waivers processed during week W+1 are leg W; a card built for report week W resolves in leg W-1; players first play for the buyer in leg+1.
+- `src/lib/guillotine/learn.ts` (pure, tested): `auctionsFrom` (a losing bid above the price is dropped: Sleeper rejected it for money/room), `rivalProfiles` (head-to-head aggression = shrunk geo mean of bid / auction median, prior 4 bids), `typicalTop`, `roomFactor` (clamp 0.85-1.25), `gradeOurBids` / `summarizeOurBids` (contested overpay vs unopposed extra, near misses, started points per $), `gradeChopCalls`, `gradeShadows` (4 report-only bid rules replayed against real bids, 3-week horizon).
+- `learn-build.ts` (IO): `saveWeek` writes `guillotine:v1:learn:{league}:{season}:card:w{W}` (card + chop odds, no TTL) on every report build until leg W-1 has a completed waiver; `roomProfiles` and `buildLearning` assemble `report.learning` (also in `/api/faab` as `learning`).
+- Live effect on bids: recommend.ts multiplies demand pressure by `roomFactor(contested rivals' aggression / typicalTop)`; it only raises takesToWin, so the bid still never passes worth or the hold-rule ceiling. Reasons name the rival when one moved the price.
+- Strategy constants (EDGE, URGENCY, hold curve) do NOT change on their own: one league, ~10 weeks left, too few samples. Shadow rules and chop calibration are report-only; the first saved card is next Tuesday (Week 8), first graded shadow week after Week 8 waivers + games.
+- First read (Week 7): 219 bids over 6 runs; we won 14/39, $26 contested overpay on 4 wins, $117 above $1 on 10 unopposed wins; typical toughest bidder 1.29x; no live rival currently past it, joechabala10/burnerr28/Youre Chopped soft.
+- Page: FAAB page section "What the room has taught us" (Learning.tsx) under the season plan.
+
 ## NBA runs daily, not weekly (2026-10-20)
 - Jack: NBA games are most days with no weekly reset; make the UI and systems account for it. Also: live/final NBA cards said "not posted".
 - ESPN's scoreboard drops odds once a game tips. nba-store fills live/final games from the game summary's pickcenter (parseNbaSummaryOdds), and NbaView's asSaved() prefers the copy saved before tip (the graded numbers) and rebuilds Sam's read from it, since Sam drops tipped games from his page. Final cards show "Sam: Spread won · Total lost".
@@ -42,6 +52,7 @@
 
 ## NBA first basket: waiting on Sam (2026-10-20)
 - Jack wants a First Basket section under NBA props, like First TD. Sam's NBA board shows "FIRST BASKET — LOCKED" (span.bdbtn.lk, no href) on every game; /nba/firstbasket/, /nba/fb/, /nba/first/ all 404. Jack: don't build until the page is live. Then: parse from the real markup, save pregame copies (pages likely vanish like NFL firsttd), grade from ESPN play-by-play.
+- 2026-10-21 9am: still locked on all 11 games, all four guessed paths (incl. /first-basket/) 404. Jack chose a daily check: scripts/check-first-basket.mjs runs 8:30am via ~/Library/LaunchAgents/com.jackh.first-basket-check.plist, logs to ~/Library/Logs/first-basket-check.log, and posts a Mac notification once when a button gets an href or a path stops 404ing (then writes ~/Library/Logs/first-basket-open.flag and goes quiet). When it fires: build per the plan above, then `launchctl bootout gui/$(id -u)/com.jackh.first-basket-check` and delete the plist.
 
 ## Picks learning: generated cuts act on their own (2026-10-20, 22c398f)
 - Jack: "allow it to implement things on its own so long as it is best." Neighbour cuts the Tuesday review generates (`propose`, e.g. `cfb:ats:both-edge-3~minBothEdge2`) are now `actionable: true` and pass through the same frozen CRITERIA as built-in research cuts (30+ matched games, 3+ weeks, t >= 1.645, CLV and drawdown checks, auto rollback). `engine.derivedCut` rebuilds them from their id (`<research cut>~<minLine|maxLine|minBothEdge|minAvgEdge><value>`, chains allowed), so activation needs no code change. Generated cuts already collecting are flipped at the next review (journal "can now go live on its own"). Unchanged: limits, parlays, grading, CRITERIA, and the other report-only questions (timing, SU method, PEM, Harris tracker). NBA has no proposal step.
@@ -266,3 +277,7 @@ Latest session: an audit-driven pass on Picks in three stages (branch `picks-aud
 - 2026-10-19: Money > Weather tab (WeatherTab) + overview tile/panel for the weather desk. Uncommitted, needs deploy.
 
 - 2026-10-19: Money overview gains "Picks, all sports" and "Props" charts (lib/money/sports.ts, props/store.ts propsWeeks). Cumulative units by week; NBA joins once it keeps a record. No new tabs.
+
+## Pool tiebreaker: models' average (2026-10-20, a749980, deployed dpl_9QmGGuLorY7NMEHfqsUv3WZabVvQ)
+
+The pool page showed the market total of the week's last game; Jack's 10/17 rule (already in /pickem) is the average of Sam's and David's totals. `tiebreakTotal` in pool.ts (falls back to one model, then market), pool-store reads `getPicksCore("nfl")` rows, cache key bumped to picks:v3:pool. Jack deployed it himself after auto mode blocked the deploy.

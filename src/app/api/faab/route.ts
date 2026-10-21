@@ -166,6 +166,7 @@ export async function GET(request: Request) {
     },
 
     scoringNotes: report.league.scoringNotes,
+    learning: report.learning ?? null,
     caveats: report.caveats,
   });
 }

@@ -14,6 +14,7 @@ import { readLeagueState, seasonBids, seasonResults, writeSnapshot } from "./lea
 import { lastWeekFor } from "./results";
 import { assessFragility, submittedLineupNote, type Fragility } from "./fragility";
 import { buildMarket, type ObservedBid, type Tier } from "./market";
+import { buildLearning, roomProfiles, saveWeek, type LearnInput } from "./learn-build";
 import { getByeWeeks, getSeasonRates, getWeekProjections } from "./projections";
 import { buildBidCard, finalFourBars } from "./recommend";
 import { bestLineup, slotAccepts } from "./lineup";
@@ -392,16 +393,16 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
   const bars = finalFourBars(leaguePlayers, profile.rosterPositions);
 
   const bids = await seasonBids(leagueId, Math.max(0, week - 1));
-  const observed: ObservedBid[] = bids.map((bid) => {
-    const player = seasonRates[bid.playerId];
+  // Tiering a historical bid by the player's level is the only reading
+  // available after the fact: what he was worth to the buyer's lineup that
+  // week is not recoverable.
+  const pastTier = (playerId: string): Tier => {
+    const player = seasonRates[playerId];
     const rate = player?.points ?? 0;
     const bar = player ? (bars[player.position] ?? Infinity) : Infinity;
-    // Tiering a historical bid by the player's level is the only reading
-    // available after the fact: what he was worth to the buyer's lineup that
-    // week is not recoverable.
-    const tier: Tier = rate >= bar ? "championship" : rate >= bar * 0.6 ? "multiweek" : "bandaid";
-    return { week: bid.week, tier, amount: bid.amount };
-  });
+    return rate >= bar ? "championship" : rate >= bar * 0.6 ? "multiweek" : "bandaid";
+  };
+  const observed: ObservedBid[] = bids.map((bid) => ({ week: bid.week, tier: pastTier(bid.playerId), amount: bid.amount }));
 
   const season = seasonOutlook({
     budget: budgetTotal,
@@ -424,6 +425,31 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     .sort((a, b) => b.remaining - a.remaining);
 
   const market = buildMarket(budgetTotal, budget.phase, observed);
+
+  // --- What the room has taught us (learn.ts) ---
+  //
+  // Every bid in the league so far, losing ones included, read into a profile
+  // of how each manager bids. The card uses it to price a contested player
+  // against the rivals who actually want him.
+  const learnInput: LearnInput = {
+    leagueId,
+    season: profile.season,
+    week,
+    budget: budgetTotal,
+    myRosterId: myRoster.roster_id,
+    rosters: rosters.map((r) => ({
+      rosterId: r.roster_id,
+      name: teamName(r.roster_id),
+      alive: state.aliveRosterIds.includes(r.roster_id),
+      faabLeft: state.faabRemaining[r.roster_id] ?? 0,
+    })),
+    positionOf: (id) => seasonRates[id]?.position ?? weekProjections[id]?.position ?? null,
+    nameOf: (id) => seasonRates[id]?.name ?? weekProjections[id]?.name ?? id,
+  };
+  const room = await roomProfiles(learnInput).catch(() => null);
+  // Relative to the toughest bidder in a typical contested auction, because
+  // the market's tier prices already carry that bidder.
+  const aggression = new Map((room?.profiles ?? []).map((p) => [p.rosterId, p.aggression / (room?.typical ?? 1)]));
 
   // --- The pool ---
 
@@ -477,6 +503,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
         name: teamName(id),
         faabLeft: state.faabRemaining[id] ?? 0,
         bars: byPosition,
+        aggression: aggression.get(id) ?? 1,
       };
     });
 
@@ -533,6 +560,20 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
   // Store this week's rosters so next week can tell what was chopped.
   await writeSnapshot(leagueId, snapshotFrom(rosters, week));
 
+  // Keep the card and the chop odds as they stand before waivers run, then
+  // grade everything the record can grade.
+  await saveWeek(
+    leagueId,
+    profile.season,
+    week,
+    card,
+    myFaab,
+    posture.posture,
+    risk.teams.map((t) => ({ rosterId: t.rosterId, chopProbability: t.chopProbability })),
+    myRoster.roster_id,
+  );
+  const learning = room ? await buildLearning(learnInput, room).catch(() => undefined) : undefined;
+
   return {
     state: "ok",
     league: {
@@ -572,6 +613,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     wallets,
     market,
     card,
+    learning,
     caveats,
   };
 }

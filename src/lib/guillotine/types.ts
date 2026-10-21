@@ -1,3 +1,4 @@
+import type { GuillotineLearning } from "./learn-build";
 // Shared shapes for the FAAB advisor.
 
 import type { Phase, BudgetPlan } from "./budget";
@@ -152,6 +153,8 @@ export interface WeeklyFaabReport {
   wallets: Wallet[];
   market: MarketModel;
   card: BidCard;
+  /** What the room's record has taught us. Absent when it could not be read. */
+  learning?: GuillotineLearning;
 
   /** Anything the report wants to caveat about its own inputs. */
   caveats: string[];

@@ -12,6 +12,7 @@
 import { bestLineup, marginalValue, startingSlots, type LineupPlayer } from "./lineup";
 import { unroundBid, TIER_MEANING, type MarketModel, type Tier } from "./market";
 import type { BudgetPlan } from "./budget";
+import { roomFactor } from "./learn";
 import type { Posture } from "./chop-line";
 import type { BidCard, BidChain, BidTarget, PoolPlayer } from "./types";
 
@@ -172,7 +173,7 @@ export interface RecommendInput {
    * card priced on the market alone rather than one priced as if nobody else
    * wanted anybody.
    */
-  rivals?: { name: string; faabLeft: number; bars: Record<string, number> }[];
+  rivals?: { name: string; faabLeft: number; bars: Record<string, number>; aggression?: number }[];
 }
 
 const asLineup = (p: PoolPlayer, useRos = false): LineupPlayer => ({
@@ -214,6 +215,17 @@ export function qualityFactor(player: PoolPlayer, bars: Record<string, number>):
   const bar = bars[player.position];
   if (!bar || !Number.isFinite(bar) || bar <= 0) return 1;
   return Math.min(1, Math.max(MIN_QUALITY, player.rosPoints / bar));
+}
+
+/** Names the rival whose bidding habit moved the price, when one did. */
+function roomNote(contested: string[], rivals: { name: string; aggression?: number }[]): string {
+  const hot = rivals
+    .filter((r) => contested.includes(r.name) && (r.aggression ?? 1) >= 1.1)
+    .sort((a, b) => (b.aggression ?? 1) - (a.aggression ?? 1))[0];
+  if (hot) return ` ${hot.name} wants him and pushes harder than the toughest bidder in a typical auction here, so the bid is up to match.`;
+  const cold = rivals.filter((r) => contested.includes(r.name));
+  if (cold.length && cold.every((r) => (r.aggression ?? 1) <= 0.9)) return " The rivals who want him bid softer than the toughest bidder in a typical auction here, so the bid is down to match.";
+  return "";
 }
 
 /** Surviving rivals who would start this player AND can afford to chase him. */
@@ -542,7 +554,11 @@ export function buildBidCard(input: RecommendInput): BidCard {
       const priced = priceTarget(tier, gain, market, budget, posture, {
         quality: qualityFactor(player, bars),
         plays,
-        demand: demandPressure(contested.length, supply, rivals.length > 0),
+        // The rivals who want him, priced by how they have actually bid this
+        // season (learn.ts), not as an average room.
+        demand:
+          demandPressure(contested.length, supply, rivals.length > 0) *
+          roomFactor(contested, new Map(rivals.map((r) => [r.name, r.aggression ?? 1]))),
       });
       const replaceable = gain <= 0 && hasFreeReplacement(player, candidates);
       const price = replaceable ? { ...priced, bid: MIN_BID, walkAway: MIN_BID } : priced;
@@ -566,6 +582,7 @@ export function buildBidCard(input: RecommendInput): BidCard {
             supply,
             rivalsKnown: rivals.length > 0,
           }) +
+          roomNote(contested, rivals) +
           (replaceable
             ? ` Depth only: another ${player.position} about as good is still free, and every chop adds more, so this is a minimum bid.`
             : ""),

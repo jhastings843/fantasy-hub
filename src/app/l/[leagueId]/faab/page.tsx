@@ -6,6 +6,7 @@ import type { Posture } from "@/lib/guillotine/chop-line";
 import type { BidChain, WeeklyFaabReport } from "@/lib/guillotine/types";
 import { RefreshButton } from "@/components/RefreshButton";
 import { ChopLine } from "./ChopLine";
+import { RoomLearning } from "./Learning";
 
 export const dynamic = "force-dynamic";
 
@@ -550,6 +551,8 @@ export default async function FaabPage({
         </Card>
 
         <SeasonPlan report={report} />
+
+        {report.learning ? <RoomLearning learning={report.learning} /> : null}
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Card>
