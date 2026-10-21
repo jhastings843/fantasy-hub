@@ -323,3 +323,11 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 ## Own prop models, Phase 4: NFL First TD (2026-10-21)
 - "Our model" section on the First TD tab from `/api/firsttd/ours` (first-td.yml): team-first from the market total and spread played drive by drive, scorer from shrunk TD shares, against Kalshi. Model `src/lib/models/nfl/firsttd.ts`, constants `ftd-params.json` from `scripts/fit-first-td.mts` (history via `scripts/nfl-ftd-history.mts`). Learning section `nfl-firsttd-ours`.
 - On Sam's 14 saved games it scored better than Sam and just behind Kalshi (see the spec doc).
+
+
+## NFL prop prices from The Odds API (2026-10-21, ce2977e, NOT deployed, no key yet)
+- ESPN sends DK's NFL prop lines with no prices (0 of 664 this week); NBA props and First Basket are fully priced by ESPN, so only NFL needs this.
+- `src/lib/models/nfl/odds-api.ts` (pure, tested) + `odds-api-store.ts`: one read per game on its Eastern date from 8am ET (markets player_pass_yds, player_rush_yds, player_reception_yds, player_receptions, player_1st_td; DK only; at most 5 credits a read), Redis `oddsapi:v1:nfl:{season}:{espnId}` (14-day TTL) and `oddsapi:v1:usage` (from x-requests-used/remaining). MONTHLY_STOP 450. Estimate ~325 credits/month.
+- Price order in ourNflMarkets: ESPN > odds-api > David > -110, only at ESPN's DK line. First TD: `OurFtdStored.dk` shown as a DK column beside Kalshi, display only (marketBets still reads Kalshi).
+- Trigger: `.github/workflows/odds-morning.yml` 13:00 UTC Thu-Mon, plus the existing Sunday 8:30am first-td slot.
+- Waiting on: a NEW Odds API key for fantasy-hub (Jack's existing key belongs to kalshi-phil, which used 12 credits by Oct 21). Then set ODDS_API_KEY in .env.local and Vercel production, deploy, and check the first game-day summary line "odds: ...".
