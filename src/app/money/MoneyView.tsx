@@ -332,7 +332,7 @@ function BookCard({ b }: { b: Book }) {
     <div className={`${m.card} ${b.retired ? m.cardRetired : ""}`}>
       <div className={m.cardHead}>
         <h3 className={m.cardTitle} title={b.about}>{b.label}</h3>
-        {b.retired ? <span className={m.tag}>retired</span> : null}
+        {b.retired ? <span className={m.tag}>retired</span> : <span className={m.cardOpen}>Open ›</span>}
       </div>
       <div className={m.cardNums}>
         <span className={`${m.cardRet} ${tone(ret)}`}>{pct(ret)}</span>
@@ -523,7 +523,13 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
         ]}
       />
       <p className={m.sub}>{`$100,000 each, traded at 6:30am on the previous close; the dashed line is the same money left in SPY.${live ? ` Charts are live at ${clockEt(live)} ET.` : ""}`}</p>
-      <div className={m.cards}>{[...active, ...books.filter((b) => b.retired)].map((b) => <BookCard key={b.id} b={b} />)}</div>
+      <div className={m.cards}>
+        {[...active, ...books.filter((b) => b.retired)].map((b) => (
+          <Link key={b.id} href={`/money/book/${encodeURIComponent(b.id)}`} target="_blank" rel="noopener" className={m.cardLink} aria-label={`${b.label}: open the full chart and strategy in a new window`}>
+            <BookCard b={b} />
+          </Link>
+        ))}
+      </div>
       <details className={`${m.panel} ${m.fold}`}>
         <summary className={m.foldHead}>
           <h2 className={m.panelTitle}>Holdings and trades</h2>

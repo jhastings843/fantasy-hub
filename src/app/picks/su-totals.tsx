@@ -72,7 +72,9 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
                   <span className={`${s.num} ${s.rank}`}>{i + 1}</span>
                   <span className={s.gGame}>
                     {name(side === "home" ? g.home : g.away)}
-                    <span>{`over ${name(side === "home" ? g.away : g.home)} · ${kickoffEt(g.ref?.kickoff)}`}</span>
+                    <span>{`over ${name(side === "home" ? g.away : g.home)} · ${kickoffEt(g.ref?.kickoff)}${
+                      g.sam && g.david && Math.sign(g.sam.model) !== Math.sign(g.david.model) ? ` · split: Sam ${name(g.sam.model < 0 ? g.home : g.away)}, David ${name(g.david.model < 0 ? g.home : g.away)}` : ""
+                    }`}</span>
                   </span>
                   <span className={`${s.readChip} ${bandCls(margin)}`}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
                 </div>

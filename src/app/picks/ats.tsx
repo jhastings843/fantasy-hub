@@ -909,6 +909,20 @@ export function AtsResearch({ r, harris }: { r: PicksReport; harris?: React.Reac
   );
 }
 
+const SU_METHOD: { [k: string]: string } = { avg: "the two models' average", sam: "Sam's line", david: "David's line", vegas: "the Vegas favorite" };
+
+/** The straight-up call in words: who, by how much, and, when Sam and David split, what broke the tie. */
+export function suWhy(g: BoardGame, name: (k: string) => string): string {
+  const su = g.su!;
+  const pick = name(su.side === "home" ? g.home : g.away);
+  const by = `by ${su.margin.toFixed(1)}`;
+  const who = (x: number) => (x < 0 ? name(g.home) : name(g.away));
+  const split = !su.agree && g.sam && g.david;
+  const tie = split ? ` Sam has ${who(g.sam!.model)} by ${Math.abs(g.sam!.model).toFixed(1)}, David has ${who(g.david!.model)} by ${Math.abs(g.david!.model).toFixed(1)}: they split, so ${SU_METHOD[su.method] ?? su.method} decides.` : "";
+  const toss = su.margin < 1 ? " A coin flip either way." : "";
+  return `${pick} to win, ${by} on ${SU_METHOD[su.method] ?? su.method}${su.upset ? " (upset call)" : ""}.${tie}${toss}`;
+}
+
 /** One game on its own page: the pick, the market against every model, why it is or isn't a bet, and everything else known about the game. */
 export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
   const name = (k: string) => r.names[k] ?? k;
@@ -992,7 +1006,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
           <dt>Total</dt>
           <dd className={s.num}>{tot?.ref ? `${tot.ref.total} now · Sam ${tot.sam?.toFixed(1) ?? "·"} · David ${tot.david?.toFixed(1) ?? "·"}${tot.side ? ` · both lean ${tot.side}` : ""}` : "no total yet"}</dd>
           <dt>Straight up</dt>
-          <dd>{g.su ? `${name(g.su.side === "home" ? g.home : g.away)} to win${g.su.upset ? " (upset call)" : ""}` : "no read"}</dd>
+          <dd>{g.su ? suWhy(g, name) : "no read"}</dd>
         </dl>
       </Background>
     </section>
