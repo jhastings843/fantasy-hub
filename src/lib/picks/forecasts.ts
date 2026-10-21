@@ -42,6 +42,9 @@ export function fingerprint(s: Omit<ForecastSnapshot, "at">): string {
     r?.line, r?.total, r?.homePrice, r?.awayPrice, r?.overPrice, r?.underPrice, r?.kickoff,
     // Splits drift by a point every few minutes; only a 5-point step is news.
     s.splits && Math.round(s.splits.homeTickets / 5), s.splits && Math.round(s.splits.homeMoney / 5),
+    // Our NFL line, to a tenth (it moves with the reference line, and when a final changes the ratings).
+    // Only present when ours is, so fingerprints saved before it existed still match for other leagues.
+    ...(s.ours ? [Math.round(s.ours.model * 10) / 10] : []),
   ]);
 }
 
