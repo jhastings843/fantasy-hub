@@ -263,7 +263,10 @@ Walk-forward fit (`scripts/fit-first-td.mts`): each team's list is its players f
 Test results (2025 weeks 10-18 / 2026 weeks 1-6):
 - Team first: log loss 0.8752 / 0.8232 vs 0.8918 / 0.8415 with teams even.
 - Scorer: log loss 2.8104 / 2.8072 vs 3.1574 / 3.1196 with every listed player even.
-- Per-player calibration 2026, predicted vs happened: 0.009/0.009 (n 546), 0.029/0.032 (465), 0.053/0.048 (419), 0.083/0.075 (187), 0.123/0.116 (129), 0.183/0.218 (55).
+- Per-player calibration 2026, predicted vs happened: 0.009/0.009 (n 547), 0.029/0.030 (465), 0.053/0.046 (416), 0.083/0.085 (188), 0.122/0.116 (129), 0.183/0.214 (56).
 - Against Sam's 14 saved 2026 first TD games (`scripts/compare-sam-ftd.mts`): log loss ours 3.020, Sam 3.111. On the 12 with a Kalshi price for the scorer: Kalshi (overround removed) 2.902, ours 2.932.
 
 First live boards (week 7, 14 games, 13 with Kalshi): Kalshi's asks sit above our chances for most players (its overround), so few values.
+
+### Known limits of the backtests (review, 2026-10-21)
+Astra's review (no math, key or grading bugs found) flagged that every fit takes who was active from the game's own record: who played (NBA props, NFL props, First TD) and the actual starters (First Basket). No historical injury reports or lineups exist for free, so this stands in for the pregame report. It flatters the test numbers somewhat: a late scratch never enters a backtest projection, but it can on the live board. The live line archive grades every board against what actually happened, which is the honest check; read the learning sections, not the backtests, before betting any slice.
