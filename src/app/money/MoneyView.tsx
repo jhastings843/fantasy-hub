@@ -3,7 +3,8 @@ import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
 import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
 import { LineChart } from "./Chart";
-import { DeskHero, DeskTable, MoneyHero, MoneyLogSection, WeatherBrake, booksTotals, desks, moneyLog } from "./desks";
+import { BrierGauge, DeskHero, DeskTable, LearnerLog, MoneyHero, MoneyLogSection, Stats, WeatherBrake, booksLog, booksTotals, desks, moneyLog, retroLog } from "./desks";
+import { Background } from "../picks/board";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 
@@ -225,33 +226,29 @@ function PhilTab({ p }: { p: Phil }) {
   const maxAbs = Math.max(1, ...p.categories.map((c) => Math.abs(c.pnl)));
   return (
     <section className={s.section}>
-      <div className={s.tiles}>
-        <div className={`${s.tile} ${p.equity > p.bankroll ? s.good : p.equity < p.bankroll ? s.bad : ""}`}>
-          <span className={s.tileV}>{usd(p.equity)}</span>
-          <span className={s.tileK}>{`of a ${usd(p.bankroll)} paper bankroll`}</span>
-        </div>
-        <div className={s.tile}>
-          <span className={s.tileV}>{`${p.wins}-${p.settled - p.wins}`}</span>
-          <span className={s.tileK}>{`settled bets${p.voids ? `, ${p.voids} void` : ""}`}</span>
-        </div>
-        <div className={`${s.tile} ${edge !== null && edge > 0 ? s.good : edge !== null && edge < 0 ? s.bad : ""}`}>
-          <span className={s.tileV}>{p.brierPhil !== null ? p.brierPhil.toFixed(3) : "n/a"}</span>
-          <span className={s.tileK}>{p.brierMarket !== null ? `Brier, market ${p.brierMarket.toFixed(3)} (lower wins)` : "Brier score"}</span>
-        </div>
-        <div className={s.tile}>
-          <span className={s.tileV}>{usd(p.exposure)}</span>
-          <span className={s.tileK}>{`in ${p.open.length} open ${p.open.length === 1 ? "bet" : "bets"}`}</span>
-        </div>
+      <Stats
+        label={`${who(p)} at a glance`}
+        items={[
+          { k: "Bankroll", v: usd(p.equity), sub: `of ${usd(p.bankroll)} paper`, tone: p.equity > p.bankroll ? "up" : p.equity < p.bankroll ? "down" : undefined },
+          { k: "Record", v: `${p.wins}-${p.settled - p.wins}`, sub: `settled${p.voids ? `, ${p.voids} void` : ""}` },
+          { k: "Brier", v: p.brierPhil !== null ? p.brierPhil.toFixed(3) : "·", sub: p.brierMarket !== null ? `market ${p.brierMarket.toFixed(3)}, lower wins` : "scored once bets settle", tone: edge !== null ? (edge > 0 ? "up" : "down") : undefined },
+          { k: "Open", v: usd(p.exposure), sub: `in ${p.open.length} ${p.open.length === 1 ? "bet" : "bets"}` },
+        ]}
+      />
+      <div className={m.panel}>
+        <h2 className={m.panelTitle}>Bankroll</h2>
+        {philChart(p)}
       </div>
-      <div className={m.panel}>{philChart(p)}</div>
-      <p className={s.notice}>
-        <span className={p.healthOk ? "" : m.stale}>{p.health}</span>
-        {p.lastCycle ? `, last cycle ${when(p.lastCycle)}.` : "."}{" "}
-        {p.venue === "kalshi"
-          ? `Kalshi Phil is a copy of Phil that paper-trades Kalshi instead: same loop and limits, every fill priced on Kalshi's live book with its taker fee${p.fees ? ` (${usd(p.fees)} paid so far, already counted)` : ""}. Its yardstick is Kalshi's price before fees: a lower Brier score on the same bets means its probabilities beat the market.`
-          : "Phil is a Claude agent paper-trading short Polymarket markets. Its yardstick is the market itself: a Brier score below the market's on the same bets means its probabilities beat the prices it paid."}
-        {p.settled < 30 ? ` ${p.settled} settled bets is too few to call either way.` : ""}
-      </p>
+      {p.brierPhil !== null && p.brierMarket !== null && (
+        <BrierGauge
+          title={`${who(p)} against the market`}
+          ours={p.brierPhil}
+          ourLabel={who(p)}
+          mkt={p.brierMarket}
+          mktLabel="Market"
+          note={`Brier score on the same ${p.settled} settled bets; the shorter bar wins.${p.settled < 30 ? ` ${p.settled} is too few to call either way.` : ""}`}
+        />
+      )}
       {p.open.length > 0 && (
         <div className={m.panel}>
           <h2 className={m.panelTitle}>Open</h2>
@@ -292,6 +289,20 @@ function PhilTab({ p }: { p: Phil }) {
         </div>
       </details>
       {p.learner && p.learner.length > 0 && (
+        <div className={s.section}>
+          <h3 className={s.h2}>Learner log</h3>
+          <LearnerLog entries={retroLog(p.learner).slice(0, 8)} empty="" />
+        </div>
+      )}
+      <Background title={`How ${who(p)} works, and every retro in full`}>
+        <p className={s.notice}>
+          <span className={p.healthOk ? "" : m.stale}>{p.health}</span>
+          {p.lastCycle ? `, last cycle ${when(p.lastCycle)}.` : "."}{" "}
+          {p.venue === "kalshi"
+            ? `Kalshi Phil is a copy of Phil that paper-trades Kalshi instead: same loop and limits, every fill priced on Kalshi's live book with its taker fee${p.fees ? ` (${usd(p.fees)} paid so far, already counted)` : ""}. Its yardstick is Kalshi's price before fees.`
+            : "Phil is a Claude agent paper-trading short Polymarket markets. Its yardstick is the market itself: a Brier score below the market's on the same bets means its probabilities beat the prices it paid."}
+        </p>
+      {p.learner && p.learner.length > 0 && (
         <PhilLearnLog
           log={p.learner}
           title="Learner log"
@@ -302,6 +313,7 @@ function PhilTab({ p }: { p: Phil }) {
           }
         />
       )}
+      </Background>
     </section>
   );
 }
@@ -501,13 +513,16 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
   const live = books.find((b) => b.liveAt)?.liveAt;
   return (
     <section className={s.section}>
-      <div className={m.booksHead}>
-        <p className={m.sub}>
-          {`${ahead} of ${active.length} books ahead of SPY. $100,000 each, traded at 6:30am on the previous close; the dashed line is the same money left in SPY.${
-            live ? ` Charts are live at ${clockEt(live)} ET.` : ""
-          }`}
-        </p>
-      </div>
+      <Stats
+        label="Stock books at a glance"
+        items={[
+          { k: "All books", v: `${((booksTotals(books).now / booksTotals(books).start - 1) * 100).toFixed(1)}%`, sub: `${usd(booksTotals(books).now)} of ${usd(booksTotals(books).start)}`, tone: booksTotals(books).now >= booksTotals(books).start ? "up" : "down" },
+          { k: "SPY, same days", v: `${((booksTotals(books).spy / booksTotals(books).start - 1) * 100).toFixed(1)}%`, sub: "the same money left in SPY" },
+          { k: "Ahead of SPY", v: `${ahead} of ${active.length}`, sub: "active books" },
+          { k: "Best book", v: (() => { const b = [...active].sort((x, y) => y.equity / y.start - x.equity / x.start)[0]; return b ? `${((b.equity / b.start - 1) * 100).toFixed(1)}%` : "·"; })(), sub: [...active].sort((x, y) => y.equity / y.start - x.equity / x.start)[0]?.label ?? "", small: true },
+        ]}
+      />
+      <p className={m.sub}>{`$100,000 each, traded at 6:30am on the previous close; the dashed line is the same money left in SPY.${live ? ` Charts are live at ${clockEt(live)} ET.` : ""}`}</p>
       <div className={m.cards}>{[...active, ...books.filter((b) => b.retired)].map((b) => <BookCard key={b.id} b={b} />)}</div>
       <details className={`${m.panel} ${m.fold}`}>
         <summary className={m.foldHead}>
@@ -516,7 +531,17 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
         </summary>
         <div className={m.rows}>{books.map((b) => <BookHoldings key={b.id} b={b} />)}</div>
       </details>
-      {(log.length > 0 || (grades && grades.books.length > 0)) && <LearnLog log={log} grades={grades} books={books} />}
+      {log.length > 0 && (
+        <div className={s.section}>
+          <h3 className={s.h2}>Learner log</h3>
+          <LearnerLog entries={booksLog(log).slice(0, 10)} empty="" />
+        </div>
+      )}
+      {(log.length > 0 || (grades && grades.books.length > 0)) && (
+        <Background title="Every grade and learn entry in full">
+          <LearnLog log={log} grades={grades} books={books} />
+        </Background>
+      )}
     </section>
   );
 }
@@ -789,23 +814,20 @@ function WeatherTab({ w }: { w: Weather }) {
   const lost = r.settled - r.won;
   return (
     <section className={s.section}>
-      <div className={s.tiles}>
-        <div className={`${s.tile} ${w.equity > w.start ? s.good : w.equity < w.start ? s.bad : ""}`}>
-          <span className={s.tileV}>{usd(w.equity - w.start, true)}</span>
-          <span className={s.tileK}>{`paper, from ${usd(w.start)}`}</span>
-        </div>
-        <div className={s.tile}>
-          <span className={s.tileV}>{r.settled ? `${r.won}-${lost}` : "0-0"}</span>
-          <span className={s.tileK}>{`settled, ${w.open.length} open`}</span>
-        </div>
-        <div className={s.tile}>
-          <span className={s.tileV}>{`${Math.round(w.trust.w * 100)}%`}</span>
-          <span className={s.tileK}>trust in its own forecast</span>
-        </div>
-      </div>
+      <Stats
+        label="Weather desk at a glance"
+        items={[
+          { k: "Bankroll", v: usd(w.equity), sub: `${usd(w.equity - w.start, true)} from ${usd(w.start)}`, tone: w.equity > w.start ? "up" : w.equity < w.start ? "down" : undefined },
+          { k: "Record", v: r.settled ? `${r.won}-${lost}` : "0-0", sub: `${w.open.length} open, ${usd(w.openCost)} staked` },
+          { k: "Trust in its forecast", v: `${Math.round(w.trust.w * 100)}%`, sub: `market the rest${w.trust.days ? `, re-fit from ${w.trust.days} days` : ""}` },
+          { k: "Last week's score", v: w.brake?.desk != null ? w.brake.desk.toFixed(3) : w.learned.desk != null ? w.learned.desk.toFixed(3) : "·", sub: w.brake?.market != null ? `market ${w.brake.market.toFixed(3)}, lower wins` : "Brier" },
+        ]}
+      />
       <div className={m.panel}>
         <h2 className={m.panelTitle}>Bankroll</h2>
         {weatherChart(w, 220, 640)}
+      </div>
+      <Background title="How the desk forecasts and bets">
         <p className={m.sub}>
           {`Bets on tomorrow's high in ${w.cities.length} cities on Kalshi. Each forecast averages five weather models with the National Weather Service forecast, correcting each by what it has learned about the station and weighting whichever has missed by less. The desk's odds are blended with the market's: ${Math.round(w.trust.w * 100)}% desk, ${100 - Math.round(w.trust.w * 100)}% market${
             w.trust.days ? `, re-fit from ${w.trust.days} settled days` : ", until 20 days have settled"
@@ -816,7 +838,7 @@ function WeatherTab({ w }: { w: Weather }) {
             {`Brake ${w.brake.level === "stop" ? "on: no new bets" : "on: quarter stakes"}. Over the last week the market scored ${w.brake.market.toFixed(3)} to the desk's ${w.brake.desk.toFixed(3)} across ${w.brake.n} city-days (lower is better). It keeps forecasting and scoring, and bets again once its week beats the market's.`}
           </p>
         ) : null}
-      </div>
+      </Background>
       {w.open.length > 0 && (
         <details className={`${m.panel} ${m.fold}`} open>
           <summary className={m.foldHead}>
@@ -966,13 +988,6 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
     <section className={s.section}>
       <MoneyHero list={list} />
       <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>Each desk vs its yardstick</h3>
-          <p className={s.p}>Blue bar: the desk. Grey bar: what it has to beat. For Brier scores the shorter bar wins.</p>
-        </div>
-        <DeskTable list={list} />
-      </div>
-      <div className={s.section}>
         <h3 className={s.h2}>Every desk&apos;s chart</h3>
       <div className={m.panels}>
         {SHOW_BETS && (
@@ -1019,6 +1034,13 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           </div>
         )}
       </div>
+      </div>
+      <div className={s.section}>
+        <div className={s.sectionHead}>
+          <h3 className={s.h2}>Each desk vs its yardstick</h3>
+          <p className={s.p}>Blue bar: the desk. Grey bar: what it has to beat. For Brier scores the shorter bar wins.</p>
+        </div>
+        <DeskTable list={list} />
       </div>
       <MoneyLogSection entries={moneyLog(v)} />
     </section>

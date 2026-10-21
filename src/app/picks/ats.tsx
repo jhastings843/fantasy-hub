@@ -5,6 +5,7 @@ import type { PicksReport } from "@/lib/picks/report";
 import type { BetRow } from "@/lib/picks/units";
 import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
+import Link from "next/link";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine } from "./board";
@@ -135,6 +136,9 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
   );
 }
 
+/** The full breakdown page for one game. */
+export const gameHref = (r: PicksReport, g: BoardGame) => `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`;
+
 /** A bet (or an early look) as the big card: the pick, the market against the models, the three numbers that matter. */
 function BetCard({ g, r }: { g: BoardGame; r: PicksReport }) {
   const name = (k: string) => r.names[k] ?? k;
@@ -176,10 +180,9 @@ function BetCard({ g, r }: { g: BoardGame; r: PicksReport }) {
           <dd>{stake ? `${st === "early" ? "~" : ""}${stake}u` : "·"}</dd>
         </div>
       </dl>
-      <details className={s.why}>
-        <summary>Why this bet</summary>
-        <WhyList g={g} r={r} />
-      </details>
+      <Link href={gameHref(r, g)} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
+        Why this bet ›
+      </Link>
     </li>
   );
 }
@@ -197,10 +200,9 @@ function CloseCard({ g, r }: { g: BoardGame; r: PicksReport }) {
         {pickText(g, name)} <span>{opp ? `${g.side === "home" ? "vs" : "at"} ${opp} · ${kickoffEt(g.ref?.kickoff)}` : kickoffEt(g.ref?.kickoff)}</span>
       </span>
       <span className={`${s.num} ${s.statK}`}>{g.price !== undefined ? `Now ${price(g.price)} · ${need}` : need}</span>
-      <details className={s.why}>
-        <summary>Why</summary>
-        <WhyList g={g} r={r} />
-      </details>
+      <Link href={gameHref(r, g)} className={s.linkA} style={{ fontSize: 13.5 }}>
+        Why ›
+      </Link>
     </li>
   );
 }
@@ -244,6 +246,9 @@ function GameRow({ g, r }: { g: BoardGame; r: PicksReport }) {
       <div className={s.gBody}>
         <div className={s.cardMeta}>{pickText(g, name)}</div>
         {st === "final" ? <FinishedDetails g={g} r={r} /> : <WhyList g={g} r={r} />}
+        <Link href={gameHref(r, g)} className={s.linkA} style={{ display: "inline-block", marginTop: 8, fontWeight: 600, fontSize: 14 }}>
+          Full breakdown ›
+        </Link>
       </div>
     </details>
   );
@@ -900,6 +905,96 @@ export function AtsResearch({ r, harris }: { r: PicksReport; harris?: React.Reac
           </table>
         </div>
       </details>
+    </section>
+  );
+}
+
+/** One game on its own page: the pick, the market against every model, why it is or isn't a bet, and everything else known about the game. */
+export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const name = (k: string) => r.names[k] ?? k;
+  const st = statusOf(g);
+  const home = name(g.home);
+  const away = name(g.away);
+  const market = g.ref?.line ?? g.david?.market ?? g.sam?.market;
+  const st1 = r.strategies;
+  const cut = g.tier === "t1" ? st1.rule : g.tier === "t2" ? st1.second : null;
+  const proj = (x: number) => (Math.abs(x) < 0.05 ? "a pick'em" : `${x < 0 ? home : away} by ${Math.abs(Math.round(x * 10) / 10)}`);
+  const models = [g.sam?.model, g.david?.model].filter((x): x is number => x !== undefined);
+  const avg = models.length ? models.reduce((a, x) => a + x, 0) / models.length : null;
+  const tot = r.totals.board.find((t) => t.home === g.home && t.away === g.away);
+  const worst = g.p !== undefined ? worstPrice(g.p) : null;
+  const eyebrow = `${["bet", "sent", "early"].includes(st) ? "Best bet" : STATUS_TEXT[st]} · ${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` Week ${r.week}` : ""}`;
+  return (
+    <section className={s.section} aria-labelledby="game">
+      <div className={s.hero}>
+        <span className={s.eyebrow}>{eyebrow}</span>
+        <h1 className={s.heroH} id="game" style={{ fontSize: "clamp(44px, 8vw, 72px)" }}>
+          {g.side ? pickText(g, name) : `${away} at ${home}`}
+        </h1>
+        <p className={s.heroSub}>{`${away} at ${home} · ${kickoffEt(g.ref?.kickoff)}`}</p>
+        <div className={s.chips} style={{ marginTop: 6 }}>
+          {st === "early" && <span className={s.lockChip}>{`Locks ${kickoffEt(g.held)}`}</span>}
+          {(st === "bet" || st === "sent" || st === "early") && <span className={s.chip}>{`${st === "sent" ? g.issued!.units : g.stake}u at ${price(st === "sent" ? g.issued!.price : g.price)}`}</span>}
+          {g.final && <span className={s.chip}>{`Final: ${away} ${g.final.away}, ${home} ${g.final.home}`}</span>}
+        </div>
+      </div>
+
+      {market !== undefined && (
+        <div className={s.curveBox}>
+          <h2 className={s.h2}>Market vs models</h2>
+          <MarketLine market={market} sam={g.sam ? Math.round(g.sam.model * 10) / 10 : undefined} david={g.david ? Math.round(g.david.model * 10) / 10 : undefined} pem={r.league === "cfb" && g.pem ? g.pem.model : undefined} fmt={(x) => `${home} ${line(x)}`} />
+          {avg !== null && (
+            <p className={s.p}>
+              {`The models have ${proj(avg)}${models.length > 1 ? " on average" : ""}. The market has ${proj(market)}.${g.read?.agree && g.side ? ` So ${name(g.side === "home" ? g.home : g.away)} gets ${g.read.avgEdge.toFixed(1)} more points than the models think it needs.` : g.read && !g.read.agree ? " Sam and David are on different sides, so no spread bet." : ""}`}
+            </p>
+          )}
+          <MarketKey pem={r.league === "cfb"} />
+        </div>
+      )}
+
+      <div className={s.edgeGrid} style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))" }}>
+        <div className={s.edgeCard}>
+          <span className={s.eyebrow}>{["bet", "sent", "early"].includes(st) ? "Why it is a bet" : "Why it is not a bet"}</span>
+          <b className={s.closePick} style={{ textTransform: "none" }}>{cut ? cut.label : g.read?.agree ? "Agree, but outside the rule" : g.read ? "Models split" : "One model or no line"}</b>
+          <span className={s.p}>{cut ? `${g.tier === "t1" ? "The rule" : "Tier 2"} in force since the last review: ${rec(cut.record)} on the games it picked.` : "Only games in the rule or Tier 2 become bets."}</span>
+          <Link href={`/picks${r.league === "cfb" ? "/cfb" : ""}?v=research`} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
+            See the rule&apos;s record ›
+          </Link>
+        </div>
+        <div className={s.edgeCard}>
+          <span className={s.eyebrow}>Price</span>
+          <b className={s.closePick} style={{ textTransform: "none" }}>{g.price !== undefined ? `${price(g.price)} at DraftKings` : "No price yet"}</b>
+          <span className={s.p}>
+            {g.p !== undefined && g.price !== undefined ? `Estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit. It stays a bet at ${worst === null ? "plus money" : `${price(worst)} or better`}.` : "Priced when a line is quoted."}
+          </span>
+        </div>
+        <div className={s.edgeCard}>
+          <span className={s.eyebrow}>Win chance</span>
+          <b className={s.closePick} style={{ textTransform: "none" }}>{g.p !== undefined ? `${(g.p * 100).toFixed(1)}%` : "·"}</b>
+          <span className={s.p}>{g.p !== undefined ? "An estimate from the tier's record so far, not a calibrated probability." : "Only rule and Tier 2 games carry one."}</span>
+        </div>
+      </div>
+
+      {g.close && (g.close.open !== null || g.close.close !== null) && (
+        <div className={s.curveBox}>
+          <h2 className={s.h2}>Line since open</h2>
+          <p className={s.p}>{`${home} ${g.close.open !== null ? line(g.close.open) : "?"} at open → ${g.close.close !== null ? line(g.close.close) : "?"} at close.`}</p>
+        </div>
+      )}
+
+      <div className={s.curveBox}>
+        <h2 className={s.h2}>Every number</h2>
+        {g.final ? <FinishedDetails g={g} r={r} /> : <WhyList g={g} r={r} />}
+      </div>
+
+      <Background title="The rest of this game: totals and straight up">
+        <dl className={s.kv}>
+          <dt>Total</dt>
+          <dd className={s.num}>{tot?.ref ? `${tot.ref.total} now · Sam ${tot.sam?.toFixed(1) ?? "·"} · David ${tot.david?.toFixed(1) ?? "·"}${tot.side ? ` · both lean ${tot.side}` : ""}` : "no total yet"}</dd>
+          <dt>Straight up</dt>
+          <dd>{g.su ? `${name(g.su.side === "home" ? g.home : g.away)} to win${g.su.upset ? " (upset call)" : ""}` : "no read"}</dd>
+        </dl>
+      </Background>
     </section>
   );
 }

@@ -48,7 +48,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
               <li key={`${g.away}@${g.home}`} className={s.betCard}>
                 <div className={s.betCardTop}>
                   <div>
-                    <div className={s.betPickBig}>{`${upcoming.length - i}. ${name(pick)}`}</div>
+                    <div className={s.betPickBig}>{`${i + 1}. ${name(pick)}`}</div>
                     <div className={s.betWhen}>{`over ${name(opp)} · ${kickoffEt(g.ref?.kickoff)}`}</div>
                   </div>
                   <span className={s.lockChip}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
@@ -69,7 +69,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
             {upcoming.map(({ g, side, margin }, i) => (
               <div key={`${g.away}@${g.home}`} className={s.gRow}>
                 <div className={s.suLine}>
-                  <span className={`${s.num} ${s.rank}`}>{upcoming.length - i}</span>
+                  <span className={`${s.num} ${s.rank}`}>{i + 1}</span>
                   <span className={s.gGame}>
                     {name(side === "home" ? g.home : g.away)}
                     <span>{`over ${name(side === "home" ? g.away : g.home)} · ${kickoffEt(g.ref?.kickoff)}`}</span>
@@ -79,7 +79,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
               </div>
             ))}
           </div>
-          <p className={s.thin}>Bands describe the projected margin, not a probability.</p>
+          <p className={s.thin}>1 is the surest. In a confidence pool give it the most points. Bands describe the projected margin, not a probability.</p>
         </div>
       )}
       {done.length > 0 && (

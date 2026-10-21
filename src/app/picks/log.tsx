@@ -5,7 +5,7 @@ import type { League } from "@/lib/picks/parse";
 import { redisStore } from "@/lib/picks/learning/store";
 import type { JournalEntry } from "@/lib/picks/learning/review";
 import { Background, GoLiveSteps, Hero, LearnerLog, type LogEntry } from "./board";
-import { LearningPanel } from "./learning";
+import { LearningPanel, VERDICT, marketOf } from "./learning";
 import { whenEt, type Market } from "./ui";
 import s from "./picks.module.css";
 
@@ -20,9 +20,20 @@ const KIND: { [k in JournalEntry["kind"]]?: LogEntry["kind"] } = {
   proposal: "test",
 };
 
+const MARKET_NAME: { [m in Market]: string } = { ats: "Spreads", su: "Straight up", ou: "Totals" };
+/** What each market's ideas are measured against, in a sentence. */
+const AGAINST: { [m in Market]: string } = {
+  ats: "Each spread idea is tested against the rule in force, on games it saw after registering.",
+  su: "Each way of picking winners is tested against the method in force (now the Vegas favorite or the models' average).",
+  ou: "Each totals idea (over only, under only, both models 2+ or more off the number) is tested against plain \"both models agree\", on games archived after it registered.",
+};
+/** A journal line belongs to a market when its words say so; spreads takes the rest. */
+const mentions = (m: Market, t: string) => (m === "ou" ? /total|over|under/i.test(t) : m === "su" ? /straight|winner|su:/i.test(t) : !/total|straight up/i.test(t));
+
 export async function PicksLog({ league, market }: { league: League; market: Market }) {
-  const [journal, state] = await Promise.all([redisStore.journal(40).catch(() => []), redisStore.state().catch(() => null)]);
-  const entries: LogEntry[] = journal.flatMap((j) => (KIND[j.kind] ? [{ at: j.at, kind: KIND[j.kind]!, title: j.title, detail: j.why }] : []));
+  const [journal, state] = await Promise.all([redisStore.journal(60).catch(() => []), redisStore.state().catch(() => null)]);
+  const ideas = (state?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && marketOf(d.id) === market);
+  const entries: LogEntry[] = journal.flatMap((j) => (KIND[j.kind] && mentions(market, `${j.title} ${j.why}`) ? [{ at: j.at, kind: KIND[j.kind]!, title: j.title, detail: j.why }] : []));
   return (
     <section className={s.section} aria-labelledby="picks-log">
       <Hero
@@ -31,6 +42,28 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
         sub="Every idea is tested on games after it was first tracked. It goes live only when it clears the bar, and comes back off if it starts losing."
       />
       <GoLiveSteps games="30+ games over 3+ weeks, judged on games it saw after registering." />
+      <div className={s.section}>
+        <div className={s.sectionHead}>
+          <h3 className={s.h2}>{`What ${MARKET_NAME[market].toLowerCase()} is testing`}</h3>
+          <p className={s.p}>{AGAINST[market]}</p>
+        </div>
+        {ideas.length ? (
+          <ol className={s.log}>
+            {ideas.map((d) => (
+              <li key={d.id} className={s.logRow}>
+                <span className={s.logWhen}>{MARKET_NAME[market]}</span>
+                <span className={`${s.logKind} ${d.verdict === "promote" ? s.kLive : d.verdict === "reject" ? s.kBack : ""}`}>{VERDICT[d.verdict] ?? d.verdict}</span>
+                <span className={s.logText}>
+                  <b>{d.label}</b>
+                  <span>{d.why}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className={s.calm}>{`${MARKET_NAME[market]} ideas register at the next Tuesday review; from then on only later games count toward them.`}</p>
+        )}
+      </div>
       <div className={s.section}>
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the next Tuesday review." />

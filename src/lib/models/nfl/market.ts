@@ -53,7 +53,8 @@ export function ourNflMarkets(
     const ch = nflOverUnder(stat, Math.max(mean, 0.1), line, p);
     const fair = noVig(over, under);
     const ev = (s: Side) => ch[s] - implied(s === "over" ? over : under);
-    const side: Side | null = ev("over") > 0 && ev("over") >= ev("under") ? "over" : ev("under") > 0 ? "under" : null;
+    // No edge without a real price: an assumed -110 says nothing about what DK would pay.
+    const side: Side | null = source === "assumed" ? null : ev("over") > 0 && ev("over") >= ev("under") ? "over" : ev("under") > 0 ? "under" : null;
     const id = `${stat}|${who.name}`;
     const median = stat === "rec" ? mean : nflMedian(stat, Math.max(mean, 0.1), p);
     markets.push({

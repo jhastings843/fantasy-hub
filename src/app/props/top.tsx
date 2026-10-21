@@ -10,7 +10,7 @@ import { getOurFtdView, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
-import { Background, GoLiveSteps, Hero, LearnerLog, engineEntry, type LogEntry } from "../picks/board";
+import { GoLiveSteps, Hero, LearnerLog, engineEntry, type LogEntry } from "../picks/board";
 import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
 
@@ -208,9 +208,11 @@ export async function PropsTop({ sport, season }: { sport: "nfl" | "nba"; season
   );
 }
 
-/** The Props Learner log: every section's journal in plain language, with the gate detail one click down. */
-export async function PropsLog({ sport, season }: { sport: "nfl" | "nba"; season: number }) {
-  const items = await load(sport, season);
+/** The Props Learner log for one tab's market: its journal in plain language, with the gate detail one click down. */
+export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb"; season: number }) {
+  const all = await load(tab === "nba" || tab === "fb" ? "nba" : "nfl", season);
+  const want = { pp: "NFL props", ftd: "First TD", nba: "NBA props", fb: "First Basket" }[tab];
+  const items = all?.filter((p) => p.name === want) ?? null;
   if (!items) return <p className={s.calm}>The learning sections couldn&apos;t be read just now. Try again in a minute.</p>;
   const entries: LogEntry[] = items
     .flatMap((p) => p.learning.journal.filter((j) => j.kind !== "review" || /went live|rolled back|registered/i.test(j.text)).map((j) => engineEntry(j, p.name)))
@@ -219,23 +221,21 @@ export async function PropsLog({ sport, season }: { sport: "nfl" | "nba"; season
   return (
     <section className={s.section} aria-labelledby="props-log">
       <Hero
-        eyebrow="What changed, and why"
+        eyebrow={`${want} · what changed, and why`}
         title={<span id="props-log">Learner log</span>}
         sub="Every slice is tracked from the day it was first seen, on later games only. It goes live when it clears its gate and is rolled back if it starts losing."
       />
-      <GoLiveSteps games="Props: 30+ games over 3+ weeks and 100+ bets. First TD and First Basket: 60+ games over 4+ weeks." />
+      <GoLiveSteps games={tab === "pp" || tab === "nba" ? "30+ games over 3+ weeks and 100+ bets." : "60+ games over 4+ weeks and 12+ winners (long prices)."} />
       <div className={s.section}>
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={[...entries, ...reviews].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20)} empty="Nothing recorded yet. Each section's first review runs at its next data pull." />
       </div>
-      <Background title="Every slice, the exact bar and what each still needs">
-        {items.map((p) => (
-          <div key={p.name} className={s.section}>
-            <h3 className={s.h3}>{p.name}</h3>
-            <LearningBlock v={p.learning} />
-          </div>
-        ))}
-      </Background>
+      {items.map((p) => (
+        <div key={p.name} className={s.section}>
+          <h3 className={s.h2}>{`What ${p.name} is testing`}</h3>
+          <LearningBlock v={p.learning} />
+        </div>
+      ))}
     </section>
   );
 }

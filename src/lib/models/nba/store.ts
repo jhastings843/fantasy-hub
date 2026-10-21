@@ -228,7 +228,7 @@ export async function runOurNbaProps(now = new Date()): Promise<OurNbaReport> {
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
       const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
-      const { markets, extra } = ourMarkets(lines, proj, names, P);
+      const { markets, extra } = ourMarkets(lines, proj, names, P, new Map(inputs.map((x) => [x.id, x.games.length])));
       // First Basket: DK's field is its probable starters; else each team's last starting five, less anyone Out.
       const fbDk = [...lines.values()].filter((l) => l.type === "First Basket" && l.current.over !== null).map((l) => ({ id: l.athlete, price: l.current.over! }));
       const lastStarters: { [team: string]: { id: string; pos: string }[] } = {};

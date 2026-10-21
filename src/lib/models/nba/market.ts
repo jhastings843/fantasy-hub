@@ -24,6 +24,8 @@ export interface OurMarketExtra {
   under: number;
   /** Projected minutes behind the number. */
   min: number;
+  /** Games this season behind it (missing on boards saved before 2026-10-21 evening). */
+  games?: number;
 }
 
 /** DK's chance with the vig taken out (the two sides scaled to sum to 1). */
@@ -41,6 +43,7 @@ export function ourMarkets(
   proj: Map<string, Projection>,
   names: Map<string, { name: string; team: string }>,
   p: NbaParams,
+  games: Map<string, number> = new Map(),
 ): { markets: PropMarket[]; extra: { [id: string]: OurMarketExtra } } {
   const markets: PropMarket[] = [];
   const extra: { [id: string]: OurMarketExtra } = {};
@@ -77,7 +80,7 @@ export function ourMarkets(
       side,
       lean,
     });
-    extra[id] = { over: r3(ch.over), under: r3(ch.under), min: r1(pr.min) };
+    extra[id] = { over: r3(ch.over), under: r3(ch.under), min: r1(pr.min), ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}) };
   }
   markets.sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1) || a.id.localeCompare(b.id));
   return { markets, extra };

@@ -93,12 +93,15 @@ describe("ourNflMarkets (DK lines, NE at CHI 2026-10-22, no prices posted)", () 
   const rec = [...lines.values()].find((l) => l.type === "Total Receiving Yards (incl. overtime)")!;
   const names = new Map([[rec.athlete, { name: "Test Receiver", team: "NE" }]]);
   const proj = (y: number) => new Map([[rec.athlete, { id: "x", team: "NE", tgt: 6, car: 0, att: 0, mean: { rec: 4, rec_yds: y, rush_yds: 0, pass_yds: 0 } }]]);
-  it("assumes -110 when neither ESPN nor David has a price, and says so", () => {
+  it("assumes -110 when neither ESPN nor David has a price, says so, and claims no edge", () => {
     const { markets, extra } = ourNflMarkets(lines, proj(rec.current.line! * 2), names, () => null, P);
     const m = markets.find((x) => x.stat === "rec_yds")!;
     expect(m.books[0]).toMatchObject({ over: -110, under: -110 });
     expect(extra[m.id].price).toBe("assumed");
-    expect(m.side).toBe("over");
+    // Our number still leans over, but with no real price there is no edge to claim.
+    expect(m.lean).toBe("over");
+    expect(m.side).toBeNull();
+    expect(m.clears).toBe(false);
   });
   it("takes David's price when his line matches", () => {
     const { markets, extra } = ourNflMarkets(lines, proj(rec.current.line!), names, () => ({ over: -120, under: 100 }), P);

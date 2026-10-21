@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import type { getMoneyView } from "@/lib/money/store";
 import type { Book, Phil, Weather } from "@/lib/money/types";
 import { Hero, LearnerLog, Stats, type LogEntry, type Stat } from "../picks/board";
+export { LearnerLog, Stats };
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 
@@ -253,25 +254,55 @@ export function WeatherBrake({ w }: { w: Weather }) {
   const d = w.brake?.desk ?? w.learned.desk;
   const mk = w.brake?.market ?? w.learned.market;
   if (d === null || mk === null) return null;
-  const top = Math.max(d, mk, 1e-9);
+  return (
+    <BrierGauge
+      title={w.brake?.level === "stop" ? "What turns the brake off" : "Desk against the market"}
+      ours={d}
+      ourLabel="Desk"
+      mkt={mk}
+      mktLabel="Market"
+      note={`Brier score over the last ${w.brake?.n ?? w.learned.scored} city-days; the shorter bar wins.${w.brake?.level === "stop" ? " The desk bets again once its bar is shorter than the market's." : ""}`}
+    />
+  );
+}
+
+/** Two Brier bars, desk against its yardstick: the shorter bar wins. */
+export function BrierGauge({ title, ours, ourLabel, mkt, mktLabel, note }: { title: string; ours: number; ourLabel: string; mkt: number; mktLabel: string; note: string }) {
+  const top = Math.max(ours, mkt, 1e-9);
   return (
     <div className={m.gauge}>
       <h3 className={s.h3} style={{ margin: 0 }}>
-        {w.brake?.level === "stop" ? "What turns the brake off" : "Desk against the market"}
+        {title}
       </h3>
-      {[
-        ["Desk", d, s.barOurs],
-        ["Market", mk, s.barMkt],
-      ].map(([label, x, cls]) => (
-        <div key={label as string} className={m.gaugeRow}>
+      {(
+        [
+          [ourLabel, ours, s.barOurs],
+          [mktLabel, mkt, s.barMkt],
+        ] as const
+      ).map(([label, x, cls]) => (
+        <div key={label} className={m.gaugeRow}>
           <b>{label}</b>
           <span className={m.gaugeTrack}>
-            <i className={cls as string} style={{ width: `${((x as number) / top) * 100}%` }} />
+            <i className={cls} style={{ width: `${(x / top) * 100}%` }} />
           </span>
-          <span className={s.num}>{(x as number).toFixed(3)}</span>
+          <span className={s.num}>{x.toFixed(3)}</span>
         </div>
       ))}
-      <p className={s.thin}>{`Brier score over the last ${w.brake?.n ?? w.learned.scored} city-days; the shorter bar wins.${w.brake?.level === "stop" ? " The desk bets again once its bar is shorter than the market's." : ""}`}</p>
+      <p className={s.thin}>{note}</p>
     </div>
   );
+}
+
+/** A Claude agent's retros as learner-log lines: the headline, then its changes or lessons. */
+export function retroLog(log: { ts: string | null; headline: string; changes: string[]; lessons: string[] }[]): LogEntry[] {
+  return log.flatMap((r) => (r.ts ? [{ at: r.ts, kind: r.changes.length ? ("new" as const) : ("test" as const), title: r.headline, detail: [...r.changes, ...r.lessons].slice(0, 2).join(" ") || undefined }] : []));
+}
+
+/** The stock learner's weekly entries as log lines. */
+export function booksLog(log: { day: string; decisions: { action: string; book: string; why: string }[]; lessons: string | null }[]): LogEntry[] {
+  return log.flatMap((e): LogEntry[] => {
+    const at = `${e.day}T21:00:00Z`;
+    if (!e.decisions.length) return [{ at, kind: "test" as const, title: "Reviewed every book, no changes", detail: e.lessons ?? undefined }];
+    return e.decisions.map((d) => ({ at, kind: (/retire|close|drop/i.test(d.action) ? "back" : /open|add|promot/i.test(d.action) ? "new" : "test") as LogEntry["kind"], title: `${d.action} ${d.book}`, detail: d.why }));
+  });
 }

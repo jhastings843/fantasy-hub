@@ -5,8 +5,8 @@ import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecor
 import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
-import { href, kickoffEt, line, price, rec, units, NBA_VIEWS, whenEt, type View } from "../ui";
-import { Background, Hero, MarketKey, MarketLine, Stats } from "../board";
+import { href, kickoffEt, line, price, rec, units, LOG_VIEW, NBA_VIEWS, whenEt, type View } from "../ui";
+import { Background, GoLiveSteps, Hero, LearnerLog, MarketKey, MarketLine, Stats, type LogEntry } from "../board";
 import s from "../picks.module.css";
 
 // The NBA tab. One model (Sam) against the DraftKings line, tracked like
@@ -407,6 +407,49 @@ function NbaResearch({ v }: { v: NbaPicksView }) {
   );
 }
 
+const NBA_KIND: { [k: string]: LogEntry["kind"] } = { register: "new", activate: "live", rollback: "back", review: "test", retain: "test" };
+
+/** NBA's learner log: the research cuts it is testing against their parents, and what each weekly review did. */
+function NbaLog({ v }: { v: NbaPicksView }) {
+  const entries: LogEntry[] = v.journal.map((j) => ({ at: j.at, kind: NBA_KIND[j.kind] ?? "test", title: j.text }));
+  return (
+    <section className={s.section} aria-labelledby="nba-log">
+      <Hero
+        eyebrow="NBA · what changed, and why"
+        title={<span id="nba-log">Learner log</span>}
+        sub="NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered. The review runs weekly; games are daily, so evidence grows every night."
+      />
+      <GoLiveSteps games={`${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks against its parent cut, at t ${CRITERIA.MIN_T}+.`} />
+      <div className={s.section}>
+        <div className={s.sectionHead}>
+          <h3 className={s.h2}>What NBA is testing</h3>
+          <p className={s.p}>{`Spreads and totals cuts on Sam's reads. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}.` : "The first review runs this week."}`}</p>
+        </div>
+        {v.hyps.length ? (
+          <ol className={s.log}>
+            {v.hyps.map((h) => (
+              <li key={h.id} className={s.logRow}>
+                <span className={s.logWhen}>{`since ${whenEt(h.registeredAt).split(",").slice(0, 2).join(",")}`}</span>
+                <span className={`${s.logKind} ${h.status === "active" ? s.kLive : h.status === "rolled-back" ? s.kBack : ""}`}>{h.status === "active" ? "Live" : h.status === "rolled-back" ? "Rolled back" : "Testing"}</span>
+                <span className={s.logText}>
+                  <b>{h.label}</b>
+                  <span>{`Against ${h.parentLabel.toLowerCase()}: ${h.cmp.n} game${h.cmp.n === 1 ? "" : "s"} over ${h.cmp.weeks} week${h.cmp.weeks === 1 ? "" : "s"}, ${h.cmp.mean >= 0 ? "+" : ""}${h.cmp.mean.toFixed(2)}u a game${h.cmp.t !== null ? `, t ${h.cmp.t.toFixed(2)}` : ""}.`}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className={s.calm}>No NBA ideas registered yet. They register at the first weekly review.</p>
+        )}
+      </div>
+      <div className={s.section}>
+        <h3 className={s.h2}>Latest</h3>
+        <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the first weekly review." />
+      </div>
+    </section>
+  );
+}
+
 export default async function NbaView({ view = "week" }: { view?: View }) {
   const [b, v] = await Promise.all([view === "week" ? getNbaBoard().catch(() => null) : Promise.resolve(null), getNbaPicksView().catch(() => null)]);
   const today = etDay(new Date());
@@ -438,7 +481,7 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
           <h1 className={s.eyebrow} style={{ margin: 0 }}>{`Picks · NBA ${v ? `${v.season}-${String(v.season + 1).slice(2)}` : "2026-27"}`}</h1>
           <div className={s.navRows}>{sportNav}</div>
           <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {NBA_VIEWS.map((x) => (
+            {[...NBA_VIEWS, LOG_VIEW].map((x) => (
               <Link key={x.id} href={nbaHref(x.id)} aria-current={x.id === view ? "page" : undefined} className={s.tab}>
                 {x.label}
               </Link>
@@ -451,7 +494,7 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
                 { k: "Spreads, every Sam side", v: all && all.w + all.l + all.p ? units(all.units) : "0-0", sub: all ? rec(all) : "nothing graded", tone: all && all.w + all.l ? (all.units >= 0 ? "up" : "down") : undefined },
                 { k: "Rule tier 1", v: t1 ? t1.label : "None yet", sub: t1 ? rec(t1) : "nothing clears the bar", small: true },
                 { k: "Stakes", v: v.gate.live ? "Live" : "Tracking", sub: v.gate.live ? "NBA's own limits" : "until the go-live gate clears", small: true },
-                { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={nbaHref("research")}>See research</Link>, small: true },
+                { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={nbaHref("log")}>Open the log</Link>, small: true },
               ]}
             />
           )}
@@ -464,6 +507,8 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
             </div>
           ) : view === "results" ? (
             <NbaResults v={v} />
+          ) : view === "log" ? (
+            <NbaLog v={v} />
           ) : (
             <NbaResearch v={v} />
           )

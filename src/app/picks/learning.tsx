@@ -10,10 +10,10 @@ import s from "./picks.module.css";
 // Strategy review status: last reviewed, what changed and why, next review,
 // scheduler health, and the append-only journal. Read-only.
 
-const VERDICT: { [k: string]: string } = { promote: "Promoted", retain: "Collecting", reject: "Rejected", report: "Report only" };
+export const VERDICT: { [k: string]: string } = { promote: "Promoted", retain: "Collecting", reject: "Rejected", report: "Report only" };
 
 /** Which market a hypothesis belongs to, by its id (learning/model.ts). Staking, timing, parlays and PEM are about the spread bets. */
-function marketOf(id: string): Market {
+export function marketOf(id: string): Market {
   if (id.includes(":su:")) return "su";
   if (id.includes(":ou:")) return "ou";
   return "ats";
