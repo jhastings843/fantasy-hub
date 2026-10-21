@@ -20,6 +20,8 @@ export type NbaBoard = {
   generatedAt: string;
   sam: SamNbaStatus;
   days: NbaDay[];
+  /** Yesterday's games (Eastern), for the board's "last night" block. Sam's read comes from the saved copy, not his page. */
+  yesterday: NbaDay | null;
   /** Sam's games that didn't join an ESPN game in the days shown. */
   unmatched: string[];
   problems: string[];
@@ -45,7 +47,7 @@ async function get(url: string): Promise<Response> {
 export async function getNbaBoard(now = new Date()): Promise<NbaBoard> {
   const problems: string[] = [];
   const dates = Array.from({ length: LOOKAHEAD_DAYS }, (_, i) => etDay(now, i));
-  const [slates, samHtml] = await Promise.all([
+  const [slates, prior, samHtml] = await Promise.all([
     Promise.all(
       dates.map(async (d) => {
         try {
@@ -56,6 +58,12 @@ export async function getNbaBoard(now = new Date()): Promise<NbaBoard> {
         }
       }),
     ),
+    get(`${NBA_SOURCES.espn}?dates=${etDay(now, -1)}`)
+      .then(async (r) => parseNbaScoreboard(await r.json(), etDay(now, -1)))
+      .catch((e: Error) => {
+        problems.push(`ESPN ${etDay(now, -1)}: ${e.message}`);
+        return [] as NbaGame[];
+      }),
     get(NBA_SOURCES.samBoard)
       .then((r) => r.text())
       .catch((e: Error) => e),
@@ -66,6 +74,7 @@ export async function getNbaBoard(now = new Date()): Promise<NbaBoard> {
   await Promise.all(
     days
       .flat()
+      .concat(prior)
       .filter((g) => g.state !== "pre" && !g.line && !g.total && !g.ml)
       .map(async (g) => {
         try {
@@ -92,5 +101,6 @@ export async function getNbaBoard(now = new Date()): Promise<NbaBoard> {
   const abbrs = new Set(slates.flat().flatMap((g) => [g.home.abbr, g.away.abbr]));
   const unmatched = rows.filter((r) => !abbrs.has(r.home) || !abbrs.has(r.away)).map((r) => `${r.away} at ${r.home}`);
   if (!all.length) problems.push(`No NBA games on ESPN in the next ${LOOKAHEAD_DAYS} days.`);
-  return { generatedAt: now.toISOString(), sam, days: board, unmatched, problems };
+  const yesterday = prior.length ? { day: prior[0].day, games: prior.map((g) => ({ ...g, read: null })) } : null;
+  return { generatedAt: now.toISOString(), sam, days: board, yesterday, unmatched, problems };
 }

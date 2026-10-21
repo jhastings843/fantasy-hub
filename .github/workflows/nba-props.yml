@@ -3,15 +3,25 @@ name: NBA props and picks capture
 # Also saves Sam's NBA game picks (/api/picks/nba) on the same slots.
 # Sam posts an NBA player props page per game and only keeps the current
 # slate online, so the tracker saves each page before tip and grades it from
-# ESPN once final. NBA games are daily: the early slot (noon ET) grades last
-# night's games and saves afternoon tips; the late slots save the 7pm and
-# 10pm slates as close to tip as GitHub's cron allows (it can run several
-# minutes late). During EDT: 16:00 UTC is noon, 21:30 is 5:30pm, 01:00 is 9pm.
+# ESPN once final. NBA games are every day with no weekly reset, so the
+# slots run daily: 06:30 UTC grades last night's games (so the morning view
+# is graded), 16:00 saves afternoon tips and re-checks grades, and the evening
+# slots save each slate as close to tip as GitHub's cron allows (it can run
+# several minutes late). UTC slots in Eastern time:
+#   06:30  2:30am EDT / 1:30am EST   grade last night
+#   16:00  noon EDT  / 11am EST      afternoon tips, grade stragglers
+#   21:30  5:30pm EDT / 4:30pm EST   first evening copy
+#   22:45  6:45pm EDT / 5:45pm EST   7pm EDT tips
+#   23:45  7:45pm EDT / 6:45pm EST   7pm EST, 8pm EDT tips
+#   01:00  9pm EDT   / 8pm EST       late (West Coast) tips
 
 on:
   schedule:
+    - cron: "30 6 * * *"
     - cron: "0 16 * * *"
     - cron: "30 21 * * *"
+    - cron: "45 22 * * *"
+    - cron: "45 23 * * *"
     - cron: "0 1 * * *"
   workflow_dispatch:
 

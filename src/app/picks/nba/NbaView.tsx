@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard, type NbaBoardGame } from "@/lib/picks/nba-store";
 import { getNbaPicksView, type NbaPicksView } from "@/lib/picks/nba-track-store";
-import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord } from "@/lib/picks/nba-track";
+import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord, type NbaTracked } from "@/lib/picks/nba-track";
+import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
-import { href, kickoffEt, line, price, rec, units, VIEWS, whenEt, type View } from "../ui";
+import { href, kickoffEt, line, price, rec, units, NBA_VIEWS, whenEt, type View } from "../ui";
 import s from "../picks.module.css";
 
 // The NBA tab. One model (Sam) against the DraftKings line, tracked like
@@ -51,7 +52,37 @@ function boardBet(g: NbaBoardGame): NbaBet | null {
   return nbaBets({ id: g.id, day: g.day, week: 0, tip: g.tip, home: g.home.abbr, away: g.away.abbr, first: snap, last: snap }).find((b) => b.market === "ats") ?? null;
 }
 
-function GameCard({ g, v }: { g: NbaBoardGame; v: NbaPicksView | null }) {
+/**
+ * Once a game tips, Sam drops it from his page and ESPN drops the odds, so a
+ * live or final card shows the copy saved before tip: the numbers it is graded on.
+ */
+function asSaved(g: NbaBoardGame, t: NbaTracked | undefined): NbaBoardGame {
+  if (g.state === "pre" || !t) return g;
+  const s = t.last;
+  const out: NbaBoardGame = {
+    ...g,
+    line: s.line !== undefined ? { home: s.line, homePrice: s.homePrice, awayPrice: s.awayPrice } : g.line,
+    total: s.total !== undefined ? { points: s.total, overPrice: s.overPrice, underPrice: s.underPrice } : g.total,
+    ml: s.mlHome !== undefined || s.mlAway !== undefined ? { home: s.mlHome, away: s.mlAway } : g.ml,
+  };
+  return { ...out, read: readNba(out, { home: g.home.abbr, away: g.away.abbr, model: s.model, vegas: s.line ?? NaN, ...(s.modelTotal !== undefined ? { total: s.modelTotal } : {}) }) };
+}
+
+/** Sam's spread and total results on a finished game, from the saved copy. */
+function samResults(g: NbaBoardGame, t: NbaTracked | undefined): string | null {
+  if (g.state !== "post" || !g.score || !t) return null;
+  const bets = nbaBets({ ...t, final: t.final ?? g.score });
+  const word = (m: "ats" | "ou", label: string) => {
+    const b = bets.find((x) => x.market === m);
+    return b?.result ? `${label} ${b.result === "W" ? "won" : b.result === "L" ? "lost" : "push"}` : null;
+  };
+  return [word("ats", "Spread"), word("ou", "Total")].filter(Boolean).join(" · ") || null;
+}
+
+function GameCard({ g: raw, v }: { g: NbaBoardGame; v: NbaPicksView | null }) {
+  const saved = v?.games.find((x) => x.id === raw.id);
+  const g = asSaved(raw, saved);
+  const done = samResults(g, saved);
   const r = g.read;
   const bet = boardBet(g);
   const tier = bet && v && g.state === "pre" ? tierOf(bet, v.ats) : null;
@@ -92,6 +123,12 @@ function GameCard({ g, v }: { g: NbaBoardGame; v: NbaPicksView | null }) {
         <dd className={s.num}>{g.total ? `${g.total.points} (o ${price(g.total.overPrice)} / u ${price(g.total.underPrice)})` : "not posted"}</dd>
         <dt>Moneyline</dt>
         <dd className={s.num}>{g.ml ? `${g.away.abbr} ${price(g.ml.away)} · ${g.home.abbr} ${price(g.ml.home)}` : "not posted"}</dd>
+        {done && (
+          <>
+            <dt>Sam</dt>
+            <dd className={s.num}>{done}</dd>
+          </>
+        )}
         {r && (
           <>
             <dt>Sam line</dt>
@@ -153,7 +190,7 @@ function CutTable({ title, rows, v }: { title: string; rows: NbaCutRecord[]; v: 
 function NbaResults({ v }: { v: NbaPicksView }) {
   const done = v.games.filter((g) => g.final);
   if (!done.length)
-    return <p className={s.calm}>Nothing graded yet. Sam&apos;s reads are saved before each tip and graded from ESPN&apos;s final the next morning; opening night is October 20.</p>;
+    return <p className={s.calm}>Nothing graded yet. Sam&apos;s reads are saved before each tip and graded from ESPN&apos;s final overnight (2:30am ET run); opening night is October 20.</p>;
   const cut = (id: string) => v.cuts.find((c) => c.id === id)!;
   const tile = (value: string, label: string) => (
     <div className={s.tile}>
@@ -332,7 +369,7 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
           <h1 className={s.h1}>Picks</h1>
           {b ? <SamStatus b={b} /> : null}
           <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {VIEWS.map((x) => (
+            {NBA_VIEWS.map((x) => (
               <Link key={x.id} href={nbaHref(x.id)} aria-current={x.id === view ? "page" : undefined} className={s.tab}>
                 {x.label}
               </Link>
@@ -360,12 +397,14 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
           <section className={s.section} aria-labelledby="nba-slate">
             <div className={s.sectionHead}>
               <h2 className={s.h2} id="nba-slate">
-                Next games
+                Today and next
               </h2>
               <p className={s.p}>
-                {b.sam.state === "live"
-                  ? "Sorted by tip time. The big line is Sam's side at the DraftKings number; the edge is how far his line sits from it."
-                  : "Sorted by tip time, with the current DraftKings spread, total and moneyline."}
+                {`${
+                  b.sam.state === "live"
+                    ? "Sorted by tip time. The big line is Sam's side at the DraftKings number; the edge is how far his line sits from it."
+                    : "Sorted by tip time, with the current DraftKings spread, total and moneyline."
+                } Games run every day, so there is no weekly reset: once a game tips its card keeps the numbers saved before tip, and last night's games sit at the bottom with Sam's results.`}
               </p>
             </div>
             <div className={s.days}>
@@ -382,6 +421,19 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
                   </ul>
                 </div>
               ))}
+              {b.yesterday && (
+                <details className={s.day}>
+                  <summary className={s.dayHead}>
+                    <span>{`Last night · ${dayLabel(b.yesterday.day, today).replace(/^Today · /, "")}`}</span>
+                    <span className={s.num}>{`${b.yesterday.games.length} game${b.yesterday.games.length === 1 ? "" : "s"}`}</span>
+                  </summary>
+                  <ul className={s.cards}>
+                    {b.yesterday.games.map((g) => (
+                      <GameCard key={g.id} g={g} v={v} />
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           </section>
         )}

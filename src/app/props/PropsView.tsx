@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { VIEWS, type View } from "../picks/ui";
+import { NBA_VIEWS, VIEWS, type View } from "../picks/ui";
 import { FirstTdResearch, FirstTdResults, FirstTdWeek } from "./firsttd";
 import {
   NbaPropsWeek,
@@ -100,7 +100,7 @@ export default async function PropsView({
             </nav>
           )}
           <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {VIEWS.map((v) => (
+            {(market === "nba" ? NBA_VIEWS : VIEWS).map((v) => (
               <Link
                 key={v.id}
                 href={href(market, v.id)}

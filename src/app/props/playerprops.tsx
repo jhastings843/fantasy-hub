@@ -4,7 +4,7 @@
 // head at the same DraftKings line where both cover a prop. This week,
 // results, research. NBA props (Sam only) run through the same views, with
 // league="nba": its own record and system, no David board or outside projections.
-import { STAT_LABEL, type League, type PropMarket, type Side } from "@/lib/props/parse";
+import { STAT_LABEL, etDate, type League, type PropMarket, type Side } from "@/lib/props/parse";
 import { isPlay, nameKey } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
 import { getNbaPropsView } from "@/lib/props/nba-props";
@@ -33,7 +33,7 @@ function Unavailable() {
 }
 function Empty({ league = "nfl", graded = false }: { league?: League; graded?: boolean }) {
   if (league === "nba" && graded)
-    return <p className={s.calm}>Nothing graded yet. Each night&apos;s games are graded from ESPN&apos;s box scores by the next morning&apos;s run.</p>;
+    return <p className={s.calm}>Nothing graded yet. Each night&apos;s games are graded from ESPN&apos;s box scores at the overnight run, about 2:30am ET.</p>;
   if (league === "nba")
     return (
       <p className={s.calm}>
@@ -586,34 +586,45 @@ function NbaGameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
   );
 }
 
+const dayName = (d: string) => new Date(`${d}T16:00:00Z`).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long", month: "short", day: "numeric" });
+
 export async function NbaPropsWeek({ season }: { season: number }) {
   const v = await load(season, "nba");
   if (!v) return <Unavailable />;
-  const games = Object.values(v.current).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
-  if (!games.length) return <Empty league="nba" />;
+  // A rolling board, not a week: today's slate, anything saved for later days, and last night's results.
+  const today = etDate(new Date(renderedAt()));
+  const yesterday = etDate(new Date(renderedAt() - 86_400_000));
+  const games = Object.values(v.current)
+    .filter((g) => !g.kickoff || etDate(new Date(g.kickoff)) >= yesterday)
+    .sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
+  if (!Object.keys(v.current).length) return <Empty league="nba" />;
   const live = v.system.filter((e) => !e.retired);
   const byDay = new Map<string, StoredProps[]>();
   for (const g of games) {
-    const day = g.kickoff ? new Date(g.kickoff).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long", month: "short", day: "numeric" }) : "Date unknown";
+    const day = g.kickoff ? etDate(new Date(g.kickoff)) : today;
     byDay.set(day, [...(byDay.get(day) ?? []), g]);
   }
+  const order = [...byDay.keys()].filter((d) => d >= today).sort();
+  const days = [...order, ...(byDay.has(yesterday) ? [yesterday] : [])];
+  const label = (d: string) => (d === today ? `Today · ${dayName(d)}` : d === yesterday ? `Last night · ${dayName(d)}` : dayName(d));
   return (
     <section className={s.section} aria-labelledby="nba-pp-week">
       <div className={s.sectionHead}>
-        <h2 className={s.h2} id="nba-pp-week">{`Week ${v.week} NBA player props`}</h2>
+        <h2 className={s.h2} id="nba-pp-week">NBA player props</h2>
         <p className={s.p}>
-          {`Sam's NBA props, saved before each tip and graded from ESPN's box score. A play is a prop where Sam's projection sits 15%+ off the market's number (the middle of every book's line), bet at the best price posted on that number, never worse than -150. ${
+          {`Sam's NBA props, saved before each tip and graded from ESPN's box score overnight. A play is a prop where Sam's projection sits 15%+ off the market's number (the middle of every book's line), bet at the best price posted on that number, never worse than -150. Today's slate is first; last night's games stay below with their results until the next day. Older games are on Results. ${
             live.length
               ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the NBA system; plays that fall in one are marked.`
               : "Nothing has earned a place in the NBA system yet, so all of it is tracking, not money."
           }`}
         </p>
       </div>
-      {[...byDay.entries()].reverse().map(([day, gs]) => (
+      {!byDay.has(today) && <p className={s.calm}>{"Nothing saved for today yet. Sam's pages are saved at the afternoon and evening runs before tip."}</p>}
+      {days.map((day) => (
         <div key={day}>
-          <h3 className={pp.bbH}>{day}</h3>
+          <h3 className={pp.bbH}>{label(day)}</h3>
           <ol className={s.ftdGames}>
-            {gs.map((g) => (
+            {byDay.get(day)!.map((g) => (
               <NbaGameCard key={g.game.slug} saved={g} v={v} />
             ))}
           </ol>
@@ -646,7 +657,7 @@ export async function PropsResults({ season, league = "nfl" }: { season: number;
   const plays = v.graded.flatMap((x) =>
     x.result.markets.flatMap((r) => {
       const m = x.game.markets.find((y) => y.id === r.id);
-      return m && r.play ? [{ week: x.week, slug: x.slug, game: x.game, m, r }] : [];
+      return m && r.play ? [{ week: x.week, slug: x.slug, game: x.game, kickoff: x.kickoff, m, r }] : [];
     }),
   );
   const h2hSam = dget("h2h:sam");
@@ -658,7 +669,7 @@ export async function PropsResults({ season, league = "nfl" }: { season: number;
         {nba ? (
           <p className={s.p}>
             Sam&apos;s NBA props, graded the way the NFL ones are: every saved prop once its game is final, against the copy saved before tip, 1 unit risked per
-            bet at the price shown. A player who sat voids his props. Weeks run Monday to Sunday.
+            bet at the price shown, newest night first. A player who sat voids his props. Where a check counts weeks, they run Monday to Sunday.
           </p>
         ) : (
         <p className={s.p}>
@@ -727,7 +738,7 @@ export async function PropsResults({ season, league = "nfl" }: { season: number;
             <caption className={s.caption}>Sam&apos;s plays</caption>
             <thead>
               <tr>
-                <th>Wk</th>
+                <th>{nba ? "Date" : "Wk"}</th>
                 <th>Player</th>
                 <th>Bet</th>
                 <th>Price</th>
@@ -737,13 +748,13 @@ export async function PropsResults({ season, league = "nfl" }: { season: number;
               </tr>
             </thead>
             <tbody>
-              {plays.map(({ week, slug, m, r, game: xg }) => {
+              {plays.map(({ week, slug, m, r, game: xg, kickoff }) => {
                 const x = { game: xg };
                 const d = v.graded.find((x) => x.slug === slug && x.week === week)?.david?.[m.id];
                 const ds = d === undefined ? null : d > r.play!.line ? "over" : d < r.play!.line ? "under" : null;
                 return (
                   <tr key={`${slug}|${m.id}`}>
-                    <td className={s.num}>{week}</td>
+                    <td className={s.num}>{nba ? (kickoff ? new Date(kickoff).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "numeric", day: "numeric" }) : "–") : week}</td>
                     <td>{m.team ? `${m.player} (${m.team})` : `${m.player} (${x.game.away} at ${x.game.home})`}</td>
                     <td>{`${sideWord(r.play!.side)} ${r.play!.line} ${statShort(m)}`}</td>
                     <td className={s.num}>{`${am(r.play!.price)} ${r.play!.book}`}</td>

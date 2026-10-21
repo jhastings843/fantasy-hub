@@ -121,8 +121,8 @@ export default async function LearningPage() {
     {
       title: "NBA picks",
       rows: [
-        { name: "NBA spreads", loop: "NBA review: weekly, the Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ats") },
-        { name: "NBA totals", loop: "NBA review: weekly, the Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ou") },
+        { name: "NBA spreads", loop: "NBA review: games are daily, so evidence grows every night; the review runs every 7 days on a rolling clock, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ats") },
+        { name: "NBA totals", loop: "NBA review: games are daily, so evidence grows every night; the review runs every 7 days on a rolling clock, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ou") },
         {
           name: "NBA straight up",
           loop: "Record only",
@@ -139,7 +139,7 @@ export default async function LearningPage() {
       rows: [
         { name: "NFL player props (Sam and David)", loop: ENGINE, href: "/props?v=research", ...engineRow(nflProps) },
         { name: "NFL first TD", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 2.33", href: "/props?m=ftd&v=research", ...engineRow(ftd) },
-        { name: "NBA player props (Sam)", loop: ENGINE, href: "/props?m=nba&v=research", ...engineRow(nbaProps) },
+        { name: "NBA player props (Sam)", loop: `${ENGINE}. Games are daily and graded overnight; the review runs once per Monday-to-Sunday week`, href: "/props?m=nba&v=research", ...engineRow(nbaProps) },
         {
           name: "NBA first basket",
           loop: "Shared engine, First TD gate (planned)",

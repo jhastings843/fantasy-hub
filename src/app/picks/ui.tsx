@@ -17,6 +17,8 @@ export const VIEWS: { id: View; label: string }[] = [
   { id: "results", label: "Results" },
   { id: "research", label: "Research" },
 ];
+/** NBA plays every day, so its board is today's slate, not a week. */
+export const NBA_VIEWS: { id: View; label: string }[] = VIEWS.map((v) => (v.id === "week" ? { ...v, label: "Today" } : v));
 
 export const rec = (r: Pick<Rec, "w" | "l" | "p">) => `${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`;
 export const pct = (r: Rec) => `${Math.round(r.pct * 100)}%`;

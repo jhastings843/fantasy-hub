@@ -173,7 +173,9 @@ async function nbaGradedList(season: number): Promise<GradedPropsGame[]> {
 export async function getNbaPropsView(season: number): Promise<PropsView> {
   const nums = ((await redis.smembers(weeksKey(season))) ?? []).map(Number).sort((a, b) => b - a);
   const week = nums[0] ?? null;
-  const current = week ? await loadNbaWeek(season, week) : {};
+  // NBA plays daily: the board is a rolling few days, so a Monday keeps Sunday's games.
+  const recent = await Promise.all(nums.slice(0, 2).map((n) => loadNbaWeek(season, n)));
+  const current = Object.assign({}, ...recent.reverse()) as { [gameId: string]: StoredProps };
   const graded = await nbaGradedList(season);
   const [state, journal] = await Promise.all([loadSection(PROPS_SECTION.nba, season), loadJournal(PROPS_SECTION.nba, season)]);
   const learning = sectionView(PROPS_GATE, state, propCandidates(graded, "nba"), journal);

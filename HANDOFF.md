@@ -1,5 +1,11 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## NBA runs daily, not weekly (2026-10-20)
+- Jack: NBA games are most days with no weekly reset; make the UI and systems account for it. Also: live/final NBA cards said "not posted".
+- ESPN's scoreboard drops odds once a game tips. nba-store fills live/final games from the game summary's pickcenter (parseNbaSummaryOdds), and NbaView's asSaved() prefers the copy saved before tip (the graded numbers) and rebuilds Sam's read from it, since Sam drops tipped games from his page. Final cards show "Sam: Spread won · Total lost".
+- NBA tabs say "Today" (NBA_VIEWS in picks/ui.tsx). Picks board: "Today and next" plus a collapsed "Last night" day (getNbaBoard().yesterday). Props board (NbaPropsWeek): rolling today, later saved days, then last night; getNbaPropsView merges the two latest week hashes so Monday keeps Sunday. NBA props results show dates, not week numbers.
+- nba-props.yml: 6 daily slots (06:30 grade overnight, 16:00, 21:30, 22:45, 23:45, 01:00 UTC); table of EDT/EST times in the file. Learning stays weekly (picks: rolling 7 days; props engine: once per Mon-Sun week), with evidence growing nightly; /learning copy says so.
+
 ## Props week turnover (2026-10-20)
 - Jack noticed NFL props/First TD still on Week 6 on Tuesday. Cause: captures only on game days + the 8am snapshot; Sam posted Week 7 after it. Ran first-td.yml by hand (props Week 7: NE at CHI saved; First TD 1 saved, 13 waiting for Saturday). NFL props learning registered 68 slices on that run.
 - first-td.yml gains 22:30 UTC Tue/Wed/Fri. PropsWeek and FirstTdWeek use `boardWeek("nfl", ...)` (Tuesday 4am ET turnover, as Picks): when the calendar week is ahead of the last saved week they show "Nothing saved for Week N yet" instead of last week's cards.
