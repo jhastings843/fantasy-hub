@@ -57,6 +57,27 @@ const lineNum = (x: unknown): number | undefined => {
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/** DraftKings' spread, total and moneyline from one ESPN odds entry (scoreboard or summary pickcenter). */
+export function nbaOdds(o: any): Pick<NbaGame, "line" | "total" | "ml"> {
+  const g: Pick<NbaGame, "line" | "total" | "ml"> = {};
+  // `spread` is already the home line; the close prices sit under pointSpread.
+  const home = lineNum(o?.pointSpread?.home?.close?.line) ?? lineNum(o?.spread);
+  if (home !== undefined) g.line = { home, homePrice: odds(o.pointSpread?.home?.close?.odds), awayPrice: odds(o.pointSpread?.away?.close?.odds) };
+  const pts = lineNum(o?.total?.over?.close?.line) ?? lineNum(o?.overUnder);
+  if (pts !== undefined) g.total = { points: pts, overPrice: odds(o.total?.over?.close?.odds), underPrice: odds(o.total?.under?.close?.odds) };
+  const mh = odds(o?.moneyline?.home?.close?.odds);
+  const ma = odds(o?.moneyline?.away?.close?.odds);
+  if (mh !== undefined || ma !== undefined) g.ml = { home: mh, away: ma };
+  return g;
+}
+
+/** The closing odds from ESPN's game summary: the scoreboard drops them once a game tips. */
+export function parseNbaSummaryOdds(json: any): Pick<NbaGame, "line" | "total" | "ml"> {
+  const pc = json?.pickcenter ?? [];
+  const o = pc.find((x: any) => /draftkings/i.test(x?.provider?.name ?? "")) ?? pc[0];
+  return o ? nbaOdds(o) : {};
+}
+
 /** One day of ESPN's NBA scoreboard. */
 export function parseNbaScoreboard(json: any, day: string): NbaGame[] {
   const out: NbaGame[] = [];
@@ -78,16 +99,7 @@ export function parseNbaScoreboard(json: any, day: string): NbaGame[] {
       home: t(h),
       away: t(a),
     };
-    if (o) {
-      // `spread` is already the home line; the close prices sit under pointSpread.
-      const home = lineNum(o.pointSpread?.home?.close?.line) ?? lineNum(o.spread);
-      if (home !== undefined) g.line = { home, homePrice: odds(o.pointSpread?.home?.close?.odds), awayPrice: odds(o.pointSpread?.away?.close?.odds) };
-      const pts = lineNum(o.total?.over?.close?.line) ?? lineNum(o.overUnder);
-      if (pts !== undefined) g.total = { points: pts, overPrice: odds(o.total?.over?.close?.odds), underPrice: odds(o.total?.under?.close?.odds) };
-      const mh = odds(o.moneyline?.home?.close?.odds);
-      const ma = odds(o.moneyline?.away?.close?.odds);
-      if (mh !== undefined || ma !== undefined) g.ml = { home: mh, away: ma };
-    }
+    if (o) Object.assign(g, nbaOdds(o));
     if (state !== "pre") g.score = { home: Number(h.score) || 0, away: Number(a.score) || 0 };
     out.push(g);
   }

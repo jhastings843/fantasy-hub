@@ -1,5 +1,5 @@
 import "server-only";
-import { type NbaGame, type NbaRead, type SamNbaStatus, nbaNameIndex, parseNbaScoreboard, parseSamNba, readNba } from "./nba";
+import { type NbaGame, type NbaRead, type SamNbaStatus, nbaNameIndex, parseNbaScoreboard, parseNbaSummaryOdds, parseSamNba, readNba } from "./nba";
 
 // The NBA board: the next few game days from ESPN's public scoreboard
 // (DraftKings lines, no key) with Sam's NBA board joined on. Nothing is
@@ -8,6 +8,7 @@ import { type NbaGame, type NbaRead, type SamNbaStatus, nbaNameIndex, parseNbaSc
 export const NBA_SOURCES = {
   samBoard: "https://samthemodelman.smmodel.workers.dev/nba/",
   espn: "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+  espnSummary: "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary",
 } as const;
 
 const LOOKAHEAD_DAYS = 7;
@@ -61,6 +62,19 @@ export async function getNbaBoard(now = new Date()): Promise<NbaBoard> {
   ]);
 
   const days = slates.filter((g) => g.length).slice(0, SHOW_DAYS);
+  // Live and final games lose their odds on the scoreboard; the game summary keeps the close.
+  await Promise.all(
+    days
+      .flat()
+      .filter((g) => g.state !== "pre" && !g.line && !g.total && !g.ml)
+      .map(async (g) => {
+        try {
+          Object.assign(g, parseNbaSummaryOdds(await (await get(`${NBA_SOURCES.espnSummary}?event=${g.id}`)).json()));
+        } catch (e) {
+          problems.push(`ESPN summary ${g.id}: ${(e as Error).message}`);
+        }
+      }),
+  );
   const all = days.flat();
   const sam: SamNbaStatus = samHtml instanceof Error ? { state: "down", error: samHtml.message } : parseSamNba(samHtml, nbaNameIndex(slates.flat()));
 
