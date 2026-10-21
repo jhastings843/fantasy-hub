@@ -254,6 +254,9 @@ export interface WeatherDay {
   favoriteP: number;
   favoriteMid: number | null;
   models?: Record<string, number>;
+  /** The NWS high for the day and the share of the forecast it carried (added 2026-10-21). */
+  nws?: number | null;
+  nwsWeight?: number;
   edge: number | null;
   pick: string | null;
 }
@@ -274,6 +277,8 @@ export interface Weather {
   upcoming: WeatherDay[];
   learned: { days: number; scored: number; desk: number | null; market: number | null };
   trust: { w: number; days: number; fit: number | null };
+  /** Desk-wide brake over the last week (added 2026-10-21): off, slow (quarter stakes) or stop. */
+  brake?: { level: "off" | "slow" | "stop"; mult: number; n: number; desk: number | null; market: number | null; ratio: number | null };
   rules: { min_edge: number; kelly: number; max_stake: number; cutoff_hour: number; bench_min: number };
 }
 

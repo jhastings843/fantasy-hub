@@ -806,10 +806,15 @@ function WeatherTab({ w }: { w: Weather }) {
         <h2 className={m.panelTitle}>Bankroll</h2>
         {weatherChart(w, 220, 640)}
         <p className={m.sub}>
-          {`Bets on tomorrow's high in ${w.cities.length} cities on Kalshi. Each forecast averages five weather models and corrects them by what it has learned about each station. The desk's odds are blended with the market's: ${Math.round(w.trust.w * 100)}% desk, ${100 - Math.round(w.trust.w * 100)}% market${
+          {`Bets on tomorrow's high in ${w.cities.length} cities on Kalshi. Each forecast averages five weather models with the National Weather Service forecast, correcting each by what it has learned about the station and weighting whichever has missed by less. The desk's odds are blended with the market's: ${Math.round(w.trust.w * 100)}% desk, ${100 - Math.round(w.trust.w * 100)}% market${
             w.trust.days ? `, re-fit from ${w.trust.days} settled days` : ", until 20 days have settled"
           }. It bets only when the blend beats the price by ${wc(w.rules.min_edge)} after fees, no more than ${usd(w.rules.max_stake)} a bet, and never after ${w.rules.cutoff_hour}am on the day.`}
         </p>
+        {w.brake && w.brake.level !== "off" && w.brake.desk !== null && w.brake.market !== null ? (
+          <p className={`${m.sub} ${s.neg}`}>
+            {`Brake ${w.brake.level === "stop" ? "on: no new bets" : "on: quarter stakes"}. Over the last week the market scored ${w.brake.market.toFixed(3)} to the desk's ${w.brake.desk.toFixed(3)} across ${w.brake.n} city-days (lower is better). It keeps forecasting and scoring, and bets again once its week beats the market's.`}
+          </p>
+        ) : null}
       </div>
       {w.open.length > 0 && (
         <details className={`${m.panel} ${m.fold}`} open>
