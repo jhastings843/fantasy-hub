@@ -176,7 +176,10 @@ export const residual = (x: Features, p: Pick<SpreadParams, "w" | "b">) => p.b +
  * Ridge regression of the residual on the features (standardized inside,
  * returned on the raw scale). `lambda` is in units of games.
  */
-export function fitRidge(rows: { x: Features; y: number }[], lambda: number): { w: Features; b: number } {
+export function fitRidge(rows: { x: Features; y: number }[], lambda: number): { w: Features; b: number };
+export function fitRidge<K extends string>(rows: { x: Record<K, number>; y: number }[], lambda: number, keys: readonly K[]): { w: Record<K, number>; b: number };
+export function fitRidge(rows: { x: Record<string, number>; y: number }[], lambda: number, keys: readonly string[] = FEATURES): { w: Record<string, number>; b: number } {
+  const FEATURES = keys;
   const k = FEATURES.length;
   const n = rows.length;
   const mu = FEATURES.map((f) => rows.reduce((a, r) => a + r.x[f], 0) / n);
@@ -192,7 +195,7 @@ export function fitRidge(rows: { x: Features; y: number }[], lambda: number): { 
     }
   }
   const beta = solve(A, c);
-  const w = Object.fromEntries(FEATURES.map((f, j) => [f, beta[j] / sd[j]])) as Features;
+  const w = Object.fromEntries(FEATURES.map((f, j) => [f, beta[j] / sd[j]]));
   const b = ym - FEATURES.reduce((a, f, j) => a + w[f] * mu[j], 0);
   return { w, b };
 }
