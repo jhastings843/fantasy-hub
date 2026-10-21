@@ -19,7 +19,7 @@
 // Lines are home-side (negative: home favored), like the rest of Picks.
 
 import { BREAK_EVEN, MIN_SAMPLE, tally, type Result } from "./engine";
-import type { Splits } from "./splits";
+import { type Splits, readMarket } from "./splits";
 import { CRITERIA } from "./learning/model";
 import { samSpreadSide } from "./nba";
 
@@ -77,6 +77,8 @@ export interface NbaBet {
   result?: Result;
   /** Units on 1u risked at the saved price (-110 when none was saved). */
   net?: number;
+  /** Spread only, when the last pregame copy had public splits: which market signals point against this bet (splits.ts). */
+  mkt?: { rlmAgainst: boolean; publicOurs: boolean; sharpAgainst: boolean };
 }
 
 const payout = (p?: number) => (p === undefined ? 100 / 110 : p > 0 ? p / 100 : 100 / -p);
@@ -89,7 +91,9 @@ export function nbaBets(g: NbaTracked): NbaBet[] {
   if (s.line !== undefined && (s.line !== s.model || (s.samLine !== undefined && s.samLine !== s.model))) {
     const { side, edge, crossed } = samSpreadSide(s.line, s.model, s.samLine);
     const home = side === "home";
-    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0 });
+    const m = s.splits && readMarket("nba", s.splits, s.line);
+    const mkt = m ? { rlmAgainst: !!m.rlm && m.rlm !== side, publicOurs: m.publicSide === side, sharpAgainst: !!m.sharpSide && m.sharpSide !== side } : undefined;
+    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0, ...(mkt ? { mkt } : {}) });
   }
   if (s.model !== 0) {
     const home = s.model < 0;
@@ -122,6 +126,8 @@ export interface NbaCut {
   label: string;
   /** Research cuts are candidates for the rule only once the review activates them. */
   research?: { parent: string };
+  /** Tested by the review but never activated by it: a person decides (the market signals, 2026-10-21). */
+  reportOnly?: true;
   test: (b: NbaBet) => boolean;
 }
 
@@ -143,6 +149,11 @@ export const NBA_CUTS: NbaCut[] = [
   { id: "ats:dog-edge2", market: "ats", label: "Underdog, edge 2+", research: { parent: "ats:dog" }, test: (b) => b.dog && b.edge >= 2 },
   { id: "ats:home-dog", market: "ats", label: "Home underdog", research: { parent: "ats:dog" }, test: (b) => b.dog && b.side === "home" },
   { id: "ats:fav-edge3", market: "ats", label: "Favorite, edge 3+", research: { parent: "ats:fav" }, test: (b) => !b.dog && b.line !== 0 && b.edge >= 3 },
+  // Public betting and line moves: every Sam side, minus the ones a signal
+  // flags. Games without splits bet the same as the parent. Report only.
+  { id: "ats:mkt-rlm", market: "ats", label: "Skip reverse line moves against Sam", research: { parent: "ats:all" }, reportOnly: true, test: (b) => !b.mkt?.rlmAgainst },
+  { id: "ats:mkt-public", market: "ats", label: "Skip when the public (65%+) is on Sam's side", research: { parent: "ats:all" }, reportOnly: true, test: (b) => !b.mkt?.publicOurs },
+  { id: "ats:mkt-sharp", market: "ats", label: "Skip sharp money against Sam", research: { parent: "ats:all" }, reportOnly: true, test: (b) => !b.mkt?.sharpAgainst },
   { id: "ou:all", market: "ou", label: "Every Sam total", test: () => true },
   { id: "ou:edge3", market: "ou", label: "Total edge 3+ pts", test: (b) => b.edge >= 3 },
   { id: "ou:edge5", market: "ou", label: "Total edge 5+ pts", test: (b) => b.edge >= 5 },
@@ -435,7 +446,7 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
     }
   }
   const ready = next
-    .filter((h) => h.status === "collecting")
+    .filter((h) => h.status === "collecting" && !NBA_CUT.get(h.id)?.reportOnly)
     .map((h) => ({ h, c: compareCut(rows, h.id, h.registeredAt) }))
     .filter(({ c }) => c.n >= CRITERIA.MIN_OPPORTUNITIES && c.weeks >= CRITERIA.MIN_WEEKS && c.t !== null && c.t >= CRITERIA.MIN_T)
     .sort((a, b) => (b.c.t ?? 0) - (a.c.t ?? 0));

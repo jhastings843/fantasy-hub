@@ -173,7 +173,7 @@ function CutTable({ title, rows, v }: { title: string; rows: NbaCutRecord[]; v: 
                 {x.label}
                 {t1.includes(x.id) && <span className={s.pill}>tier 1</span>}
                 {t2.includes(x.id) && <span className={s.pill}>tier 2</span>}
-                {x.research && <span className={s.dim}>{v.activated.includes(x.id) ? " · research, activated" : " · research"}</span>}
+                {x.research && <span className={s.dim}>{v.activated.includes(x.id) ? " · research, activated" : x.id.startsWith("ats:mkt-") ? " · research, report only" : " · research"}</span>}
               </td>
               <td className={s.num}>{rec(x)}</td>
               <td className={s.num}>{x.w + x.l ? pctOf(x.pct) : "–"}</td>

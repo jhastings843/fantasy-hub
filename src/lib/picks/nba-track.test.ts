@@ -122,6 +122,24 @@ describe("the NBA learning review", () => {
     expect(r.journal.some((j) => j.kind === "activate")).toBe(true);
   });
 
+  it("tests the market signals but never activates them on its own", () => {
+    // Sam NY -7 at DK NY -4.5 (home). NY opened -6.5, now -4.5: moved toward PHI while 70% of tickets are on NY -> RLM against Sam.
+    const splits = { homeTickets: 70, homeMoney: 60, open: -6.5, at: "2026-10-20T12:00:00Z" };
+    const flagged = Array.from({ length: 40 }, (_, i) => game(i, { week: 1 + (i % 4), final: { home: 100, away: 110 } }, { splits }));
+    const clean = Array.from({ length: 40 }, (_, i) => game(100 + i, { week: 1 + (i % 4), final: { home: 110, away: 100 } }));
+    const b = nbaBets(flagged[0]).find((x) => x.market === "ats")!;
+    expect(b.mkt).toEqual({ rlmAgainst: true, publicOurs: true, sharpAgainst: true });
+    expect(NBA_CUT.get("ats:mkt-rlm")!.test(b)).toBe(false);
+    // No splits saved: the bet stands, same as the parent.
+    expect(NBA_CUT.get("ats:mkt-rlm")!.test(nbaBets(clean[0]).find((x) => x.market === "ats")!)).toBe(true);
+    const rows = settledRows([...flagged, ...clean]);
+    // Skipping the flagged losers clears the bar, yet the review leaves it collecting.
+    expect(compareCut(rows, "ats:mkt-rlm", "2026-10-19T00:00:00Z").t).toBeGreaterThan(1.645);
+    const hyps = registerNew([], "2026-10-19T00:00:00Z").filter((h) => h.id.startsWith("ats:mkt-"));
+    const r = reviewNba(rows, hyps, "2026-11-20T00:00:00Z");
+    expect(r.hyps.every((h) => h.status === "collecting")).toBe(true);
+  });
+
   it("runs weekly", () => {
     const now = new Date("2026-10-27T12:00:00Z");
     expect(reviewDue(undefined, now)).toBe(true);
