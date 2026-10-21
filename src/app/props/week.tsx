@@ -170,6 +170,24 @@ function GameTable({ head, rows }: { head: string[]; rows: GameRowData[] }) {
   );
 }
 
+/**
+ * FanDuel next to DraftKings on our side of a prop: its line and price, and
+ * which book is better for the side we like (a better line beats a better price).
+ */
+function fdNote(fd: { line: number; over: number; under: number } | undefined, m: PropMarket): string {
+  if (!fd) return "not read (morning of game day)";
+  const side = m.side ?? "over";
+  const fp = fd[side];
+  const dp = m.books[0][side];
+  const text = `${side === "over" ? "o" : "u"}${fd.line} ${am(fp)}`;
+  if (fd.line !== m.line) {
+    const fdBetter = side === "over" ? fd.line < m.line : fd.line > m.line;
+    return `${text} · ${fdBetter ? "better line at FanDuel" : "DK has the better line"}`;
+  }
+  if (dp === null || fp === dp) return `${text} · same as DK`;
+  return `${text} · ${implied(fp) < implied(dp) ? "FanDuel pays more" : "DK pays more"}`;
+}
+
 /** The four numbers on every Props tab: edges now, the record, the closest slice, the learner. */
 function PropStats({ edges, graded, learning, logHref, unit }: { edges: number; graded: { w: number; l: number; p: number; units: number }; learning: SectionView; logHref: string; unit: string }) {
   const best = Math.max(0, ...learning.entries.map((e) => e.ev?.games ?? 0));
@@ -357,6 +375,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
         ["Our median", `${x?.median ?? m.model}`],
         ["Price from", x?.price === "odds-api" ? "DraftKings (The Odds API)" : x?.price === "david" ? "David's board" : x?.price === "espn" ? "DraftKings (ESPN)" : "none posted yet"],
         ["DK over / under", `${am(m.books[0].over ?? -110)} / ${am(m.books[0].under ?? -110)}`],
+        ["FanDuel", fdNote(x?.fd, m)],
       ];
     },
     david,
@@ -531,20 +550,25 @@ async function FirstTdWeek({ season }: { season: number }) {
   };
   // DraftKings' First TD price (The Odds API, read the morning of game day), keyed by the full name squashed:
   // "J.Chase" matches the one key that starts with "j" and ends with "chase".
-  const dkPrice = (g: OurFtdStored, name: string): number | null => {
-    if (!g.dk) return null;
+  const bookPrice = (book: OurFtdStored["dk"], name: string): number | null => {
+    if (!book) return null;
     const [ini, ...rest] = name.split(".");
     const last = nameKey(rest.join(" "));
-    const hits = Object.keys(g.dk.prices).filter((k) => k.startsWith(ini.toLowerCase()) && k.endsWith(last));
-    return hits.length === 1 ? g.dk.prices[hits[0]] : null;
+    const hits = Object.keys(book.prices).filter((k) => k.startsWith(ini.toLowerCase()) && k.endsWith(last));
+    return hits.length === 1 ? book.prices[hits[0]] : null;
   };
-  /** The cheaper of Kalshi's cost and DraftKings' break-even, and where it is. */
+  const dkPrice = (g: OurFtdStored, name: string) => bookPrice(g.dk, name);
+  const fdPrice = (g: OurFtdStored, name: string) => bookPrice(g.fd, name);
+  /** The cheapest of Kalshi's cost, DraftKings' and FanDuel's break-evens, and where it is. */
   const best = (g: OurFtdStored, name: string): { cost: number; where: string } | null => {
     const k = kalshi(g, name);
+    const opts: { cost: number; where: string }[] = [];
+    if (k !== null) opts.push({ cost: k, where: `${Math.round(k * 100)}¢ Kalshi` });
     const d = dkPrice(g, name);
-    const dc = d !== null ? implied(d) : null;
-    if (k === null && dc === null) return null;
-    return dc !== null && (k === null || dc < k) ? { cost: dc, where: `${am(d!)} DK` } : { cost: k!, where: `${Math.round(k! * 100)}¢ Kalshi` };
+    if (d !== null) opts.push({ cost: implied(d), where: `${am(d)} DK` });
+    const f = fdPrice(g, name);
+    if (f !== null) opts.push({ cost: implied(f), where: `${am(f)} FanDuel` });
+    return opts.sort((a, b) => a.cost - b.cost)[0] ?? null;
   };
   const cost = (g: OurFtdStored, name: string) => best(g, name)?.cost ?? null;
   const edges: Edge[] = ahead
@@ -571,6 +595,7 @@ async function FirstTdWeek({ season }: { season: number }) {
             more: [
               ["Kalshi cost (fee in)", k !== null ? `${Math.round(k * 100)}¢` : "no market"],
               ["DraftKings", d !== null ? `${am(d)} (breaks even at ${pct(implied(d))})` : g.dk ? "not listed" : "read the morning of game day"],
+              ["FanDuel", fdPrice(g, p.name) !== null ? `${am(fdPrice(g, p.name)!)} (breaks even at ${pct(implied(fdPrice(g, p.name)!))})` : g.fd ? "not listed" : "read the morning of game day"],
               [`${p.team} scores first`, pct(team.pFirst)],
               ["Touches, TDs (this season and last)", `${p.touches}, ${p.tds}`],
               ["No offensive TD first", pct(g.game.none)],

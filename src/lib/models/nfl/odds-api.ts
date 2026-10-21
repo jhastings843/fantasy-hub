@@ -25,6 +25,8 @@ export const ODDS_MARKET: { [s in NflStat]: string } = {
 };
 export const FIRST_TD = "player_1st_td";
 export const MARKETS = [...Object.values(ODDS_MARKET), FIRST_TD];
+/** DraftKings plus FanDuel (Jack, 2026-10-21): up to 10 books count as one region, so the second book costs nothing. */
+export const BOOKS = ["draftkings", "fanduel"];
 
 /** One morning read of one game. */
 export interface OddsRead {
@@ -35,6 +37,8 @@ export interface OddsRead {
   firstTd: { [k: string]: number };
   /** Credits this read cost, from the API's x-requests-last header. */
   cost?: number;
+  /** FanDuel's numbers from the same read (reads from 2026-10-22 on), same shape: its own line, any line. */
+  fd?: { props: OddsRead["props"]; firstTd: OddsRead["firstTd"] };
 }
 
 interface OddsOutcome {
@@ -49,10 +53,11 @@ interface OddsEventOdds {
 
 const STAT_OF = new Map(Object.entries(ODDS_MARKET).map(([s, m]) => [m, s as NflStat]));
 
-export function parseEventOdds(json: unknown, at: string): OddsRead {
-  const out: OddsRead = { at, props: {}, firstTd: {} };
-  const dk = (json as OddsEventOdds)?.bookmakers?.find((b) => b.key === "draftkings");
-  for (const m of dk?.markets ?? []) {
+/** One book's props and First TD prices from an event-odds response. */
+function parseBook(json: unknown, book: string): { props: OddsRead["props"]; firstTd: OddsRead["firstTd"] } {
+  const out: { props: OddsRead["props"]; firstTd: OddsRead["firstTd"] } = { props: {}, firstTd: {} };
+  const b = (json as OddsEventOdds)?.bookmakers?.find((x) => x.key === book);
+  for (const m of b?.markets ?? []) {
     if (m.key === FIRST_TD) {
       for (const o of m.outcomes ?? []) {
         const who = o.description ?? o.name;
@@ -67,7 +72,7 @@ export function parseEventOdds(json: unknown, at: string): OddsRead {
       if (!o.description || typeof o.price !== "number" || typeof o.point !== "number") continue;
       const k = `${nameKey(o.description)}|${stat}`;
       const e = by.get(k) ?? {};
-      // DK posts one line per player here; a second number is an alternate and is skipped.
+      // One line per player here; a second number is an alternate and is skipped.
       if (e.line !== undefined && e.line !== o.point) continue;
       e.line = o.point;
       if (o.name === "Over") e.over = o.price;
@@ -77,6 +82,17 @@ export function parseEventOdds(json: unknown, at: string): OddsRead {
     for (const [k, e] of by) if (e.line !== undefined && e.over !== undefined && e.under !== undefined) out.props[k] = { line: e.line, over: e.over, under: e.under };
   }
   return out;
+}
+
+export function parseEventOdds(json: unknown, at: string): OddsRead {
+  const dk = parseBook(json, "draftkings");
+  const fd = parseBook(json, "fanduel");
+  return { at, ...dk, ...(Object.keys(fd.props).length || Object.keys(fd.firstTd).length ? { fd } : {}) };
+}
+
+/** FanDuel's line and prices on a prop, whatever its line. */
+export function fdProp(read: OddsRead | null | undefined, name: string, stat: NflStat): { line: number; over: number; under: number } | null {
+  return read?.fd?.props[`${nameKey(name)}|${stat}`] ?? null;
 }
 
 /** A price for our board, only when DK's line in the read is the same number ESPN shows now. */

@@ -1,11 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { samTeam } from "@/lib/firsttd/grade";
-import { matchEvent, oddsPrice, parseEventOdds, readDue } from "./odds-api";
+import { fdProp, matchEvent, oddsPrice, parseEventOdds, readDue } from "./odds-api";
 
 // Shaped like The Odds API's /events/{id}/odds response (docs example, 2026-10-21).
 const body = {
   bookmakers: [
-    { key: "fanduel", markets: [{ key: "player_rush_yds", outcomes: [{ name: "Over", description: "Chase Brown", price: 999, point: 1 }] }] },
+    {
+      key: "fanduel",
+      markets: [
+        { key: "player_rush_yds", outcomes: [{ name: "Over", description: "Chase Brown", price: 999, point: 1 }] },
+        { key: "player_rec", outcomes: [] },
+        {
+          key: "player_reception_yds",
+          outcomes: [
+            { name: "Over", description: "Ja'Marr Chase", price: -105, point: 79.5 },
+            { name: "Under", description: "Ja'Marr Chase", price: -125, point: 79.5 },
+          ],
+        },
+      ],
+    },
     {
       key: "draftkings",
       markets: [
@@ -40,6 +53,11 @@ describe("The Odds API reads", () => {
   });
   it("reads First TD yes prices, not the no side", () => {
     expect(Object.values(r.firstTd)).toEqual([650]);
+  });
+  it("keeps FanDuel apart, at its own line, both sides only", () => {
+    expect(fdProp(r, "Ja'Marr Chase", "rec_yds")).toEqual({ line: 79.5, over: -105, under: -125 });
+    expect(fdProp(r, "Chase Brown", "rush_yds")).toBeNull(); // one side only
+    expect(oddsPrice(r, "Ja'Marr Chase", "rec_yds", 79.5)).toBeNull(); // DK's price never comes from FanDuel
   });
   it("tolerates junk", () => {
     expect(parseEventOdds(null, "x")).toMatchObject({ props: {}, firstTd: {} });

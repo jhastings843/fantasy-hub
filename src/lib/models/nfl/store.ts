@@ -12,7 +12,7 @@ import { OUR_SECTION, ourPropCandidates } from "../learn";
 import { readStats, type NflRow } from "./data";
 import { NflRunning, type NflSummary } from "./history";
 import { ourNflMarkets, type NflMarketExtra } from "./market";
-import { oddsPrice } from "./odds-api";
+import { fdProp, oddsPrice } from "./odds-api";
 import { morningOddsReads } from "./odds-api-store";
 import { projectNflGame, type NflParams, type NflPlayerInput, type NflProjection, type NflStat } from "./props";
 import PARAMS from "./params.json";
@@ -212,6 +212,10 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
         };
         const { markets, extra } = ourNflMarkets(lines, proj, names, price, P);
         if (!markets.length) continue;
+        for (const m of markets) {
+          const f = m.stat ? fdProp(read, m.player, m.stat as NflStat) : null;
+          if (f && extra[m.id]) extra[m.id].fd = f;
+        }
         const week = report.week!;
         const old = (await loadWeek(season, week))[e.id];
         const stored: OurNflStored = {

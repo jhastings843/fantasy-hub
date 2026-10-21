@@ -44,6 +44,8 @@ export interface OurFtdStored {
   kalshi?: KalshiGame;
   /** DraftKings' First TD prices (American) by nameKey, from The Odds API's morning-of read. Shown only; money checks still read Kalshi. */
   dk?: { at: string; prices: { [nameKey: string]: number } };
+  /** FanDuel's First TD prices from the same read (from 2026-10-22). */
+  fd?: { at: string; prices: { [nameKey: string]: number } };
   result?: Graded;
   gradedAt?: string;
 }
@@ -146,8 +148,9 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
         const k = kalshi.get(`${A}@${H}`) ?? old?.kalshi;
         const read = reads.get(e.id);
         const dk = read && Object.keys(read.firstTd).length ? { at: read.at, prices: read.firstTd } : old?.dk;
+        const fd = read?.fd && Object.keys(read.fd.firstTd).length ? { at: read.at, prices: read.fd.firstTd } : old?.fd;
         await redis.hset(FK.week(season, week), {
-          [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}), ...(dk ? { dk } : {}) } satisfies OurFtdStored,
+          [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}), ...(dk ? { dk } : {}), ...(fd ? { fd } : {}) } satisfies OurFtdStored,
         });
         await redis.sadd(FK.weeks(season), String(week));
         report.saved.push(`${A}@${H} ${game.teams.reduce((a, t) => a + t.players.length, 0)} players${k ? ", Kalshi" : ""}`);

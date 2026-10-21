@@ -1,5 +1,10 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
+## FanDuel beside DraftKings on NFL props, free (2026-10-21)
+- Jack: stay on The Odds API free tier, no line-comparison build; asked about FanDuel. Docs: "Every group of 10 bookmakers is the equivalent of 1 region", so `bookmakers=draftkings,fanduel` costs the same as DK alone (`BOOKS` in odds-api.ts). Credit math (estimate): NFL prop reads ~320/month, MONTHLY_STOP 450; a main-line check would add ~115-230, NBA props across books ~1,200, so neither was built.
+- `parseEventOdds` reads both books (`parseBook`); `OddsRead.fd` (reads from 2026-10-22). `fdProp` gives FanDuel's own line and prices. NFL board `extra[id].fd`; First TD `fd` prices. DK's price still decides the NFL prop edge; FanDuel is shown ("FanDuel pays more" / "better line at FanDuel" / "same as DK"). First TD's cheapest price now considers Kalshi, DK and FanDuel.
+- First FanDuel read: Thu 10/22 9am ET (NE at CHI).
+
 ## NBA injury news repricer (2026-10-21, 339e443, deployed)
 - Jack chose it from the research (pros like Calvin, Circles Off 08:51: price teammates' props the minute a player is ruled out, before the book moves).
 - `src/lib/models/nba/news.ts` (pure): `readFeed` (ESPN league injuries feed, id from the player link), `changes` (new Out, or back from Out; only "Out" counts), `affected` (teammate markets whose mean moved 0.3+, with DK price, no-vig chance, our chance, edge flag = clears + 3 games), `followup` (DK at the last pregame copy: line move our way, no-vig move our way, outcome).

@@ -1,6 +1,6 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { MARKETS, MONTHLY_STOP, ODDS_SPORT, type OddsEvent, type OddsRead, matchEvent, parseEventOdds, readDue } from "./odds-api";
+import { BOOKS, MARKETS, MONTHLY_STOP, ODDS_SPORT, type OddsEvent, type OddsRead, matchEvent, parseEventOdds, readDue } from "./odds-api";
 
 // The Odds API, fetched and saved. No key (ODDS_API_KEY) means no reads:
 // every caller falls back to David's board and then -110, as before.
@@ -74,7 +74,7 @@ export async function morningOddsReads(
         notes.push(`${g.away}@${g.home}: no Odds API event`);
         continue;
       }
-      const res = await get(`${BASE}/sports/${ODDS_SPORT}/events/${e.id}/odds?apiKey=${key}&bookmakers=draftkings&markets=${MARKETS.join(",")}&oddsFormat=american`);
+      const res = await get(`${BASE}/sports/${ODDS_SPORT}/events/${e.id}/odds?apiKey=${key}&bookmakers=${BOOKS.join(",")}&markets=${MARKETS.join(",")}&oddsFormat=american`);
       const read = { ...parseEventOdds(res.body, now.toISOString()), cost: num(res.headers, "x-requests-last") };
       const used = num(res.headers, "x-requests-used");
       const remaining = num(res.headers, "x-requests-remaining");
@@ -85,7 +85,7 @@ export async function morningOddsReads(
       // Kept two weeks: long enough to grade, no longer.
       await redis.set(K.read(season, g.espnId), read, { ex: 14 * 86400 });
       reads.set(g.espnId, read);
-      notes.push(`${g.away}@${g.home}: ${Object.keys(read.props).length} props, ${Object.keys(read.firstTd).length} first TD, ${read.cost ?? "?"} credits`);
+      notes.push(`${g.away}@${g.home}: ${Object.keys(read.props).length} props (FanDuel ${Object.keys(read.fd?.props ?? {}).length}), ${Object.keys(read.firstTd).length} first TD, ${read.cost ?? "?"} credits`);
     }
     if (usage) notes.push(`${usage.used} used this month, ${usage.remaining} left`);
   } catch (err) {

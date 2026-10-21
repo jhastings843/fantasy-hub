@@ -25,6 +25,8 @@ export interface NflMarketExtra {
   median: number;
   /** Where the price came from. */
   price: "espn" | "odds-api" | "david" | "assumed";
+  /** FanDuel's line and prices on the same prop, the morning of game day (shown, not used for the edge). */
+  fd?: { line: number; over: number; under: number };
 }
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
