@@ -155,3 +155,37 @@ describe("Harris veto on a PEM split pick (Astra, 2026-10-20)", () => {
     expect(tierBoard("cfb", [row], s, "avg", { harris: true })[0]).toMatchObject({ tier: "split", vetoedBy: "Harris" });
   });
 });
+
+describe("public betting and line moves (report only)", () => {
+  // Sam -7, David -5 at KC -6: models split, so use both on KC -9 / -8 to make KC (home) the rule side.
+  const ours = snap({ sam: { model: -9, market: -6 }, david: { model: -8, market: -6 } });
+  const at = "2026-10-22T12:00:00Z";
+  const withSplits = (splits: ForecastSnapshot["splits"]) => opp({ home: 30, away: 20 }, { ...ours, splits });
+
+  it("registers three report-only hypotheses per league", async () => {
+    const { laterHypotheses: later } = await import("./model");
+    const hs = later("2026-10-21T11:00:00Z").filter((h) => h.kind === "market");
+    expect(hs.map((h) => h.id).sort()).toEqual(["cfb:mkt:public-ours", "cfb:mkt:rlm-against", "cfb:mkt:sharp-against", "nfl:mkt:public-ours", "nfl:mkt:rlm-against", "nfl:mkt:sharp-against"]);
+    expect(hs.every((h) => !h.actionable)).toBe(true);
+  });
+
+  it("skips a rule bet when the line moved toward the side the tickets are against, and it is not ours", async () => {
+    const { marketPairs } = await import("./model");
+    // KC opened -8, now -6: moved toward LV while 70% of tickets are on KC -> RLM on LV, against us.
+    const [p] = marketPairs("rlm-against", "nfl", {}, [withSplits({ homeTickets: 70, homeMoney: 60, open: -8, at })]);
+    expect(p.inc.bet).toBe(true);
+    expect(p.ch.bet).toBe(false);
+    // Same move with the public on LV is not RLM: the bet stands.
+    const [q] = marketPairs("rlm-against", "nfl", {}, [withSplits({ homeTickets: 30, homeMoney: 30, open: -8, at })]);
+    expect(q.ch.bet).toBe(true);
+  });
+
+  it("public-ours and sharp-against fire on their own reads, and no splits means no change", async () => {
+    const { marketPairs } = await import("./model");
+    expect(marketPairs("public-ours", "nfl", {}, [withSplits({ homeTickets: 72, homeMoney: 70, at })])[0].ch.bet).toBe(false);
+    expect(marketPairs("sharp-against", "nfl", {}, [withSplits({ homeTickets: 60, homeMoney: 45, at })])[0].ch.bet).toBe(false);
+    expect(marketPairs("sharp-against", "nfl", {}, [withSplits({ homeTickets: 45, homeMoney: 60, at })])[0].ch.bet).toBe(true);
+    const [none] = marketPairs("public-ours", "nfl", {}, [opp({ home: 30, away: 20 }, ours)]);
+    expect(none.ch).toEqual(none.inc);
+  });
+});

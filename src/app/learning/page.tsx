@@ -36,7 +36,7 @@ interface Row {
 }
 
 function picksMarket(state: ReviewState | null, policy: PicksPolicy, league: "nfl" | "cfb", market: "ats" | "ou" | "su"): Pick<Row, "live" | "collecting" | "last"> {
-  const ds = (state?.decisions ?? []).filter((d) => d.id.startsWith(`${league}:`) && (market === "su" ? d.id.includes(":su:") : market === "ou" ? d.id.includes(":ou:") : !d.id.includes(":su:") && !d.id.includes(":ou:")));
+  const ds = (state?.decisions ?? []).filter((d) => d.id.startsWith(`${league}:`) && (market === "su" ? d.id.includes(":su:") : market === "ou" ? d.id.includes(":ou:") : !d.id.includes(":su:") && !d.id.includes(":ou:") && !d.id.includes(":mkt:")));
   const count = (v: string) => ds.filter((d) => d.verdict === v).length;
   const live =
     market === "su"
@@ -117,6 +117,20 @@ export default async function LearningPage() {
         href: "/picks/cfb?v=research",
         ...sourceRow(state, policy, src),
       })),
+    },
+    {
+      title: "Public betting and line moves (report only)",
+      rows: (["nfl", "cfb"] as const).map((l) => {
+        const ds = (state?.decisions ?? []).filter((d) => d.id.startsWith(`${l}:mkt:`));
+        return {
+          name: `${l === "nfl" ? "NFL" : "College"}: reverse line moves, public side, sharp money`,
+          loop: "Picks review: does skipping the rule bets each signal flags gain? Splits from Action Network's public feed, saved with every pregame snapshot since Oct 21. Report only: nothing changes a bet until Jack says so.",
+          href: l === "nfl" ? "/picks?v=research" : "/picks/cfb?v=research",
+          live: "Not used on any bet",
+          collecting: ds.length ? ds.map((d) => `${d.id.split(":mkt:")[1]}: ${d.why}`).join(" · ") : "Registers at the next Tuesday review",
+          last: state?.lastReviewAt ?? null,
+        };
+      }),
     },
     {
       title: "NBA picks",

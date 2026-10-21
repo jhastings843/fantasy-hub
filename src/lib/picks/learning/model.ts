@@ -35,6 +35,7 @@ import { clvPoints } from "../closing";
 import { decimal, stakeFor } from "../staking";
 import { payout } from "../units";
 import type { League } from "../parse";
+import { readMarket } from "../splits";
 import { type DecisionRecord, type SizingEvidence, type SizingPair, sizingEvidence } from "./replay";
 
 // ----------------------------------------------------------------- criteria
@@ -67,7 +68,7 @@ export const CRITERIA = {
 
 // --------------------------------------------------------------- hypotheses
 
-export type HypothesisKind = "ats-cut" | "totals-cut" | "stake-policy" | "timing" | "parlay" | "su-method" | "pem" | "source";
+export type HypothesisKind = "ats-cut" | "totals-cut" | "stake-policy" | "timing" | "parlay" | "su-method" | "pem" | "source" | "market";
 
 export interface Hypothesis {
   id: string;
@@ -82,7 +83,8 @@ export interface Hypothesis {
     | { kind: "parlay"; label: string; minEdge: number }
     | { kind: "su-method"; method: string; vs: string; label: string }
     | { kind: "pem"; label: string }
-    | { kind: "source"; source: Source; label: string };
+    | { kind: "source"; source: Source; label: string }
+    | { kind: "market"; filter: MarketFilter; label: string };
   /** Activatable automatically, or a report/proposal only. */
   actionable: boolean;
   registeredAt: string;
@@ -170,7 +172,19 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
             }),
           )
         : [];
-    return [...totals, ...su, ...sources];
+    const market = MARKET_FILTERS.map(
+      (f): Hypothesis => ({
+        id: `${league}:mkt:${f.id}`,
+        kind: "market",
+        league,
+        definition: { kind: "market", filter: f.id, label: f.label },
+        actionable: false,
+        registeredAt,
+        status: "collecting",
+        origin: "Jack, 2026-10-21: test public betting splits and reverse line movement before they touch a bet",
+      }),
+    );
+    return [...totals, ...su, ...sources, ...market];
   });
   return [
     {
@@ -542,6 +556,43 @@ export function sourcePairs(src: Source, rule: CutTest, opps: Opportunity[], har
   });
 }
 
+// ---------------------------------------------------------- market signals
+
+/**
+ * Public splits and line movement as a veto on the rule's bets (splits.ts).
+ * Report only for now: a person decides before any of these touches a bet.
+ *   rlm-against:   the line moved toward the side the tickets are against, and that side is not ours
+ *   public-ours:   65%+ of tickets are on our side (the "fade the public" idea, as a skip)
+ *   sharp-against: money share beats ticket share by 10+ on the other side
+ */
+export type MarketFilter = "rlm-against" | "public-ours" | "sharp-against";
+export const MARKET_FILTERS: { id: MarketFilter; label: string }[] = [
+  { id: "rlm-against", label: "Reverse line movement against our side: does skipping those rule bets gain?" },
+  { id: "public-ours", label: "Public on our side (65%+ of tickets): does skipping those rule bets gain?" },
+  { id: "sharp-against", label: "Sharp money against our side (money 10+ points over tickets): does skipping those rule bets gain?" },
+];
+
+/** True when the filter says skip this bet, judged at the last pregame snapshot that carried splits. */
+export function marketSkips(filter: MarketFilter, league: League, side: "home" | "away", o: Opportunity): boolean | null {
+  const s = o.last.splits ? o.last : null;
+  if (!s?.splits) return null;
+  const m = readMarket(league, s.splits, s.ref?.line);
+  if (filter === "rlm-against") return !!m.rlm && m.rlm !== side;
+  if (filter === "public-ours") return m.publicSide === side;
+  return !!m.sharpSide && m.sharpSide !== side;
+}
+
+/** Rule bet vs the same bet skipped when the market filter fires. Games without splits score the same on both sides. */
+export function marketPairs(filter: MarketFilter, league: League, rule: CutTest, opps: Opportunity[]): { o: Opportunity; ch: Scored; inc: Scored }[] {
+  return opps.map((o) => {
+    const inc = scoreCut(rule, o.last, o);
+    if (!inc.bet) return { o, ch: inc, inc };
+    const r = readAt(o.last.ref!.line, o.last.sam!, o.last.david!, o.last.pem);
+    const side = rule.pemSplit ? r.pemSide : r.side;
+    return { o, ch: side && marketSkips(filter, league, side, o) ? none : inc, inc };
+  });
+}
+
 export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
   const opps = after(h, x.opps).filter((o) => h.league === "both" || o.league === h.league);
   const d = h.definition;
@@ -554,6 +605,12 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       const since = [h.registeredAt, x.active.sourcesChangedAt?.[d.source] ?? ""].sort().at(-1)!;
       const own = x.opps.filter((o) => o.league === "cfb" && o.first.at >= since);
       return { id: h.id, comparison: compare(sourcePairs(d.source, t, own, x.harris)), note: `${d.source} is ${sourceState(x.active, d.source)}; challenger = skip its disagreements` };
+    }
+    case "market": {
+      const t = x.ruleTest[h.league as League];
+      if (!t) return { id: h.id, note: "no rule in force" };
+      const withSplits = opps.filter((o) => o.last.splits).length;
+      return { id: h.id, comparison: compare(marketPairs(d.filter, h.league as League, t, opps)), note: `challenger = skip when it fires; ${withSplits} of ${opps.length} games had splits` };
     }
     case "totals-cut":
       return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) }))) };

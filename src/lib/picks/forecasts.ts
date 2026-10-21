@@ -3,6 +3,7 @@ import { redis } from "@/lib/redis/client";
 import type { League, ModelLine } from "./parse";
 import { type BoardGame, type PemLine, type RefLine, key } from "./engine";
 import type { CoreRow } from "./compose";
+import { type SplitGame, type Splits, matchSplits, toSplits } from "./splits";
 
 // Immutable pregame evidence. Every data run appends a snapshot for each game
 // whose inputs changed since the last one: both models' lines and totals,
@@ -22,6 +23,8 @@ export interface ForecastSnapshot {
   samTotal?: number;
   davidTotal?: number;
   ref?: RefLine;
+  /** Public betting splits and the opening line at this read (splits.ts), when the feed had the game. */
+  splits?: Splits;
 }
 
 const listKey = (league: League, season: number, week: number) => `picks:v2:${league}:${season}:forecast:w${week}`;
@@ -34,16 +37,19 @@ export function fingerprint(s: Omit<ForecastSnapshot, "at">): string {
   return JSON.stringify([
     s.sam?.model, s.sam?.market, s.david?.model, s.david?.market, s.pem?.model, s.samTotal, s.davidTotal,
     r?.line, r?.total, r?.homePrice, r?.awayPrice, r?.overPrice, r?.underPrice, r?.kickoff,
+    // Splits drift by a point every few minutes; only a 5-point step is news.
+    s.splits && Math.round(s.splits.homeTickets / 5), s.splits && Math.round(s.splits.homeMoney / 5),
   ]);
 }
 
-export async function archiveForecasts(league: League, season: number, week: number, board: BoardGame[], rows: CoreRow[]): Promise<number> {
+export async function archiveForecasts(league: League, season: number, week: number, board: BoardGame[], rows: CoreRow[], feed: SplitGame[] = []): Promise<number> {
   const at = new Date().toISOString();
   const snaps: ForecastSnapshot[] = board
     .filter((g) => g.basis === "reference" && g.ref)
     .map((g) => {
       const row = rows.find((r) => r.home === g.home && r.away === g.away);
-      return { at, week, home: g.home, away: g.away, sam: g.sam, david: g.david, pem: g.pem, samTotal: row?.samTotal, davidTotal: row?.davidTotal, ref: g.ref };
+      const m = matchSplits({ home: g.home, away: g.away, kickoff: g.ref?.kickoff, line: g.ref?.line }, feed);
+      return { at, week, home: g.home, away: g.away, sam: g.sam, david: g.david, pem: g.pem, samTotal: row?.samTotal, davidTotal: row?.davidTotal, ref: g.ref, ...(m ? { splits: toSplits(m) } : {}) };
     });
   if (!snaps.length) return 0;
   const prev = ((await redis.hgetall<Record<string, string>>(fpKey(league, season, week))) ?? {}) as Record<string, string>;

@@ -1,4 +1,6 @@
 import "server-only";
+import { fetchSplits } from "./splits-feed";
+import { matchSplits, toSplits } from "./splits";
 import { redis } from "@/lib/redis/client";
 import { nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard } from "./nba-store";
@@ -50,7 +52,9 @@ async function journal(season: number, entries: NbaJournalEntry[]) {
   if (entries.length) await redis.lpush(journalKey(season), ...entries);
 }
 
-const same = (a: NbaSnap, b: NbaSnap) => JSON.stringify({ ...a, at: "" }) === JSON.stringify({ ...b, at: "" });
+// Splits drift by a point every few minutes; only a 5-point step is a new copy.
+const bucket = (s: NbaSnap) => ({ ...s, at: "", splits: s.splits && [Math.round(s.splits.homeTickets / 5), Math.round(s.splits.homeMoney / 5), s.splits.open] });
+const same = (a: NbaSnap, b: NbaSnap) => JSON.stringify(bucket(a)) === JSON.stringify(bucket(b));
 
 export interface NbaPicksRunReport {
   season: number;
@@ -72,6 +76,7 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
     report.problems.push(`NBA board: ${e instanceof Error ? e.message : String(e)}`);
   }
   const have = new Map((await loadGames(season)).map((g) => [g.id, g]));
+  const feed = await fetchSplits("nba");
 
   // 1. Pregame reads: the first copy is kept, the latest pregame copy replaces the last.
   for (const g of board?.days.flatMap((d) => d.games) ?? []) {
@@ -90,6 +95,8 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
       samLine: g.read.samLine,
       modelTotal: g.read.modelTotal,
     };
+    const m = matchSplits({ home: g.home.name, away: g.away.name, kickoff: g.tip, line: g.line?.home }, feed);
+    if (m) snap.splits = toSplits(m);
     const old = have.get(g.id);
     if (old && same(old.last, snap)) continue;
     const t: NbaTracked = { id: g.id, day: g.day, week: nbaWeek(new Date(g.tip), season), tip: g.tip, home: g.home.abbr, away: g.away.abbr, first: old?.first ?? snap, last: snap };

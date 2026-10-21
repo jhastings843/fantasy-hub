@@ -29,6 +29,8 @@ import { harrisWeeks } from "./harris";
 import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
 import { archiveForecasts, loadForecasts } from "./forecasts";
+import { fetchSplits } from "./splits-feed";
+import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
 import { loadRuleFreeze, saveRuleFreeze } from "./rule-freeze";
 import { redisStore } from "./learning/store";
@@ -543,9 +545,13 @@ export async function runPicksData(league: League): Promise<string> {
   const finals = new Map(core.finals);
   const settled = await settleIssued(league, r.season, finals);
   let forecasts = 0;
+  let splitsMatched = "0/0";
   let totalsNew = 0;
   if (r.week) {
-    forecasts = await archiveForecasts(league, r.season, r.week, r.board, core.rows);
+    const feed = await fetchSplits(league);
+    const priced = r.board.filter((g) => g.basis === "reference" && g.ref);
+    splitsMatched = `${priced.filter((g) => matchSplits({ home: g.home, away: g.away, kickoff: g.ref?.kickoff, line: g.ref?.line }, feed)).length}/${priced.length}`;
+    forecasts = await archiveForecasts(league, r.season, r.week, r.board, core.rows, feed);
     const meet: TotalsSeen[] = r.totals.board.flatMap((g) =>
       g.sam !== undefined && g.david !== undefined && g.ref
         ? [{ week: r.week as number, home: g.home, away: g.away, sam: g.sam, david: g.david, line: g.ref.total, source: g.ref.source, seenAt: g.ref.fetchedAt }]
@@ -554,7 +560,7 @@ export async function runPicksData(league: League): Promise<string> {
     totalsNew = await archiveTotals(league, r.season, r.week, meet).catch(() => 0);
     if (r.board.length) await saveSnapshot(league, r.season, r.week, r.board, r.strategies.rule?.label ?? null);
   }
-  return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${totalsNew} totals archived, ${settled} issued games final`;
+  return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${splitsMatched} with splits, ${totalsNew} totals archived, ${settled} issued games final`;
 }
 
 export type { RefLine, BoardGame };

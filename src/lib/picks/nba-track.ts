@@ -19,6 +19,7 @@
 // Lines are home-side (negative: home favored), like the rest of Picks.
 
 import { BREAK_EVEN, MIN_SAMPLE, tally, type Result } from "./engine";
+import type { Splits } from "./splits";
 import { CRITERIA } from "./learning/model";
 import { samSpreadSide } from "./nba";
 
@@ -40,6 +41,8 @@ export interface NbaSnap {
   /** The home line Sam's page posted beside his model; his side is taken against it. Missing on copies saved before 2026-10-21. */
   samLine?: number;
   modelTotal?: number;
+  /** Public betting splits and the opening line at this read (splits.ts), when the feed had the game. */
+  splits?: Splits;
 }
 
 export interface NbaTracked {
