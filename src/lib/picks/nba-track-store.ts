@@ -87,6 +87,7 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
       mlHome: g.ml?.home,
       mlAway: g.ml?.away,
       model: g.read.model,
+      samLine: g.read.samLine,
       modelTotal: g.read.modelTotal,
     };
     const old = have.get(g.id);

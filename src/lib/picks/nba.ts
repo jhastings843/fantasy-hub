@@ -182,19 +182,38 @@ export function parseSamNba(html: string, index: Map<string, string>): SamNbaSta
 export type NbaRead = {
   /** Sam's home line, rounded to a tenth. */
   model: number;
-  /** Points between Sam's line and DraftKings', on the side he likes. */
+  /** Points between Sam's line and DraftKings', on his side. Negative when DraftKings has crossed his number. */
   edge: number;
   side: "home" | "away";
+  /** The home line Sam's page posts beside his model (his "Vegas line"), when read. */
+  samLine?: number;
+  /** DraftKings has moved through Sam's model: at DK's number his own side is no longer value. */
+  crossed: boolean;
   modelTotal?: number;
   totalSide?: "over" | "under";
   totalEdge?: number;
 };
 
-/** Sam's side and edge at the DraftKings line. Null with no line or no model. */
+/**
+ * Sam's spread side: the one his own posted line gives (what he calls his
+ * pick, Jack 2026-10-21), or DraftKings' when his line wasn't read or he has
+ * no lean against it. The edge is measured at DraftKings on that side, so it
+ * goes negative when DK has moved through his model: OKC at SA on 10-20,
+ * Sam posted SA -2.5 with a model of SA -0.3 (Thunder) and DK closed SA +1.5.
+ */
+export function samSpreadSide(dk: number, model: number, samLine?: number): { side: "home" | "away"; edge: number; crossed: boolean } {
+  const dkLean = dk - model; // > 0: Sam likes the home team more than the book does
+  const samLean = samLine !== undefined && Number.isFinite(samLine) ? samLine - model : 0;
+  const home = samLean !== 0 ? samLean > 0 : dkLean >= 0;
+  const edge = Math.round((home ? dkLean : -dkLean) * 10) / 10;
+  return { side: home ? "home" : "away", edge, crossed: edge < 0 };
+}
+
+/** Sam's side (see samSpreadSide) and edge at the DraftKings line. Null with no line or no model. */
 export function readNba(g: NbaGame, sam?: SamNbaRow): NbaRead | null {
   if (!sam || !g.line) return null;
-  const diff = g.line.home - sam.model; // > 0: Sam likes the home team more than the book does
-  const r: NbaRead = { model: Math.round(sam.model * 10) / 10, edge: Math.round(Math.abs(diff) * 10) / 10, side: diff >= 0 ? "home" : "away" };
+  const samLine = Number.isFinite(sam.vegas) ? sam.vegas : undefined;
+  const r: NbaRead = { model: Math.round(sam.model * 10) / 10, ...samSpreadSide(g.line.home, sam.model, samLine), ...(samLine !== undefined ? { samLine } : {}) };
   if (sam.total !== undefined && g.total) {
     const t = sam.total - g.total.points;
     r.modelTotal = sam.total;

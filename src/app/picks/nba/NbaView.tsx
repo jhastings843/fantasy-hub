@@ -48,7 +48,7 @@ function SamStatus({ b }: { b: NbaBoard }) {
 /** Sam's spread bet on a board game, in the tracker's terms (for the rule's tiers). */
 function boardBet(g: NbaBoardGame): NbaBet | null {
   if (!g.read) return null;
-  const snap = { at: "", line: g.line?.home, homePrice: g.line?.homePrice, awayPrice: g.line?.awayPrice, model: g.read.model };
+  const snap = { at: "", line: g.line?.home, homePrice: g.line?.homePrice, awayPrice: g.line?.awayPrice, model: g.read.model, samLine: g.read.samLine };
   return nbaBets({ id: g.id, day: g.day, week: 0, tip: g.tip, home: g.home.abbr, away: g.away.abbr, first: snap, last: snap }).find((b) => b.market === "ats") ?? null;
 }
 
@@ -65,7 +65,7 @@ function asSaved(g: NbaBoardGame, t: NbaTracked | undefined): NbaBoardGame {
     total: s.total !== undefined ? { points: s.total, overPrice: s.overPrice, underPrice: s.underPrice } : g.total,
     ml: s.mlHome !== undefined || s.mlAway !== undefined ? { home: s.mlHome, away: s.mlAway } : g.ml,
   };
-  return { ...out, read: readNba(out, { home: g.home.abbr, away: g.away.abbr, model: s.model, vegas: s.line ?? NaN, ...(s.modelTotal !== undefined ? { total: s.modelTotal } : {}) }) };
+  return { ...out, read: readNba(out, { home: g.home.abbr, away: g.away.abbr, model: s.model, vegas: s.samLine ?? NaN, ...(s.modelTotal !== undefined ? { total: s.modelTotal } : {}) }) };
 }
 
 /** Sam's spread and total results on a finished game, from the saved copy. */
@@ -108,7 +108,7 @@ function GameCard({ g: raw, v }: { g: NbaBoardGame; v: NbaPicksView | null }) {
         ) : r ? (
           <div className={s.stake}>
             <b className={s.num}>{stake ? `${stake}u` : `${r.edge.toFixed(1)} pts`}</b>
-            <span className={s.num}>{`${stake ? `Tier ${tier} bet · ${r.edge.toFixed(1)} pts` : tier ? `Tier ${tier}, tracking · Sam's edge` : "Sam's edge"} · ${price(pickPrice)}`}</span>
+            <span className={s.num}>{`${stake ? `Tier ${tier} bet · ${r.edge.toFixed(1)} pts` : tier ? `Tier ${tier}, tracking · Sam's edge` : r.crossed ? "DK crossed Sam's number" : "Sam's edge"} · ${price(pickPrice)}`}</span>
           </div>
         ) : (
           <span className={s.statusChip}>{g.line ? "No model yet" : "No line yet"}</span>
@@ -132,7 +132,7 @@ function GameCard({ g: raw, v }: { g: NbaBoardGame; v: NbaPicksView | null }) {
         {r && (
           <>
             <dt>Sam line</dt>
-            <dd className={s.num}>{`${g.home.short} ${line(r.model)}`}</dd>
+            <dd className={s.num}>{`${g.home.short} ${line(r.model)}${r.samLine !== undefined ? ` vs his posted ${line(r.samLine)}` : ""}`}</dd>
             {r.modelTotal !== undefined && (
               <>
                 <dt>Sam total</dt>
@@ -402,7 +402,7 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
               <p className={s.p}>
                 {`${
                   b.sam.state === "live"
-                    ? "Sorted by tip time. The big line is Sam's side at the DraftKings number; the edge is how far his line sits from it."
+                    ? "Sorted by tip time. The big line is the side Sam posts, at the DraftKings number; the edge is how far his line sits from DK's, negative when DK has moved through it."
                     : "Sorted by tip time, with the current DraftKings spread, total and moneyline."
                 } Games run every day, so there is no weekly reset: once a game tips its card keeps the numbers saved before tip, and last night's games sit at the bottom with Sam's results.`}
               </p>

@@ -25,6 +25,22 @@ describe("Sam's NBA bets", () => {
     expect(nbaBets(game(2, {}, { line: -2.5, model: -0.3 })).find((x) => x.market === "ats")).toMatchObject({ side: "away", line: 2.5, edge: 2.2, dog: true });
   });
 
+  it("takes the side Sam posts, graded at DraftKings, when DK has moved through his number", () => {
+    // OKC at SA, 2026-10-20: Sam posted SA -2.5 with his model SA -0.3 (Thunder). DK closed SA +1.5.
+    const okc = game(3, { home: "SA", away: "OKC", final: { home: 104, away: 116 } }, { line: 1.5, homePrice: -112, awayPrice: -108, model: -0.3, samLine: -2.5 });
+    expect(nbaBets(okc).find((x) => x.market === "ats")).toMatchObject({ side: "away", line: -1.5, price: -108, edge: -1.8, crossed: true, dog: false, result: "W" });
+    // A copy saved before Sam's line was kept falls back to DraftKings, as before.
+    expect(nbaBets(game(4, {}, { line: 1.5, model: -0.3 })).find((x) => x.market === "ats")).toMatchObject({ side: "home", line: 1.5, edge: 1.8, crossed: false });
+    // Sam's line and DK agree on the side: nothing crossed.
+    expect(nbaBets(game(5, {}, { line: -4.5, model: -7, samLine: -5 })).find((x) => x.market === "ats")).toMatchObject({ side: "home", edge: 2.5, crossed: false });
+  });
+
+  it("keeps a crossed side out of the edge cuts", () => {
+    const b = nbaBets(game(6, {}, { line: 1.5, model: -0.3, samLine: -2.5 })).find((x) => x.market === "ats")!;
+    expect(NBA_CUT.get("ats:all")!.test(b)).toBe(true);
+    expect(NBA_CUT.get("ats:edge1")!.test(b)).toBe(false);
+  });
+
   it("grades at the saved number and price", () => {
     const b = nbaBets(game(1, { final: { home: 110, away: 104 } }));
     expect(b.find((x) => x.market === "ats")).toMatchObject({ result: "W", net: 0.909 }); // NY by 6 covers 4.5

@@ -20,6 +20,7 @@
 
 import { BREAK_EVEN, MIN_SAMPLE, tally, type Result } from "./engine";
 import { CRITERIA } from "./learning/model";
+import { samSpreadSide } from "./nba";
 
 export type NbaMarket = "ats" | "su" | "ou";
 
@@ -36,6 +37,8 @@ export interface NbaSnap {
   mlAway?: number;
   /** Sam's home line. */
   model: number;
+  /** The home line Sam's page posted beside his model; his side is taken against it. Missing on copies saved before 2026-10-21. */
+  samLine?: number;
   modelTotal?: number;
 }
 
@@ -62,8 +65,10 @@ export interface NbaBet {
   /** The number bet: the side's spread, the total, or 0 straight up. */
   line: number;
   price?: number;
-  /** Points between Sam and DraftKings on that side. */
+  /** Points between Sam and DraftKings on that side; negative when DK has crossed his number. */
   edge: number;
+  /** Spread only: Sam's posted side, but DraftKings has moved through his model. */
+  crossed?: boolean;
   /** Sam's side is the underdog (spread or moneyline). */
   dog: boolean;
   result?: Result;
@@ -78,12 +83,10 @@ const r1 = (x: number) => Math.round(x * 10) / 10;
 export function nbaBets(g: NbaTracked): NbaBet[] {
   const s = g.last;
   const out: NbaBet[] = [];
-  if (s.line !== undefined) {
-    const diff = s.line - s.model; // > 0: Sam likes the home team more than the book does
-    if (diff !== 0) {
-      const home = diff > 0;
-      out.push({ market: "ats", side: home ? "home" : "away", line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(Math.abs(diff)), dog: home ? s.line > 0 : s.line < 0 });
-    }
+  if (s.line !== undefined && (s.line !== s.model || (s.samLine !== undefined && s.samLine !== s.model))) {
+    const { side, edge, crossed } = samSpreadSide(s.line, s.model, s.samLine);
+    const home = side === "home";
+    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0 });
   }
   if (s.model !== 0) {
     const home = s.model < 0;

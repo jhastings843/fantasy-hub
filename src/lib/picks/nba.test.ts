@@ -83,6 +83,14 @@ describe("Sam's read at the DraftKings line", () => {
     expect(readNba(ny, { home: "NY", away: "PHI", model: -2, vegas: -4.5 })).toMatchObject({ side: "away", edge: 2.5 });
   });
 
+  it("takes Sam's posted side and flags it when DraftKings has crossed his number", () => {
+    const ny = slate[1]; // NY -4.5 at DK
+    // Sam posted NY -7 against a model of NY -5.5 (PHI); DK has since moved to NY -4.5.
+    expect(readNba(ny, { home: "NY", away: "PHI", model: -5.5, vegas: -7 })).toMatchObject({ side: "away", edge: -1, crossed: true, samLine: -7 });
+    // No posted line read: DraftKings decides, as before.
+    expect(readNba(ny, { home: "NY", away: "PHI", model: -5.5, vegas: NaN })).toMatchObject({ side: "home", edge: 1, crossed: false });
+  });
+
   it("is null without a model row or a line", () => {
     expect(readNba(slate[0], undefined)).toBeNull();
     expect(readNba({ ...slate[0], line: undefined }, { home: "DET", away: "BOS", model: -3, vegas: 1.5 })).toBeNull();
