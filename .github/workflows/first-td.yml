@@ -29,7 +29,7 @@ on:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Save pregame pages and grade finished games
         env:
@@ -52,4 +52,8 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nfl/ours")
           echo "our NFL model HTTP $ostatus"
           jq -r '.report | "our NFL model week \(.week) (nflverse through week \(.nflverseWeek)): saved \(.saved | length), graded \(.graded | length)", (.learning[]? | "learning: \(.)"), (.problems[]? | "problem: \(.)")' ours.json | tee -a "$GITHUB_STEP_SUMMARY"
-          [ "$status" = "200" ] && [ "$pstatus" = "200" ] && [ "$lstatus" = "200" ] && [ "$ostatus" = "200" ]
+          fstatus=$(curl -sS -o ourftd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd/ours")
+          echo "our first TD model HTTP $fstatus"
+          jq -r '.report | "our first TD model week \(.week): saved \(.saved | length), graded \(.graded | length)", (.learning[]? | "learning: \(.)"), (.problems[]? | "problem: \(.)")' ourftd.json | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$status" = "200" ] && [ "$pstatus" = "200" ] && [ "$lstatus" = "200" ] && [ "$ostatus" = "200" ] && [ "$fstatus" = "200" ]

@@ -319,3 +319,7 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 ## Own prop models, Phase 3: NFL props v1 (2026-10-21)
 - "Our model" section on the NFL player props tab (board and results) from `/api/props/nfl/ours` (added to first-td.yml). Model `src/lib/models/nfl/`, constants `params.json` from `scripts/fit-nfl-props.mts`; data cache `.cache/nfl` (nflverse stats_player_week_2024..2026, games.csv). Prior seeded with `scripts/seed-nfl-models.mts 2026`. Learning section `nfl-props-ours`.
 - Weak spots, written on the page: passing yards no better than a coin flip at a naive line, QB rushing low, ESPN posts no NFL prices so most are -110 assumed (David's prices fill in where his line matches).
+
+## Own prop models, Phase 4: NFL First TD (2026-10-21)
+- "Our model" section on the First TD tab from `/api/firsttd/ours` (first-td.yml): team-first from the market total and spread played drive by drive, scorer from shrunk TD shares, against Kalshi. Model `src/lib/models/nfl/firsttd.ts`, constants `ftd-params.json` from `scripts/fit-first-td.mts` (history via `scripts/nfl-ftd-history.mts`). Learning section `nfl-firsttd-ours`.
+- On Sam's 14 saved games it scored better than Sam and just behind Kalshi (see the spec doc).

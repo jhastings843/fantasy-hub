@@ -242,3 +242,28 @@ Test results, 2025 weeks 10-18 / 2026 weeks 1-6, MAE ours vs season average:
 - Against Sam's saved weeks 6-7 and David (`scripts/compare-sam-nfl.mts`), MAE ours / Sam / market line / David: passing 48.5 / 38.0 / 41.3 / 41.9 (n 23), rushing 16.4 / 15.2 / 14.8 / 16.6 (56), receiving 21.2 / 20.2 / 19.6 / 21.7 (114), receptions 1.7 all four. Right side of the line: ours 11, 30, 58, 65; Sam 14, 27, 53, 62.
 
 Honest read: receiving and receptions are the useful part; passing yards has no skill yet; QB rushing reads low (the QB yards-per-carry prior includes kneel-downs). The first live board (week 7) flags most props as edges, mostly unders, and most prices are assumed -110. Not a bet until a slice clears the gate.
+
+### Phase 4: NFL First TD (2026-10-21)
+Code: `src/lib/models/nfl/firsttd.ts` (pure) and `ftd-store.ts`, route `/api/firsttd/ours` (on first-td.yml), "Our model" section on the First TD tab (`src/app/props/ourftd.tsx`), learning section `nfl-firsttd-ours` on FTD_GATE, money checks through the tracker's own `marketBets` at Kalshi's ask plus fee. Output is an `FtdGame` with `F.Last` names, so `grade`, `sameName` and `kalshiFor` work unchanged. Redis: `models:v1:nfl:{season}:tdprior` (seeded), `ftd:v1:ours:{season}:w{week}`. History: `scripts/nfl-ftd-history.mts` cached ESPN's first TD and drive counts for 637 games (2024, 2025, 2026 weeks 1-6; 0 unreadable).
+
+Base rates (637 games): no offensive TD first 5.3% (16 pick-sixes, 4 punt returns, 4 no TD at all, others); 10.7 drives per team; 41.5% of first offensive TDs rushing (train).
+
+Walk-forward fit (`scripts/fit-first-td.mts`): each team's list is its players from its last 3 games this season who had a stat row in the game; TD history pools last season with this season before the game. Fit on 2024 plus 2025 weeks 1-9 (407 games), tested on 2025 weeks 10-18 (137) and 2026 weeks 1-6 (93).
+
+| Constant | Fitted value | How |
+|---|---|---|
+| c (offensive TD chance per drive per implied point, x drives) | 0.18 | grid 0.06 to 0.20, team-first log loss |
+| delta (non-offensive TD per drive) | 0.02 | grid 0 to 0.03 |
+| drives per team | 10.69 | data |
+| League rushing share of first TDs | 0.415 | data |
+| Off-list scorer share | 0.067 | data |
+| kTd (TD share toward opportunity share) | 40 | grid {0..100}, scorer log loss given the team |
+| kR (team rushing share toward league) | 50 | grid {0..1000} |
+
+Test results (2025 weeks 10-18 / 2026 weeks 1-6):
+- Team first: log loss 0.8752 / 0.8232 vs 0.8918 / 0.8415 with teams even.
+- Scorer: log loss 2.8104 / 2.8072 vs 3.1574 / 3.1196 with every listed player even.
+- Per-player calibration 2026, predicted vs happened: 0.009/0.009 (n 546), 0.029/0.032 (465), 0.053/0.048 (419), 0.083/0.075 (187), 0.123/0.116 (129), 0.183/0.218 (55).
+- Against Sam's 14 saved 2026 first TD games (`scripts/compare-sam-ftd.mts`): log loss ours 3.020, Sam 3.111. On the 12 with a Kalshi price for the scorer: Kalshi (overround removed) 2.902, ours 2.932.
+
+First live boards (week 7, 14 games, 13 with Kalshi): Kalshi's asks sit above our chances for most players (its overround), so few values.

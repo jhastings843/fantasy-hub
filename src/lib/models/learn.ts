@@ -7,6 +7,9 @@ import type { Bet, Candidate } from "@/lib/learning/engine";
 import { STAT_LABEL, type Stat } from "@/lib/props/parse";
 import type { GradedBet } from "@/lib/props/grade";
 import type { GradedPropsGame } from "@/lib/props/trends";
+import { marketBets, type GradedGame as FtdGradedGame } from "@/lib/firsttd/trends";
+
+type Keep = Parameters<typeof marketBets>[1];
 
 export const OUR_SECTION = {
   nbaProps: "nba-props-ours",
@@ -112,5 +115,25 @@ export function fbCandidates(boards: FbGradedBoard[]): Candidate[] {
     label,
     ...(id === "fb:all" ? {} : { parent: "fb:all" }),
     bets: boards.flatMap((b) => b.bets.filter((x) => keep(b, x)).map((x): Bet => ({ game: b.event, week: b.week, at: b.at, net: x.net }))),
+  }));
+}
+
+// NFL First TD: our chances against Kalshi's ask (fee in), through the first
+// TD tracker's own bet logic (lib/firsttd/trends.ts marketBets), on FTD_GATE.
+
+export const OUR_FTD_SLICES: [string, string, Keep][] = [
+  ["ftd:value", "Our chance above Kalshi's cost", (p, c) => p.p > c],
+  ["ftd:value3", "Above Kalshi's cost by 3+ points", (p, c) => p.p >= c + 0.03],
+  ["ftd:pick", "Our most likely scorer, bought at Kalshi's ask", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team],
+  ["ftd:short", "Kalshi 10% or less, ours above cost", (p, c) => c <= 0.1 && p.p > c],
+  ["ftd:long", "Kalshi above 10%, ours above cost", (p, c) => c > 0.1 && p.p > c],
+];
+
+export function ourFtdCandidates(list: FtdGradedGame[]): Candidate[] {
+  return OUR_FTD_SLICES.map(([id, label, keep]) => ({
+    id,
+    label,
+    ...(id === "ftd:value" ? {} : { parent: "ftd:value" }),
+    bets: marketBets(list, keep).map((b): Bet => ({ game: b.game.slug, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000 })),
   }));
 }
