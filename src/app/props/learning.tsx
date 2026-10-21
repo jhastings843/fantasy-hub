@@ -10,7 +10,7 @@ import s from "../picks/picks.module.css";
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const CLOSEST = 8;
 
-export function LearningBlock({ v, unit = "bets" }: { v: SectionView; unit?: string }) {
+export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
   const g = v.gate;
   const live = v.entries.filter((e) => e.activatedAt).sort((a, b) => (b.activatedAt ?? "").localeCompare(a.activatedAt ?? ""));
   const closest = v.entries
@@ -25,13 +25,9 @@ export function LearningBlock({ v, unit = "bets" }: { v: SectionView; unit?: str
         <Link href="/learning" className={s.dim} style={{ fontSize: 13 }}>
           Every section&apos;s learning on one page
         </Link>
-        <p className={s.p}>
-          {`Every slice below is tracked from the day it was first seen, on later games only. One goes live when it has ${g.minGames}+ games over ${g.minWeeks}+ weeks and ${g.minBets}+ ${unit}${
-            g.minWins ? `, ${g.minWins}+ winners` : ""
-          }, is up, and beats break-even at t ${g.minT} judged game by game (${unit} from one game move together, so the game is the unit). A narrower slice must also beat the broader one it sits in, at t ${g.minPairedT}, and the line can't have moved against it more often than toward it. At most ${g.maxNew} go live per weekly review. A live slice that loses at t −${g.rollbackT} over ${g.rollbackGames}+ games is rolled back. ${
-            v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; ${collecting} collecting.` : "First review runs at the next data pull."
-          }`}
-        </p>
+        <p className={s.p}>{`A slice goes live after ${g.minGames}+ games over ${g.minWeeks}+ weeks with a clear edge, and is rolled back if it turns. ${
+          v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; ${collecting} collecting.` : "First review runs at the next data pull."
+        }`}</p>
       </div>
       <div className={s.tw}>
         <table className={s.table}>

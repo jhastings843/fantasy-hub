@@ -4,6 +4,7 @@
 // head at the same DraftKings line where both cover a prop. This week,
 // results, research. NBA props (Sam only) run through the same views, with
 // league="nba": its own record and system, no David board or outside projections.
+import { updated } from "./updated";
 import { STAT_LABEL, etDate, type League, type PropMarket, type Side } from "@/lib/props/parse";
 import { isPlay, nameKey } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
@@ -37,14 +38,12 @@ function Empty({ league = "nfl", graded = false }: { league?: League; graded?: b
   if (league === "nba")
     return (
       <p className={s.calm}>
-        Nothing saved yet. Sam&apos;s NBA props pages are saved before each tip and graded from ESPN&apos;s box score once final. His site only keeps
-        the current slate, so the record starts with opening night, October 20.
+        Nothing saved yet. Sam&apos;s NBA props are saved before each tip and graded once final.
       </p>
     );
   return (
     <p className={s.calm}>
-      Nothing saved yet. Sam&apos;s props pages and David&apos;s board are saved before each kickoff and graded from ESPN&apos;s
-      box score once final. Both sites only keep the current week, so the record starts with Week 6 Sunday.
+      Nothing saved yet. Sam&apos;s and David&apos;s props are saved before each kickoff and graded once final.
     </p>
   );
 }
@@ -278,8 +277,7 @@ function BestBets({ games, samOf, record, now }: { now: number; games: DavidGame
         <span className={`${s.dim} ${s.num}`}>{rec ? `Season so far ${rec}` : "No graded record yet"}</span>
       </div>
       <p className={pp.bbNote}>
-        Props where Sam and David land on the same side of DraftKings&apos; line. Ranked by edge, an estimate: the less confident model&apos;s chance of hitting (from David&apos;s 80% range) minus what DraftKings&apos; price needs.
-        Tracking only, not in the system yet.
+        Props where Sam and David are on the same side of DraftKings&apos; line, ranked by edge. Tracking only.
       </p>
       {up.length ? (
         <ol className={pp.bbList}>
@@ -465,7 +463,7 @@ function Awaiting({ id, week, what }: { id: string; week: number; what: string }
         <h2 className={s.h2} id={id}>{`Week ${week} ${what}`}</h2>
       </div>
       <p className={s.calm}>
-        {`Nothing saved for Week ${week} yet. Sam posts the Thursday game first and the Sunday and Monday pages on Saturday; the tracker picks them up at 8am and 6:30pm ET and before each kickoff. Week ${week - 1} is graded under Results.`}
+        {`Nothing saved for Week ${week} yet; Sam posts Thursday's page first and the weekend's on Saturday. Week ${week - 1} is under Results.`}
       </p>
     </section>
   );
@@ -494,11 +492,7 @@ export async function PropsWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-week">{`Week ${week} player props`}</h2>
         <p className={s.p}>
-          {`Sam's and David's prop models. Start with the props they agree on, then open a game for each model's plays side by side: Sam's are the ones his page says clear the vig, David's the ones his own 80% range puts ${PLAY_PCT}+ points above DraftKings' break-even (his board has no pick flag, so that bar is ours). Every prop both cover sits in the table under them. ${
-            live.length
-              ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the system; bets that fall in one are marked.`
-              : "Nothing has earned a place in the system yet, so all of it is tracking, not money."
-          }`}
+          {`Sam's and David's plays, side by side; start with the props they agree on. ${live.length ? `${live.length} slice${live.length > 1 ? "s" : ""} live (marked).` : "Tracking only, nothing live yet."} ${updated([...samGames.map((g) => g.capturedAt), ...dGames.map((g) => g.capturedAt)])}`}
         </p>
       </div>
       <BestBets now={now} games={dGames} samOf={samOf} record={v.david.trends.slices.find((x) => x.id === "h2h:agree")} />
@@ -612,11 +606,7 @@ export async function NbaPropsWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="nba-pp-week">NBA player props</h2>
         <p className={s.p}>
-          {`Sam's NBA props, saved before each tip and graded from ESPN's box score overnight. A play is a prop where Sam's projection sits 15%+ off the market's number (the middle of every book's line), bet at the best price posted on that number, never worse than -150. Today's slate is first; last night's games stay below with their results until the next day. Older games are on Results. ${
-            live.length
-              ? `${live.length} slice${live.length > 1 ? "s have" : " has"} earned a place in the NBA system; plays that fall in one are marked.`
-              : "Nothing has earned a place in the NBA system yet, so all of it is tracking, not money."
-          }`}
+          {`Sam's NBA plays, 15%+ off the market's number; today first, last night below. ${live.length ? `${live.length} slice${live.length > 1 ? "s" : ""} live (marked).` : "Tracking only, nothing live yet."} ${updated(games.map((g) => g.capturedAt))}`}
         </p>
       </div>
       {!byDay.has(today) && <p className={s.calm}>{"Nothing from Sam for today: his NBA props pages went behind his members paywall on October 21, so they can no longer be saved. Games he posted before then stay below and on Results."}</p>}
@@ -667,15 +657,9 @@ export async function PropsResults({ season, league = "nfl" }: { season: number;
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-results">{nba ? "NBA player prop results" : "Player prop results"}</h2>
         {nba ? (
-          <p className={s.p}>
-            Sam&apos;s NBA props, graded the way the NFL ones are: every saved prop once its game is final, against the copy saved before tip, 1 unit risked per
-            bet at the price shown, newest night first. A player who sat voids his props. Where a check counts weeks, they run Monday to Sunday.
-          </p>
+          <p className={s.p}>{`Every saved NBA prop graded once final, 1 unit per bet at the price shown. ${updated(v.graded.map((x) => x.kickoff), "Graded through")}`}</p>
         ) : (
-        <p className={s.p}>
-          Sam and David, graded the same way: every saved prop once its game is final, against the copy saved before kickoff, 1 unit risked per bet at the price
-          shown. The head to head grades both on the props they share, at the same DraftKings line and price.
-        </p>
+        <p className={s.p}>{`Every saved prop graded once final, 1 unit per bet at the price shown, plus Sam vs David on shared props. ${updated(v.graded.map((x) => x.kickoff), "Graded through")}`}</p>
         )}
       </div>
       <div className={s.tiles}>
@@ -903,7 +887,7 @@ export async function PropsResearch({ season, league = "nfl" }: { season: number
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="pp-research">{nba ? "Where Sam's NBA props make money" : "Where the prop models make money"}</h2>
         <p className={s.p}>
-          {nba ? `The NFL props' research, on Sam's NBA pages. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. The read in each row is season to date, called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better. Whether a slice goes live is the learning block's call, on its own evidence and NBA games only. Line move is how far the consensus moved toward the bet between the first and last pregame copy.` : `Sam and David on the same footing. Each row is a slice of bets settled at the saved price. "Wins vs needed" sets the wins against the wins it takes to break even at those prices. The read in each row is season to date, called profitable only at ${MIN_BETS}+ decided bets and z 1.96 or better; with this many slices checked at once, a looser bar would crown one by luck every week. Whether a slice goes live is the learning block's call, below, and either model's slices can. Line move is how far the line moved toward the bet between the first and last pregame copy: steady positive numbers mean the market agrees after the fact, the quickest early sign of a real edge.`}
+          {`Each slice's record at the saved prices; a slice is called profitable at ${MIN_BETS}+ bets and z 1.96. ${updated(v.graded.map((x) => x.kickoff), "Graded through")}`}
         </p>
       </div>
       {findings.length > 0 ? (
@@ -914,7 +898,7 @@ export async function PropsResearch({ season, league = "nfl" }: { season: number
         </ul>
       ) : (
         <p className={s.calm}>
-          {nba ? `No slice has cleared the bar yet. At about 13 props a game and up to 15 games a night, the bigger slices reach ${MIN_BETS} bets within the first couple of weeks.` : `No slice has cleared the bar yet. At about 30 markets a game for Sam and 25 for David, the bigger slices reach ${MIN_BETS} bets in a week or two; small ones take most of the season.`}
+          {`No slice has cleared the bar yet.`}
         </p>
       )}
 

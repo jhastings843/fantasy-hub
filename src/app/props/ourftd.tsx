@@ -1,5 +1,6 @@
 // Our own NFL First TD model (lib/models/nfl/firsttd.ts): this week's boards
 // against Kalshi's prices, and the record, on the First TD tab.
+import { updated } from "./updated";
 import { nameKey } from "@/lib/props/grade";
 import { getOurFtdView, type OurFtdStored, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { kalshiCost, kalshiFor, marketBets } from "@/lib/firsttd/trends";
@@ -94,12 +95,7 @@ export async function OurFtdWeek({ season }: { season: number }) {
         <h2 className={s.h2} id="our-ftd-week">
           Our model{v.week ? ` · Week ${v.week}` : ""}
         </h2>
-        <p className={s.p}>
-          Our chance each player scores the game&apos;s first touchdown. Which team scores first comes from the market&apos;s total and spread, played out drive by
-          drive (a defensive or special-teams score, or none, is its own outcome); the scorer from his team&apos;s rushing and receiving TD shares, shrunk toward
-          his share of its carries and targets. Tested on 2025&apos;s second half and 2026 weeks 1-6: its chances were calibrated within about 2 points and beat
-          an even split of each team&apos;s players. A value is our chance above Kalshi&apos;s cost; none is a bet until a slice clears our First TD learning gate.
-        </p>
+        <p className={s.p}>{`Our chance each player scores the first touchdown, compared with Kalshi's price; tracking only until a slice clears the gate. ${updated(v.board.map((g) => g.capturedAt))}`}</p>
       </div>
       {v.board.length ? (
         <ol className={s.ftdGames}>

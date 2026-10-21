@@ -2,6 +2,7 @@
 // cards and tables as Sam's board in playerprops.tsx, with our chances shown
 // against DraftKings' price. Its edges are model edges, not bets, until a
 // slice in our own learning section clears the gate.
+import { updated } from "./updated";
 import { etDate, implied, type PropMarket } from "@/lib/props/parse";
 import type { StoredProps } from "@/lib/props/store";
 import { getOurNbaView, type OurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
@@ -166,11 +167,7 @@ export async function OurNbaWeek({ season }: { season: number }) {
         <h2 className={s.h2} id="our-nba-week">
           Our model
         </h2>
-        <p className={s.p}>
-          {`Our own projection for points, rebounds, assists and threes: minutes from recent games and last season, per-minute rates shrunk toward last season, both teams' pace, then a chance for each side of DraftKings' line. An edge is a side where our chance beats DK's break-even at its price. Tested on last season (it beat season averages and its chances were calibrated), not yet against real lines, which only started being saved on October 21, so early edges are mostly where the market knows a role change we don't. ${
-            live ? `${live} slice${live > 1 ? "s are" : " is"} live in our learning section.` : "Nothing has cleared our learning gate, so none of it is a bet yet."
-          }`}
-        </p>
+        <p className={s.p}>{`Our projection for points, rebounds, assists and threes against DraftKings' lines; ${live ? `${live} slice${live > 1 ? "s" : ""} live` : "tracking only until a slice clears the learning gate"}. ${updated(v.board.map((g) => g.capturedAt))}`}</p>
       </div>
       {!v.board.length && <p className={s.calm}>Nothing projected yet. Boards are built at each NBA capture slot once DraftKings posts player props.</p>}
       {days.map((day) => (
@@ -326,13 +323,7 @@ export async function OurFirstBasket({ season }: { season: number }) {
         <h2 className={s.h2} id="our-fb">
           First Basket
         </h2>
-        <p className={s.p}>
-          Our chance each starter scores the game&apos;s first field goal (DraftKings&apos; rules: free throws don&apos;t count, non-starters are void). It comes from
-          the tip (each jumper&apos;s shrunk record; the team that wins it scored first 64% of the time over the last two seasons), then each starter&apos;s share of
-          his team&apos;s first baskets, shrunk toward his share of its field goals. Tested on the second half of last season: it picked the tip winner 64.9% of the
-          time and its chances were calibrated within a point, but the scorer itself is close to a coin toss among the starters. An edge beats DK&apos;s break-even
-          at its price; none is a bet until a slice clears the First Basket learning gate.
-        </p>
+        <p className={s.p}>{`Our chance each starter scores the first field goal, from the tip and each starter's share; tracking only until a slice clears the gate. ${updated(games.map((g) => g.capturedAt))}`}</p>
       </div>
       {games.length ? (
         <ol className={s.ftdGames}>

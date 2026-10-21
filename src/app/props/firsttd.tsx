@@ -1,5 +1,6 @@
 // First TD: Sam's first touchdown model, saved before kickoff and graded
 // after. This week, results, research (the trend checks). NFL only.
+import { updated } from "./updated";
 import { fairAmerican, pricedPlayers, type FtdGame } from "@/lib/firsttd/parse";
 import type { Graded } from "@/lib/firsttd/grade";
 import { getFirstTdView, type FirstTdView, type StoredGame } from "@/lib/firsttd/store";
@@ -24,8 +25,7 @@ function Unavailable() {
 function Empty() {
   return (
     <p className={s.calm}>
-      Nothing saved yet. Sam&apos;s first TD pages (Thursday&apos;s early in the week, Sunday and Monday&apos;s on Saturday) are saved before each kickoff and graded
-      once ESPN has the final. His site only keeps the current week, so the record starts with Week 6.
+      Nothing saved yet. Sam&apos;s first TD pages are saved before each kickoff and graded once final.
     </p>
   );
 }
@@ -251,7 +251,7 @@ function Awaiting({ id, week, what }: { id: string; week: number; what: string }
         <h2 className={s.h2} id={id}>{`Week ${week} ${what}`}</h2>
       </div>
       <p className={s.calm}>
-        {`Nothing saved for Week ${week} yet. Sam posts the Thursday game first and the Sunday and Monday pages on Saturday; the tracker picks them up at 8am and 6:30pm ET and before each kickoff. Week ${week - 1} is graded under Results.`}
+        {`Nothing saved for Week ${week} yet; Sam posts Thursday's page first and the weekend's on Saturday. Week ${week - 1} is under Results.`}
       </p>
     </section>
   );
@@ -271,7 +271,7 @@ export async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="ftd-week">{`Week ${w.week} first touchdown`}</h2>
         <p className={s.p}>
-          {`Sam's model, saved before kickoff, ranked by his chance a player scores the game's first TD. The fair price is the break-even. Tap a game for every player. Kalshi is what one contract cost at the same moment (ask plus fee), green with the gap in points when Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} games graded.` : "Each game is graded from ESPN once it's final."}`}
+          {`Sam's first TD chances against Kalshi's cost; green where Sam's chance is higher. ${done.length ? `${done.length} of ${games.length} graded. ` : ""}${updated(games.map((g) => g.capturedAt))}`}
         </p>
       </div>
       <MostLikely games={games} now={renderedAt()} />
@@ -436,7 +436,7 @@ export async function FirstTdResearch({ season }: { season: number }) {
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="ftd-research">Where Sam&apos;s first TD model is right and wrong</h2>
         <p className={s.p}>
-          {`Each row is a slice of his output: how often it scored the first TD against how often his own numbers said it would. A trend needs ${MIN_GAMES} graded games and a gap past the 90% bar (z 1.6); until then rows read "too early". ${t.games} of ${MIN_GAMES} games graded so far.`}
+          {`How often each slice scored first versus Sam's own chances; a trend needs ${MIN_GAMES} graded games (${t.games} so far).`}
         </p>
       </div>
       {t.findings.length ? (
@@ -448,7 +448,7 @@ export async function FirstTdResearch({ season }: { season: number }) {
       ) : (
         <p className={s.calm}>
           {t.games < MIN_GAMES
-            ? `No trends yet. ${MIN_GAMES - t.games} more graded games before any slice can be called; first TDs are long shots, so a few weeks of data can look like a pattern when it isn't one.`
+            ? `No trends yet: ${MIN_GAMES - t.games} more graded games needed.`
             : "Nothing has cleared the bar: every slice is within normal luck of Sam's own numbers."}
         </p>
       )}

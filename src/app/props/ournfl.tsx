@@ -1,5 +1,6 @@
 // Our own NFL props model (lib/models/nfl): this week's board and its record,
 // on the NFL player props tab. Same cards as the NBA board (ournba.tsx).
+import { updated } from "./updated";
 import { getOurNflView, type OurNflView } from "@/lib/models/nfl/store";
 import { ourPropSlices, ourSliceBets, record } from "@/lib/models/learn";
 import { GameCard, Tile } from "./ournba";
@@ -22,6 +23,7 @@ export async function OurNflWeek({ season }: { season: number }) {
         <h2 className={s.h2} id="our-nfl-week">
           Our model{v.week ? ` · Week ${v.week}` : ""}
         </h2>
+        <p className={s.p}>{`Our projection for yards and receptions, priced against DraftKings' line; tracking only until a slice clears the learning gate. ${updated(v.board.map((g) => g.capturedAt))}`}</p>
       </div>
       {v.board.length ? (
         <ol className={s.ftdGames}>
