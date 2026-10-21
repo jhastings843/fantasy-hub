@@ -84,7 +84,7 @@ export async function KotcWeek({ season }: { season: number }) {
   const now = nowMs();
   const n = [...nights].sort((a, b) => a.date.localeCompare(b.date)).find((x) => !x.result && Date.parse(x.firstTip) > now - 6 * 3_600_000) ?? null;
   const last = nights.find((x) => x.result);
-  if (!n)
+  if (!n || !n.board.rows.length)
     return (
       <section className={s.section} aria-labelledby="kotc-today">
         <Hero eyebrow="King of the Court" title={<span id="kotc-today">No slate saved yet</span>} sub="The board is built from our props model once DraftKings posts the night's props (usually by mid-afternoon Eastern) and freezes at the first tip." />

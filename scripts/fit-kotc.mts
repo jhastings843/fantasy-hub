@@ -172,7 +172,9 @@ for (const [lo, hi] of [[0, 0.01], [0.01, 0.03], [0.03, 0.07], [0.07, 0.15], [0.
 // night: log(backers) = a + b log(chance), least squares. Standard nights
 // without a stated pool are taken as $1M (DK's standard pool; payout x
 // backers comes to $0.98M to $1.03M on rows that have both). Three Kings
-// nights are left out (three pools, top-3 rules).
+// nights are left out (three pools, top-3 rules). This one is descriptive:
+// it uses every matched night, test nights included, and nothing above or on
+// the page claims it was tested out of sample.
 {
   const csv = readFileSync("data/kotc-payouts.csv", "utf8").trim().split("\n").slice(1).map((l) => l.split(","));
   const pts: { date: string; who: string; p: number; backers: number }[] = [];

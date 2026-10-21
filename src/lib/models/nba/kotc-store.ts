@@ -33,6 +33,8 @@ export interface KotcNight {
   games: { id: string; away: string; home: string; tip: string; spread: number | null }[];
   /** Games on the scoreboard that night; more than `games.length` means some had no board yet. */
   slateGames: number;
+  /** Every scoreboard game that night (missing on nights saved before 2026-10-21 late): grading reads all of them, so a king from a game we had no board for still counts. */
+  slateIds?: string[];
   board: KotcBoard;
   result?: {
     kings: { id: string; name: string; team: string }[];
@@ -78,8 +80,10 @@ export async function runKotc(season: number, now: Date, games: SbGame[], boards
     // Frozen once anything on the slate has started.
     if (gs.some((g) => g.state !== "pre" || (g.tip && new Date(g.tip) <= now))) continue;
     const n = nightOf(date, boards, gs.length, now);
-    if (!n) continue;
-    await redis.hset(KEY(season), { [date]: n });
+    if (!n || !n.board.rows.length) continue;
+    // The run can take a while: check the first tip again right before writing.
+    if (gs.some((g) => g.tip && new Date(g.tip) <= new Date())) continue;
+    await redis.hset(KEY(season), { [date]: { ...n, slateIds: gs.map((g) => g.id) } });
     const top = n.board.rows[0];
     out.push(`${date}: ${n.games.length} of ${gs.length} games, ${n.board.rows.length} players, favorite ${top?.name} ${Math.round((top?.p ?? 0) * 100)}%`);
   }
@@ -89,14 +93,14 @@ export async function runKotc(season: number, now: Date, games: SbGame[], boards
     try {
       const actual: { id: string; name: string; team: string; pra: number }[] = [];
       let done = true;
-      for (const g of n.games) {
-        const s = await summary(g.id);
+      for (const id of n.slateIds ?? n.games.map((g) => g.id)) {
+        const s = await summary(id);
         if (!s.header?.competitions?.[0]?.status?.type?.completed) {
           done = false;
           break;
         }
-        const box = compactGame(g.id, s);
-        if (!box) throw new Error(`no box score for ${g.id}`);
+        const box = compactGame(id, s);
+        if (!box) throw new Error(`no box score for ${id}`);
         for (const l of box.players) actual.push({ id: l.id, name: l.name, team: l.team, pra: l.pts + l.reb + l.ast });
       }
       if (!done || !actual.length) continue;
