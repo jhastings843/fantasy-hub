@@ -166,6 +166,19 @@ export const PLAYBOOKS: Playbook[] = [
           "But do not panic. An average roster in an 18-team league carries about 5.6 percent weekly elimination risk, and a functional roster's early-week survival odds are above 90 percent.",
         ],
       },
+      {
+        heading: "How the bid card learns",
+        points: [
+          "Sleeper keeps every waiver bid in the league, the losing ones too. The card reads all of them each week, so it knows who bid on whom, how much, and what it took to win.",
+          "Each rival gets a head-to-head score: when two or more managers chase the same player, how high do they go against the middle bid? A few bids are not enough to judge, so new or quiet bidders count as average.",
+          "That score moves your bid. If a rival who pushes hard wants the same player, the bid goes up; if only soft bidders want him, it comes down. The change is capped (15 percent down, 25 percent up) and never goes past your walk-away.",
+          "It grades our own bids: won or lost, by how much, what we paid over the runner-up, and what the player scored for us afterward.",
+          "It saves each Tuesday card before waivers run, then replays it against the real bids under other rules (bid lower, bid higher, bid the walk-away) to see what each would have bought.",
+          "It checks the chop odds against who actually got chopped, so you can see whether the risk numbers deserve trust.",
+          "What it will not do on its own: change the strategy itself. One league and a dozen weeks is too few to prove a rule better, so the replays are shown to you and the call stays yours.",
+          "All of it lives in \"What the room has taught us\" on the league's FAAB page.",
+        ],
+      },
     ],
     sources: [
       {
