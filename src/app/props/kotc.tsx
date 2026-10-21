@@ -39,16 +39,20 @@ function Explainer() {
   return (
     <Background title="How the promo pays, and how to read this board">
       <p className={s.p}>
-        Opt in on DraftKings&apos; promotions page, bet any player prop priced -200 or longer and tag it as your King of the Court bet. If
-        that player has the most points + rebounds + assists on the night, everyone who tagged him splits the pool in bonus bets (ties
-        split it across every tied player&apos;s backers). The prop itself wins or loses on its own. Check the terms in the app for a
-        per-winner cap before trusting the math below.
+        Opt in on DraftKings&apos; promotions page, bet any player prop (or a same-player parlay) priced -200 or longer on every leg, $5
+        or more, and tag it as your King of the Court bet. One token per customer. If that player has the most points + rebounds +
+        assists on the night, everyone who tagged him splits the pool in bonus bets (ties split it across every tied player&apos;s
+        backers), paid within 24 hours and good for 7 days. The prop itself wins or loses on its own. No per-winner cap: past payouts
+        run to $2,174.
       </p>
       <p className={s.p}>
-        The pool is shared, so the best tag is not simply the likeliest king. Your share is worth about: his chance × pool ÷ the number
-        of people on him × 0.70 (a bonus bet converts to roughly 70 cents of cash). If 25% of everyone tags a player we give 25%, his
-        tag is average value. A player we give 6% that only 2% of people tag is worth three times as much per entry. Crowd sizes
-        aren&apos;t public before the night; that column comes once enough posted payouts are logged.
+        The pool is shared, so the likeliest king is not automatically the best tag. On the 18 paid nights we could match to last
+        season&apos;s replay, the number of people backing the winner rose almost exactly in step with the chance we had given him
+        (backers ≈ 92,000 × our chance on a $1M pool, R² 0.66). So on average the crowd prices the favorites right and every tag is
+        worth about the same: roughly $7.60 of bonus-bet cash value per $1M of pool (a bonus bet converts to about 70 cents; estimate).
+        The edge is in single players the crowd misses: Banchero (we gave 14%, 2,466 backers, paid $811) against Wembanyama (we
+        gave 4.6%, 15,873 backers). Lesser names with a big chance are the tags to look for; a household name at the same chance is
+        likely over-backed.
       </p>
       <p className={s.p}>
         Chances come from 20,000 runs of the whole slate on our props model&apos;s projections: each game&apos;s pace is shared by both
@@ -63,11 +67,12 @@ function Backtest() {
   return (
     <Background title="How it tested on last season">
       <p className={s.p}>
-        Replayed night by night on 2025-26 with only what was known before each night, fit on nights before Jan 15 (52) and judged on the
-        55 after it, which the fit never saw. Our favorite led 30% of those nights; we had given him 32% on average. The winning PRA
-        averaged 50.5, and our median for it averaged 50.5. Players we gave 7 to 15% led 11.3% of the time (n 137); 30%+ led 45.7%
-        against 45.5% given (n 23). Log loss 2.480 against 2.487 for a plain ranking on projected PRA: the game-level shocks add a
-        little, so the projections carry most of it, and the edge on this promo is in the crowd, not the ranking.
+        Replayed night by night on 2025-26 with only what was known before each night: fit on the 76 nights before Jan 15, judged on
+        the 82 after it, which the fit never saw. Chances from 0 to 30% landed close (players we gave 3 to 7% led 5.0% of the time,
+        n 402; 15 to 30% led 21.9% against 21.3%, n 73). Favorites ran hot: our favorite led 22% of nights against 29% given, and
+        players we gave 30%+ led 35% against 40% (n 31), so read a big favorite&apos;s number a few points lower. The winning PRA
+        averaged 54.9 against our median of 55.5. Log loss 2.677, level with independent players (2.676) and better than a plain
+        ranking on projected PRA (2.775).
       </p>
     </Background>
   );
@@ -186,7 +191,7 @@ export async function KotcResults({ season }: { season: number }) {
           { k: "Favorite led", v: n ? `${favWon} of ${n}` : "·", sub: n ? `we gave him ${pct(favP)} on average` : "first grade pending" },
           { k: "King in our top 5", v: n ? `${top5} of ${n}` : "·", sub: "nights" },
           { k: "Log loss", v: n ? ll.toFixed(2) : "·", sub: n ? `everyone equal would be ${flat.toFixed(2)}; lower is better` : "", small: true },
-          { k: "Backtest", v: "30% / 32%", sub: "favorite led vs chance given, 55 nights of 2025-26", small: true },
+          { k: "Backtest", v: "22% / 29%", sub: "favorite led vs chance given, 82 nights of 2025-26", small: true },
         ]}
       />
       {n > 0 && (

@@ -19,6 +19,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { NbaGame } from "../src/lib/models/nba/box";
 import { summarize, RunningSeason } from "../src/lib/models/nba/history";
 import { projectGame, type NbaParams } from "../src/lib/models/nba/props";
+import { etDate } from "../src/lib/props/parse";
 import { kingLogLoss, kingsOf, simulateSlate, type KotcGame, type KotcParams, type KotcPlayer } from "../src/lib/models/nba/kotc";
 
 const NP = JSON.parse(readFileSync("src/lib/models/nba/params.json", "utf8")) as NbaParams;
@@ -42,7 +43,13 @@ interface Night {
 const run = new RunningSeason();
 const nights: Night[] = [];
 const byDate = new Map<string, NbaGame[]>();
-for (const g of season) byDate.set(g.date, [...(byDate.get(g.date) ?? []), g]);
+// Cached dates are tip times (UTC); a night is the Eastern date.
+const nightOf = (g: NbaGame) => etDate(new Date(g.date));
+const names = new Map<string, string>();
+for (const g of season) {
+  byDate.set(nightOf(g), [...(byDate.get(nightOf(g)) ?? []), g]);
+  for (const l of g.players) names.set(l.id, l.name);
+}
 for (const [date, gs] of byDate) {
   const night: Night = { date, games: [], players: [], actual: new Map() };
   for (const g of gs) {
@@ -55,7 +62,7 @@ for (const [date, gs] of byDate) {
     night.games.push({ id: g.id, home: g.home, away: g.away, homeSpread: g.spread });
     for (const pr of projectGame(players, teams, g.spread, prior.base, NP, absent)) {
       if (!informed.has(pr.id) || pr.min < MIN_MIN) continue;
-      night.players.push({ id: pr.id, name: pr.id, team: pr.team, game: g.id, min: pr.min, pra: pr.mean.pts + pr.mean.reb + pr.mean.ast, starter: starters.has(pr.id) });
+      night.players.push({ id: pr.id, name: names.get(pr.id) ?? pr.id, team: pr.team, game: g.id, min: pr.min, pra: pr.mean.pts + pr.mean.reb + pr.mean.ast, starter: starters.has(pr.id) });
     }
     for (const l of g.players) night.actual.set(l.id, l.pts + l.reb + l.ast);
   }
@@ -158,6 +165,38 @@ say("calibration (chance to be king, bins: predicted vs happened, n)");
 for (const [lo, hi] of [[0, 0.01], [0.01, 0.03], [0.03, 0.07], [0.07, 0.15], [0.15, 0.3], [0.3, 1.01]]) {
   const b = cal.filter((c) => c.p >= lo && c.p < hi);
   if (b.length) say(`  ${(lo * 100).toFixed(0)}-${(Math.min(hi, 1) * 100).toFixed(0)}%: ${((100 * b.reduce((a, c) => a + c.p, 0)) / b.length).toFixed(2)}% vs ${((100 * b.reduce((a, c) => a + c.y, 0)) / b.length).toFixed(2)}%, n ${b.length}`);
+}
+
+// 3. The crowd. DraftKings posts what each winning backer got; pool / payout
+// = how many people tagged the king. Against the chance we gave him that
+// night: log(backers) = a + b log(chance), least squares. Standard nights
+// without a stated pool are taken as $1M (DK's standard pool; payout x
+// backers comes to $0.98M to $1.03M on rows that have both). Three Kings
+// nights are left out (three pools, top-3 rules).
+{
+  const csv = readFileSync("data/kotc-payouts.csv", "utf8").trim().split("\n").slice(1).map((l) => l.split(","));
+  const pts: { date: string; who: string; p: number; backers: number }[] = [];
+  const all = new Map(nights.map((n) => [n.date, n]));
+  for (const [date, pool, variant, winners, , payout] of csv) {
+    if (!payout || /three/i.test(variant)) continue;
+    const n = all.get(date);
+    if (!n) continue;
+    const b = simulateSlate(n.games, n.players, { ...P, sims: 20000 }, 7);
+    const who = winners.split(";").map((x) => x.trim());
+    const p = b.rows.filter((r) => who.includes(r.name)).reduce((a, r) => a + r.p, 0);
+    if (p <= 0) continue;
+    pts.push({ date, who: winners, p, backers: (Number(pool) || 1_000_000) / Number(payout) });
+  }
+  const xs = pts.map((x) => Math.log(x.p));
+  const ys = pts.map((x) => Math.log(x.backers));
+  const mx = xs.reduce((a, x) => a + x, 0) / xs.length;
+  const my = ys.reduce((a, y) => a + y, 0) / ys.length;
+  const b = xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+  const a = my - b * mx;
+  const r2 = 1 - ys.reduce((acc, y, i) => acc + (y - (a + b * xs[i])) ** 2, 0) / ys.reduce((acc, y) => acc + (y - my) ** 2, 0);
+  say(`\ncrowd: ${pts.length} paid nights matched; backers per pool = ${Math.exp(a).toFixed(0)} x chance^${b.toFixed(2)} (R2 ${r2.toFixed(2)})`);
+  for (const x of pts.sort((m, n) => m.p - n.p)) say(`  ${x.date} ${x.who}: we gave ${(100 * x.p).toFixed(1)}%, ${Math.round(x.backers)} backers`);
+  P = { ...P, crowd: { a: Math.round(a * 1000) / 1000, b: Math.round(b * 1000) / 1000, n: pts.length, r2: Math.round(r2 * 100) / 100 } } as KotcParams;
 }
 
 writeFileSync("src/lib/models/nba/kotc-params.json", JSON.stringify(P, null, 2) + "\n");

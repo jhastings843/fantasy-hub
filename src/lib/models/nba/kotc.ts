@@ -28,6 +28,8 @@ export interface KotcParams {
   sdGame: number;
   sdMin: number;
   phi: number;
+  /** The crowd: backers of a player = exp(a) x (our chance)^b, fit on DK's posted payouts. */
+  crowd?: { a: number; b: number; n: number; r2: number };
 }
 
 export interface KotcGame {
