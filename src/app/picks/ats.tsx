@@ -981,7 +981,15 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
           <span className={s.eyebrow}>Price</span>
           <b className={s.closePick} style={{ textTransform: "none" }}>{g.price !== undefined ? `${price(g.price)} at DraftKings` : "No price yet"}</b>
           <span className={s.p}>
-            {g.p !== undefined && g.price !== undefined ? `Estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit. It stays a bet at ${worst === null ? "plus money" : `${price(worst)} or better`}.` : "Priced when a line is quoted."}
+            {g.p !== undefined && g.price !== undefined
+              ? `Estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit. ${
+                  worst === null
+                    ? "It needs plus money to be a bet."
+                    : g.price >= worst
+                      ? `Still a bet down to ${price(worst)}; anything more expensive than that (${price(worst - 3)}, say) is a pass.`
+                      : `Too expensive at ${price(g.price)}: it needs ${price(worst)} or cheaper (${price(Math.min(-100, worst + 2))}, say) to be a bet.`
+                }`
+              : "Priced when a line is quoted."}
           </span>
         </div>
         <div className={s.edgeCard}>
