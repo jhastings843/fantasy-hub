@@ -296,7 +296,7 @@ function propRows(board: (OurStoredProps | OurNflStored)[], extraCol: (g: OurSto
                       <td className={s.num}>{x ? pct(x.over) : "·"}</td>
                       <td className={`${s.num} ${m.side ? s.cSam : s.dim}`}>{m.side && m.gap !== null ? `${sideWord(m.side)} +${(m.gap * 100).toFixed(1)}` : "·"}</td>
                       <td className={s.dim}>{extraCol(g, m)}</td>
-                      {g.result && <td className={`${s.num} ${outCls(r?.play?.outcome)}`}>{r?.actual === undefined ? "·" : r.actual === null ? "DNP" : `${r.actual}${r.play ? ` ${r.play.outcome}` : ""}`}</td>}
+                      {g.result && <td className={`${s.num} ${outCls(r?.play?.outcome)}`}>{r?.actual === undefined ? "·" : r.actual === null ? "DNP" : r.actual}</td>}
                     </tr>
                   );
                 })}
