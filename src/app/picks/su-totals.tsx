@@ -30,7 +30,8 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
   const doneW = done.filter((x) => won(x) === "W").length;
   const band = (margin: number) => marginBand(r.league, margin);
   const bandCls = (m: number) => (band(m) === "wide" ? s.readBet : band(m) === "clear" ? "" : s.readPass);
-  const surest = upcoming.slice(0, 3);
+  const surest = upcoming.slice(0, 4);
+  const rest = upcoming.slice(surest.length);
   return (
     <section className={s.section} aria-labelledby="su-week">
       <Hero
@@ -62,11 +63,13 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
         </ul>
       )}
       {surest.length > 0 && <MarketKey />}
-      {upcoming.length > 0 && (
+      {rest.length > 0 && (
         <div className={s.section}>
-          <h3 className={s.h2}>Every pick, ranked</h3>
+          <h3 className={s.h2}>{`The rest, ranked ${surest.length + 1} to ${upcoming.length}`}</h3>
           <div className={s.gtable}>
-            {upcoming.map(({ g, side, margin }, i) => (
+            {rest.map(({ g, side, margin }, j) => {
+              const i = j + surest.length;
+              return (
               <div key={`${g.away}@${g.home}`} className={s.gRow}>
                 <div className={s.suLine}>
                   <span className={`${s.num} ${s.rank}`}>{i + 1}</span>
@@ -79,7 +82,8 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
                   <span className={`${s.readChip} ${bandCls(margin)}`}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <p className={s.thin}>1 is the surest. In a confidence pool give it the most points. Bands describe the projected margin, not a probability.</p>
         </div>
