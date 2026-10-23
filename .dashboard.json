@@ -96,6 +96,7 @@
   ],
   "last_worked": "2026-10-22",
   "notes": [
+    "2026-10-22: Picks learner logs split by league (shared sizing tagged); Tracking in the background progress section on every learner log; Hobby Hub Ledger redesign mockup published as an artifact.",
     "2026-10-22: Props game tables put live games on top (Live tag); NFL props now priced at DK's line from the Odds API read when ESPN's line differs (11 of 14 NE@CHI props had gone unpriced).",
     "2026-10-21: Money gets a Trends tab (6ff3997) for trade-bot's trend book: picks, passes, record by kind of bet, playbook, weekly review; also on Overview.",
     "2026-10-21: Stock book pages with an interactive chart and plain-English strategy; straight-up splits explained; NBA props at the line nearest -110; DK First TD prices beside Kalshi.",
