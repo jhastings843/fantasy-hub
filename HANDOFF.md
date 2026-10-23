@@ -398,3 +398,5 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Fix: `oddsPrice` returns DK's own line when it differs; `ourNflMarkets` tests the prop at that line and stores `extra.espnLine` (shown in "Price from"). David's price still requires an exact match.
 - Every Props game table sorts started, ungraded games first with a green Live tag (`GameRowData.live`, `.gLive` in picks.module.css).
 - Offered, not built: backup cron slots (10am, 11am ET) against GitHub delays; pre-kickoff re-read for games with edges; "better at FanDuel" tag.
+- Later 10-22: Live tag on NBA picks Read (was "Final" mid-game); First TD Read says Bet/No bet (bet = live learner slice); NBA props table Edges follow the 3-game card rule; Top edge reads "R. Johnson u25.5 rush yds".
+- Learner logs (Picks football, Picks NBA, every Props tab) open with "Tracking in the background": a card per model/slice with Games and Weeks bars toward its gate, results so far, what else it needs (`TrackingProgress` in picks/board.tsx; props rows from `trackRows` in props/learning.tsx). Football reviews now save n/weeks/t per decision; older reviews are parsed from the sentence.
