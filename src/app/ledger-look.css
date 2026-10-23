@@ -273,12 +273,11 @@
   font-weight: 500;
 }
 
-/* Headlines and card titles: condensed, upper case. */
+/* Headlines and card titles: condensed, mixed case (the Ledger, 2026-10-22). */
 :is(h1, h2, h3):is(.text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl),
 :is(h1, h2, h3, h4).tracking-tight {
   font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.005em;
   font-weight: 700;
   line-height: 1.02;
 }

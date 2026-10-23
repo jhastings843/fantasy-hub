@@ -5,7 +5,7 @@ import { getNbaBoard } from "@/lib/picks/nba-store";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { readGame } from "../picks/nba/NbaView";
 import { loadProducts } from "../props/top";
-import { Hero, ModelGrid, Stats, statusChip, type ModelRow } from "../picks/board";
+import { ModelGrid, PageHead, SecHead, Stats, statusChip, type ModelRow } from "../picks/board";
 import { LEAGUE_NAME, kickoffEt, line, price, rec } from "../picks/ui";
 import s from "../picks/picks.module.css";
 
@@ -177,15 +177,12 @@ export default async function TodayPage() {
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <header className={s.header}>
-          <Hero eyebrow="Today" title={today} sub={headline} />
+        <header className={s.pageFrame}>
+          <PageHead title={today} sub={headline} />
         </header>
 
         <section className={s.section} aria-labelledby="t-live">
-          <div className={s.lineupHead}>
-            <h2 className={s.h3} id="t-live" style={{ margin: 0 }}>In play now</h2>
-            <span className={s.muted}>Real stakes first, then sides we only track</span>
-          </div>
+          <SecHead id="t-live" title="In play now" aside={"Real stakes first, then sides we only track"} />
           {live.length ? (
             <div className={s.slips}>
               {[...live.filter((x) => x.kind === "issued"), ...live.filter((x) => x.kind !== "issued")].map((x) => (
@@ -198,10 +195,7 @@ export default async function TodayPage() {
         </section>
 
         <section className={s.section} aria-labelledby="t-next">
-          <div className={s.lineupHead}>
-            <h2 className={s.h3} id="t-next" style={{ margin: 0 }}>Next up</h2>
-            <span className={s.muted}>{`${next.reduce((a, x) => a + (x.kind === "issued" ? (x.stake ?? 0) : 0), 0)}u issued and not started`}</span>
-          </div>
+          <SecHead id="t-next" title="Next up" aside={<>{`${next.reduce((a, x) => a + (x.kind === "issued" ? (x.stake ?? 0) : 0), 0)}u issued and not started`}</>} />
           {next.length ? (
             <div className={s.slips}>
               {next.map((x) => (
@@ -214,12 +208,7 @@ export default async function TodayPage() {
         </section>
 
         <section className={s.section} aria-labelledby="t-drivers">
-          <div className={s.lineupHead}>
-            <h2 className={s.h3} id="t-drivers" style={{ margin: 0 }}>What drives each section</h2>
-            <span className={s.muted}>
-              <Link href="/picks">Picks</Link> · <Link href="/props">Props</Link> for the full lineups
-            </span>
-          </div>
+          <SecHead id="t-drivers" title="What drives each section" aside={<><Link href="/picks">Picks</Link> · <Link href="/props">Props</Link> for the full lineups</>} />
           <ModelGrid models={drivers} />
           <div className={s.legendRow}>
             <span>{statusChip("active")} its picks get real stakes</span>
@@ -229,12 +218,7 @@ export default async function TodayPage() {
         </section>
 
         <section className={s.section} aria-labelledby="t-record">
-          <div className={s.lineupHead}>
-            <h2 className={s.h3} id="t-record" style={{ margin: 0 }}>How we are doing</h2>
-            <Link href="/records" className={s.muted}>
-              All records
-            </Link>
-          </div>
+          <SecHead id="t-record" title="How we are doing" aside={<><Link href="/records">All records</Link></>} />
           <Stats
             label="Issued record"
             items={[

@@ -4,8 +4,8 @@ import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
 import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, TrendGraded, TrendPick, Trends, TrendStats, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
 import { LineChart } from "./Chart";
-import { BrierGauge, DeskHero, DeskTable, LearnerLog, MoneyHero, MoneyLogSection, Stats, WeatherBrake, booksLog, booksTotals, desks, moneyLog, retroLog } from "./desks";
-import { Background } from "../picks/board";
+import { BrierGauge, DeskHero, DeskTable, LearnerLog, MoneyLogSection, Stats, WeatherBrake, booksLog, booksTotals, desks, moneyLog, retroLog } from "./desks";
+import { Background, PageHead, SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 
@@ -1237,15 +1237,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const list = desks(v);
   return (
     <section className={s.section}>
-      <MoneyHero list={list} />
       <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>Each desk vs its yardstick</h3>
-          <p className={s.p}>Each desk against what it has to beat (oxblood bar: the desk; grey: the yardstick; for Brier scores the shorter bar wins). Open a desk for its ledger. Paper dollars and units never add together.</p>
-        </div>
-        <h4 className={s.h3}>Paper dollars</h4>
+        <SecHead title="Each desk vs its yardstick" aside="Open a desk for its ledger" />
+        <p className={s.p}>Each desk against what it has to beat (oxblood bar: the desk; grey: the yardstick; for Brier scores the shorter bar wins). Open a desk for its ledger. Paper dollars and units never add together.</p>
+        <SecHead title="Paper dollars" aside="Prediction markets, weather and stock books" />
         <DeskTable list={list.filter((d) => d.money === "usd")} />
-        <h4 className={s.h3}>Units</h4>
+        <SecHead title="Units" aside="Issued picks and tracked prop edges" />
         <DeskTable list={list.filter((d) => d.money === "units")} />
       </div>
       <details className={s.details}>
@@ -1391,15 +1388,12 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <header className={s.header}>
-          <div className={s.headRow}>
-            <h1 className={s.eyebrow} style={{ margin: 0 }}>Money · paper and units, no real balances</h1>
-            {snap && (
-              <span className={`${s.eyebrow} ${age !== null && age > 3 ? m.stale : ""}`}>
-                {`Desks updated ${when(snap.generatedAt)}`}
-              </span>
-            )}
-          </div>
+        <header className={s.pageFrame}>
+          <PageHead
+            title="Money"
+            sub="Separate desks, each judged against its own market. Paper dollars and units never add together; no real balances here."
+            asof={snap ? <span className={age !== null && age > 3 ? m.stale : ""}>{`Desks updated ${when(snap.generatedAt)}`}</span> : undefined}
+          />
           <nav className={s.chips} aria-label="Desk">
             {TABS.map((x) => (
               <Link key={x.id} href={href(x.id)} aria-current={x.id === tab ? "page" : undefined} className={s.chip}>

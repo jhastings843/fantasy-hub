@@ -21,7 +21,7 @@
 
 .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .panelHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.panelTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; font-size: 22px; font-weight: 700; margin: 0; line-height: 1.1; }
+.panelTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; letter-spacing: -.005em; font-size: 22px; font-weight: 700; margin: 0; line-height: 1.1; }
 .panelLink { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); text-decoration: none; }
 .panelLink:hover { text-decoration: underline; }
 /* Collapsible panel (Phil's settled bets). Closed by default; the chevron turns when open. */

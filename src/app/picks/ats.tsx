@@ -8,7 +8,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
-import { Background, Curve, Hero, MarketKey, MarketLine } from "./board";
+import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import s from "./picks.module.css";
 
 export type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
@@ -474,7 +474,8 @@ export function AtsWeek({ r }: { r: PicksReport }) {
   const upcoming = open.filter((g) => statusOf(g) !== "started");
   return (
     <section className={s.section} aria-labelledby="ats-week">
-      <Hero eyebrow={`${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` · Week ${r.week}` : ""} · Spreads`} title={<span id="ats-week">{title}</span>} sub={sub} />
+      <SecHead id="ats-week" title="Spreads" aside={`${title} · started games first`} />
+      {sub && <p className={s.p}>{sub}</p>}
       {all.length > 0 ? (
         <div className={s.section}>
           <ReadLegend />

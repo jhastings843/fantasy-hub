@@ -6,7 +6,7 @@ import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
 import { href, kickoffEt, line, price, rec, units, LOG_VIEW, NBA_VIEWS, whenEt, type View } from "../ui";
-import { Background, CutRanges, Hero, LearnerLog, ModelLineup, Stats, TrackingProgress, type LogEntry } from "../board";
+import { Background, CutRanges, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry } from "../board";
 import { ReadLegend } from "../ats";
 import s from "../picks.module.css";
 
@@ -457,16 +457,18 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <header className={s.header}>
-          <h1 className={s.eyebrow} style={{ margin: 0 }}>{`Picks · NBA ${v ? `${v.season}-${String(v.season + 1).slice(2)}` : "2026-27"}`}</h1>
-          <div className={s.navRows}>{sportNav}</div>
-          <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {[...NBA_VIEWS, LOG_VIEW].map((x) => (
-              <Link key={x.id} href={nbaHref(x.id)} aria-current={x.id === view ? "page" : undefined} className={s.tab}>
-                {x.label}
-              </Link>
-            ))}
-          </nav>
+        <header className={s.pageFrame}>
+          <PageHead title="NBA picks" sub="Tonight. Which model moves money here, and what each game reads." asof={`NBA ${v ? `${v.season}-${String(v.season + 1).slice(2)}` : "2026-27"}`} />
+          <div className={s.controlBar}>
+            {sportNav}
+            <nav className={s.chips} aria-label="View">
+              {[...NBA_VIEWS, LOG_VIEW].map((x) => (
+                <Link key={x.id} href={nbaHref(x.id)} aria-current={x.id === view ? "page" : undefined} className={s.chip}>
+                  {x.id === "week" ? "Board" : x.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
           {v && view !== "week" && (
             <Stats
               label="NBA record, rule and learner"
@@ -519,11 +521,8 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
           <p className={s.calm}>No NBA games in the next week.</p>
         ) : (
           <section className={s.section} aria-labelledby="nba-slate">
-            <Hero
-              eyebrow="NBA · Spreads"
-              title={<span id="nba-slate">{best.length ? `${best.length} in the rule's tier today` : todayGames ? `${todayGames} games today, none in the rule's tier` : "No games today"}</span>}
-              sub={samLine(b)}
-            />
+            <SecHead id="nba-slate" title="Spreads" aside={`${best.length ? `${best.length} in the rule's tier today` : todayGames ? `${todayGames} games today, none in the rule's tier` : "No games today"} · started games first`} />
+            <p className={s.p}>{samLine(b)}</p>
             <div className={s.section}>
               <ReadLegend />
               <RowsTable rows={[...upcoming.filter(({ x }) => x.g.state === "in"), ...upcoming.filter(({ x }) => x.g.state !== "in")]} />

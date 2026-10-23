@@ -6,6 +6,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* The Ledger faces (Jack, 2026-10-22: "fonts, layout, all"): a condensed display face, the system text face
+     and system mono for numbers. The variable names stay so every existing rule follows. */
+  --font-barlow: "Avenir Next Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-plex: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-plex-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --background: #f5f2e9;
   --foreground: #302d29;
 }
@@ -26,8 +31,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  /* IBM Plex, loaded in layout.tsx: the Picks ledger face, site wide since
-     2026-10-19 (ledger-look.css). Keep this rule: an old Arial rule once
-     silently overrode the chosen typeface. */
+  /* The Ledger's text face, site wide (see :root). Keep this rule: an old
+     Arial rule once silently overrode the chosen typeface. */
   font-family: var(--font-plex), system-ui, -apple-system, sans-serif;
 }

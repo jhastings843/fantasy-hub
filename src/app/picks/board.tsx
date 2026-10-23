@@ -7,12 +7,37 @@ import type { JournalLine } from "@/lib/learning/engine";
 import { whenEt } from "./ui";
 import s from "./picks.module.css";
 
+/** The Ledger's page frame: a big mixed-case title, one line under it, and the as-of stamp on the right. */
+export function PageHead({ title, sub, asof }: { title: ReactNode; sub?: ReactNode; asof?: ReactNode }) {
+  return (
+    <div className={s.pageHead}>
+      <div>
+        <h1 className={s.pageTitle}>{title}</h1>
+        {sub && <p className={s.pageSub}>{sub}</p>}
+      </div>
+      {asof && <div className={s.pageAsof}>{asof}</div>}
+    </div>
+  );
+}
+
+/** A section heading: title left, a short note right, a 2px rule under both. */
+export function SecHead({ title, aside, id }: { title: ReactNode; aside?: ReactNode; id?: string }) {
+  return (
+    <div className={s.secHead}>
+      <h2 className={s.secTitle} id={id}>
+        {title}
+      </h2>
+      {aside && <span className={s.secAside}>{aside}</span>}
+    </div>
+  );
+}
+
+/** A section's opening, drawn as the Ledger section heading: title left, its label right, the line under. */
 export function Hero({ eyebrow, title, sub }: { eyebrow: string; title: ReactNode; sub?: ReactNode }) {
   return (
-    <div className={s.hero}>
-      <span className={s.eyebrow}>{eyebrow}</span>
-      <h2 className={s.heroH}>{title}</h2>
-      {sub ? <p className={s.heroSub}>{sub}</p> : null}
+    <div className={s.pageFrame}>
+      <SecHead title={title} aside={eyebrow} />
+      {sub ? <p className={s.p}>{sub}</p> : null}
     </div>
   );
 }
@@ -247,10 +272,7 @@ export function ModelLineup({ title, aside, models }: { title: string; aside: st
   const kinds = [...new Set(rest.map((m) => MODEL_STATUS[m.status][0].toLowerCase()))].join(", ");
   return (
     <section className={s.lineup} aria-label={title}>
-      <div className={s.lineupHead}>
-        <h2 className={s.h3} style={{ margin: 0 }}>{title}</h2>
-        <span className={s.muted}>{aside}</span>
-      </div>
+      <SecHead title={title} aside={aside} />
       {lead && <ModelLine m={lead} />}
       {rest.length > 0 && (
         <details className={s.lineupMore}>

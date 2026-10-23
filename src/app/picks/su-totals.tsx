@@ -4,7 +4,7 @@ import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
 import { kickoffEt, n, price, rec, units } from "./ui";
-import { Background, Hero } from "./board";
+import { Background, Hero, SecHead } from "./board";
 import { ReadLegend } from "./ats";
 import s from "./picks.module.css";
 
@@ -12,6 +12,11 @@ import s from "./picks.module.css";
 
 // Sleeper and ESPN spell a few teams differently (pool-store.ts canon).
 const POOL_CANON: { [abbr: string]: string } = { WSH: "WAS", LA: "LAR", JAC: "JAX" };
+
+/** The one line under a board's section heading. */
+function SuSub({ text }: { text: string }) {
+  return <p className={s.p}>{text}</p>;
+}
 
 export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entries: number; shares: Record<string, number> } | null }) {
   const name = (k: string) => r.names[k] ?? k;
@@ -33,10 +38,9 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
   const bandCls = (m: number) => (band(m) === "wide" ? s.readTrack : band(m) === "clear" ? "" : s.readPass);
   return (
     <section className={s.section} aria-labelledby="su-week">
-      <Hero
-        eyebrow={`${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` · Week ${r.week}` : ""} · Straight up`}
-        title={<span id="su-week">{upcoming.length ? "Who wins, most sure first" : done.length ? "Every game played" : "No games on the board yet"}</span>}
-        sub={`${r.league === "nfl" ? "For the Weekly payout pool use the entry above; this list is for a confidence pool. " : ""}Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l} this season)` : ""}. Pick'em only: no stake.`}
+      <SecHead id="su-week" title="Straight up" aside={upcoming.length ? "Who wins, surest first" : done.length ? "Every game played" : "No games on the board yet"} />
+      <SuSub
+        text={`${r.league === "nfl" ? "For the Weekly payout pool use the entry above; this list is for a confidence pool. " : ""}Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l} this season)` : ""}. Pick'em only: no stake.`}
       />
       {upcoming.length > 0 ? (
         <div className={s.section}>
@@ -282,10 +286,9 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
   const title = bets.length ? `${bets.length} totals bet${bets.length === 1 ? "" : "s"} this week` : t.backtest.rule ? "No totals bets this week" : "Totals are tracking only";
   return (
     <section className={s.section} aria-labelledby="ou-week">
-      <Hero
-        eyebrow={`${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` · Week ${r.week}` : ""} · Totals`}
-        title={<span id="ou-week">{title}</span>}
-        sub={
+      <SecHead id="ou-week" title="Totals" aside={`${title} · started games first`} />
+      <SuSub
+        text={
           t.backtest.rule
             ? `Rule: ${t.backtest.rule.label.toLowerCase()} (${rec(t.backtest.rule.record)} in the archive).`
             : `No totals cut has 10+ decided games and a winning rate yet, so nothing here is a bet. ${t.backtest.archived} archived games graded so far.`

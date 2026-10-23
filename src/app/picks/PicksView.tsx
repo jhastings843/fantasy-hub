@@ -9,7 +9,7 @@ import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
 import { OurSpreadCard } from "./ours";
 import { FOOTBALL_VIEWS, LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
-import { Background, ModelLineup, Stats, type ModelRow } from "./board";
+import { Background, ModelLineup, PageHead, Stats, type ModelRow } from "./board";
 import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
 import { PicksLog } from "./log";
 import { redisStore } from "@/lib/picks/learning/store";
@@ -65,9 +65,13 @@ export default async function PicksView({ league, market: asked, view }: { leagu
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <header className={s.header}>
-          <h1 className={s.eyebrow} style={{ margin: 0 }}>{`Picks · ${LEAGUE_NAME[league]} ${r.season}${r.week ? ` · Week ${r.week}` : ""}`}</h1>
-          <div className={s.navRows}>
+        <header className={s.pageFrame}>
+          <PageHead
+            title={`${LEAGUE_NAME[league]} picks`}
+            sub={`${r.week ? `Week ${r.week}. ` : ""}Which model moves money here, and what each game reads.`}
+            asof={`${LEAGUE_NAME[league]} ${r.season}`}
+          />
+          <div className={s.controlBar}>
             {sportNav}
             <nav className={s.chips} aria-label="Market">
               {MARKETS.map((m) => (
@@ -76,25 +80,23 @@ export default async function PicksView({ league, market: asked, view }: { leagu
                 </Link>
               ))}
             </nav>
+            <nav className={s.chips} aria-label="View">
+              {FOOTBALL_VIEWS.map((v) => (
+                <Link key={v.id} href={href(league, market, v.id)} aria-current={v.id === view ? "page" : undefined} className={s.chip}>
+                  {v.id === "week" ? "Board" : v.label}
+                </Link>
+              ))}
+            </nav>
+            {r.board.length > 0 && view === "week" && (
+              <div className={s.barSearch}>
+                <WeekSearch entries={picksSearchIndex(r)} label="Search this week" placeholder={league === "nfl" ? "Team, e.g. Bills or KC" : "Team, e.g. Ohio State"} />
+              </div>
+            )}
           </div>
-          <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {FOOTBALL_VIEWS.map((v) => (
-              <Link key={v.id} href={href(league, market, v.id)} aria-current={v.id === view ? "page" : undefined} className={s.tab}>
-                {v.label}
-              </Link>
-            ))}
-          </nav>
-          {view !== "week" && <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />}
-          {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
-          {r.board.length > 0 && view === "week" && (
-            <WeekSearch
-              entries={picksSearchIndex(r)}
-              label={`Search ${r.week ? `Week ${r.week}` : "this week"}: spread, winner and total`}
-              placeholder={league === "nfl" ? "Team, e.g. Bills or KC" : "Team, e.g. Ohio State"}
-            />
-          )}
+          {view !== "week" && <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />}
         </header>
+        {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
 
         {market === "ats" && view === "week" && <AtsWeek r={r} />}
         {market === "ats" && view === "results" && <AtsResults r={r} />}

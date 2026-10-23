@@ -55,10 +55,10 @@
 .wrap { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
 .num { font-family: var(--font-plex-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
 .muted { color: var(--mute); }
-.h1, .h2 { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; margin: 0; text-wrap: balance; line-height: 1; }
+.h1, .h2 { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; letter-spacing: -.005em; margin: 0; text-wrap: balance; line-height: 1; }
 .h1 { font-size: clamp(34px, 6vw, 52px); font-weight: 800; }
 .h2 { font-size: clamp(22px, 4vw, 28px); font-weight: 700; }
-.h3 { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; font-size: 20px; font-weight: 700; margin: 12px 0 0; line-height: 1.1; }
+.h3 { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; letter-spacing: -.005em; font-size: 20px; font-weight: 700; margin: 12px 0 0; line-height: 1.1; }
 .eyebrow { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
 .p { margin: 0; max-width: 68ch; color: var(--ink2); }
 .section { display: flex; flex-direction: column; gap: 16px; }
@@ -140,7 +140,7 @@
 
 .suGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .suCard { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
-.suTeam { font-family: var(--font-barlow), Impact, sans-serif; font-size: 26px; font-weight: 700; line-height: 1; text-transform: uppercase; }
+.suTeam { font-family: var(--font-barlow), Impact, sans-serif; font-size: 26px; font-weight: 700; line-height: 1; }
 .suMeta { font-size: 12.5px; color: var(--ink2); }
 .suRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
@@ -150,7 +150,7 @@
 .input { font-family: var(--font-plex-mono), monospace; font-size: 16px; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); color: var(--ink); width: 100%; }
 .input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .out { border-radius: 8px; padding: 12px 14px; background: var(--surface2); min-height: 64px; }
-.out b { font-family: var(--font-barlow), Impact, sans-serif; font-size: 22px; text-transform: uppercase; letter-spacing: .02em; display: block; }
+.out b { font-family: var(--font-barlow), Impact, sans-serif; font-size: 22px; letter-spacing: -.005em; display: block; }
 .out span { font-size: 13px; color: var(--ink2); }
 .outT1 { background: var(--accent); }
 .outT1 b, .outT1 span { color: var(--surface); }
@@ -193,7 +193,7 @@
 .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .cardBet { border-left: 4px solid var(--accent); }
 .cardTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-.cardPick { font-family: var(--font-barlow), Impact, sans-serif; font-size: 22px; font-weight: 700; line-height: 1.1; text-transform: uppercase; overflow-wrap: anywhere; }
+.cardPick { font-family: var(--font-barlow), Impact, sans-serif; font-size: 22px; font-weight: 700; line-height: 1.1; overflow-wrap: anywhere; }
 .cardMeta { font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
 .stake { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; }
 .stake b { font-size: 20px; color: var(--accent); line-height: 1.1; }
@@ -225,7 +225,7 @@
 .poolTop { display: flex; align-items: center; gap: 10px; }
 .poolLogo { flex: 0 0 auto; object-fit: contain; }
 .poolWho { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.poolTeam { font-family: var(--font-barlow), Impact, sans-serif; font-size: 24px; font-weight: 700; line-height: 1; text-transform: uppercase; }
+.poolTeam { font-family: var(--font-barlow), Impact, sans-serif; font-size: 24px; font-weight: 700; line-height: 1; }
 .poolOpp { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mute); margin-top: 3px; }
 .poolPct { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .poolPct b { font-size: 18px; line-height: 1; }
@@ -287,7 +287,7 @@
 .betWeek summary::before { content: "›"; color: var(--mute); transition: transform .15s ease; display: inline-block; grid-row: 1; margin-right: -4px; }
 .betWeek[open] summary::before { transform: rotate(90deg); }
 .betWeek summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
-.betWeekName { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; font-weight: 700; font-size: 17px; }
+.betWeekName { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; letter-spacing: -.005em; font-weight: 700; font-size: 17px; }
 .betWeekRec { font-size: 12.5px; color: var(--mute); }
 .betWeekNet { font-weight: 700; font-size: 15px; }
 .betWeekBody { padding: 0 14px 12px; border-top: 1px solid var(--rule); }
@@ -329,7 +329,7 @@
 .ppSys { border-color: var(--accent); background: var(--accent-soft); }
 .ppMain { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
 .ppWho { font-weight: 600; font-size: 14px; }
-.ppBet { font-family: var(--font-barlow), Impact, sans-serif; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.ppBet { font-family: var(--font-barlow), Impact, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: -.005em; }
 .ppMeta { font-size: 12px; color: var(--mute); }
 .ppAll summary { cursor: pointer; font-size: 13px; color: var(--ink2); padding: 4px 0; }
 .ppAll .tw { margin-top: 6px; }
@@ -341,7 +341,7 @@
 .ftdSum { list-style: none; cursor: pointer; display: grid; grid-template-columns: 190px 230px minmax(0, 1fr) 150px; gap: 6px 18px; align-items: center; padding: 12px 16px; }
 .ftdSum::-webkit-details-marker { display: none; }
 .ftdWhen, .ftdPick { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13px; }
-.ftdPickName { font-family: var(--font-barlow), Impact, sans-serif; font-size: 20px; font-weight: 700; text-transform: uppercase; line-height: 1.05; }
+.ftdPickName { font-family: var(--font-barlow), Impact, sans-serif; font-size: 20px; font-weight: 700; line-height: 1.05; }
 .ftdOdds { font-size: 12.5px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ftdFlags { display: flex; align-items: center; gap: 8px; justify-self: end; }
 .chev { font-size: 20px; color: var(--mute); transition: transform .15s ease; display: inline-block; }
@@ -422,7 +422,7 @@
 .betGrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 14px; }
 .betCard { background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .betCardTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.betPickBig { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 800; font-size: clamp(34px, 5vw, 44px); line-height: 1; text-transform: uppercase; overflow-wrap: anywhere; }
+.betPickBig { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 800; font-size: clamp(34px, 5vw, 44px); line-height: 1; overflow-wrap: anywhere; }
 .betWhen { color: var(--ink2); font-size: 14px; margin-top: 4px; }
 /* Edge, lock and tracking tags are never a stake: dashed, like every no-stake marker. */
 .lockChip { flex: 0 0 auto; padding: 4px 9px; border-radius: 5px; border: 1.5px dashed var(--accent); background: transparent; color: var(--accent-ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -449,7 +449,7 @@
 
 .closeGrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 10px; }
 .closeCard { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.closePick { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 24px; text-transform: uppercase; line-height: 1.05; }
+.closePick { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 24px; line-height: 1.05; }
 .closePick span { font-size: 15px; color: var(--mute); font-weight: 600; }
 
 .gtable { border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--surface); }
@@ -516,7 +516,7 @@
 .edgeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 14px; }
 .edgeCard { background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .edgeHead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.edgeHead h3 { margin: 0; font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 24px; text-transform: uppercase; letter-spacing: .03em; }
+.edgeHead h3 { margin: 0; font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -.005em; }
 .edgeHead span { font-size: 12.5px; color: var(--mute); }
 .edgeRow { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--rule); }
 .edgeWho { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -594,7 +594,7 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .slipReady { border: 1.5px dashed var(--accent); background: transparent; }
 .slipDash { border: 1.5px dashed var(--rule); background: transparent; }
 .slipTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; }
-.slipPick { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 24px; line-height: 1.1; text-transform: uppercase; letter-spacing: .02em; }
+.slipPick { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 24px; line-height: 1.1; letter-spacing: -.005em; }
 .slipNote { margin: 0; font-size: 13px; color: var(--ink2); }
 .slipStub { display: flex; flex-wrap: wrap; gap: 4px 18px; border-top: 1px dashed var(--rule); padding-top: 9px; font-size: 13px; color: var(--ink2); }
 .slipStub b { color: var(--ink); font-weight: 600; }
@@ -630,7 +630,7 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .edgeGrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .edgeCard { border: 1.5px dashed color-mix(in srgb, var(--ink2) 40%, transparent); border-radius: 10px; padding: 13px 15px; display: grid; gap: 9px; min-width: 0; align-content: start; }
 .edgeTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
-.edgeWho { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
+.edgeWho { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; letter-spacing: -.005em; overflow-wrap: anywhere; }
 .edgeBet { font-size: 13.5px; color: var(--ink2); margin-top: 2px; }
 .edgeTrio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid var(--rule); padding-top: 8px; margin: 0; }
 .edgeTrio dt { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
@@ -652,3 +652,55 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .cutStat { text-align: right; font-family: var(--font-plex-mono), monospace; font-size: 13px; display: flex; flex-direction: column; }
 .cutStat small { font-size: 11.5px; color: var(--mute); }
 @media (max-width: 640px) { .cutRow { grid-template-columns: minmax(0, 1fr) 90px; } .cutRow .range { grid-column: 1 / -1; grid-row: 2; } }
+
+/* The Ledger page frame (port of the artifact, 2026-10-22). */
+.pageHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 24px; }
+.pageTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: clamp(36px, 6vw, 56px); line-height: 1; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+.pageSub { margin: 8px 0 0; color: var(--ink2); max-width: 64ch; font-size: 15.5px; }
+.pageAsof { font-family: var(--font-plex-mono), monospace; font-size: 12px; color: var(--mute); text-align: right; }
+.controlBar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.controlBar > .barSearch { margin-left: auto; min-width: 220px; flex: 0 1 320px; }
+.secHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+.secTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 26px; line-height: 1.1; letter-spacing: -.005em; margin: 0; }
+.secAside { font-size: 13px; color: var(--mute); }
+.pageFrame { display: flex; flex-direction: column; gap: 18px; }
+@media (max-width: 640px) { .pageAsof { text-align: left; } .controlBar > .barSearch { margin-left: 0; flex: 1 1 100%; } }
+
+/* Props: every game as a folding group, every prop its own row (the Ledger port). Fixed tracks so rows align. */
+.propGames { display: grid; gap: 0; }
+.propGroup { border-bottom: 1px solid var(--rule); }
+.propGroup > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 18px; gap: 12px; align-items: center; padding: 13px 0; }
+.propGroup > summary::-webkit-details-marker { display: none; }
+.propGroup > summary::after { content: "+"; font-family: var(--font-plex-mono), monospace; font-size: 18px; color: var(--mute); justify-self: end; }
+.propGroup[open] > summary::after { content: "−"; }
+.propGroupTitle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.propGroupTitle b { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 20px; }
+.propGroupAside { justify-self: end; text-align: right; font-size: 13px; color: var(--mute); }
+.propRows { border-left: 2px solid var(--rule); padding-left: 14px; margin-bottom: 12px; }
+.propRow { border-bottom: 1px solid var(--rule); }
+.propRow:last-child { border-bottom: 0; }
+.propRow > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(170px, 1.5fr) minmax(90px, .8fr) minmax(100px, .9fr) minmax(110px, 1fr) 190px 16px; gap: 12px; align-items: center; padding: 11px 0; }
+.propRow > summary::-webkit-details-marker { display: none; }
+.propRow > summary:hover { background: var(--surface2); }
+.propRow[open] > summary .chev { transform: rotate(90deg); }
+.propRow .gNum { display: flex; flex-direction: column; gap: 1px; font-family: var(--font-plex-mono), monospace; font-size: 13.5px; min-width: 0; }
+.propRow .gNum small { font-family: var(--font-plex), sans-serif; font-size: 12px; color: var(--mute); }
+.propWho { display: flex; flex-direction: column; min-width: 0; }
+.propWho b { font-weight: 650; font-size: 14.5px; overflow-wrap: anywhere; }
+.propWho span { font-size: 12.5px; color: var(--mute); }
+.why2 { margin: 0 0 10px; font-size: 14px; color: var(--ink2); background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+@media (max-width: 760px) {
+  .propRow > summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 150px 16px; row-gap: 4px; }
+  .propRow > summary .propWho { grid-column: 1 / 3; }
+  .propRow > summary .ledgerRead { grid-column: 3; grid-row: 1; }
+  .propRow > summary .chev { grid-column: 4; grid-row: 1; }
+  .propRow > summary .hideSm { display: none; }
+  .propRows { padding-left: 8px; }
+}
+
+/* Search inside the control row: a compact pill like the artifact's, label kept for screen readers only. */
+.barSearch .searchLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.barSearch .searchInput { min-height: 40px; padding: 8px 14px; border-radius: 999px; font-size: 14px; }
+.barSearch { position: relative; flex: 1 1 220px; max-width: 320px; margin-left: auto; }
+.barSearch .searchResults { position: absolute; z-index: 20; right: 0; left: auto; width: min(520px, 92vw); margin-top: 6px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 12px 30px rgb(0 0 0 / .35); }
+@media (max-width: 640px) { .barSearch { max-width: none; margin-left: 0; flex-basis: 100%; } .barSearch .searchResults { left: 0; right: 0; width: auto; } }

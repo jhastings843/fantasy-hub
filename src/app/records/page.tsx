@@ -8,7 +8,7 @@ import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { ourSliceBets, record } from "@/lib/models/learn";
 import { ftdKalshiRecord } from "../props/week";
-import { Hero, Stats } from "../picks/board";
+import { PageHead, SecHead, Stats } from "../picks/board";
 import { LEAGUE_NAME, line } from "../picks/ui";
 import RecordsTable, { type IssuedRow } from "./RecordsTable";
 import s from "../picks/picks.module.css";
@@ -103,11 +103,11 @@ export default async function RecordsPage() {
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <header className={s.header}>
-          <Hero
-            eyebrow={`Records · ${season} season`}
-            title="Issued, graded at the saved price"
-            sub="Every pick the emails issued with a saved price and stake. Tracked-only records sit below and never add to these totals."
+        <header className={s.pageFrame}>
+          <PageHead
+            title="Records"
+            sub="Every pick the emails issued, graded at the price saved when it was sent. Tracked-only records sit below and never add to these totals."
+            asof={`${season} season`}
           />
           <p className={s.issuedNote}>
             <b>Issued is not placed.</b> An issued recommendation was sent with a saved price and stake. Nothing here confirms a person placed a real-money wager on it.
@@ -124,13 +124,13 @@ export default async function RecordsPage() {
         </header>
 
         <section className={s.section} aria-labelledby="rec-settled">
-          <h2 className={s.h2} id="rec-settled">Settled</h2>
+          <SecHead id="rec-settled" title="Settled" aside="Graded at the saved price · sort below" />
           <RecordsTable rows={settled} />
           {unstaked > 0 && <p className={s.p}>{`${unstaked} early pick${unstaked === 1 ? " was" : "s were"} sent before stakes existed: in the win-loss record on each Picks page, not here.`}</p>}
         </section>
 
         <section className={s.section} aria-labelledby="rec-open">
-          <h2 className={s.h2} id="rec-open">Open</h2>
+          <SecHead id="rec-open" title="Open" aside="Not counted until final" />
           {open.length ? (
             <div className={s.tw}>
               <table className={s.table}>

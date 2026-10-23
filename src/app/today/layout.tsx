@@ -1,10 +1,4 @@
-import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
-
-// The ledger faces, loaded only here (as on Picks).
-const barlow = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-barlow" });
-const plex = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono" });
-
+// The Ledger faces are site wide (globals.css, 2026-10-22), so this layout only keeps the column.
 export default function TodayLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${barlow.variable} ${plex.variable} ${plexMono.variable} flex flex-1 flex-col`}>{children}</div>;
+  return <div className="flex flex-1 flex-col">{children}</div>;
 }

@@ -18,7 +18,7 @@ import { OUR_FTD_SLICES, ourSliceBets, record } from "@/lib/models/learn";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
-import { Background, Hero, Stats } from "../picks/board";
+import { Background, Hero, SecHead, Stats } from "../picks/board";
 import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
 
@@ -30,11 +30,6 @@ const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes", pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
 const DAVID_MARKET: { [k: string]: DavidMarket } = { pass_yds: "passing_yards", rush_yds: "rushing_yards", rec_yds: "receiving_yards", rec: "receptions" };
 const sideWord = (x: "over" | "under") => (x === "over" ? "Over" : "Under");
-/** "Roschon Johnson" -> "R. Johnson"; suffixes stay off ("Luther Burden III" -> "L. Burden"). */
-const short = (name: string) => {
-  const w = name.split(" ").filter((x) => !/^(Jr\.?|Sr\.?|II|III|IV|V)$/.test(x));
-  return w.length > 1 ? `${w[0][0]}. ${w.at(-1)}` : name;
-};
 const TOP = 6;
 /** NBA games a player needs this season before his edge gets a card. */
 const NBA_CARD_GAMES = 3;
@@ -266,73 +261,6 @@ function propEdges(board: (OurStoredProps | OurNflStored)[], extraMore: (g: OurS
     .sort((a, b) => b.gap - a.gap);
 }
 
-/** `bettable` narrows Edges and Top edge to the props the edge cards would show (NBA: 3+ games this season). */
-function propRows(
-  board: (OurStoredProps | OurNflStored)[],
-  extraCol: (g: OurStoredProps | OurNflStored, m: PropMarket) => string,
-  bettable: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean = () => true,
-): GameRowData[] {
-  return board.map((g) => {
-    const edges = g.game.markets.filter((m) => m.clears && m.side && bettable(g, m));
-    const net = g.result ? g.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
-    const res = new Map((g.result?.markets ?? []).map((r) => [r.id, r]));
-    const top = [...edges].sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0))[0];
-    return {
-      key: g.game.slug,
-      title: `${g.away} at ${g.home}`,
-      when: g.kickoff,
-      live: started(g.kickoff, g.result),
-      cells: [
-        ["Props", `${g.game.markets.length}`],
-        ["Edges", `${edges.length}`],
-        ["Top edge", top ? `${short(top.player)} ${top.side === "over" ? "o" : "u"}${top.line} ${SHORT[top.stat ?? ""] ?? top.statLabel}` : "·"],
-        ["Graded", net !== null ? u(net) : "·"],
-      ],
-      read: net !== null ? [net > 0 ? "Up" : net < 0 ? "Down" : "Even", net > 0 ? s.readW : net < 0 ? s.readL : ""] : edges.length ? [`${edges.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
-      body: (
-        <div className={s.tw}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Prop</th>
-                <th>Line</th>
-                <th>Ours</th>
-                <th>Over</th>
-                <th>Edge</th>
-                <th>{extraCol === noCol ? "" : "Note"}</th>
-                {g.result && <th>Actual</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {[...g.game.markets]
-                .sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1))
-                .map((m) => {
-                  const r = res.get(m.id);
-                  const x = g.extra[m.id] as { over: number } | undefined;
-                  return (
-                    <tr key={m.id}>
-                      <td>{`${m.player} `}<span className={s.dim}>{m.team}</span></td>
-                      <td>{SHORT[m.stat ?? ""] ?? m.statLabel}</td>
-                      <td className={s.num}>{m.line}</td>
-                      <td className={s.num}>{m.model}</td>
-                      <td className={s.num}>{x ? pct(x.over) : "·"}</td>
-                      <td className={`${s.num} ${m.side ? s.cSam : s.dim}`}>{m.side && m.gap !== null ? `${sideWord(m.side)} +${(m.gap * 100).toFixed(1)}` : "·"}</td>
-                      <td className={s.dim}>{extraCol(g, m)}</td>
-                      {g.result && <td className={`${s.num} ${outCls(r?.play?.outcome)}`}>{r?.actual === undefined ? "·" : r.actual === null ? "DNP" : r.actual}</td>}
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-      ),
-    };
-  });
-}
-const noCol = () => "";
-/** Our side in oxblood; a result in green or red by how our side did, white when we had no side. */
-const outCls = (o: string | undefined) => (o === "W" ? s.pos : o === "L" ? s.neg : o === "P" ? s.dim : "");
 /** When the board used DK's alternate line nearer -110 instead of the main line, say which. */
 const altNote = (g: OurStoredProps, m: PropMarket) => {
   const x = g.extra[m.id]?.main;
@@ -341,79 +269,132 @@ const altNote = (g: OurStoredProps, m: PropMarket) => {
 
 
 /**
- * Today's NBA game, opened: every prop grouped by player, with his projected
- * minutes and games, DK's prices and vig-out chance, how DK's line moved since
- * it opened, the outside projections we saved, our number, our chances and the edge.
+ * Every game, the Ledger way: one folding group per game (started games pinned and open), each prop its own
+ * row (player, line, ours, lean, read) that opens to the saved line and price, where the price came from,
+ * our projection and the result. Read chips: dashed for a tracked edge or a wait, plain for no edge or no price.
  */
-function NbaGameDetail({ g }: { g: OurStoredProps }) {
-  const byPlayer = new Map<string, PropMarket[]>();
-  for (const m of g.game.markets) byPlayer.set(m.player, [...(byPlayer.get(m.player) ?? []), m]);
-  const best = (ms: PropMarket[]) => Math.max(-1, ...ms.map((m) => (m.clears && m.side ? (m.gap ?? 0) : -1)));
-  const players = [...byPlayer].sort((a, b) => best(b[1]) - best(a[1]) || (g.extra[b[1][0].id]?.min ?? 0) - (g.extra[a[1][0].id]?.min ?? 0));
-  const edges = g.game.markets.filter((m) => m.clears && m.side);
-  const outside = !!(g.rw || g.espn);
-  const moves = !!g.dk && Object.keys(g.dk).length > 0;
-  const f1 = (x: number | undefined) => (x === undefined ? "·" : `${Math.round(x * 10) / 10}`);
+function PropGames({ board, sport, settled }: { board: (OurStoredProps | OurNflStored)[]; sport: "nfl" | "nba"; settled?: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean }) {
+  const now = nowMs();
+  const stateOf = (g: OurStoredProps | OurNflStored) => (g.result ? "final" : g.kickoff && Date.parse(g.kickoff) <= now ? "live" : "pre");
+  const order = { live: 0, pre: 1, final: 2 } as const;
+  const games = [...board].sort((a, b) => order[stateOf(a)] - order[stateOf(b)] || (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
+  if (!games.length) return <p className={s.calm}>No games on the board yet.</p>;
   return (
-    <div className={s.section} style={{ gap: 12 }}>
-      <p className={s.p}>
-        {`${g.game.markets.length} props on ${byPlayer.size} players, ${edges.length} edges. Players with an edge first, then by projected minutes. DK read ${whenEt(g.capturedAt)}.`}
-      </p>
-      <div className={s.tw}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>Prop</th>
-              <th>Line</th>
-              <th>DK o / u</th>
-              <th>DK over, vig out</th>
-              {moves && <th>DK open</th>}
-              <th>Ours</th>
-              {outside && <th>Rotowire</th>}
-              {outside && <th>ESPN</th>}
-              <th>Our over</th>
-              <th>Edge</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map(([player, ms]) => {
-              const x0 = g.extra[ms[0].id];
-              return [
-                <tr key={`${player}|h`}>
-                  <td colSpan={7 + (outside ? 2 : 0) + (moves ? 1 : 0)} style={{ background: "var(--surface2)" }}>
-                    <strong>{player}</strong> <span className={s.dim}>{`${ms[0].team} · ${x0?.min ?? "·"} min projected${x0?.games !== undefined ? ` · ${x0.games} game${x0.games === 1 ? "" : "s"} this season` : ""}${(x0?.games ?? 0) < NBA_CARD_GAMES ? " · leans on last season" : ""}`}</span>
-                  </td>
-                </tr>,
-                ...[...ms]
-                  .sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1))
-                  .map((m) => {
-                    const dk = m.books[0];
-                    const x = g.extra[m.id];
-                    const fair = dk?.over != null && dk?.under != null ? noVig(dk.over, dk.under).over : null;
-                    const mv = g.dk?.[m.id];
-                    return (
-                      <tr key={m.id}>
-                        <td>{SHORT[m.stat ?? ""] ?? m.statLabel}</td>
-                        <td className={s.num}>
-                          {m.line}
-                          {x?.main && <span className={s.dim}>{` alt (main ${x.main.line})`}</span>}
-                        </td>
-                        <td className={s.num}>{`${dk?.over != null ? am(dk.over) : "·"} / ${dk?.under != null ? am(dk.under) : "·"}`}</td>
-                        <td className={s.num}>{fair !== null ? pct(fair) : "·"}</td>
-                        {moves && <td className={s.num}>{mv && mv.open !== mv.current ? `${mv.open} → ${mv.current}` : mv ? `${mv.open}` : "·"}</td>}
-                        <td className={s.num}>{m.model}</td>
-                        {outside && <td className={s.num}>{f1(g.rw?.[m.id])}</td>}
-                        {outside && <td className={s.num}>{f1(g.espn?.[m.id])}</td>}
-                        <td className={s.num}>{x ? pct(x.over) : "·"}</td>
-                        <td className={`${s.num} ${m.side ? s.cSam : s.dim}`}>{m.side && m.gap !== null ? `${sideWord(m.side)} +${(m.gap * 100).toFixed(1)}` : "·"}</td>
-                      </tr>
-                    );
-                  }),
-              ];
-            })}
-          </tbody>
-        </table>
-      </div>
+    <div className={s.propGames}>
+      {games.map((g) => {
+        const st = stateOf(g);
+        const res = new Map((g.result?.markets ?? []).map((r) => [r.id, r]));
+        const net = g.result ? g.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
+        const priced = g.game.markets.filter((m) => (g as OurNflStored).extra[m.id]?.price !== "assumed").length;
+        const markets = [...g.game.markets].sort((a, b) => (b.clears ? 1 : 0) - (a.clears ? 1 : 0) || (b.gap ?? -1) - (a.gap ?? -1));
+        return (
+          <details key={g.game.slug} className={s.propGroup} open={st === "live"}>
+            <summary>
+              <span className={s.propGroupTitle}>
+                <b>{`${g.away} at ${g.home}`}</b>
+                {st === "live" ? <span className={`${s.readChip} ${s.readLive}`}>Live</span> : <span className={s.muted}>{st === "final" ? "Final" : g.kickoff ? whenEt(g.kickoff) : ""}</span>}
+              </span>
+              <span className={s.propGroupAside}>
+                {`${g.game.markets.length} props${sport === "nfl" && st === "pre" && priced < g.game.markets.length ? ` · ${g.game.markets.length - priced} wait on the morning price` : ""}${net !== null ? ` · shadow ${u(net)}` : ""}`}
+              </span>
+            </summary>
+            <div className={s.propRows}>
+              {markets.map((m) => {
+                const nx = (g as OurNflStored).extra[m.id];
+                const bx = (g as OurStoredProps).extra[m.id];
+                const over = nx?.over ?? bx?.over;
+                const r = res.get(m.id);
+                const dk = m.books[0];
+                const assumed = sport === "nfl" && nx?.price === "assumed";
+                const waits = sport === "nba" && settled && m.clears && !settled(g, m);
+                const lean = m.lean;
+                const chance = over === undefined || !lean ? undefined : lean === "over" ? over : 1 - over;
+                const fair = dk?.over != null && dk?.under != null && lean ? noVig(dk.over, dk.under)[lean] : undefined;
+                const chip: [string, string] = r?.play
+                  ? [`Shadow ${r.play.outcome === "W" ? "W" : r.play.outcome === "L" ? "L" : "P"} ${u(r.play.net)}`, r.play.outcome === "W" ? s.readW : r.play.outcome === "L" ? s.readL : ""]
+                  : assumed
+                    ? ["No price yet", s.readPass]
+                    : waits
+                      ? [`Waits · ${bx?.games ?? 0} of ${NBA_CARD_GAMES} games`, s.readTrack]
+                      : m.clears && m.side && m.gap !== null
+                        ? [`Tracked edge +${(m.gap * 100).toFixed(1)}`, s.readTrack]
+                        : ["No edge", s.readPass];
+                const why = assumed
+                  ? "DraftKings' price is read the morning of game day. Until then this shows our number and claims no edge."
+                  : waits
+                    ? `Leans ${lean} at ${chance !== undefined ? pct(chance) : "·"} against ${fair !== undefined ? pct(fair) : "·"} after vig, but ${m.player} has ${bx?.games ?? 0} game${bx?.games === 1 ? "" : "s"} this season. Edges count from ${NBA_CARD_GAMES}, when the minutes come from this season's role.`
+                    : m.clears && m.side
+                      ? `Our ${m.model} against ${m.line}: ${chance !== undefined ? pct(chance) : "·"} ${lean} vs the market's ${fair !== undefined ? pct(fair) : "·"} after vig. Tracked at the saved price with no stake: no ${sport === "nfl" ? "NFL" : "NBA"} prop slice is live.`
+                      : `Our ${m.model} is close to ${m.line}${chance !== undefined && fair !== undefined ? `: ${pct(chance)} ${lean} vs ${pct(fair)} after vig` : ""}. No edge.`;
+                return (
+                  <details key={m.id} className={s.propRow}>
+                    <summary>
+                      <span className={s.propWho}>
+                        <b>{m.player}</b>
+                        <span>{`${m.team} · ${SHORT[m.stat ?? ""] ?? m.statLabel}`}</span>
+                      </span>
+                      <span className={s.gNum} data-k="Line">
+                        {m.line}
+                        <small>{assumed ? "price not read" : `${dk?.over != null ? am(dk.over) : "·"} / ${dk?.under != null ? am(dk.under) : "·"}`}</small>
+                      </span>
+                      <span className={s.gNum} data-k="Ours">
+                        {m.model}
+                        <small>{over !== undefined ? `${pct(over)} over` : "·"}</small>
+                      </span>
+                      <span className={`${s.gNum} ${s.hideSm}`} data-k="Lean">
+                        {lean ? sideWord(lean) : "None"}
+                        <small>{chance !== undefined ? `${pct(chance)} our chance` : ""}</small>
+                      </span>
+                      <span className={s.ledgerRead}>
+                        <span className={`${s.readChip} ${chip[1]}`}>{chip[0]}</span>
+                        {r && r.actual !== undefined && <small>{r.actual === null ? "Did not play" : `Final ${r.actual}`}</small>}
+                      </span>
+                      <span className={s.chev} aria-hidden>
+                        ›
+                      </span>
+                    </summary>
+                    <div className={s.gBody}>
+                      <p className={s.why2}>{why}</p>
+                      <dl className={s.kv}>
+                        <dt>Saved line</dt>
+                        <dd className={s.num}>{`${m.line}${nx?.espnLine !== undefined ? ` (ESPN showed ${nx.espnLine}; tested at DraftKings' number)` : ""}${bx?.main ? ` (alternate; main ${bx.main.line})` : ""}`}</dd>
+                        <dt>Saved price</dt>
+                        <dd className={s.num}>{assumed ? "Not read yet" : `Over ${dk?.over != null ? am(dk.over) : "·"} · Under ${dk?.under != null ? am(dk.under) : "·"} · DraftKings`}</dd>
+                        {sport === "nfl" && (
+                          <>
+                            <dt>Price from</dt>
+                            <dd>{nx?.price === "odds-api" ? "DraftKings via The Odds API" : nx?.price === "david" ? "David's board" : nx?.price === "espn" ? "DraftKings via ESPN" : "Not posted yet"}</dd>
+                            <dt>Current quote</dt>
+                            <dd className={s.num}>{nx?.fd ? `FanDuel ${nx.fd.line} at ${am(nx.fd.over)} / ${am(nx.fd.under)}` : st === "live" ? "No quote after start" : "None newer"}</dd>
+                          </>
+                        )}
+                        {sport === "nba" && (
+                          <>
+                            <dt>Projected minutes</dt>
+                            <dd className={s.num}>{bx?.min ?? "·"}</dd>
+                            <dt>Games this season</dt>
+                            <dd className={s.num}>{bx?.games ?? "·"}</dd>
+                          </>
+                        )}
+                        <dt>Our projection</dt>
+                        <dd className={s.num}>{`${m.model}${nx?.median !== undefined ? ` median` : ""}${over !== undefined ? ` · ${pct(over)} over` : ""}`}</dd>
+                        <dt>Model</dt>
+                        <dd>{`Hobby Hub ${sport === "nfl" ? "NFL" : "NBA"} prop model · collecting evidence`}</dd>
+                        {r && (
+                          <>
+                            <dt>Result</dt>
+                            <dd className={s.num}>{r.actual === null ? "Did not play" : r.actual === undefined ? "·" : `${r.actual} · ${r.actual > m.line ? "over" : r.actual < m.line ? "under" : "push"}`}</dd>
+                          </>
+                        )}
+                      </dl>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </details>
+        );
+      })}
     </div>
   );
 }
@@ -441,38 +422,34 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
     const edges = allEdges.filter((e) => keys.has(e.key));
     const early = allEdges.length - edges.length;
     const graded = record(ourSliceBets(v.graded, "edge:all"));
-    const todayRows = propRows(tonight, noCol, settled).map((r, i) => ({ ...r, body: <NbaGameDetail g={tonight[i]} /> }));
     return (
       <section className={s.section} aria-labelledby="pp-week">
-        <Hero
-          eyebrow={`NBA player props · today · ${tonight.length} game${tonight.length === 1 ? "" : "s"}`}
-          title={<span id="pp-week">{v.learning.entries.some((e) => e.status === "active") ? "Prop bets live" : "No prop bets yet"}</span>}
-          sub={`Points, rebounds, assists and threes against DraftKings. ${edges.length ? `${edges.length} edges from players with ${NBA_CARD_GAMES}+ games this season; the biggest are below.` : `No edges yet from players with ${NBA_CARD_GAMES}+ games this season.`}${early ? ` ${early} more lean on last season's minutes, so they stay in the game table until the player has ${NBA_CARD_GAMES} games (a summer role change otherwise reads as a huge edge).` : ""}`}
-        />
-        <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=nba&v=log" unit={early ? `${early} more wait on 3 games` : "on games still to play"} />
-        {edges.length > 0 && (
-          <ul className={s.edgeGrid} data-first-pick>
-            {edges.slice(0, TOP).map((e) => (
-              <EdgeCard key={e.key} e={e} />
-            ))}
-          </ul>
-        )}
-        <div className={s.section}>
-          <div className={s.sectionHead}>
-            <h3 className={s.h2}>Today&apos;s games</h3>
-            <p className={s.p}>Open a game for every prop by player: projected minutes, DK&apos;s prices and line move, our number, our chances and the edge. Lines are the ones priced closest to -110 (DK&apos;s main line, or an alternate when the main one is lopsided). Later games show up the morning of.</p>
-          </div>
-          {todayRows.length ? <GameTable head={["Props", "Edges", "Top edge", "Graded"]} rows={todayRows} /> : <p className={s.calm}>No NBA games today.</p>}
+        <div className={s.pageFrame}>
+          <SecHead id="pp-week" title="Tracked edges" aside={`Players with ${NBA_CARD_GAMES}+ games · no stakes`} />
+          {edges.length > 0 ? (
+            <ul className={s.edgeGrid} data-first-pick>
+              {edges.slice(0, TOP).map((e) => (
+                <EdgeCard key={e.key} e={e} />
+              ))}
+            </ul>
+          ) : (
+            <p className={s.calm}>{`No tracked edges yet from players with ${NBA_CARD_GAMES}+ games this season.${early ? ` ${early} more wait on their third game.` : ""}`}</p>
+          )}
+        </div>
+        <div className={s.pageFrame}>
+          <SecHead title="Every game" aside="Started games pinned on top · open a player for detail" />
+          {tonight.length ? <PropGames board={tonight} sport="nba" settled={settled} /> : <p className={s.calm}>No NBA games today. Later days show up the morning of.</p>}
         </div>
         {results.length > 0 && (
-          <div className={s.section}>
-            <div className={s.sectionHead}>
-              <h3 className={s.h2}>Results</h3>
-              <p className={s.p}>Every graded game, newest first. Our side in oxblood; the result green when it won, red when it lost.</p>
-            </div>
-            <GameTable head={["Props", "Edges", "Top edge", "Graded"]} rows={propRows(results, (g, m) => altNote(g as OurStoredProps, m))} />
+          <div className={s.pageFrame}>
+            <SecHead title="Graded" aside="Newest first · shadow results at the saved price" />
+            <PropGames board={results} sport="nba" settled={settled} />
           </div>
         )}
+        <div className={s.pageFrame}>
+          <SecHead title="How it is doing" aside="Tracked, never staked" />
+          <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=nba&v=log" unit={early ? `${early} more wait on 3 games` : "on games still to play"} />
+        </div>
         <Gate learning={v.learning} label="NBA prop" />
       </section>
     );
@@ -502,30 +479,26 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
   const graded = record(ourSliceBets(v.graded, "edge:all"));
   return (
     <section className={s.section} aria-labelledby="pp-week">
-      <Hero
-        eyebrow={`NFL player props${v.week ? ` · Week ${v.week}` : ""}`}
-        title={<span id="pp-week">{v.learning.entries.some((e) => e.status === "active") ? "Prop bets live" : "No prop bets yet"}</span>}
-        sub={`Passing, rushing and receiving yards and receptions against DraftKings. ${
-          waiting ? `${waiting} of ${all} props have no DraftKings price yet (it's read the morning of game day), so they show our number but no edge. ` : ""
-        }${edges.length ? `${edges.length} edges with a real price; the biggest are below.` : "No edges with a real price yet."}`}
-      />
-      <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?v=log" unit="on games still to play" />
-      {edges.length > 0 && (
-        <>
+      <div className={s.pageFrame}>
+        <SecHead id="pp-week" title="Tracked edges" aside="Games still to finish · no stakes" />
+        {edges.length > 0 ? (
           <ul className={s.edgeGrid} data-first-pick>
             {edges.slice(0, TOP).map((e) => (
               <EdgeCard key={e.key} e={e} />
             ))}
           </ul>
-          <p className={s.thin}>Every edge here is tracked with no stake until a slice goes live. Open &quot;Every number&quot; for the line chart: DraftKings&apos; line (tick), ours (oxblood), David (amber).</p>
-        </>
-      )}
-      <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>Every game</h3>
-          <p className={s.p}>Open a game for every prop. A prop shows an edge only once DraftKings&apos; price is in.</p>
-        </div>
-        <GameTable head={["Props", "Edges", "Top edge", "Graded"]} rows={propRows([...ahead, ...done], (g, m) => ((g as OurNflStored).extra[m.id]?.price === "assumed" ? "price at game-day morning" : ""))} />
+        ) : (
+          <p className={s.calm}>No tracked edges with a real price yet.</p>
+        )}
+        {waiting > 0 && <p className={s.thin}>{`${waiting} of ${all} props wait on DraftKings' game-day morning price, so they show our number with no edge.`}</p>}
+      </div>
+      <div className={s.pageFrame}>
+        <SecHead title="Every game" aside="Started games pinned on top · open a player for detail" />
+        <PropGames board={[...ahead, ...done]} sport="nfl" />
+      </div>
+      <div className={s.pageFrame}>
+        <SecHead title="How it is doing" aside="Tracked, never staked" />
+        <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?v=log" unit="on games still to play" />
       </div>
       <Gate learning={v.learning} label="NFL prop" />
     </section>

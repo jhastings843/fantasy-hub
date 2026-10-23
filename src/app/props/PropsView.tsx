@@ -9,6 +9,7 @@ import { OurFirstBasketResults, OurNbaResults } from "./ournba";
 import { KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
 import WeekSearch from "../picks/WeekSearch";
+import { PageHead } from "../picks/board";
 import { getPropsView } from "@/lib/props/store";
 import { DAVID_URL } from "@/lib/props/david";
 import { getOurNflView } from "@/lib/models/nfl/store";
@@ -24,17 +25,15 @@ import s from "../picks/picks.module.css";
 // tracked and graded until a slice earns its way into the system.
 
 export type PropsMarket = "pp" | "ftd" | "nba" | "fb" | "kotc";
-const MARKETS: { [sport in "nfl" | "nba"]: { id: PropsMarket; label: string }[] } = {
-  nfl: [
-    { id: "pp", label: "Player props" },
-    { id: "ftd", label: "First TD" },
-  ],
-  nba: [
-    { id: "nba", label: "Player props" },
-    { id: "fb", label: "First Basket" },
-    { id: "kotc", label: "King of the Court" },
-  ],
-};
+/** Every market in one control, in the Ledger order, and each one's page title. */
+const ALL_MARKETS: { id: PropsMarket; label: string }[] = [
+  { id: "pp", label: "NFL props" },
+  { id: "ftd", label: "First TD" },
+  { id: "nba", label: "NBA props" },
+  { id: "fb", label: "First Basket" },
+  { id: "kotc", label: "King of the Court" },
+];
+const TITLE: { [k in PropsMarket]: string } = { pp: "NFL player props", ftd: "NFL First TD", nba: "NBA player props", fb: "NBA First Basket", kotc: "NBA King of the Court" };
 export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" ? x : "pp");
 
 function href(m: PropsMarket, v: View) {
@@ -72,37 +71,33 @@ export default async function PropsView({
   return (
     <main className={s.page}>
       <div className={s.wrap}>
-        <header className={s.header}>
-          <h1 className={s.eyebrow} style={{ margin: 0 }}>
-            {`Props · ${sport === "nba" ? `NBA ${season}-${String(season + 1).slice(2)}` : `NFL ${season}`}`}
-          </h1>
-          <div className={s.navRows}>
-            <nav className={s.chips} aria-label="Sport">
-              <Link className={s.chip} href={href("pp", shown === "research" ? "week" : shown)} aria-current={sport === "nfl" ? "page" : undefined}>
-                NFL
-              </Link>
-              <Link className={s.chip} href={href("nba", shown === "research" ? "week" : shown)} aria-current={sport === "nba" ? "page" : undefined}>
-                NBA
-              </Link>
-            </nav>
+        <header className={s.pageFrame}>
+          <PageHead
+            title={TITLE[market]}
+            sub="Our own models only. Sam plays no part in Props."
+            asof={sport === "nba" ? `NBA ${season}-${String(season + 1).slice(2)}` : `NFL ${season}`}
+          />
+          <div className={s.controlBar}>
             <nav className={s.chips} aria-label="Market">
-              {MARKETS[sport].map((m) => (
-                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
+              {ALL_MARKETS.map((m) => (
+                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown === "log" && m.id === "kotc" ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
                   {m.label}
                 </Link>
               ))}
             </nav>
+            <nav className={s.chips} aria-label="View">
+              {views.map((v) => (
+                <Link key={v.id} href={href(market, v.id)} aria-current={v.id === shown ? "page" : undefined} className={s.chip}>
+                  {v.id === "week" ? "Board" : v.label}
+                </Link>
+              ))}
+            </nav>
+            {sport === "nfl" && shown === "week" && entries.length > 0 && (
+              <div className={s.barSearch}>
+                <WeekSearch entries={entries} label="Search this week" placeholder="Player or team, e.g. Kelce or Chiefs" />
+              </div>
+            )}
           </div>
-          <nav className={`${s.tabs} ${s.tabsSoft}`} aria-label="View">
-            {views.map((v) => (
-              <Link key={v.id} href={href(market, v.id)} aria-current={v.id === shown ? "page" : undefined} className={s.tab}>
-                {v.label}
-              </Link>
-            ))}
-          </nav>
-          {sport === "nfl" && shown === "week" && entries.length > 0 && (
-            <WeekSearch entries={entries} label="Search this week: our props and first TD models, David's board" placeholder="Player or team, e.g. Kelce or Chiefs" />
-          )}
         </header>
 
         {shown === "week" && <PropsLineup tab={market} season={season} />}

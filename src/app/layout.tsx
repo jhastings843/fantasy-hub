@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Trophy } from "lucide-react";
 import { FantasyTabs, HobbyTabs, SectionTabs } from "@/components/SiteNav";
 import "./globals.css";
 
-// The Picks ledger faces, site wide since 2026-10-19 (see ledger-look.css).
-const barlow = Barlow_Condensed({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-barlow" });
-const plex = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-plex" });
-const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono" });
+// The Ledger faces are system fonts set in globals.css (2026-10-22): nothing to load.
 
 export const metadata: Metadata = {
   title: "Hobby Hub",
@@ -37,7 +33,7 @@ function SiteHeader() {
           className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
         >
           <BrandMark />
-          <span className="ledger-brand text-xl font-extrabold uppercase">
+          <span className="ledger-brand text-xl font-extrabold">
             Hobby Hub
           </span>
         </Link>
@@ -111,7 +107,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${barlow.variable} ${plex.variable} ${plexMono.variable} h-full antialiased`}
+      className="dark h-full antialiased"
     >
       <body className="relative flex min-h-full flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
         <SiteHeader />
