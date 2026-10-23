@@ -392,3 +392,9 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Straight up: when Sam and David split, the game page and the ranked list say so and name what decided it (the method in force, the models' average for NFL now) and flag a coin flip under 1 point.
 - NBA props: tested at the DK line nearest -110 (main line, or the full-game alternate ladder when the main one is lopsided; part-game ladders under the same type are dropped).
 - First TD: DraftKings First TD prices (The Odds API, game-day morning) next to Kalshi; a value beats the cheaper of the two.
+
+## Props: priced at DK's line, live games on top (2026-10-22)
+- NE@CHI morning read ran at 1:46pm ET (GitHub cron delay, scheduled 9am). DK priced all 39 props, but 11 of the 14 shown on the board stayed "assumed" because ESPN's DK line differed from the read's DK line (by 1 to 6 points).
+- Fix: `oddsPrice` returns DK's own line when it differs; `ourNflMarkets` tests the prop at that line and stores `extra.espnLine` (shown in "Price from"). David's price still requires an exact match.
+- Every Props game table sorts started, ungraded games first with a green Live tag (`GameRowData.live`, `.gLive` in picks.module.css).
+- Offered, not built: backup cron slots (10am, 11am ET) against GitHub delays; pre-kickoff re-read for games with edges; "better at FanDuel" tag.
