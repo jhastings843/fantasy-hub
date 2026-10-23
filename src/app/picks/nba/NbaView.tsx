@@ -148,7 +148,9 @@ function NbaBetCard({ x }: { x: ReturnType<typeof readGame> }) {
 
 function NbaRow({ x, day }: { x: ReturnType<typeof readGame>; day: string }) {
   const { g, r, tier, done } = x;
-  const read: [string, string] = g.score
+  const read: [string, string] = g.score && g.state !== "post"
+    ? ["Live", s.readLive]
+    : g.score
     ? done
       ? [done.split(" · ")[0].replace("Spread ", ""), /won/.test(done.split(" · ")[0]) ? s.readW : /lost/.test(done.split(" · ")[0]) ? s.readL : ""]
       : ["Final", s.readPass]
