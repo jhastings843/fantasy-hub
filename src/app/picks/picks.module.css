@@ -704,3 +704,4 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .barSearch { position: relative; flex: 1 1 220px; max-width: 320px; margin-left: auto; }
 .barSearch .searchResults { position: absolute; z-index: 20; right: 0; left: auto; width: min(520px, 92vw); margin-top: 6px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 12px 30px rgb(0 0 0 / .35); }
 @media (max-width: 640px) { .barSearch { max-width: none; margin-left: 0; flex-basis: 100%; } .barSearch .searchResults { left: 0; right: 0; width: auto; } }
+.liveRefresh { display: inline-flex; align-items: center; }

@@ -42,7 +42,7 @@ const FANTASY_TABS = [
 export function SectionTabs() {
   const p = usePathname() ?? "/";
   return (
-    <div className="-mx-1 flex items-center gap-1 overflow-x-auto sm:mx-0">
+    <div className="flex items-center gap-1 overflow-x-auto">
       {SECTIONS.map((s) => {
         const active = s.owns(p);
         return (
@@ -50,10 +50,8 @@ export function SectionTabs() {
             key={s.key}
             href={s.href}
             aria-current={active ? "page" : undefined}
-            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
-              active
-                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
-                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-[15px] font-semibold transition-colors ${
+              active ? "bg-zinc-50 text-zinc-900" : "text-zinc-400 hover:text-zinc-50"
             }`}
           >
             {s.label}

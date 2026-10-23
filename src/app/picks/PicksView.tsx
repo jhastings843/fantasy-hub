@@ -11,10 +11,10 @@ import { OurSpreadCard } from "./ours";
 import { FOOTBALL_VIEWS, LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
 import { Background, ModelLineup, PageHead, Stats, type ModelRow } from "./board";
 import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
+import { scoreboard } from "@/lib/live/espn";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { PicksLog } from "./log";
 import { redisStore } from "@/lib/picks/learning/store";
-import WeekSearch from "./WeekSearch";
-import { picksSearchIndex } from "./search";
 import s from "./picks.module.css";
 
 // The Picks tab. Sport, then market, then view, all in the URL (?m=, ?v=),
@@ -46,6 +46,9 @@ export default async function PicksView({ league, market: asked, view }: { leagu
     </nav>
   );
   const [review, active] = await Promise.all([redisStore.state().catch(() => null), redisStore.active().catch(() => null)]);
+  // Live scores only when a game on the board is under way (ESPN, free); the page then refreshes every 10 minutes.
+  const anyLive = r?.board.some((g) => g.basis === "started" && !g.final) ?? false;
+  const live = anyLive && view === "week" ? await scoreboard(league).catch(() => []) : [];
   const testing = (review?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && d.verdict === "retain").length;
 
   if (!r) {
@@ -87,10 +90,10 @@ export default async function PicksView({ league, market: asked, view }: { leagu
                 </Link>
               ))}
             </nav>
-            {r.board.length > 0 && view === "week" && (
-              <div className={s.barSearch}>
-                <WeekSearch entries={picksSearchIndex(r)} label="Search this week" placeholder={league === "nfl" ? "Team, e.g. Bills or KC" : "Team, e.g. Ohio State"} />
-              </div>
+            {anyLive && view === "week" && (
+              <span className={s.liveRefresh}>
+                <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />
+              </span>
             )}
           </div>
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
@@ -98,7 +101,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         </header>
         {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
 
-        {market === "ats" && view === "week" && <AtsWeek r={r} />}
+        {market === "ats" && view === "week" && <AtsWeek r={r} live={live} />}
         {market === "ats" && view === "results" && <AtsResults r={r} />}
         {market === "ats" && view === "research" && <AtsResearch r={r} panel={league === "cfb" ? <HarrisCard /> : <OurSpreadCard season={r.season} />} />}
         {market === "su" && view === "week" && league === "nfl" && <PoolCard />}

@@ -9,6 +9,7 @@ import Link from "next/link";
 import TierChecker from "./TierChecker";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
+import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
 
 export type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
@@ -144,7 +145,7 @@ export const gameHref = (r: PicksReport, g: BoardGame) => `/picks/game?l=${r.lea
  * Solid only once a bet is sent; sized-not-sent and early looks are dashed;
  * close calls are tracked; a pass is plain text.
  */
-function readOf(g: BoardGame, r: PicksReport): { chip: [string, string]; note?: string; noteCls?: string } {
+function readOf(g: BoardGame, r: PicksReport, live?: LiveGame): { chip: [string, string]; note?: string; noteCls?: string } {
   const st = statusOf(g);
   const tier = g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Bet";
   const res = g.results?.issued ?? g.results?.pick;
@@ -152,7 +153,14 @@ function readOf(g: BoardGame, r: PicksReport): { chip: [string, string]; note?: 
     return g.issued && res
       ? { chip: [res === "W" ? "Won" : res === "L" ? "Lost" : "Push", res === "W" ? s.readW : res === "L" ? s.readL : ""], note: `${tier} · ${amt(g.issued.units)}` }
       : { chip: ["Final", s.readPass], note: res && g.side ? `Pick ${res === "W" ? "covered" : res === "L" ? "missed" : "pushed"}, no stake` : undefined };
-  if (st === "started") return g.issued ? { chip: [`${tier} · ${amt(g.issued.units)}`, s.readBet], note: "In progress", noteCls: s.liveNote } : { chip: ["In progress", s.readLive] };
+  if (st === "started") {
+    if (!g.issued) return { chip: ["In progress", s.readLive] };
+    if (!live) return { chip: [`${tier} · ${amt(g.issued.units)}`, s.readBet], note: "In progress", noteCls: s.liveNote };
+    // Live cover at the line it was sent at: home margin plus the home line, flipped for the away side.
+    const m = live.home.score - live.away.score + g.issued.homeLine;
+    const by = g.issued.side === "home" ? m : -m;
+    return { chip: [`${tier} · ${amt(g.issued.units)}`, s.readBet], note: by > 0 ? `Covering by ${by}` : by < 0 ? `Short by ${-by}` : "On the number", noteCls: by > 0 ? s.pos : by < 0 ? s.neg : s.liveNote };
+  }
   if (st === "sent") return { chip: [`${tier} · ${amt(g.issued!.units)}`, s.readBet], note: `Sent at ${price(g.issued!.price)}` };
   if (st === "early") return { chip: [`${tier} · not sent`, s.readPend], note: `Locks ${kickoffEt(g.held)}` };
   if (st === "bet") return { chip: [`${tier} · not sent`, s.readPend], note: `${amt(g.stake ?? 0)} at ${price(g.price)}` };
@@ -167,12 +175,12 @@ function readOf(g: BoardGame, r: PicksReport): { chip: [string, string]; note?: 
 }
 
 /** One game in the ledger: matchup, market, both models, our side and the read; opens to every reason. */
-function LedgerRow({ g, r }: { g: BoardGame; r: PicksReport }) {
+function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGame }) {
   const name = (k: string) => r.names[k] ?? k;
   const st = statusOf(g);
   const home = name(g.home);
   const m = (x?: number) => (x === undefined ? "·" : `${home} ${line(Math.round(x * 10) / 10)}`);
-  const rd = readOf(g, r);
+  const rd = readOf(g, r, live);
   const side = g.side && g.homeLine !== undefined ? pickText(g, name) : g.tier === "split" && g.read ? "Models split" : "None";
   return (
     <details className={`${s.gRow} ${s.ledger}`} open={st === "started" && !!g.issued}>
@@ -180,6 +188,7 @@ function LedgerRow({ g, r }: { g: BoardGame; r: PicksReport }) {
         <span className={s.gGame}>
           {`${name(g.away)} at ${home}`}
           {st === "started" ? <span className={s.gLive}>Live</span> : <span>{g.final ? `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}` : kickoffEt(g.ref?.kickoff)}</span>}
+          {st === "started" && live && <span className={s.num}>{`${live.away.score}-${live.home.score} · ${live.state === "post" ? "Final" : live.detail}`}</span>}
         </span>
         <span className={s.gNum} data-k="Market">{m(g.ref?.line)}</span>
         <span className={s.gNum} data-k="Sam · David">
@@ -449,7 +458,7 @@ export function ReadLegend() {
   );
 }
 
-export function AtsWeek({ r }: { r: PicksReport }) {
+export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] }) {
   const st = r.strategies;
   const byKick = (a: BoardGame, b: BoardGame) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? "");
   const all = r.board.slice().sort(byKick);
@@ -489,7 +498,7 @@ export function AtsWeek({ r }: { r: PicksReport }) {
               <span />
             </div>
             {[...started, ...upcoming, ...finished].map((g) => (
-              <LedgerRow key={`${g.away}@${g.home}`} g={g} r={r} />
+              <LedgerRow key={`${g.away}@${g.home}`} g={g} r={r} live={findGame(live, r.league, g.away, g.home)} />
             ))}
           </div>
           <p className={s.p}>{`Started games first, then by kickoff${finished.length ? `; ${finished.length} final at the bottom` : ""}. Home spread throughout. Open a game for every reason.`}</p>

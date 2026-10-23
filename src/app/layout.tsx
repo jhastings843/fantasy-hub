@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { FantasyTabs, HobbyTabs, SectionTabs } from "@/components/SiteNav";
+import HeaderSearch from "@/components/HeaderSearch";
 import "./globals.css";
 
 // The Ledger faces are system fonts set in globals.css (2026-10-22): nothing to load.
@@ -27,19 +28,19 @@ function BrandMark() {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80">
-      <nav className="mx-auto flex min-h-16 w-full max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-0 lg:px-8">
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
-        >
+      {/* The Ledger header (2026-10-22): brand left, sections centered, search right.
+          Phones: brand and search on one row, the sections on the next. */}
+      <nav className="mx-auto grid min-h-16 w-full max-w-6xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:py-0 lg:px-8">
+        <Link href="/" className="flex items-center gap-2.5 justify-self-start transition-opacity hover:opacity-80">
           <BrandMark />
-          <span className="ledger-brand text-xl font-extrabold">
-            Hobby Hub
-          </span>
+          <span className="ledger-brand text-2xl font-bold">Hobby Hub</span>
         </Link>
-        {/* Wrap on phones instead of a cramped horizontal scroll; stays a
-            single row on sm+ where there is room. */}
-        <SectionTabs />
+        <div className="col-span-2 row-start-2 justify-self-center md:col-span-1 md:col-start-2 md:row-start-1">
+          <SectionTabs />
+        </div>
+        <div className="col-start-2 row-start-1 justify-self-end md:col-start-3">
+          <HeaderSearch />
+        </div>
       </nav>
     </header>
   );

@@ -4,6 +4,8 @@ import { getPicksReport, type PicksReport } from "@/lib/picks/report";
 import { getNbaBoard } from "@/lib/picks/nba-store";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { readGame } from "../picks/nba/NbaView";
+import { findGame, scoreboard } from "@/lib/live/espn";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { loadProducts } from "../props/top";
 import { ModelGrid, PageHead, SecHead, Stats, statusChip, type ModelRow } from "../picks/board";
 import { LEAGUE_NAME, kickoffEt, line, price, rec } from "../picks/ui";
@@ -27,6 +29,9 @@ const u = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFix
 
 interface Slip {
   key: string;
+  /** Board team keys, to find the live score. */
+  awayKey?: string;
+  homeKey?: string;
   league: string;
   pick: string;
   game: string;
@@ -51,7 +56,7 @@ function footballSlips(r: PicksReport): Slip[] {
     const game = `${n(g.away)} at ${n(g.home)}`;
     if (g.issued) {
       const side = g.issued.side;
-      out.push({ key: `${r.league}-${g.home}`, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
+      out.push({ key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
     } else if (g.stake && g.side && g.homeLine !== undefined && state === "next") {
       out.push({ key: `${r.league}-${g.home}`, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out with the next picks email." });
     }
@@ -60,7 +65,7 @@ function footballSlips(r: PicksReport): Slip[] {
     const g = r.board.find((x) => x.home === t.home && x.away === t.away);
     if (!g || g.final || !t.issued) continue;
     const kick = g.ref?.kickoff ?? "";
-    out.push({ key: `${r.league}-${t.home}-ou`, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
+    out.push({ key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
   }
   return out;
 }
@@ -114,7 +119,15 @@ export default async function TodayPage() {
     loadProducts("nba", season).catch(() => null),
   ]);
   const reports = [nfl?.value, cfb?.value].filter((r): r is PicksReport => !!r);
-  const football = reports.flatMap(footballSlips).sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  // Live scores for started football games (ESPN, free); NBA's board carries its own.
+  const boards = await Promise.all(reports.map(async (r) => [r.league, r.board.some((g) => g.basis === "started" && !g.final) ? await scoreboard(r.league).catch(() => []) : []] as const));
+  const scoreOf = (league: "nfl" | "cfb", away: string, home: string) => {
+    const g = findGame(boards.find(([l]) => l === league)?.[1] ?? [], league, away, home);
+    return g && g.state !== "pre" ? ` · ${g.away.abbr || g.away.name} ${g.away.score}, ${g.home.abbr || g.home.name} ${g.home.score} · ${g.state === "post" ? "Final" : g.detail}` : "";
+  };
+  const football = reports
+    .flatMap((r) => footballSlips(r).map((x) => (x.state === "live" ? { ...x, game: x.game + scoreOf(r.league, x.awayKey!, x.homeKey!) } : x)))
+    .sort((a, b) => a.kickoff.localeCompare(b.kickoff));
 
   // NBA: tonight's started games. Staked only once NBA's go-live gate clears; until then Sam's side is tracked.
   const nbaLive: Slip[] = (board?.days[0]?.games ?? [])
@@ -178,7 +191,7 @@ export default async function TodayPage() {
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.pageFrame}>
-          <PageHead title={today} sub={headline} />
+          <PageHead title={today} sub={headline} asof={live.length ? <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" /> : undefined} />
         </header>
 
         <section className={s.section} aria-labelledby="t-live">

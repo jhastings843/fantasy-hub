@@ -8,13 +8,8 @@ import { OurFtdResults } from "./ourftd";
 import { OurFirstBasketResults, OurNbaResults } from "./ournba";
 import { KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
-import WeekSearch from "../picks/WeekSearch";
 import { Background, PageHead, SecHead } from "../picks/board";
-import { getPropsView } from "@/lib/props/store";
 import { DAVID_URL } from "@/lib/props/david";
-import { getOurNflView } from "@/lib/models/nfl/store";
-import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
-import { propsSearchIndex } from "./search";
 import s from "../picks/picks.module.css";
 
 // The Props tab: our own models (NFL props and first TD, NBA props, first
@@ -56,12 +51,6 @@ export default async function PropsView({
   view: View;
 }) {
   const season = seasonOf(new Date());
-  const [ov, pv, fv] = await Promise.all([
-    getOurNflView(season).catch(() => null),
-    getPropsView(season).catch(() => null),
-    getOurFtdView(season).catch(() => null),
-  ]);
-  const entries = propsSearchIndex(ov, pv, fv);
   const sport = market === "nba" || market === "fb" || market === "kotc" ? "nba" : "nfl";
   // Only David's board has a Research view (NFL player props); our models keep theirs on Results and the Learner log.
   const base = sport === "nba" ? NBA_VIEWS : VIEWS;
@@ -92,11 +81,6 @@ export default async function PropsView({
                 </Link>
               ))}
             </nav>
-            {sport === "nfl" && shown === "week" && entries.length > 0 && (
-              <div className={s.barSearch}>
-                <WeekSearch entries={entries} label="Search this week" placeholder="Player or team, e.g. Kelce or Chiefs" />
-              </div>
-            )}
           </div>
         </header>
 

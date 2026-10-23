@@ -26,6 +26,8 @@ export interface SearchEntry {
   /** Lower sorts first: bets, then open calls, then finished. */
   rank: number;
   rows: SearchRow[];
+  /** The page it comes from (the header search links there). */
+  href?: string;
 }
 
 const LIMIT = 12;

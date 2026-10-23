@@ -8,6 +8,8 @@ import Link from "next/link";
 import type { SectionView } from "@/lib/learning/engine";
 import { etDate, implied, type PropMarket } from "@/lib/props/parse";
 import { nameKey } from "@/lib/props/grade";
+import { liveBox } from "@/lib/live/espn";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { getPropsView } from "@/lib/props/store";
 import type { DavidMarket } from "@/lib/props/david";
 import { getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
@@ -273,7 +275,17 @@ const altNote = (g: OurStoredProps, m: PropMarket) => {
  * row (player, line, ours, lean, read) that opens to the saved line and price, where the price came from,
  * our projection and the result. Read chips: dashed for a tracked edge or a wait, plain for no edge or no price.
  */
-function PropGames({ board, sport, settled }: { board: (OurStoredProps | OurNflStored)[]; sport: "nfl" | "nba"; settled?: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean }) {
+type LiveBoxes = Map<string, Awaited<ReturnType<typeof liveBox>>>;
+
+/** ESPN box scores for every started, ungraded game on a board (free; cached a minute). */
+async function liveBoxes(board: (OurStoredProps | OurNflStored)[], sport: "nfl" | "nba"): Promise<LiveBoxes> {
+  const now = nowMs();
+  const started = board.filter((g) => !g.result && g.kickoff && Date.parse(g.kickoff) <= now && g.espnId);
+  const boxes = await Promise.all(started.map(async (g) => [g.game.slug, await liveBox(sport, g.espnId!)] as const));
+  return new Map(boxes);
+}
+
+function PropGames({ board, sport, settled, live }: { board: (OurStoredProps | OurNflStored)[]; sport: "nfl" | "nba"; settled?: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean; live?: LiveBoxes }) {
   const now = nowMs();
   const stateOf = (g: OurStoredProps | OurNflStored) => (g.result ? "final" : g.kickoff && Date.parse(g.kickoff) <= now ? "live" : "pre");
   const order = { live: 0, pre: 1, final: 2 } as const;
@@ -283,6 +295,8 @@ function PropGames({ board, sport, settled }: { board: (OurStoredProps | OurNflS
     <div className={s.propGames}>
       {games.map((g) => {
         const st = stateOf(g);
+        const box = live?.get(g.game.slug);
+        const lg = box?.game;
         const res = new Map((g.result?.markets ?? []).map((r) => [r.id, r]));
         const net = g.result ? g.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
         const priced = g.game.markets.filter((m) => (g as OurNflStored).extra[m.id]?.price !== "assumed").length;
@@ -292,7 +306,8 @@ function PropGames({ board, sport, settled }: { board: (OurStoredProps | OurNflS
             <summary>
               <span className={s.propGroupTitle}>
                 <b>{`${g.away} at ${g.home}`}</b>
-                {st === "live" ? <span className={`${s.readChip} ${s.readLive}`}>Live</span> : <span className={s.muted}>{st === "final" ? "Final" : g.kickoff ? whenEt(g.kickoff) : ""}</span>}
+                {st === "live" && lg?.state !== "post" ? <span className={`${s.readChip} ${s.readLive}`}>Live</span> : <span className={s.muted}>{st === "final" || lg?.state === "post" ? "Final" : g.kickoff ? whenEt(g.kickoff) : ""}</span>}
+                {lg && lg.state !== "pre" && <span className={`${s.num} ${s.muted}`}>{`${lg.away.abbr} ${lg.away.score}, ${lg.home.abbr} ${lg.home.score}${lg.state === "in" ? ` · ${lg.detail}` : ""}`}</span>}
               </span>
               <span className={s.propGroupAside}>
                 {`${g.game.markets.length} props${sport === "nfl" && st === "pre" && priced < g.game.markets.length ? ` · ${g.game.markets.length - priced} wait on the morning price` : ""}${net !== null ? ` · shadow ${u(net)}` : ""}`}
@@ -304,6 +319,7 @@ function PropGames({ board, sport, settled }: { board: (OurStoredProps | OurNflS
                 const bx = (g as OurStoredProps).extra[m.id];
                 const over = nx?.over ?? bx?.over;
                 const r = res.get(m.id);
+                const soFar = box ? box.stats.get(nameKey(m.player))?.[m.stat ?? ""] : undefined;
                 const dk = m.books[0];
                 const assumed = sport === "nfl" && nx?.price === "assumed";
                 const waits = sport === "nba" && settled && m.clears && !settled(g, m);
@@ -347,7 +363,11 @@ function PropGames({ board, sport, settled }: { board: (OurStoredProps | OurNflS
                       </span>
                       <span className={s.ledgerRead}>
                         <span className={`${s.readChip} ${chip[1]}`}>{chip[0]}</span>
-                        {r && r.actual !== undefined && <small>{r.actual === null ? "Did not play" : `Final ${r.actual}`}</small>}
+                        {r && r.actual !== undefined ? (
+                          <small>{r.actual === null ? "Did not play" : `Final ${r.actual}`}</small>
+                        ) : soFar !== undefined ? (
+                          <small className={soFar > m.line ? (lean === "over" ? s.pos : lean === "under" ? s.neg : undefined) : undefined}>{`${lg?.state === "post" ? "Final" : "So far"} ${soFar}`}</small>
+                        ) : null}
                       </span>
                       <span className={s.chev} aria-hidden>
                         ›
@@ -422,6 +442,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
     const edges = allEdges.filter((e) => keys.has(e.key));
     const early = allEdges.length - edges.length;
     const graded = record(ourSliceBets(v.graded, "edge:all"));
+    const nbaLive = await liveBoxes(tonight, "nba");
     return (
       <section className={s.section} aria-labelledby="pp-week">
         <div className={s.pageFrame}>
@@ -438,7 +459,8 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
         </div>
         <div className={s.pageFrame}>
           <SecHead title="Every game" aside="Started games pinned on top · open a player for detail" />
-          {tonight.length ? <PropGames board={tonight} sport="nba" settled={settled} /> : <p className={s.calm}>No NBA games today. Later days show up the morning of.</p>}
+          {nbaLive.size > 0 && <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />}
+          {tonight.length ? <PropGames board={tonight} sport="nba" settled={settled} live={nbaLive} /> : <p className={s.calm}>No NBA games today. Later days show up the morning of.</p>}
         </div>
         {results.length > 0 && (
           <div className={s.pageFrame}>
@@ -477,6 +499,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
   const waiting = ahead.reduce((a, g) => a + Object.values(g.extra).filter((x) => x.price === "assumed").length, 0);
   const all = ahead.reduce((a, g) => a + g.game.markets.length, 0);
   const graded = record(ourSliceBets(v.graded, "edge:all"));
+  const nflLive = await liveBoxes(done, "nfl");
   return (
     <section className={s.section} aria-labelledby="pp-week">
       <div className={s.pageFrame}>
@@ -494,7 +517,8 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
       </div>
       <div className={s.pageFrame}>
         <SecHead title="Every game" aside="Started games pinned on top · open a player for detail" />
-        <PropGames board={[...ahead, ...done]} sport="nfl" />
+        {nflLive.size > 0 && <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />}
+        <PropGames board={[...ahead, ...done]} sport="nfl" live={nflLive} />
       </div>
       <div className={s.pageFrame}>
         <SecHead title="How it is doing" aside="Tracked, never staked" />

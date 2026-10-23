@@ -1,0 +1,42 @@
+name: Props re-save before kickoff
+
+# A backstop for the game-day morning read (odds-morning.yml), added
+# 2026-10-22 after NE@CHI kept 11 unpriced props: its only save ran at
+# 1:46pm ET (GitHub ran the 9am job late) and nothing re-saved it before
+# kickoff. These runs re-save every game that has not started yet, so each
+# prop is priced from that day's stored DraftKings read at its own line. The
+# read itself still happens once per game day, so these cost no Odds API
+# credits; a run after kickoff saves nothing (started games are skipped).
+#
+# UTC times are about 45 min before each Eastern kickoff window in EDT
+# (7:30pm Thu and Mon, 8:45am, 12:15pm, 3:20pm and 7:35pm Sun); in EST they
+# land an hour earlier, still before kickoff.
+
+on:
+  schedule:
+    - cron: "30 23 * * 4"
+    - cron: "45 12 * * 0"
+    - cron: "15 16 * * 0"
+    - cron: "20 19 * * 0"
+    - cron: "35 23 * * 0"
+    - cron: "30 23 * * 1"
+  workflow_dispatch:
+
+jobs:
+  resave:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Re-save games not started yet
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          ostatus=$(curl -sS -o ours.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/props/nfl/ours")
+          echo "our NFL model HTTP $ostatus"
+          jq -r '.report | "saved \(.saved | length)", "odds: \(.odds // "nothing due")", (.saved[]? | "  \(.)"), (.problems[]? | "problem: \(.)")' ours.json | tee -a "$GITHUB_STEP_SUMMARY"
+          fstatus=$(curl -sS -o ourftd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd/ours")
+          echo "our first TD model HTTP $fstatus"
+          [ "$ostatus" = "200" ] && [ "$fstatus" = "200" ]
