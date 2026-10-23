@@ -462,6 +462,7 @@
 .gRow[open] > summary .chev { transform: rotate(90deg); }
 .gGame { font-family: var(--font-plex), sans-serif; font-weight: 600; min-width: 0; }
 .gGame span { font-weight: 400; color: var(--mute); font-size: 12.5px; margin-left: 4px; }
+.gGame .gLive { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--pos); background: color-mix(in srgb, var(--pos) 18%, transparent); }
 .gBody { padding: 4px 16px 16px; border-top: 1px dashed var(--rule); }
 .readChip { justify-self: start; font-family: var(--font-plex), sans-serif; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface2); color: var(--ink2); white-space: nowrap; }
 .readBet { background: var(--accent-soft); color: var(--accent-ink); }

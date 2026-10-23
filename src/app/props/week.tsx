@@ -57,10 +57,14 @@ interface GameRowData {
   key: string;
   title: string;
   when?: string;
+  /** Started and not graded yet: sorts to the top with a Live tag. */
+  live?: boolean;
   cells: [string, string][];
   read: [string, string];
   body: ReactNode;
 }
+
+const started = (kickoff: string | undefined, graded: unknown) => !graded && !!kickoff && Date.parse(kickoff) <= nowMs();
 
 /** Our number and the market's line on one track, like the Picks market line. */
 function PropLine({ line }: { line: NonNullable<Edge["line"]> }) {
@@ -146,12 +150,12 @@ function GameTable({ head, rows }: { head: string[]; rows: GameRowData[] }) {
         <span>Read</span>
         <span />
       </div>
-      {rows.map((r) => (
+      {[...rows.filter((r) => r.live), ...rows.filter((r) => !r.live)].map((r) => (
         <details key={r.key} className={s.gRow}>
           <summary>
             <span className={s.gGame}>
               {r.title}
-              {r.when && <span>{whenEt(r.when)}</span>}
+              {r.live ? <span className={s.gLive}>Live</span> : r.when && <span>{whenEt(r.when)}</span>}
             </span>
             {r.cells.map(([k, v]) => (
               <span key={k} className={s.gNum} data-k={k}>
@@ -259,6 +263,7 @@ function propRows(board: (OurStoredProps | OurNflStored)[], extraCol: (g: OurSto
       key: g.game.slug,
       title: `${g.away} at ${g.home}`,
       when: g.kickoff,
+      live: started(g.kickoff, g.result),
       cells: [
         ["Props", `${g.game.markets.length}`],
         ["Edges", `${edges.length}`],
@@ -569,6 +574,7 @@ async function FirstBasketWeek({ season }: { season: number }) {
       key: g.game.slug,
       title: `${g.away} at ${g.home}`,
       when: g.kickoff,
+      live: started(g.kickoff, res),
       cells: [
         ["Tip", `${tipTeam} ${pct(Math.max(b.tip, 1 - b.tip))}`],
         ["Likeliest", `${b.players[0].name.split(" ").slice(-1)[0]} ${pct(b.players[0].p)}`],
@@ -727,6 +733,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       key: g.game.slug,
       title: `${g.game.away} at ${g.game.home}`,
       when: g.kickoff,
+      live: started(g.kickoff, r),
       cells: [
         ["Scores first", fav ? `${fav.team} ${pct(fav.pFirst)}` : "·"],
         ["Likeliest", g.game.pick ? `${g.game.pick.name} ${pct(g.game.pick.p)}` : "·"],
