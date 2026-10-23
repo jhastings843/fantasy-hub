@@ -30,6 +30,11 @@ const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes", pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
 const DAVID_MARKET: { [k: string]: DavidMarket } = { pass_yds: "passing_yards", rush_yds: "rushing_yards", rec_yds: "receiving_yards", rec: "receptions" };
 const sideWord = (x: "over" | "under") => (x === "over" ? "Over" : "Under");
+/** "Roschon Johnson" -> "R. Johnson"; suffixes stay off ("Luther Burden III" -> "L. Burden"). */
+const short = (name: string) => {
+  const w = name.split(" ").filter((x) => !/^(Jr\.?|Sr\.?|II|III|IV|V)$/.test(x));
+  return w.length > 1 ? `${w[0][0]}. ${w.at(-1)}` : name;
+};
 const TOP = 6;
 /** NBA games a player needs this season before his edge gets a card. */
 const NBA_CARD_GAMES = 3;
@@ -267,7 +272,7 @@ function propRows(board: (OurStoredProps | OurNflStored)[], extraCol: (g: OurSto
       cells: [
         ["Props", `${g.game.markets.length}`],
         ["Edges", `${edges.length}`],
-        ["Top edge", top ? `${top.player.split(" ").slice(-1)[0]} ${sideWord(top.side!).charAt(0)}${top.line}` : "·"],
+        ["Top edge", top ? `${short(top.player)} ${sideWord(top.side!).charAt(0)}${top.line} ${SHORT[top.stat ?? ""] ?? top.statLabel}` : "·"],
         ["Graded", net !== null ? u(net) : "·"],
       ],
       read: net !== null ? [net > 0 ? "Up" : net < 0 ? "Down" : "Even", net > 0 ? s.readW : net < 0 ? s.readL : ""] : edges.length ? ["Edges", s.readBet] : ["No edges", s.readPass],
