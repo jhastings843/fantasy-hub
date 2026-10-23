@@ -6,7 +6,7 @@ import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
 import { href, kickoffEt, line, price, rec, units, LOG_VIEW, NBA_VIEWS, whenEt, type View } from "../ui";
-import { Background, GoLiveSteps, Hero, LearnerLog, MarketKey, MarketLine, Stats, type LogEntry } from "../board";
+import { Background, GoLiveSteps, Hero, LearnerLog, MarketKey, MarketLine, Stats, TrackingProgress, type LogEntry } from "../board";
 import s from "../picks.module.css";
 
 // The NBA tab. One model (Sam) against the DraftKings line, tracked like
@@ -422,6 +422,21 @@ function NbaLog({ v }: { v: NbaPicksView }) {
         sub="NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered. The review runs weekly; games are daily, so evidence grows every night."
       />
       <GoLiveSteps games={`${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks against its parent cut, at t ${CRITERIA.MIN_T}+.`} />
+      <TrackingProgress
+        rows={v.hyps.map((h) => ({
+          id: h.id,
+          label: h.label,
+          status: h.status === "active" ? "live" : h.status === "rolled-back" ? "back" : "testing",
+          games: h.cmp.n,
+          needGames: CRITERIA.MIN_OPPORTUNITIES,
+          weeks: h.cmp.weeks,
+          needWeeks: CRITERIA.MIN_WEEKS,
+          result: h.cmp.n ? `${h.cmp.mean >= 0 ? "+" : "−"}${Math.abs(h.cmp.mean).toFixed(2)}u a game vs ${h.parentLabel.charAt(0).toLowerCase()}${h.parentLabel.slice(1)}${h.cmp.t !== null ? `, t ${h.cmp.t.toFixed(2)} of ${CRITERIA.MIN_T}` : ""}` : undefined,
+          note: h.cmp.n ? undefined : "No games yet: only games after it registered count.",
+        }))}
+        sub="Research cuts on Sam's NBA reads, each against the broader cut it narrows. New games land every night."
+        empty="No NBA ideas registered yet. They register at the first weekly review."
+      />
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>What NBA is testing</h3>

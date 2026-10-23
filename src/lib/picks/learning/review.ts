@@ -59,7 +59,7 @@ export interface ReviewState {
   activatedAt?: string;
   activatedFrom?: string;
   /** Every hypothesis's verdict at the last review, for the page. */
-  decisions?: { id: string; label: string; verdict: string; why: string }[];
+  decisions?: { id: string; label: string; verdict: string; why: string; n?: number; weeks?: number; t?: number }[];
   calibration?: { n: number; meanP: number; winRate: number; brier: number };
   /** Each sizing challenger, replayed through the limits against the live sizing (the page's sizing block). */
   sizing?: SizingState[];
@@ -313,7 +313,8 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     activatedFrom: activated ? activated.hypothesis : rolledBack ? undefined : prev?.activatedFrom,
     decisions: decisions.map((d) => {
       const h = hs.find((y) => y.id === d.id)!;
-      return { id: d.id, label: "label" in h.definition ? h.definition.label : d.id, verdict: d.verdict, why: d.why };
+      const c = evaluations.find((e) => e.id === d.id)?.comparison;
+      return { id: d.id, label: "label" in h.definition ? h.definition.label : d.id, verdict: d.verdict, why: d.why, ...(c ? { n: c.n, weeks: c.weeks.length, t: c.t } : {}) };
     }),
     calibration: { n: cal.n, meanP: cal.meanP, winRate: cal.winRate, brier: cal.brier },
     sizing: collecting.flatMap((h, i): SizingState[] => {

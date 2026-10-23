@@ -5,10 +5,35 @@
 import Link from "next/link";
 import type { SectionView } from "@/lib/learning/engine";
 import { whenEt } from "../picks/ui";
+import type { TrackRow } from "../picks/board";
 import s from "../picks/picks.module.css";
 
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const CLOSEST = 8;
+
+/** Every slice the engine is measuring, for the learner log's progress section. */
+export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
+  const g = v.gate;
+  return v.entries.map((e): TrackRow => {
+    const ev = e.ev;
+    const live = e.status === "active";
+    const rec = e.live ? `${e.live.w}-${e.live.l}${e.live.p ? `-${e.live.p}` : ""}, ${u(e.live.units)} since it went live` : undefined;
+    // Games and weeks have their own bars; the note lists what else is short.
+    const short = ev?.checks.filter((c) => !c.pass && c.name !== "games" && c.name !== "weeks").map((c) => c.note) ?? [];
+    const still = !ev?.games ? "No games yet: only games after it was first tracked count." : short.length ? `Also needs ${short.slice(0, 2).join(", ")}` : ev.ready ? "Ready at the next review" : undefined;
+    return {
+      id: `${prefix}${e.id}`,
+      label: `${prefix}${e.label}`,
+      status: live ? "live" : e.status === "rolled-back" ? "back" : "testing",
+      games: ev?.games ?? 0,
+      needGames: g.minGames,
+      weeks: ev?.weeks ?? 0,
+      needWeeks: g.minWeeks,
+      result: live || e.status === "rolled-back" ? rec : ev && ev.bets ? `${u(ev.units)} over ${ev.bets} bet${ev.bets === 1 ? "" : "s"}` : undefined,
+      note: live ? undefined : e.status === "rolled-back" ? e.reason : still,
+    };
+  });
+}
 
 export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
   const g = v.gate;

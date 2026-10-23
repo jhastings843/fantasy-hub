@@ -10,8 +10,8 @@ import { getOurFtdView, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
-import { GoLiveSteps, Hero, LearnerLog, engineEntry, type LogEntry } from "../picks/board";
-import { LearningBlock } from "./learning";
+import { GoLiveSteps, Hero, LearnerLog, TrackingProgress, engineEntry, type LogEntry } from "../picks/board";
+import { LearningBlock, trackRows } from "./learning";
 import s from "../picks/picks.module.css";
 
 const TOP = 4;
@@ -226,6 +226,11 @@ export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "f
         sub="Every slice is tracked from the day it was first seen, on later games only. It goes live when it clears its gate and is rolled back if it starts losing."
       />
       <GoLiveSteps games={tab === "pp" || tab === "nba" ? "30+ games over 3+ weeks and 100+ bets." : "60+ games over 4+ weeks and 12+ winners (long prices)."} />
+      <TrackingProgress
+        rows={items.flatMap((p) => trackRows(p.learning, items.length > 1 ? `${p.name}: ` : ""))}
+        sub="Each one counts only games after it was first tracked, and bets for real once it clears its gate."
+        empty="Nothing registered yet. Slices register at this section's next data pull."
+      />
       <div className={s.section}>
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={[...entries, ...reviews].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20)} empty="Nothing recorded yet. Each section's first review runs at its next data pull." />

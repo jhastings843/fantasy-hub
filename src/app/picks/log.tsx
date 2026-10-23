@@ -4,7 +4,8 @@
 import type { League } from "@/lib/picks/parse";
 import { redisStore } from "@/lib/picks/learning/store";
 import type { JournalEntry } from "@/lib/picks/learning/review";
-import { Background, GoLiveSteps, Hero, LearnerLog, type LogEntry } from "./board";
+import { Background, GoLiveSteps, Hero, LearnerLog, TrackingProgress, type LogEntry } from "./board";
+import { CRITERIA } from "@/lib/picks/learning/model";
 import { LearningPanel, VERDICT, marketOf } from "./learning";
 import { whenEt, type Market } from "./ui";
 import s from "./picks.module.css";
@@ -42,6 +43,29 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
         sub="Every idea is tested on games after it was first tracked. It goes live only when it clears the bar, and comes back off if it starts losing."
       />
       <GoLiveSteps games="30+ games over 3+ weeks, judged on games it saw after registering." />
+      <TrackingProgress
+        rows={ideas
+          .filter((d) => d.verdict !== "reject")
+          .map((d) => {
+            // Reviews before 2026-10-22 saved only the sentence ("10 of 30 settled matched games, 1 of 3 weeks"; "n=12" on report-only ideas).
+            const n = d.n ?? Number(/(\d+) of \d+ settled/.exec(d.why)?.[1] ?? /n=(\d+)/.exec(d.why)?.[1] ?? 0);
+            const wk = d.weeks ?? (/(\d+) of \d+ weeks?/.exec(d.why) ? Number(/(\d+) of \d+ weeks?/.exec(d.why)![1]) : undefined);
+            const counted = /^insufficient evidence: [^;]*$/.test(d.why);
+            return {
+              id: d.id,
+              label: d.label,
+              status: d.verdict === "promote" ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
+              games: n,
+              needGames: CRITERIA.MIN_OPPORTUNITIES,
+              weeks: wk,
+              needWeeks: CRITERIA.MIN_WEEKS,
+              result: d.t !== undefined ? `t ${d.t.toFixed(2)} of ${CRITERIA.MIN_T}` : undefined,
+              note: counted ? undefined : d.why.replace(/^insufficient evidence: /, ""),
+            };
+          })}
+        sub={`${MARKET_NAME[market]} ideas, measured against the rule in force on games after each registered. Counts update at each Tuesday review.`}
+        empty={`${MARKET_NAME[market]} ideas register at the next Tuesday review.`}
+      />
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>{`What ${MARKET_NAME[market].toLowerCase()} is testing`}</h3>
