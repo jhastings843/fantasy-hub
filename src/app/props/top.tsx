@@ -10,7 +10,7 @@ import { getOurFtdView, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
-import { GoLiveSteps, Hero, LearnerLog, TrackingProgress, engineEntry, type LogEntry } from "../picks/board";
+import { GoLiveSteps, Hero, LearnerLog, ModelLineup, TrackingProgress, engineEntry, type LogEntry, type ModelRow } from "../picks/board";
 import { LearningBlock, trackRows } from "./learning";
 import s from "../picks/picks.module.css";
 
@@ -29,7 +29,7 @@ interface EdgeRow {
   mkt: number;
 }
 
-interface Product {
+export interface Product {
   name: string;
   meta: string;
   rows: EdgeRow[];
@@ -163,7 +163,7 @@ function nflProducts(v: OurNflView, f: OurFtdView): Product[] {
   ];
 }
 
-async function load(sport: "nfl" | "nba", season: number): Promise<Product[] | null> {
+export async function loadProducts(sport: "nfl" | "nba", season: number): Promise<Product[] | null> {
   if (sport === "nba") {
     const v = await getOurNbaView(season).catch(() => null);
     return v ? nbaProducts(v) : null;
@@ -172,8 +172,50 @@ async function load(sport: "nfl" | "nba", season: number): Promise<Product[] | n
   return v && f ? nflProducts(v, f) : null;
 }
 
+/**
+ * Who decides a Props market: our own model only (Sam is never part of Props).
+ * "Sets real stakes" only when a learner slice is live; otherwise its edges are tracked.
+ */
+const LINEUP: { [k in "pp" | "ftd" | "nba" | "fb"]: { product: string; model: string; role: string; prices: string } } = {
+  pp: { product: "NFL props", model: "Hobby Hub NFL prop model", role: "Pass, rush and receiving yards and catches", prices: "DraftKings prices come from one game-day morning read; a prop without a price shows our number and no edge. David's line is shown for comparison only." },
+  ftd: { product: "First TD", model: "Hobby Hub First TD model", role: "Team to score first, then the scorer", prices: "Compared with Kalshi (fee in), DraftKings and FanDuel; an edge beats the cheapest." },
+  nba: { product: "NBA props", model: "Hobby Hub NBA prop model", role: "Points, rebounds, assists and threes", prices: "A player needs 3 games this season before an edge counts." },
+  fb: { product: "First Basket", model: "Hobby Hub First Basket model", role: "Tip chance and each starter's share of first shots", prices: "DraftKings prices read the morning of the game." },
+};
+export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb" | "kotc"; season: number }) {
+  if (tab === "kotc")
+    return (
+      <ModelLineup
+        title="Who decides King of the Court"
+        aside="Projections only. Nothing is staked."
+        models={[
+          { name: "Slate simulation", role: "Chance to lead the slate in points + rebounds + assists", status: "projections", note: "Simulated slates, saved before the first tip and graded after the last final. No stakes." },
+          { name: "Crowd model", role: "Who else backs each player", status: "unavailable", note: "Not built, so the payout share can't be estimated. A chance to lead is not a price." },
+        ]}
+      />
+    );
+  const L = LINEUP[tab];
+  const items = await loadProducts(tab === "nba" || tab === "fb" ? "nba" : "nfl", season);
+  const p = items?.find((x) => x.name === L.product);
+  const entries = p?.learning.entries ?? [];
+  const live = entries.filter((e) => e.status === "active");
+  const gate = p?.learning.gate;
+  const best = entries.filter((e) => e.status === "collecting").reduce((a, e) => Math.max(a, e.ev?.games ?? 0), 0);
+  const model: ModelRow = {
+    name: L.model,
+    role: L.role,
+    status: !p ? "unavailable" : live.length ? "active" : "collecting",
+    note: !p
+      ? "Couldn't read this model's learning just now."
+      : live.length
+        ? `${live.length} slice${live.length === 1 ? " is" : "s are"} live for real stakes: ${live.map((e) => e.label).join(", ")}. Everything else is tracked. ${L.prices}`
+        : `Edges are tracked only: no slice has cleared its gate (closest ${best} of ${gate?.minGames ?? 30} games). ${L.prices}`,
+  };
+  return <ModelLineup title={`Who decides ${L.product}`} aside={live.length ? "Live slices set stakes. Everything else is tracked." : "Nothing here carries a stake."} models={[model]} />;
+}
+
 export async function PropsTop({ sport, season }: { sport: "nfl" | "nba"; season: number }) {
-  const items = await load(sport, season);
+  const items = await loadProducts(sport, season);
   if (!items) return null;
   const live = items.reduce((a, p) => a + p.learning.entries.filter((e) => e.status === "active").length, 0);
   const edges = items.reduce((a, p) => a + p.rows.length, 0);
@@ -210,7 +252,7 @@ export async function PropsTop({ sport, season }: { sport: "nfl" | "nba"; season
 
 /** The Props Learner log for one tab's market: its journal in plain language, with the gate detail one click down. */
 export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb"; season: number }) {
-  const all = await load(tab === "nba" || tab === "fb" ? "nba" : "nfl", season);
+  const all = await loadProducts(tab === "nba" || tab === "fb" ? "nba" : "nfl", season);
   const want = { pp: "NFL props", ftd: "First TD", nba: "NBA props", fb: "First Basket" }[tab];
   const items = all?.filter((p) => p.name === want) ?? null;
   if (!items) return <p className={s.calm}>The learning sections couldn&apos;t be read just now. Try again in a minute.</p>;

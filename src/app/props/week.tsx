@@ -280,7 +280,7 @@ function propRows(
         ["Top edge", top ? `${short(top.player)} ${top.side === "over" ? "o" : "u"}${top.line} ${SHORT[top.stat ?? ""] ?? top.statLabel}` : "·"],
         ["Graded", net !== null ? u(net) : "·"],
       ],
-      read: net !== null ? [net > 0 ? "Up" : net < 0 ? "Down" : "Even", net > 0 ? s.readW : net < 0 ? s.readL : ""] : edges.length ? ["Edges", s.readBet] : ["No edges", s.readPass],
+      read: net !== null ? [net > 0 ? "Up" : net < 0 ? "Down" : "Even", net > 0 ? s.readW : net < 0 ? s.readL : ""] : edges.length ? [`${edges.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
       body: (
         <div className={s.tw}>
           <table className={s.table}>
@@ -323,7 +323,7 @@ function propRows(
   });
 }
 const noCol = () => "";
-/** Our side in blue; a result in green or red by how our side did, white when we had no side. */
+/** Our side in oxblood; a result in green or red by how our side did, white when we had no side. */
 const outCls = (o: string | undefined) => (o === "W" ? s.pos : o === "L" ? s.neg : o === "P" ? s.dim : "");
 /** When the board used DK's alternate line nearer -110 instead of the main line, say which. */
 const altNote = (g: OurStoredProps, m: PropMarket) => {
@@ -460,7 +460,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
           <div className={s.section}>
             <div className={s.sectionHead}>
               <h3 className={s.h2}>Results</h3>
-              <p className={s.p}>Every graded game, newest first. Our side in blue; the result green when it won, red when it lost.</p>
+              <p className={s.p}>Every graded game, newest first. Our side in oxblood; the result green when it won, red when it lost.</p>
             </div>
             <GameTable head={["Props", "Edges", "Top edge", "Graded"]} rows={propRows(results, (g, m) => altNote(g as OurStoredProps, m))} />
           </div>
@@ -591,7 +591,7 @@ async function FirstBasketWeek({ season }: { season: number }) {
         ["Edges", `${e.length}`],
         ["First basket", scorer ?? "·"],
       ],
-      read: res !== undefined ? (e.some((x) => x.id === res?.player) ? ["Hit", s.readW] : ["Missed", e.length ? s.readL : s.readPass]) : e.length ? ["Edges", s.readBet] : ["No edges", s.readPass],
+      read: res !== undefined ? (e.some((x) => x.id === res?.player) ? ["Hit", s.readW] : ["Missed", e.length ? s.readL : s.readPass]) : e.length ? [`${e.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
       body: (
         <div className={s.tw}>
           <table className={s.table}>
@@ -648,6 +648,25 @@ async function FirstBasketWeek({ season }: { season: number }) {
 }
 
 /* ----------------------------------------------------------- first TD --- */
+
+/** Every First TD edge at Kalshi's cost (fee in), graded: the shadow record the learner reads. Shared with Records. */
+export function ftdKalshiRecord(graded: Awaited<ReturnType<typeof getOurFtdView>>["graded"]) {
+  let w = 0;
+  let l = 0;
+  let units = 0;
+  for (const x of graded)
+    for (const p of pricedPlayers(x.game)) {
+      const k = kalshiFor(x.kalshi, p.name);
+      if (!k?.ask) continue;
+      const c = kalshiCost(k.ask);
+      if (c >= 1 || p.p <= c) continue;
+      const won = x.result.key === p.key;
+      if (won) w++;
+      else l++;
+      units += won ? (1 - c) / c : -1;
+    }
+  return { w, l, p: 0, units };
+}
 
 async function FirstTdWeek({ season }: { season: number }) {
   const v = await getOurFtdView(season).catch(() => null);
@@ -715,23 +734,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       }),
     )
     .sort((a, b) => b.gap - a.gap);
-  const graded = (() => {
-    let w = 0;
-    let l = 0;
-    let units = 0;
-    for (const x of v.graded)
-      for (const p of pricedPlayers(x.game)) {
-        const k = kalshiFor(x.kalshi, p.name);
-        if (!k?.ask) continue;
-        const c = kalshiCost(k.ask);
-        if (c >= 1 || p.p <= c) continue;
-        const won = x.result.key === p.key;
-        if (won) w++;
-        else l++;
-        units += won ? (1 - c) / c : -1;
-      }
-    return { w, l, p: 0, units };
-  })();
+  const graded = ftdKalshiRecord(v.graded);
   // A bet is a player in a learner slice that has gone live, at Kalshi's cost (the learner grades on Kalshi). An edge alone is not a bet: most games have a few.
   // Only games that kicked off after a slice went live: an earlier game was never bet, whatever the slice says now.
   const since = new Map(v.learning.entries.filter((e) => e.status === "active" && e.activatedAt).map((e) => [e.id, e.activatedAt!]));
@@ -774,12 +777,13 @@ async function FirstTdWeek({ season }: { season: number }) {
               </tr>
             </thead>
             <tbody>
-              {pricedPlayers(g.game).map((p) => {
+              {pricedPlayers(g.game).map((p, i) => {
                 const c = cost(g, p.name);
                 const k = kalshi(g, p.name);
                 const d = dkPrice(g, p.name);
                 return (
-                  <tr key={p.key}>
+                  // Player keys are team + initial + surname, so two "ATL_B.Robinson"s collide; the index keeps rows distinct.
+                  <tr key={`${p.key}|${i}`}>
                     <td>{`${p.name} `}<span className={s.dim}>{p.team}</span>{r?.key === p.key && <b className={s.pos}> · scored first</b>}</td>
                     <td className={s.num}>{pct(p.p)}</td>
                     <td className={s.num}>{k !== null ? `${Math.round(k * 100)}¢` : "·"}</td>

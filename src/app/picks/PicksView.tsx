@@ -9,7 +9,8 @@ import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
 import { OurSpreadCard } from "./ours";
 import { FOOTBALL_VIEWS, LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
-import { Background, Stats } from "./board";
+import { Background, ModelLineup, Stats, type ModelRow } from "./board";
+import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
 import { PicksLog } from "./log";
 import { redisStore } from "@/lib/picks/learning/store";
 import WeekSearch from "./WeekSearch";
@@ -44,7 +45,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
       </Link>
     </nav>
   );
-  const review = await redisStore.state().catch(() => null);
+  const [review, active] = await Promise.all([redisStore.state().catch(() => null), redisStore.active().catch(() => null)]);
   const testing = (review?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && d.verdict === "retain").length;
 
   if (!r) {
@@ -84,6 +85,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
             ))}
           </nav>
           <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />
+          {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
           {r.board.length > 0 && view === "week" && (
             <WeekSearch
@@ -124,6 +126,55 @@ export default async function PicksView({ league, market: asked, view }: { leagu
       </div>
     </main>
   );
+}
+
+/**
+ * Every model behind this market and what it does with money, from the report
+ * and the policy in force. Only a rule that issues stakes reads "Sets real stakes".
+ */
+function lineup(r: PicksReport, market: Market, policy: PicksPolicy | null): ModelRow[] {
+  const L = LEAGUE_NAME[r.league];
+  const rule = r.strategies.rule;
+  const totalsRule = r.totals.backtest.rule;
+  const inputs: ModelRow[] = [
+    { name: "Sam", role: "Spread and total numbers, outside source", status: "input", note: "Feeds the rule. Never stakes on its own." },
+    { name: "David", role: "Spread and total numbers, outside source", status: "input", note: "Feeds the rule. Never stakes on its own." },
+  ];
+  const sources: ModelRow[] =
+    r.league === "cfb" && policy
+      ? (["pem", "harris"] as const).map((src) => {
+          const st = sourceState(policy, src);
+          const name = src === "pem" ? "PEM" : "John Harris";
+          return st === "out"
+            ? { name, role: "College source", status: "collecting" as const, note: "Not used in the rule now. The review keeps testing whether skipping the bets it disagrees with would gain." }
+            : { name, role: "College source", status: "input" as const, note: st === "veto" ? "Its agreement cuts can be the rule, and a rule bet it disagrees with is skipped." : "Its agreement cuts compete for the rule. It vetoes nothing." };
+        })
+      : [];
+  if (market === "ats")
+    return [
+      rule
+        ? { name: `Spread rule: ${rule.label}`, role: `Decides ${L} spread bets`, status: "active", note: `${rule.record.w}-${rule.record.l}${rule.record.p ? `-${rule.record.p}` : ""} since tracking. Bets issue with that morning's DraftKings price and a stake under the weekly limits.` }
+        : { name: "Spread rule", role: `Decides ${L} spread bets`, status: "collecting", note: "No cut clears the bar yet, so no spread bets issue. Every game is tracked." },
+      ...inputs,
+      ...sources,
+      ...(r.league === "nfl" ? [{ name: "Our NFL spread model", role: "Our own number for every game", status: "collecting" as const, note: "Tracked only. Its leans are tested against the earlier price; it never touches the rule until it clears its gate." }] : []),
+    ];
+  if (market === "ou")
+    return [
+      totalsRule
+        ? { name: `Totals rule: ${totalsRule.label}`, role: `Decides ${L} totals bets`, status: "active", note: `${totalsRule.record.w}-${totalsRule.record.l}${totalsRule.record.p ? `-${totalsRule.record.p}` : ""} on ${totalsRule.games} games. Bets issue with a saved price and a stake.` }
+        : { name: "Totals", role: `${L} over/unders`, status: "collecting", note: "No totals cut clears the bar, so totals are tracked with no stake." },
+      ...inputs,
+    ];
+  return [
+    { name: "Straight-up picks", role: r.league === "nfl" ? "Pool entries" : "Winners, tracked", status: "projections", note: r.league === "nfl" ? "Picks for the pool, ranked by win chance. Pool entries only, never staked." : "Winner picks by the method in force. Tracked only, never staked." },
+    ...inputs,
+  ];
+}
+function lineupAside(r: PicksReport, market: Market): string {
+  if (market === "ats") return r.strategies.rule ? "One rule sets stakes. Everything else is tracked." : "Nothing sets a stake right now.";
+  if (market === "ou") return r.totals.backtest.rule ? "One rule sets stakes." : "Tracked only, no stakes.";
+  return "No stakes in straight up.";
 }
 
 /** The four numbers that matter, on every view: season, this week, the rule in force, the learner. */

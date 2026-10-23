@@ -3,21 +3,21 @@
    weekly version reads the same. Tokens on the wrapper, redefined for dark. */
 
 .page {
-  --bg: #f3f5f1;
-  --surface: #ffffff;
-  --surface2: #e9ede6;
-  --ink: #14211c;
-  --ink2: #3d4b44;
-  --mute: #6c7a72;
-  --rule: #d5dcd3;
-  --accent: #0d6b57;
-  --accent-soft: #d6ebe3;
-  --pos: #0d6b57;
-  --neg: #b0413e;
-  --gold: #a8730f;
-  --gold-soft: #f6ead0;
-  --track: #e3e8e1;
-  --ci: #c3d6cd;
+  --bg: #f5f2e9;
+  --surface: #fcfaf4;
+  --surface2: #eae5da;
+  --ink: #302d29;
+  --ink2: #4f4a44;
+  --mute: #706a61;
+  --rule: #d7d1c5;
+  --accent: #812f40;
+  --accent-soft: #efe0e1;
+  --pos: #32664e;
+  --neg: #a14135;
+  --gold: #87601e;
+  --gold-soft: #f2e7ce;
+  --track: #eae5da;
+  --ci: #e0eade;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-plex), system-ui, -apple-system, sans-serif;
@@ -31,24 +31,25 @@
 @media all {
   .page {
     color-scheme: dark;
-    --bg: #0e1412;
-    --surface: #151d1a;
-    --surface2: #1c2622;
-    --ink: #e4ebe7;
-    --ink2: #b9c5bf;
-    --mute: #86958e;
-    --rule: #2a3631;
-    /* Steel blue accent since 2026-10-21 (Jack chose it over the yellow); green and red are only wins and losses. */
-    --accent: #7fb3e6;
-    --accent-soft: #1b2a3a;
-    --accent-ink: #a9cdf0;
-    --pos: #43b996;
-    --neg: #e0716b;
-    --gold: #a9cdf0;
-    --gold-soft: #1b2a3a;
-    --david: #43b996;
-    --track: #222d29;
-    --ci: #2c4a40;
+    --bg: #201f1c;
+    --surface: #272622;
+    --surface2: #33312b;
+    --ink: #eee9df;
+    --ink2: #cfc8bc;
+    --mute: #a8a093;
+    --rule: #49453e;
+    /* Astra's palette since 2026-10-22 (Jack: "use astra's color schema, no blue"). Oxblood marks real stakes and
+       Sam; green and red are only wins and losses (red leans orange so it never reads as the oxblood). */
+    --accent: #efabb6;
+    --accent-soft: #422d33;
+    --accent-ink: #f5c6cd;
+    --pos: #9ac9a7;
+    --neg: #f08f78;
+    --gold: #dfc17e;
+    --gold-soft: #3e3525;
+    --david: #dfc17e;
+    --track: #33312b;
+    --ci: #2a3a30;
   }
 }
 .wrap { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
@@ -423,7 +424,8 @@
 .betCardTop { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .betPickBig { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 800; font-size: clamp(34px, 5vw, 44px); line-height: 1; text-transform: uppercase; overflow-wrap: anywhere; }
 .betWhen { color: var(--ink2); font-size: 14px; margin-top: 4px; }
-.lockChip { flex: 0 0 auto; padding: 5px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
+/* Edge, lock and tracking tags are never a stake: dashed, like every no-stake marker. */
+.lockChip { flex: 0 0 auto; padding: 4px 9px; border-radius: 5px; border: 1.5px dashed var(--accent); background: transparent; color: var(--accent-ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-top: 1px solid var(--rule); padding-top: 12px; margin: 0; }
 .facts dt { font-size: 12px; color: var(--mute); }
 .facts dd { margin: 0; font-family: var(--font-plex-mono), monospace; font-weight: 500; font-size: 14px; }
@@ -462,18 +464,23 @@
 .gRow[open] > summary .chev { transform: rotate(90deg); }
 .gGame { font-family: var(--font-plex), sans-serif; font-weight: 600; min-width: 0; }
 .gGame span { font-weight: 400; color: var(--mute); font-size: 12.5px; margin-left: 4px; }
-.gGame .gLive { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--pos); background: color-mix(in srgb, var(--pos) 18%, transparent); }
+.gGame .gLive { margin-left: 8px; padding: 1px 8px; border-radius: 5px; font-size: 11.5px; font-weight: 600; color: var(--gold); background: var(--gold-soft); }
 .gBody { padding: 4px 16px 16px; border-top: 1px dashed var(--rule); }
-.readChip { justify-self: start; font-family: var(--font-plex), sans-serif; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface2); color: var(--ink2); white-space: nowrap; }
-.readBet { background: var(--accent-soft); color: var(--accent-ink); }
+/* Read chips: form carries the meaning (2026-10-22, the Ledger redesign).
+   Solid oxblood = a real stake. Dashed oxblood = qualifies, no stake yet. Dashed grey = tracked only. Amber = live. */
+.readChip { justify-self: start; font-family: var(--font-plex), sans-serif; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 5px; border: 1.5px solid transparent; background: var(--surface2); color: var(--ink2); white-space: nowrap; }
+.readBet { background: var(--accent); color: var(--bg); }
+.readPend { background: transparent; color: var(--accent); border: 1.5px dashed var(--accent); }
+.readTrack { background: transparent; color: var(--ink2); border: 1.5px dashed color-mix(in srgb, var(--ink2) 45%, transparent); }
 .readPass { background: transparent; color: var(--mute); }
 .readW { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
 .readL { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
 @media (max-width: 760px) {
   .gHead { display: none; }
-  .gRow > summary { grid-template-columns: 1fr auto 16px; row-gap: 4px; }
+  /* A fixed chip column on phones too, so every row's game name starts and ends in the same place. */
+  .gRow > summary { grid-template-columns: minmax(0, 1fr) 150px 16px; row-gap: 4px; }
   .gRow > summary .gGame { grid-column: 1; }
-  .gRow > summary .readChip { grid-column: 2; grid-row: 1; }
+  .gRow > summary .readChip { grid-column: 2; grid-row: 1; justify-self: end; max-width: 100%; white-space: normal; text-align: right; }
   .gRow > summary .chev { grid-column: 3; grid-row: 1; }
   .gRow > summary .gNum { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink2); }
   .gRow > summary .gNum::before { content: attr(data-k) " "; color: var(--mute); }
@@ -492,7 +499,7 @@
 .logWhen { font-family: var(--font-plex-mono), monospace; font-size: 12.5px; color: var(--mute); }
 .logKind { justify-self: start; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface2); color: var(--ink2); white-space: nowrap; }
 .kLive { background: color-mix(in srgb, var(--pos) 18%, transparent); color: var(--pos); }
-.readLive { background: color-mix(in srgb, var(--pos) 18%, transparent); color: var(--pos); }
+.readLive { background: var(--gold-soft); color: var(--gold); }
 .kNew { background: var(--accent-soft); color: var(--accent-ink); }
 .kBack { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
 .logText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -546,3 +553,51 @@
 .tkNum { font-family: var(--font-plex-mono), monospace; font-size: 12px; color: var(--ink2); min-width: 54px; text-align: right; }
 .tkNote { margin: 0; font-size: 12.5px; color: var(--mute); line-height: 1.45; }
 @media (prefers-reduced-motion: no-preference) { .tkFill { transition: width .5s ease; } }
+
+/* Who decides (ModelLineup) */
+.lineup { display: grid; gap: 4px; }
+.lineupHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+.lineupHead .muted { font-size: 13px; }
+.drv { padding: 12px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 4px; }
+.drvHead { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.drvHead b { font-weight: 650; }
+.drvRole { font-size: 13px; color: var(--mute); }
+.drvNote { margin: 0; font-size: 13.5px; color: var(--ink2); max-width: 75ch; }
+.lineupMore > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) 16px; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--rule); font-weight: 600; font-size: 14px; }
+.lineupMore > summary::-webkit-details-marker { display: none; }
+.lineupMore > summary .muted { font-weight: 400; font-size: 13px; justify-self: end; text-align: right; }
+.lineupMore > summary::after { content: "+"; font-family: var(--font-plex-mono), monospace; color: var(--mute); justify-self: end; }
+.lineupMore[open] > summary::after { content: "−"; }
+.lineupGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); column-gap: 28px; }
+.ms { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 5px; font-size: 12px; font-weight: 650; white-space: nowrap; border: 1.5px solid transparent; font-family: var(--font-plex), sans-serif; }
+.msActive { background: var(--accent); color: var(--bg); }
+.msCollecting { border: 1.5px dashed var(--accent); color: var(--accent); }
+.msProjections { border-color: var(--rule); color: var(--ink2); }
+.msInput { background: var(--surface2); color: var(--ink2); }
+.msUnavailable { background: var(--surface2); color: var(--mute); text-decoration: line-through; text-decoration-thickness: 1px; }
+@media (max-width: 640px) { .lineupGrid { grid-template-columns: 1fr; } .lineupMore > summary { grid-template-columns: minmax(0, 1fr) 16px; } .lineupMore > summary .muted { grid-column: 1; grid-row: 2; justify-self: start; text-align: left; } .lineupMore > summary::after { grid-column: 2; grid-row: 1; } }
+
+/* Records: sort controls and sortable headers */
+button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sortBar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sortLabel { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin-right: 4px; }
+.thSort { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+.thSort:hover, th[aria-sort="ascending"] .thSort, th[aria-sort="descending"] .thSort { color: var(--ink); }
+.table th.thNum, .table td.tdNum { text-align: right; white-space: nowrap; }
+.issuedNote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--surface); color: var(--ink2); font-size: 14px; max-width: 80ch; }
+
+/* Today: bet slips. Solid oxblood border = an issued stake; dashed oxblood = sized, not sent; dashed grey = tracked. */
+.slips { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.slip { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; align-content: start; }
+.slipReal { border: 1.5px solid var(--accent); }
+.slipReady { border: 1.5px dashed var(--accent); background: transparent; }
+.slipDash { border: 1.5px dashed var(--rule); background: transparent; }
+.slipTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; }
+.slipPick { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 24px; line-height: 1.1; text-transform: uppercase; letter-spacing: .02em; }
+.slipNote { margin: 0; font-size: 13px; color: var(--ink2); }
+.slipStub { display: flex; flex-wrap: wrap; gap: 4px 18px; border-top: 1px dashed var(--rule); padding-top: 9px; font-size: 13px; color: var(--ink2); }
+.slipStub b { color: var(--ink); font-weight: 600; }
+.legendRow { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12.5px; color: var(--mute); }
+.legendRow > span { display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 640px) { .slips { grid-template-columns: 1fr; } }

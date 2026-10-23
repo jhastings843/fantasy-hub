@@ -193,6 +193,82 @@ export function GoLiveSteps({ games }: { games: string }) {
   );
 }
 
+/**
+ * Who decides a section's bets (the Ledger redesign, 2026-10-22): the one model
+ * that can move money stays in view, everything else folds into one line. Each
+ * carries one status from a fixed set, so a page never implies an unconfirmed
+ * model is driving a real bet.
+ */
+export type ModelStatus = "active" | "collecting" | "projections" | "input" | "unavailable";
+export interface ModelRow {
+  name: string;
+  role: string;
+  status: ModelStatus;
+  note: string;
+}
+const MODEL_STATUS: { [k in ModelStatus]: [string, string] } = {
+  active: ["Sets real stakes", s.msActive],
+  collecting: ["Collecting evidence", s.msCollecting],
+  projections: ["Projections only", s.msProjections],
+  input: ["Input to a rule", s.msInput],
+  unavailable: ["Unavailable", s.msUnavailable],
+};
+export const statusChip = (st: ModelStatus) => <span className={`${s.ms} ${MODEL_STATUS[st][1]}`}>{MODEL_STATUS[st][0]}</span>;
+
+function ModelLine({ m }: { m: ModelRow }) {
+  return (
+    <div className={s.drv}>
+      <div className={s.drvHead}>
+        <div>
+          <b>{m.name}</b>
+          <div className={s.drvRole}>{m.role}</div>
+        </div>
+        {statusChip(m.status)}
+      </div>
+      <p className={s.drvNote}>{m.note}</p>
+    </div>
+  );
+}
+
+/** Every model at once, for the Today overview. */
+export function ModelGrid({ models }: { models: ModelRow[] }) {
+  return (
+    <div className={s.lineupGrid}>
+      {models.map((m) => (
+        <ModelLine key={m.name} m={m} />
+      ))}
+    </div>
+  );
+}
+
+export function ModelLineup({ title, aside, models }: { title: string; aside: string; models: ModelRow[] }) {
+  const lead = models.find((m) => m.status === "active") ?? models[0];
+  const rest = models.filter((m) => m !== lead);
+  const kinds = [...new Set(rest.map((m) => MODEL_STATUS[m.status][0].toLowerCase()))].join(", ");
+  return (
+    <section className={s.lineup} aria-label={title}>
+      <div className={s.lineupHead}>
+        <h2 className={s.h3} style={{ margin: 0 }}>{title}</h2>
+        <span className={s.muted}>{aside}</span>
+      </div>
+      {lead && <ModelLine m={lead} />}
+      {rest.length > 0 && (
+        <details className={s.lineupMore}>
+          <summary>
+            <span>{`${rest.length} more model${rest.length === 1 ? "" : "s"} and inputs`}</span>
+            <span className={s.muted}>{rest.some((m) => m.status === "active") ? kinds : `none of these stakes on its own · ${kinds}`}</span>
+          </summary>
+          <div className={s.lineupGrid}>
+            {rest.map((m) => (
+              <ModelLine key={m.name} m={m} />
+            ))}
+          </div>
+        </details>
+      )}
+    </section>
+  );
+}
+
 /** One model or slice the learner is tracking, with how far it is toward its gate. */
 export interface TrackRow {
   id: string;

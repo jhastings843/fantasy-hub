@@ -24,6 +24,8 @@ const toneOf = (n: number): "up" | "down" | undefined => (n > 0 ? "up" : n < 0 ?
 
 export interface Desk {
   id: string;
+  /** Paper dollars or units: the two never share a table (the Ledger redesign, 2026-10-22). */
+  money: "usd" | "units";
   name: string;
   what: string;
   result: string;
@@ -52,6 +54,7 @@ function philDesk(p: Phil, id: string, name: string, what: string, href: string)
   const brier = p.brierPhil !== null && p.brierMarket !== null;
   const read = !decided ? "No bets settled" : p.settled < PHIL_MIN ? "Too early" : brier && p.brierPhil! < p.brierMarket! ? "Beating the market" : "Trailing the market";
   return {
+    money: "usd",
     id,
     name,
     what,
@@ -73,6 +76,7 @@ function weatherDesk(w: Weather): Desk {
   const d = w.brake?.desk ?? w.learned.desk;
   const mk = w.brake?.market ?? w.learned.market;
   return {
+    money: "usd",
     id: "weather",
     name: "Weather",
     what: "Daily highs on Kalshi",
@@ -96,8 +100,9 @@ export function desks(v: View): Desk[] {
     const p = sp.picks.reduce((a, x) => ({ u: a.u + x.units, w: a.w + x.w, l: a.l + x.l, pu: a.pu + x.p }), { u: 0, w: 0, l: 0, pu: 0 });
     out.push({
       id: "picks",
+      money: "units",
       name: "Picks",
-      what: "Spread bets, NFL and college",
+      what: "Issued spread bets, NFL and college",
       result: units(p.u),
       rec: `${p.w}-${p.l}${p.pu ? `-${p.pu}` : ""}`,
       tone: toneOf(p.u),
@@ -114,6 +119,7 @@ export function desks(v: View): Desk[] {
     const b = booksTotals(snap.books);
     out.push({
       id: "books",
+      money: "usd",
       name: "Stock books",
       what: `${b.live} books, ${usd(snap.books[0].start)} each`,
       result: pct(b.now / b.start - 1),
@@ -133,6 +139,7 @@ export function desks(v: View): Desk[] {
     const r = snap!.trends!.record;
     out.push({
       id: "trends",
+      money: "usd",
       name: "Trend themes",
       what: "Claude picks trending companies",
       result: pct(ret),
@@ -150,14 +157,15 @@ export function desks(v: View): Desk[] {
     const e = sp.props.reduce((a, x) => ({ u: a.u + x.edges, n: a.n + x.edgeBets }), { u: 0, n: 0 });
     out.push({
       id: "props",
+      money: "units",
       name: "Props",
-      what: "Our four models' edges",
+      what: "Our four models' edges, tracked, no stake",
       result: units(e.u),
       rec: `${e.n} graded`,
       tone: toneOf(e.u),
       ours: units(e.u),
       yard: "Break-even 0u",
-      read: e.n ? "Tracking" : "First grades pending",
+      read: e.n ? "Tracked only" : "First grades pending",
       readTone: "neutral",
       href: "/props?v=results",
     });
@@ -165,7 +173,7 @@ export function desks(v: View): Desk[] {
   return out;
 }
 
-const READ_CLS = { good: s.readW, bad: s.readL, neutral: "" };
+const READ_CLS = { good: s.readW, bad: s.readL, neutral: s.readTrack };
 
 export function DeskTable({ list }: { list: Desk[] }) {
   return (

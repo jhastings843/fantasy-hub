@@ -19,8 +19,11 @@ const SECTIONS: Section[] = [
   { key: "fantasy", label: "Fantasy", href: "/", owns: isFantasy },
   // Its own section (Jack, 2026-10-15): the pool is not a fantasy league.
   { key: "survivor", label: "Survivor", href: "/survivor", owns: (p) => under(p, "/survivor") },
+  // The betting sections in the Ledger order (2026-10-22): today first, the record after the markets.
+  { key: "today", label: "Today", href: "/today", owns: (p) => under(p, "/today") },
   { key: "picks", label: "Picks", href: "/picks", owns: (p) => under(p, "/picks") },
   { key: "props", label: "Props", href: "/props", owns: (p) => under(p, "/props") },
+  { key: "records", label: "Records", href: "/records", owns: (p) => under(p, "/records") },
   { key: "money", label: "Money", href: "/money", owns: (p) => under(p, "/money") },
 ];
 

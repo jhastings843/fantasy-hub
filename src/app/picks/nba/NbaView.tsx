@@ -6,7 +6,7 @@ import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
 import { href, kickoffEt, line, price, rec, units, LOG_VIEW, NBA_VIEWS, whenEt, type View } from "../ui";
-import { Background, GoLiveSteps, Hero, LearnerLog, MarketKey, MarketLine, Stats, TrackingProgress, type LogEntry } from "../board";
+import { Background, GoLiveSteps, Hero, LearnerLog, MarketKey, MarketLine, ModelLineup, Stats, TrackingProgress, type LogEntry } from "../board";
 import s from "../picks.module.css";
 
 // The NBA tab. One model (Sam) against the DraftKings line, tracked like
@@ -97,7 +97,7 @@ function NbaWhy({ g, done }: { g: NbaBoardGame; done: string | null }) {
 }
 
 /** One game's read: the saved copy once tipped, Sam's side, the rule's tier and any stake. */
-function readGame(raw: NbaBoardGame, v: NbaPicksView | null) {
+export function readGame(raw: NbaBoardGame, v: NbaPicksView | null) {
   const saved = v?.games.find((x) => x.id === raw.id);
   const g = asSaved(raw, saved);
   const done = samResults(g, saved);
@@ -147,7 +147,7 @@ function NbaBetCard({ x }: { x: ReturnType<typeof readGame> }) {
 }
 
 function NbaRow({ x, day }: { x: ReturnType<typeof readGame>; day: string }) {
-  const { g, r, tier, done } = x;
+  const { g, r, tier, done, stake } = x;
   const read: [string, string] = g.score && g.state !== "post"
     ? ["Live", s.readLive]
     : g.score
@@ -155,11 +155,13 @@ function NbaRow({ x, day }: { x: ReturnType<typeof readGame>; day: string }) {
       ? [done.split(" · ")[0].replace("Spread ", ""), /won/.test(done.split(" · ")[0]) ? s.readW : /lost/.test(done.split(" · ")[0]) ? s.readL : ""]
       : ["Final", s.readPass]
     : tier
-    ? [`Tier ${tier}`, s.readBet]
+    ? stake
+      ? [`Tier ${tier} · ${stake}u`, s.readBet]
+      : [`Tier ${tier} · no stake`, s.readPend]
     : r?.crossed
     ? ["DK crossed", s.readPass]
     : r
-    ? ["Sam's side", ""]
+    ? ["Sam's side · no stake", s.readTrack]
     : [g.line ? "No model yet" : "No line yet", s.readPass];
   return (
     <details className={s.gRow}>
@@ -512,6 +514,25 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
                 { k: "Rule tier 1", v: t1 ? t1.label : "None yet", sub: t1 ? rec(t1) : "nothing clears the bar", small: true },
                 { k: "Stakes", v: v.gate.live ? "Live" : "Tracking", sub: v.gate.live ? "NBA's own limits" : "until the go-live gate clears", small: true },
                 { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={nbaHref("log")}>Open the log</Link>, small: true },
+              ]}
+            />
+          )}
+          {v && view === "week" && (
+            <ModelLineup
+              title="Who decides NBA spreads"
+              aside={v.gate.live ? "The tier rule sets stakes under NBA's own limits." : "Nothing in NBA picks sets a stake yet."}
+              models={[
+                {
+                  name: t1 ? `Tier rule: ${t1.label}` : "Tier rule",
+                  role: "Decides NBA spread bets once live",
+                  status: v.gate.live ? "active" : "collecting",
+                  note: v.gate.live
+                    ? "Tier bets carry stakes under NBA's own limits."
+                    : `Every Sam side is tracked at the saved DraftKings price with no stake. Go-live gate: ${v.gate.checks.map((c) => `${c.have} of ${c.need} ${c.label.toLowerCase()}`).join("; ")}.`,
+                },
+                { name: "Sam's NBA reads", role: "Spreads and totals, outside source", status: "input", note: "The only NBA input. Never stakes on its own." },
+                { name: "Our NBA game model", role: "Not built", status: "unavailable", note: "NBA picks use Sam only for now." },
+                { name: "Pool picks", role: "Straight up", status: "unavailable", note: "No NBA pool, so NBA straight up is not tracked." },
               ]}
             />
           )}

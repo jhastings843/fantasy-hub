@@ -1309,9 +1309,12 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>Each desk vs its yardstick</h3>
-          <p className={s.p}>Blue bar: the desk. Grey bar: what it has to beat. For Brier scores the shorter bar wins.</p>
+          <p className={s.p}>Oxblood bar: the desk. Grey bar: what it has to beat. For Brier scores the shorter bar wins. Paper dollars and units sit in separate tables and never add together.</p>
         </div>
-        <DeskTable list={list} />
+        <h4 className={s.h3}>Paper dollars</h4>
+        <DeskTable list={list.filter((d) => d.money === "usd")} />
+        <h4 className={s.h3}>Units</h4>
+        <DeskTable list={list.filter((d) => d.money === "units")} />
       </div>
       <MoneyLogSection entries={moneyLog(v)} />
     </section>

@@ -211,7 +211,7 @@ function CloseCard({ g, r }: { g: BoardGame; r: PicksReport }) {
 const READ: { [k in Status]?: [string, string] } = {
   bet: ["Bet", s.readBet],
   sent: ["Sent", s.readBet],
-  early: ["Best bet", s.readBet],
+  early: ["Best bet · not yet", s.readPend],
   priced: ["Close call", ""],
   budget: ["Close call", ""],
   wait: ["Needs PEM", ""],

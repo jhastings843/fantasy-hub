@@ -6,8 +6,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f3f5f1;
-  --foreground: #14211c;
+  --background: #f5f2e9;
+  --foreground: #302d29;
 }
 
 @theme inline {
@@ -19,8 +19,8 @@
 
 :root.dark {
   color-scheme: dark;
-  --background: #0e1412;
-  --foreground: #e4ebe7;
+  --background: #201f1c;
+  --foreground: #eee9df;
 }
 
 body {

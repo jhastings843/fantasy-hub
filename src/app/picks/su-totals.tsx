@@ -29,7 +29,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
   };
   const doneW = done.filter((x) => won(x) === "W").length;
   const band = (margin: number) => marginBand(r.league, margin);
-  const bandCls = (m: number) => (band(m) === "wide" ? s.readBet : band(m) === "clear" ? "" : s.readPass);
+  const bandCls = (m: number) => (band(m) === "wide" ? s.readTrack : band(m) === "clear" ? "" : s.readPass);
   const surest = upcoming.slice(0, 4);
   const rest = upcoming.slice(surest.length);
   return (

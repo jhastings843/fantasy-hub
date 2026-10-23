@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LOG_VIEW, NBA_VIEWS, VIEWS, type View } from "../picks/ui";
-import { PropsLog } from "./top";
+import { PropsLineup, PropsLog } from "./top";
 import { PropTabWeek } from "./week";
 import { DavidResearch, DavidResults, DavidWeek } from "./davidprops";
 import { OurNflResults } from "./ournfl";
@@ -105,6 +105,7 @@ export default async function PropsView({
           )}
         </header>
 
+        {shown === "week" && <PropsLineup tab={market} season={season} />}
         {shown === "week" && market !== "kotc" && <PropTabWeek tab={market} season={season} />}
         {shown === "log" && market !== "kotc" && <PropsLog tab={market} season={season} />}
         {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
