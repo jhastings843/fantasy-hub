@@ -109,4 +109,12 @@ describe("ourNflMarkets (DK lines, NE at CHI 2026-10-22, no prices posted)", () 
     expect(m.books[0]).toMatchObject({ over: -120, under: 100 });
     expect(extra[m.id].price).toBe("david");
   });
+  it("moves to DK's line from the morning read when ESPN's differs, and keeps ESPN's", () => {
+    const at = rec.current.line! + 2;
+    const { markets, extra } = ourNflMarkets(lines, proj(rec.current.line!), names, () => ({ over: -112, under: -112, line: at, source: "odds-api" }), P);
+    const m = markets.find((x) => x.stat === "rec_yds")!;
+    expect(m.line).toBe(at);
+    expect(m.books[0]).toMatchObject({ line: at, over: -112, under: -112 });
+    expect(extra[m.id]).toMatchObject({ price: "odds-api", espnLine: rec.current.line });
+  });
 });

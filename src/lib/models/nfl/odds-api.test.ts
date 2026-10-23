@@ -45,8 +45,8 @@ describe("The Odds API reads", () => {
     expect(oddsPrice(r, "Chase Brown", "rush_yds", 76.5)).toEqual({ over: -115, under: -115 });
     expect(oddsPrice(r, "Rico Dowdle", "rush_yds", 65.5)).toEqual({ over: -105, under: -125 });
   });
-  it("uses a price only at ESPN's line", () => {
-    expect(oddsPrice(r, "Chase Brown", "rush_yds", 77.5)).toBeNull();
+  it("hands back DK's own line when ESPN shows a different one", () => {
+    expect(oddsPrice(r, "Chase Brown", "rush_yds", 77.5)).toEqual({ over: -115, under: -115, line: 76.5 });
   });
   it("drops a market with one side missing", () => {
     expect(oddsPrice(r, "Ja'Marr Chase", "rec", 6.5)).toBeNull();

@@ -4,7 +4,9 @@
 // else from DK itself via The Odds API's morning-of read (odds-api.ts), else
 // from David Sasser's board when his DK line is the same number, else -110
 // both ways, marked as assumed (grading already treats a missing price as
-// -110). Each fallback is used only when its line equals ESPN's DK line.
+// -110). David's price is used only when his line equals ESPN's DK line; the
+// Odds API read carries its own DK line, and when that differs from ESPN's the
+// prop is tested at the read's line (extra.espnLine keeps what ESPN showed).
 
 import { STAT_LABEL, implied, type PropMarket, type Side } from "@/lib/props/parse";
 import type { LiveLine } from "../lines";
@@ -25,6 +27,8 @@ export interface NflMarketExtra {
   median: number;
   /** Where the price came from. */
   price: "espn" | "odds-api" | "david" | "assumed";
+  /** ESPN's DK line when the price came at a different line (the market's line is the priced one). */
+  espnLine?: number;
   /** FanDuel's line and prices on the same prop, the morning of game day (shown, not used for the edge). */
   fd?: { line: number; over: number; under: number };
 }
@@ -36,7 +40,7 @@ export function ourNflMarkets(
   lines: Map<string, LiveLine>,
   proj: Map<string, NflProjection>,
   names: Map<string, { name: string; team: string }>,
-  david: (name: string, stat: NflStat, line: number) => { over: number; under: number; source?: "odds-api" | "david" } | null,
+  david: (name: string, stat: NflStat, line: number) => { over: number; under: number; line?: number; source?: "odds-api" | "david" } | null,
   p: NflParams,
 ): { markets: PropMarket[]; extra: { [id: string]: NflMarketExtra } } {
   const markets: PropMarket[] = [];
@@ -45,9 +49,10 @@ export function ourNflMarkets(
     const stat = DK_NFL_STAT[l.type];
     const pr = proj.get(l.athlete);
     const who = names.get(l.athlete);
-    const line = l.current.line;
-    if (!stat || !pr || !who || line === null) continue;
-    const d = l.current.over !== null && l.current.under !== null ? null : david(who.name, stat, line);
+    const espn = l.current.line;
+    if (!stat || !pr || !who || espn === null) continue;
+    const d = l.current.over !== null && l.current.under !== null ? null : david(who.name, stat, espn);
+    const line = d?.line ?? espn;
     const over = l.current.over ?? d?.over ?? -110;
     const under = l.current.under ?? d?.under ?? -110;
     const source: NflMarketExtra["price"] = l.current.over !== null ? "espn" : d ? (d.source ?? "david") : "assumed";
@@ -75,7 +80,7 @@ export function ourNflMarkets(
       side,
       lean: ch.over > ch.under ? "over" : ch.under > ch.over ? "under" : null,
     });
-    extra[id] = { over: r3(ch.over), under: r3(ch.under), median: r1(median), price: source };
+    extra[id] = { over: r3(ch.over), under: r3(ch.under), median: r1(median), price: source, ...(line !== espn ? { espnLine: espn } : {}) };
   }
   markets.sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1) || a.id.localeCompare(b.id));
   return { markets, extra };

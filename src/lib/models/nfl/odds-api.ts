@@ -95,10 +95,16 @@ export function fdProp(read: OddsRead | null | undefined, name: string, stat: Nf
   return read?.fd?.props[`${nameKey(name)}|${stat}`] ?? null;
 }
 
-/** A price for our board, only when DK's line in the read is the same number ESPN shows now. */
-export function oddsPrice(read: OddsRead | null | undefined, name: string, stat: NflStat, line: number): { over: number; under: number } | null {
+/**
+ * DK's price for our board. At ESPN's line when the read agrees; when DK's
+ * line in the read is a different number, that line and its price, so the
+ * prop is tested where DK actually priced it (Jack, 2026-10-22: 11 of 14
+ * NE@CHI props went unpriced over a half to six point gap).
+ */
+export function oddsPrice(read: OddsRead | null | undefined, name: string, stat: NflStat, line: number): { over: number; under: number; line?: number } | null {
   const p = read?.props[`${nameKey(name)}|${stat}`];
-  return p && p.line === line ? { over: p.over, under: p.under } : null;
+  if (!p) return null;
+  return p.line === line ? { over: p.over, under: p.under } : { over: p.over, under: p.under, line: p.line };
 }
 
 export interface OddsEvent {

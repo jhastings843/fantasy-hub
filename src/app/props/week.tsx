@@ -472,7 +472,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
       const x = (g as OurNflStored).extra[m.id];
       return [
         ["Our median", `${x?.median ?? m.model}`],
-        ["Price from", x?.price === "odds-api" ? "DraftKings (The Odds API)" : x?.price === "david" ? "David's board" : x?.price === "espn" ? "DraftKings (ESPN)" : "none posted yet"],
+        ["Price from", x?.price === "odds-api" ? `DraftKings (The Odds API)${x.espnLine !== undefined ? `, at its ${m.line}; ESPN showed ${x.espnLine}` : ""}` : x?.price === "david" ? "David's board" : x?.price === "espn" ? "DraftKings (ESPN)" : "none posted yet"],
         ["DK over / under", `${am(m.books[0].over ?? -110)} / ${am(m.books[0].under ?? -110)}`],
         ["FanDuel", fdNote(x?.fd, m)],
       ];
