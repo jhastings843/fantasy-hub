@@ -9,7 +9,7 @@ import { OurFirstBasketResults, OurNbaResults } from "./ournba";
 import { KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
 import WeekSearch from "../picks/WeekSearch";
-import { PageHead } from "../picks/board";
+import { Background, PageHead, SecHead } from "../picks/board";
 import { getPropsView } from "@/lib/props/store";
 import { DAVID_URL } from "@/lib/props/david";
 import { getOurNflView } from "@/lib/models/nfl/store";
@@ -105,14 +105,22 @@ export default async function PropsView({
         {shown === "log" && market !== "kotc" && <PropsLog tab={market} season={season} />}
         {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
         {market === "kotc" && shown === "results" && <KotcResults season={season} />}
-        {market === "pp" && shown === "week" && <DavidWeek season={season} />}
-        {market === "pp" && shown === "results" && (
+        {market === "pp" && shown === "results" && <OurNflResults season={season} />}
+        {/* David's board is research only (Jack, 2026-10-22): still saved and graded by the data jobs, shown folded here. */}
+        {market === "pp" && shown === "research" && (
           <>
-            <OurNflResults season={season} />
-            <DavidResults season={season} />
+            <SecHead title="David Sasser's props board" aside="Research only · tracked in the background" />
+            <Background title="This week's board">
+              <DavidWeek season={season} />
+            </Background>
+            <Background title="Results">
+              <DavidResults season={season} />
+            </Background>
+            <Background title="Research: what beats the price">
+              <DavidResearch season={season} />
+            </Background>
           </>
         )}
-        {market === "pp" && shown === "research" && <DavidResearch season={season} />}
         {market === "ftd" && shown === "results" && <OurFtdResults season={season} />}
         {market === "nba" && shown === "week" && <NbaNewsToday season={season} />}
         {market === "nba" && shown === "results" && (
