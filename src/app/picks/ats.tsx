@@ -493,7 +493,10 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
     : best.length
     ? `${st.rule ? `${st.rule.label} (${rec(st.rule.record)})${st.second ? `, plus Tier 2: ${st.second.label.toLowerCase()}` : ""}.` : ""}${early ? ` Early looks lock at 9am on game day.` : ""}`
     : "Nothing clears the rule at a price worth a stake. That's a normal week.";
-  const started = open.filter((g) => statusOf(g) === "started");
+  // A started game ESPN already calls final drops to the bottom right away, ahead of grading (up to ~3 hours later).
+  const over = (g: BoardGame) => findGame(live, r.league, g.away, g.home)?.state === "post";
+  const started = open.filter((g) => statusOf(g) === "started" && !over(g));
+  const justEnded = open.filter((g) => statusOf(g) === "started" && over(g));
   const upcoming = open.filter((g) => statusOf(g) !== "started");
   return (
     <section className={s.section} aria-labelledby="ats-week">
@@ -511,7 +514,7 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
               <span>Read</span>
               <span />
             </div>
-            {[...started, ...upcoming, ...finished].map((g) => (
+            {[...started, ...upcoming, ...justEnded, ...finished].map((g) => (
               <LedgerRow key={`${g.away}@${g.home}`} g={g} r={r} live={findGame(live, r.league, g.away, g.home)} />
             ))}
           </div>

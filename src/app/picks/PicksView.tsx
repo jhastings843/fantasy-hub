@@ -108,7 +108,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         {market === "su" && view === "week" && <SuWeek r={r} poolShares={poolShares} />}
         {market === "su" && view === "results" && <SuResults r={r} poolTrack={poolTrack} />}
         {market === "su" && view === "research" && <SuResearch r={r} />}
-        {market === "ou" && view === "week" && <TotalsWeek r={r} />}
+        {market === "ou" && view === "week" && <TotalsWeek r={r} live={live} />}
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
         {view === "log" && <PicksLog league={league} market={market} />}

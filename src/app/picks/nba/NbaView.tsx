@@ -525,8 +525,8 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
             <p className={s.p}>{samLine(b)}</p>
             <div className={s.section}>
               <ReadLegend />
-              <RowsTable rows={[...upcoming.filter(({ x }) => x.g.state === "in"), ...upcoming.filter(({ x }) => x.g.state !== "in")]} />
-              <p className={s.p}>Started games first, then by tip. Home spread throughout. Open a game for the total, moneyline and Sam&apos;s numbers.</p>
+              <RowsTable rows={[...upcoming.filter(({ x }) => x.g.state === "in"), ...upcoming.filter(({ x }) => x.g.state === "pre"), ...upcoming.filter(({ x }) => x.g.state === "post")]} />
+              <p className={s.p}>Live games first, then by tip; finished games drop to the bottom. Home spread throughout. Open a game for the total, moneyline and Sam&apos;s numbers.</p>
             </div>
             {last.length > 0 && (
               <div className={s.section}>

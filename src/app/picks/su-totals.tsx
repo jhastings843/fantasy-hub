@@ -6,6 +6,7 @@ import type { TotalsBoardGame } from "@/lib/picks/totals";
 import { kickoffEt, n, price, rec, units } from "./ui";
 import { Background, Hero, SecHead } from "./board";
 import { ReadLegend } from "./ats";
+import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
 
 // ------------------------------------------------------------- straight up
@@ -226,7 +227,7 @@ export function SuResearch({ r }: { r: PicksReport }) {
 
 // ------------------------------------------------------------------ totals
 
-export function TotalsWeek({ r }: { r: PicksReport }) {
+export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] }) {
   const t = r.totals;
   const name = (k: string) => r.names[k] ?? k;
   const order = { t1: 0, lean: 1, split: 2, one: 3, noline: 4 } as const;
@@ -268,6 +269,9 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
   );
   // Solid only once sent; sized-not-sent dashed oxblood; leans and priced-out tracked (the Ledger redesign).
   const startedOf = new Set(r.board.filter((g) => g.basis === "started" && !g.final).map((g) => `${g.away}@${g.home}`));
+  const liveOf = (g: { away: string; home: string }) => findGame(live, r.league, g.away, g.home);
+  // Over on ESPN but not graded yet: to the bottom with its score, ahead of grading.
+  const endedOf = (g: { away: string; home: string }) => startedOf.has(`${g.away}@${g.home}`) && liveOf(g)?.state === "post";
   const readOf = (g: TotalsBoardGame): { chip: [string, string]; note?: string } => {
     if (finalOf.has(`${g.away}@${g.home}`)) {
       const res = ouResult(g);
@@ -275,6 +279,7 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
       return { chip: ["Final", s.readPass], note: res && g.side ? `Lean ${res === "W" ? "hit" : res === "L" ? "missed" : "pushed"}, no stake` : undefined };
     }
     if (g.issued) return { chip: [`Totals · ${g.issued.units}u`, s.readBet], note: startedOf.has(`${g.away}@${g.home}`) ? "In progress" : `Sent at ${price(g.issued.price)}` };
+    if (endedOf(g)) return { chip: ["Final", s.readPass], note: "Grading soon" };
     if (startedOf.has(`${g.away}@${g.home}`)) return { chip: ["In progress", s.readLive] };
     if (g.stake) return { chip: ["Totals · not sent", s.readPend], note: g.held ? `Locks ${kickoffEt(g.held)}` : `${g.stake}u at ${price(g.price)}` };
     if (g.tier === "t1") return { chip: ["Close call", s.readTrack], note: `Priced out at ${price(g.price)}` };
@@ -306,16 +311,26 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
               <span>Read</span>
               <span />
             </div>
-            {[...games.filter((g) => startedOf.has(`${g.away}@${g.home}`)), ...games.filter((g) => !startedOf.has(`${g.away}@${g.home}`)), ...done].map((g) => {
+            {[...games.filter((g) => startedOf.has(`${g.away}@${g.home}`) && !endedOf(g)), ...games.filter((g) => !startedOf.has(`${g.away}@${g.home}`)), ...games.filter(endedOf), ...done].map((g) => {
               const rd = readOf(g);
               const f = finalOf.get(`${g.away}@${g.home}`);
-              const live = startedOf.has(`${g.away}@${g.home}`);
+              const lg = liveOf(g);
+              const live = startedOf.has(`${g.away}@${g.home}`) && lg?.state !== "post";
               return (
                 <details key={`${g.away}@${g.home}`} className={`${s.gRow} ${s.ledger}`}>
                   <summary>
                     <span className={s.gGame}>
                       {`${name(g.away)} at ${name(g.home)}`}
-                      {live ? <span className={s.gLive}>Live</span> : <span>{f ? `Final · ${f.home + f.away} scored` : kickoffEt(g.ref?.kickoff)}</span>}
+                      {live ? (
+                        <>
+                          <span className={s.gLive}>Live</span>
+                          {lg && <span className={s.scoreLine}>{`${lg.away.score + lg.home.score} so far · ${lg.detail}`}</span>}
+                        </>
+                      ) : lg?.state === "post" && !f ? (
+                        <span className={s.scoreLine}>{`Final · ${lg.away.score + lg.home.score} scored`}</span>
+                      ) : (
+                        <span>{f ? `Final · ${f.home + f.away} scored` : kickoffEt(g.ref?.kickoff)}</span>
+                      )}
                     </span>
                     <span className={s.gNum} data-k="Total">{g.ref?.total ?? "·"}</span>
                     <span className={s.gNum} data-k="Sam · David">
