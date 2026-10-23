@@ -258,9 +258,14 @@ function propEdges(board: (OurStoredProps | OurNflStored)[], extraMore: (g: OurS
     .sort((a, b) => b.gap - a.gap);
 }
 
-function propRows(board: (OurStoredProps | OurNflStored)[], extraCol: (g: OurStoredProps | OurNflStored, m: PropMarket) => string): GameRowData[] {
+/** `bettable` narrows Edges and Top edge to the props the edge cards would show (NBA: 3+ games this season). */
+function propRows(
+  board: (OurStoredProps | OurNflStored)[],
+  extraCol: (g: OurStoredProps | OurNflStored, m: PropMarket) => string,
+  bettable: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean = () => true,
+): GameRowData[] {
   return board.map((g) => {
-    const edges = g.game.markets.filter((m) => m.clears && m.side);
+    const edges = g.game.markets.filter((m) => m.clears && m.side && bettable(g, m));
     const net = g.result ? g.result.markets.reduce((a, r) => a + (r.play?.net ?? 0), 0) : null;
     const res = new Map((g.result?.markets ?? []).map((r) => [r.id, r]));
     const top = [...edges].sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0))[0];
@@ -428,7 +433,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
     const edges = allEdges.filter((e) => keys.has(e.key));
     const early = allEdges.length - edges.length;
     const graded = record(ourSliceBets(v.graded, "edge:all"));
-    const todayRows = propRows(tonight, noCol).map((r, i) => ({ ...r, body: <NbaGameDetail g={tonight[i]} /> }));
+    const todayRows = propRows(tonight, noCol, settled).map((r, i) => ({ ...r, body: <NbaGameDetail g={tonight[i]} /> }));
     return (
       <section className={s.section} aria-labelledby="pp-week">
         <Hero
@@ -742,10 +747,10 @@ async function FirstTdWeek({ season }: { season: number }) {
       cells: [
         ["Scores first", fav ? `${fav.team} ${pct(fav.pFirst)}` : "·"],
         ["Likeliest", g.game.pick ? `${g.game.pick.name} ${pct(g.game.pick.p)}` : "·"],
-        ["Values", g.kalshi || g.dk ? `${vals.length}` : "no prices"],
+        ["Edges", g.kalshi || g.dk ? `${vals.length}` : "no prices"],
         ["First TD", r ? (r.first.kind === "offense" ? r.first.scorer : "none") : "·"],
       ],
-      read: r ? (vals.some((p) => p.key === r.key) ? ["Hit", s.readW] : ["Missed", vals.length ? s.readL : s.readPass]) : vals.length ? ["Values", s.readBet] : ["No values", s.readPass],
+      read: r ? (vals.some((p) => p.key === r.key) ? ["Hit", s.readW] : ["Missed", vals.length ? s.readL : s.readPass]) : vals.length ? ["Edge", s.readBet] : ["No edge", s.readPass],
       body: (
         <div className={s.tw}>
           <table className={s.table}>
@@ -755,7 +760,7 @@ async function FirstTdWeek({ season }: { season: number }) {
                 <th>Ours</th>
                 <th>Kalshi cost</th>
                 <th>DraftKings</th>
-                <th>Value</th>
+                <th>Edge</th>
               </tr>
             </thead>
             <tbody>
@@ -804,9 +809,9 @@ async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>Every game</h3>
-          <p className={s.p}>Open a game for every player: our chance against Kalshi&apos;s cost (fee in) and DraftKings&apos; price, which is read the morning of game day. A value beats the cheaper of the two.</p>
+          <p className={s.p}>Open a game for every player: our chance against Kalshi&apos;s cost (fee in) and DraftKings&apos; price, which is read the morning of game day. It&apos;s an edge when our chance beats the cheaper of the two.</p>
         </div>
-        <GameTable head={["Scores first", "Likeliest", "Values", "First TD"]} rows={rows} />
+        <GameTable head={["Scores first", "Likeliest", "Edges", "First TD"]} rows={rows} />
       </div>
       <Gate learning={v.learning} label="First TD" />
     </section>

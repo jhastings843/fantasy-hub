@@ -58,7 +58,7 @@ function Card({ g }: { g: OurFtdStored }) {
                   <th>Ours</th>
                   <th>Kalshi cost</th>
                   {g.dk && <th>DK</th>}
-                  <th>Value</th>
+                  <th>Edge</th>
                 </tr>
               </thead>
               <tbody>

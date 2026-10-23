@@ -145,7 +145,7 @@ function GameRow({ g, saved }: { g: FtdGame; saved: StoredGame }) {
           </span>
           <span className={`${s.ftdOdds} ${s.num}`}>{[...sides.map((t) => `${t.team} ${p0(t.pFirst)}`), `none ${p0(g.none)}`].join(" · ")}</span>
           <span className={s.ftdFlags}>
-            {r ? <Chip hit={r.pickHit} label="Pick" /> : value > 0 ? <span className={s.pill} title="Players whose Kalshi price (with fee) is below Sam's chance">{`${value} Kalshi value`}</span> : null}
+            {r ? <Chip hit={r.pickHit} label="Pick" /> : value > 0 ? <span className={s.pill} title="Players whose Kalshi price (with fee) is below Sam's chance">{`${value} Kalshi edge${value === 1 ? "" : "s"}`}</span> : null}
             <span className={s.chev} aria-hidden>›</span>
           </span>
         </summary>
