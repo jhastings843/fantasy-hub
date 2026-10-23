@@ -1239,7 +1239,18 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
     <section className={s.section}>
       <MoneyHero list={list} />
       <div className={s.section}>
-        <h3 className={s.h2}>Every desk&apos;s chart</h3>
+        <div className={s.sectionHead}>
+          <h3 className={s.h2}>Each desk vs its yardstick</h3>
+          <p className={s.p}>Each desk against what it has to beat (oxblood bar: the desk; grey: the yardstick; for Brier scores the shorter bar wins). Open a desk for its ledger. Paper dollars and units never add together.</p>
+        </div>
+        <h4 className={s.h3}>Paper dollars</h4>
+        <DeskTable list={list.filter((d) => d.money === "usd")} />
+        <h4 className={s.h3}>Units</h4>
+        <DeskTable list={list.filter((d) => d.money === "units")} />
+      </div>
+      <details className={s.details}>
+        <summary>Every desk&apos;s chart</summary>
+        <div className={s.detailsBody}>
       <div className={m.panels}>
         {SHOW_BETS && (
           <div className={m.panel}>
@@ -1306,16 +1317,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
         )}
       </div>
       </div>
-      <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>Each desk vs its yardstick</h3>
-          <p className={s.p}>Oxblood bar: the desk. Grey bar: what it has to beat. For Brier scores the shorter bar wins. Paper dollars and units sit in separate tables and never add together.</p>
-        </div>
-        <h4 className={s.h3}>Paper dollars</h4>
-        <DeskTable list={list.filter((d) => d.money === "usd")} />
-        <h4 className={s.h3}>Units</h4>
-        <DeskTable list={list.filter((d) => d.money === "units")} />
-      </div>
+      </details>
       <MoneyLogSection entries={moneyLog(v)} />
     </section>
   );

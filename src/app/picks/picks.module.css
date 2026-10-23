@@ -563,7 +563,7 @@
 .drvHead b { font-weight: 650; }
 .drvRole { font-size: 13px; color: var(--mute); }
 .drvNote { margin: 0; font-size: 13.5px; color: var(--ink2); max-width: 75ch; }
-.lineupMore > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) 16px; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--rule); font-weight: 600; font-size: 14px; }
+.lineupMore > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 16px; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--rule); font-weight: 600; font-size: 14px; }
 .lineupMore > summary::-webkit-details-marker { display: none; }
 .lineupMore > summary .muted { font-weight: 400; font-size: 13px; justify-self: end; text-align: right; }
 .lineupMore > summary::after { content: "+"; font-family: var(--font-plex-mono), monospace; color: var(--mute); justify-self: end; }
@@ -601,3 +601,54 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .legendRow { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12.5px; color: var(--mute); }
 .legendRow > span { display: inline-flex; align-items: center; gap: 8px; }
 @media (max-width: 640px) { .slips { grid-template-columns: 1fr; } }
+
+/* Page controls as the Ledger's segmented groups (2026-10-22 rebuild): one rounded group per choice,
+   the current one filled in ink. Same markup as before (chips = sport/market, tabs = view). */
+.chips, .tabs, .sortBar { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border: 1px solid color-mix(in srgb, var(--ink2) 35%, transparent); border-radius: 22px; background: var(--surface); width: fit-content; max-width: 100%; overflow: visible; }
+.chips .chip, .sortBar .chip, .tabs .tab, .tabsSoft .tab { border: 0; min-height: 34px; padding: 6px 13px; border-radius: 999px; font-family: var(--font-plex), sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink2); background: transparent; }
+.chips .chip[aria-current="page"], .sortBar .chip[aria-pressed="true"], .tabs .tab[aria-current="page"] { background: var(--ink); color: var(--bg); border: 0; }
+.tabsSoft .tab[aria-current="page"] { background: var(--surface2); color: var(--ink); border: 0; }
+.chips .chip:hover:not([aria-current="page"]), .tabs .tab:hover:not([aria-current="page"]) { color: var(--ink); }
+.sortLabel { padding: 0 6px 0 10px; }
+.navRows { justify-content: flex-start; gap: 10px 14px; }
+.header { border-bottom-width: 2px; }
+
+/* Ledger rows (Picks boards): fixed tracks, so every row's columns line up. */
+.ledger > summary, .ledgerHead { grid-template-columns: minmax(170px, 1.6fr) minmax(96px, .8fr) minmax(130px, 1.1fr) minmax(130px, 1.1fr) 190px 16px; }
+.ledger .gNum { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.ledger .gNum small, .ledgerRead small { font-family: var(--font-plex), sans-serif; font-size: 12px; color: var(--mute); }
+.ledger .gNum small.cDavid { color: var(--david); font-family: var(--font-plex-mono), monospace; }
+.ledgerRead { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; justify-self: end; min-width: 0; }
+.liveNote { color: var(--gold) !important; }
+@media (max-width: 760px) {
+  .ledger > summary { grid-template-columns: minmax(0, 1fr) 150px 16px; }
+  .ledger > summary .ledgerRead { grid-column: 2; grid-row: 1; }
+  .ledger > summary .gNum { flex-direction: row; flex-wrap: wrap; gap: 0 8px; }
+}
+
+/* Props edge cards (the Ledger redesign): compact, dashed unless a live slice stakes it. */
+.edgeGrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.edgeCard { border: 1.5px dashed color-mix(in srgb, var(--ink2) 40%, transparent); border-radius: 10px; padding: 13px 15px; display: grid; gap: 9px; min-width: 0; align-content: start; }
+.edgeTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
+.edgeWho { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
+.edgeBet { font-size: 13.5px; color: var(--ink2); margin-top: 2px; }
+.edgeTrio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid var(--rule); padding-top: 8px; margin: 0; }
+.edgeTrio dt { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.edgeTrio dd { margin: 0; font-family: var(--font-plex-mono), monospace; font-size: 16px; font-weight: 600; }
+@media (max-width: 640px) { .edgeGrid { grid-template-columns: 1fr; } }
+
+/* Cut comparisons (CutRanges) */
+.cutList { display: grid; }
+.cutRow { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) 110px; gap: 14px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.cutName b { font-weight: 650; font-size: 14px; display: block; }
+.cutName small { font-size: 12px; color: var(--mute); }
+.range { position: relative; height: 22px; }
+.rangeAxis { position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--surface2); }
+.rangeBand { position: absolute; top: 5px; height: 12px; border-radius: 3px; background: var(--surface2); border: 1px solid color-mix(in srgb, var(--ink2) 45%, transparent); }
+.rangeBand.cutGood { background: color-mix(in srgb, var(--pos) 22%, transparent); border-color: var(--pos); }
+.rangeBand.cutBad { background: color-mix(in srgb, var(--neg) 22%, transparent); border-color: var(--neg); }
+.rangeBe { position: absolute; top: 0; height: 22px; border-left: 1.5px dashed var(--ink2); }
+.rangeDot { position: absolute; top: 6px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink); }
+.cutStat { text-align: right; font-family: var(--font-plex-mono), monospace; font-size: 13px; display: flex; flex-direction: column; }
+.cutStat small { font-size: 11.5px; color: var(--mute); }
+@media (max-width: 640px) { .cutRow { grid-template-columns: minmax(0, 1fr) 90px; } .cutRow .range { grid-column: 1 / -1; grid-row: 2; } }

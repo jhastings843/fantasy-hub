@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Trophy } from "lucide-react";
-import { FantasyTabs, SectionTabs } from "@/components/SiteNav";
+import { FantasyTabs, HobbyTabs, SectionTabs } from "@/components/SiteNav";
 import "./globals.css";
 
 // The Picks ledger faces, site wide since 2026-10-19 (see ledger-look.css).
@@ -116,6 +116,7 @@ export default function RootLayout({
       <body className="relative flex min-h-full flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
         <SiteHeader />
         <FantasyTabs />
+        <HobbyTabs />
         <div className="flex-1">{children}</div>
         <SiteFooter />
       </body>

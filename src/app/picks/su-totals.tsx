@@ -4,7 +4,8 @@ import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
 import { kickoffEt, n, price, rec, units } from "./ui";
-import { Background, Hero, MarketKey, MarketLine } from "./board";
+import { Background, Hero } from "./board";
+import { ReadLegend } from "./ats";
 import s from "./picks.module.css";
 
 // ------------------------------------------------------------- straight up
@@ -30,8 +31,6 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
   const doneW = done.filter((x) => won(x) === "W").length;
   const band = (margin: number) => marginBand(r.league, margin);
   const bandCls = (m: number) => (band(m) === "wide" ? s.readTrack : band(m) === "clear" ? "" : s.readPass);
-  const surest = upcoming.slice(0, 4);
-  const rest = upcoming.slice(surest.length);
   return (
     <section className={s.section} aria-labelledby="su-week">
       <Hero
@@ -39,54 +38,34 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
         title={<span id="su-week">{upcoming.length ? "Who wins, most sure first" : done.length ? "Every game played" : "No games on the board yet"}</span>}
         sub={`${r.league === "nfl" ? "For the Weekly payout pool use the entry above; this list is for a confidence pool. " : ""}Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l} this season)` : ""}. Pick'em only: no stake.`}
       />
-      {surest.length > 0 && (
-        <ul className={s.betGrid} data-first-pick>
-          {surest.map(({ g, side, margin }, i) => {
-            const pick = side === "home" ? g.home : g.away;
-            const opp = side === "home" ? g.away : g.home;
-            const market = g.ref?.line;
-            return (
-              <li key={`${g.away}@${g.home}`} className={s.betCard}>
-                <div className={s.betCardTop}>
-                  <div>
-                    <div className={s.betPickBig}>{`${i + 1}. ${name(pick)}`}</div>
-                    <div className={s.betWhen}>{`over ${name(opp)} · ${kickoffEt(g.ref?.kickoff)}`}</div>
-                  </div>
-                  <span className={s.lockChip}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
-                </div>
-                {market !== undefined && (
-                  <MarketLine market={market} sam={g.sam?.model} david={g.david?.model} fmt={(x) => `${name(g.home)} ${x > 0 ? "+" : ""}${Math.round(x * 10) / 10}`} pk={{ below: name(g.home), above: name(g.away) }} />
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {surest.length > 0 && <MarketKey />}
-      {rest.length > 0 && (
+      {upcoming.length > 0 ? (
         <div className={s.section}>
-          <h3 className={s.h2}>{`The rest, ranked ${surest.length + 1} to ${upcoming.length}`}</h3>
-          <div className={s.gtable}>
-            {rest.map(({ g, side, margin }, j) => {
-              const i = j + surest.length;
+          <div className={s.gtable} data-first-pick>
+            {upcoming.map(({ g, side, margin }, i) => {
+              const pick = side === "home" ? g.home : g.away;
+              const share = poolShares ? poolShares.shares[POOL_CANON[pick.toUpperCase()] ?? pick.toUpperCase()] : undefined;
+              const live = g.basis === "started";
               return (
-              <div key={`${g.away}@${g.home}`} className={s.gRow}>
-                <div className={s.suLine}>
-                  <span className={`${s.num} ${s.rank}`}>{i + 1}</span>
-                  <span className={s.gGame}>
-                    {name(side === "home" ? g.home : g.away)}
-                    <span>{`over ${name(side === "home" ? g.away : g.home)} · ${kickoffEt(g.ref?.kickoff)}${
-                      g.sam && g.david && Math.sign(g.sam.model) !== Math.sign(g.david.model) ? ` · split: Sam ${name(g.sam.model < 0 ? g.home : g.away)}, David ${name(g.david.model < 0 ? g.home : g.away)}` : ""
-                    }`}</span>
-                  </span>
-                  <span className={`${s.readChip} ${bandCls(margin)}`}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
+                <div key={`${g.away}@${g.home}`} className={s.gRow}>
+                  <div className={s.suLine}>
+                    <span className={`${s.num} ${s.rank}`}>{i + 1}</span>
+                    <span className={s.gGame}>
+                      {name(pick)}
+                      {live && <span className={s.gLive}>Live</span>}
+                      <span>{`over ${name(side === "home" ? g.away : g.home)}${live ? "" : ` · ${kickoffEt(g.ref?.kickoff)}`}${
+                        g.sam && g.david && Math.sign(g.sam.model) !== Math.sign(g.david.model) ? ` · split: Sam ${name(g.sam.model < 0 ? g.home : g.away)}, David ${name(g.david.model < 0 ? g.home : g.away)}` : ""
+                      }${share !== undefined ? ` · ${Math.round(share * 100)}% of the pool on ${name(pick)}` : ""}`}</span>
+                    </span>
+                    <span className={`${s.readChip} ${bandCls(margin)}`}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
+                  </div>
                 </div>
-              </div>
               );
             })}
           </div>
-          <p className={s.thin}>1 is the surest. In a confidence pool give it the most points. Bands describe the projected margin, not a probability.</p>
+          <p className={s.thin}>1 is the surest: in a confidence pool give it the most points. The chip is the projected margin band, not a probability. Pick&apos;em only, never staked.</p>
         </div>
+      ) : (
+        !done.length && <p className={s.calm}>No games on the board yet.</p>
       )}
       {done.length > 0 && (
         <div className={s.finished}>
@@ -260,7 +239,6 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
     return pts === at ? "P" : (pts > at) === (g.side === "over") ? "W" : "L";
   };
   const bets = games.filter((g) => g.stake);
-  const leans = games.filter((g) => !g.stake && (g.tier === "t1" || g.tier === "lean"));
   const ou = (x?: string) => (x === "over" ? "Over" : "Under");
   const why = (g: TotalsBoardGame) => (
     <dl className={s.kv}>
@@ -284,17 +262,22 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
       ) : null}
     </dl>
   );
-  const readOf = (g: TotalsBoardGame): [string, string] => {
+  // Solid only once sent; sized-not-sent dashed oxblood; leans and priced-out tracked (the Ledger redesign).
+  const startedOf = new Set(r.board.filter((g) => g.basis === "started" && !g.final).map((g) => `${g.away}@${g.home}`));
+  const readOf = (g: TotalsBoardGame): { chip: [string, string]; note?: string } => {
     if (finalOf.has(`${g.away}@${g.home}`)) {
       const res = ouResult(g);
-      return res ? [res === "W" ? "Won" : res === "L" ? "Lost" : "Push", res === "W" ? s.readW : res === "L" ? s.readL : ""] : ["Final", s.readPass];
+      if (g.issued && res) return { chip: [res === "W" ? "Won" : res === "L" ? "Lost" : "Push", res === "W" ? s.readW : res === "L" ? s.readL : ""], note: `Totals · ${g.issued.units}u` };
+      return { chip: ["Final", s.readPass], note: res && g.side ? `Lean ${res === "W" ? "hit" : res === "L" ? "missed" : "pushed"}, no stake` : undefined };
     }
-    if (g.stake) return ["Bet", s.readBet];
-    if (g.tier === "t1") return ["Priced out", ""];
-    if (g.tier === "lean") return [`Lean ${ou(g.side).toLowerCase()}`, ""];
-    if (g.tier === "split") return ["Split", s.readPass];
-    if (g.tier === "one") return ["One model", s.readPass];
-    return ["No line", s.readPass];
+    if (g.issued) return { chip: [`Totals · ${g.issued.units}u`, s.readBet], note: startedOf.has(`${g.away}@${g.home}`) ? "In progress" : `Sent at ${price(g.issued.price)}` };
+    if (startedOf.has(`${g.away}@${g.home}`)) return { chip: ["In progress", s.readLive] };
+    if (g.stake) return { chip: ["Totals · not sent", s.readPend], note: g.held ? `Locks ${kickoffEt(g.held)}` : `${g.stake}u at ${price(g.price)}` };
+    if (g.tier === "t1") return { chip: ["Close call", s.readTrack], note: `Priced out at ${price(g.price)}` };
+    if (g.tier === "lean") return { chip: [`Lean ${ou(g.side).toLowerCase()} · no stake`, s.readTrack] };
+    if (g.tier === "split") return { chip: ["Split", s.readPass] };
+    if (g.tier === "one") return { chip: ["One model", s.readPass] };
+    return { chip: ["No line", s.readPass] };
   };
   const title = bets.length ? `${bets.length} totals bet${bets.length === 1 ? "" : "s"} this week` : t.backtest.rule ? "No totals bets this week" : "Totals are tracking only";
   return (
@@ -308,90 +291,42 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
             : `No totals cut has 10+ decided games and a winning rate yet, so nothing here is a bet. ${t.backtest.archived} archived games graded so far.`
         }
       />
-      {bets.length > 0 && (
-        <ul className={s.betGrid} data-first-pick>
-          {bets.map((g) => (
-            <li key={`${g.away}@${g.home}`} className={s.betCard}>
-              <div className={s.betCardTop}>
-                <div>
-                  <div className={s.betPickBig}>{`${ou(g.side)} ${g.ref?.total ?? ""}`}</div>
-                  <div className={s.betWhen}>{`${name(g.away)} at ${name(g.home)} · ${kickoffEt(g.ref?.kickoff)}`}</div>
-                </div>
-                <span className={s.lockChip}>{g.held ? `Locks ${kickoffEt(g.held)}` : "Bet"}</span>
-              </div>
-              {g.ref && <MarketLine market={g.ref.total} sam={g.sam} david={g.david} fmt={(x) => `${Math.round(x * 10) / 10}`} />}
-              <dl className={s.facts}>
-                <div>
-                  <dt>Models vs market</dt>
-                  <dd>{g.read ? `${g.read.avgEdge.toFixed(1)} pts` : "·"}</dd>
-                </div>
-                <div>
-                  <dt>Price</dt>
-                  <dd>{price(g.price)}</dd>
-                </div>
-                <div>
-                  <dt>Stake</dt>
-                  <dd>{`${g.stake}u`}</dd>
-                </div>
-              </dl>
-              <details className={s.why}>
-                <summary>Why this bet</summary>
-                {why(g)}
-              </details>
-            </li>
-          ))}
-        </ul>
-      )}
-      {leans.length > 0 && (
+      {all.length > 0 ? (
         <div className={s.section}>
-          <div className={s.sectionHead}>
-            <h3 className={s.h2}>Both models lean</h3>
-            <p className={s.p}>{bets.length ? "Same side from both models, no bet at this price." : "Same side from both models. Tracked, not bet, until a totals cut earns a rule."}</p>
-          </div>
-          <ul className={s.closeGrid} data-first-pick={bets.length ? undefined : true}>
-            {leans.map((g) => (
-              <li key={`${g.away}@${g.home}`} className={s.closeCard}>
-                <span className={s.closePick}>
-                  {`${ou(g.side)} ${g.ref?.total ?? ""} `}
-                  <span>{`${name(g.away)} at ${name(g.home)} · ${kickoffEt(g.ref?.kickoff)}`}</span>
-                </span>
-                <span className={`${s.num} ${s.statK}`}>{`Sam ${g.sam?.toFixed(1) ?? "·"} · David ${g.david?.toFixed(1) ?? "·"}`}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {all.length > 0 && (
-        <div className={s.section}>
-          <div className={s.sectionHead}>
-            <h3 className={s.h2}>Market vs models</h3>
-            <p className={s.p}>Every game&apos;s total. Open a game for the numbers behind it.</p>
-          </div>
+          <ReadLegend />
           <div className={s.gtable}>
-            <div className={s.gHead} aria-hidden>
+            <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
               <span>Game</span>
-              <span>Market</span>
-              <span>Sam</span>
-              <span>David</span>
-              <span>Gap</span>
+              <span>Total</span>
+              <span>Sam · David</span>
+              <span>Lean</span>
               <span>Read</span>
               <span />
             </div>
-            {[...games, ...done].map((g) => {
+            {[...games.filter((g) => startedOf.has(`${g.away}@${g.home}`)), ...games.filter((g) => !startedOf.has(`${g.away}@${g.home}`)), ...done].map((g) => {
               const rd = readOf(g);
               const f = finalOf.get(`${g.away}@${g.home}`);
+              const live = startedOf.has(`${g.away}@${g.home}`);
               return (
-                <details key={`${g.away}@${g.home}`} className={s.gRow}>
+                <details key={`${g.away}@${g.home}`} className={`${s.gRow} ${s.ledger}`}>
                   <summary>
                     <span className={s.gGame}>
                       {`${name(g.away)} at ${name(g.home)}`}
-                      <span>{f ? `${f.home + f.away} scored` : kickoffEt(g.ref?.kickoff)}</span>
+                      {live ? <span className={s.gLive}>Live</span> : <span>{f ? `Final · ${f.home + f.away} scored` : kickoffEt(g.ref?.kickoff)}</span>}
                     </span>
-                    <span className={s.gNum} data-k="Market">{g.ref?.total ?? "·"}</span>
-                    <span className={`${s.gNum} ${s.cSam}`} data-k="Sam">{g.sam !== undefined ? g.sam.toFixed(1) : "·"}</span>
-                    <span className={`${s.gNum} ${s.cDavid}`} data-k="David">{g.david !== undefined ? g.david.toFixed(1) : "·"}</span>
-                    <span className={s.gNum} data-k="Gap">{g.read ? g.read.avgEdge.toFixed(1) : "·"}</span>
-                    <span className={`${s.readChip} ${rd[1]}`}>{rd[0]}</span>
+                    <span className={s.gNum} data-k="Total">{g.ref?.total ?? "·"}</span>
+                    <span className={s.gNum} data-k="Sam · David">
+                      <span className={s.cSam}>{g.sam !== undefined ? g.sam.toFixed(1) : "·"}</span>
+                      <small className={s.cDavid}>{g.david !== undefined ? g.david.toFixed(1) : "·"}</small>
+                    </span>
+                    <span className={s.gNum} data-k="Lean">
+                      {g.side && g.ref ? `${ou(g.side)} ${g.ref.total}` : "None"}
+                      {g.read && <small>{`${g.read.avgEdge.toFixed(1)} off`}</small>}
+                    </span>
+                    <span className={s.ledgerRead}>
+                      <span className={`${s.readChip} ${rd.chip[1]}`}>{rd.chip[0]}</span>
+                      {rd.note && <small>{rd.note}</small>}
+                    </span>
                     <span className={s.chev} aria-hidden>
                       ›
                     </span>
@@ -401,9 +336,12 @@ export function TotalsWeek({ r }: { r: PicksReport }) {
               );
             })}
           </div>
+          <p className={s.p}>{`Started games first, then the strongest reads. ${bets.length ? "" : "Tracked, not bet, until a totals cut earns a rule."}`}</p>
         </div>
+      ) : (
+        <p className={s.calm} data-first-pick>No totals on the board yet.</p>
       )}
-      {bets.length === 0 && leans.length === 0 && <p className={s.calm} data-first-pick>No totals bets this week.</p>}
+
       <Background>
         <p className={s.p}>Totals history only exists from our own archive (neither site keeps it), so the record grows a game at a time. The cuts and the tiebreak check are on Research.</p>
       </Background>

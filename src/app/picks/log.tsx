@@ -4,10 +4,11 @@
 import type { League } from "@/lib/picks/parse";
 import { redisStore } from "@/lib/picks/learning/store";
 import type { JournalEntry } from "@/lib/picks/learning/review";
-import { Background, GoLiveSteps, Hero, LearnerLog, TrackingProgress, type LogEntry } from "./board";
+import { Background, CutRanges, Hero, LearnerLog, TrackingProgress, type CutRow, type LogEntry } from "./board";
+import { getPicksReport } from "@/lib/picks/report";
 import { CRITERIA } from "@/lib/picks/learning/model";
-import { LearningPanel, OTHER, VERDICT, leagueOf, marketOf } from "./learning";
-import { whenEt, type Market } from "./ui";
+import { LearningPanel, OTHER, leagueOf, marketOf } from "./learning";
+import { LEAGUE_NAME, whenEt, type Market } from "./ui";
 import s from "./picks.module.css";
 
 const KIND: { [k in JournalEntry["kind"]]?: LogEntry["kind"] } = {
@@ -31,8 +32,20 @@ const AGAINST: { [m in Market]: string } = {
 /** A journal line belongs to a market when its words say so; spreads takes the rest. */
 const mentions = (m: Market, t: string) => (m === "ou" ? /total|over|under/i.test(t) : m === "su" ? /straight|winner|su:/i.test(t) : !/total|straight up/i.test(t));
 
+/** What a market's ideas are measured against, in a few words (the hero line). */
+const AGAINST_SHORT: { [m in Market]: string } = { ats: "the rule in force", su: "the method in force", ou: "plain both-agree" };
+
 export async function PicksLog({ league, market }: { league: League; market: Market }) {
-  const [journal, state] = await Promise.all([redisStore.journal(60).catch(() => []), redisStore.state().catch(() => null)]);
+  const [journal, state, report] = await Promise.all([redisStore.journal(60).catch(() => []), redisStore.state().catch(() => null), getPicksReport(league).catch(() => null)]);
+  const rep = report?.value ?? null;
+  // Every cut this market tracks, from the same report the board reads; straight up has no price, so no break-even.
+  const cuts: CutRow[] = !rep
+    ? []
+    : market === "ats"
+      ? rep.strategies.cuts.filter((c) => c.record.w + c.record.l > 0).map((c) => ({ label: c.label, w: c.record.w, l: c.record.l, p: c.record.p, be: 0.524 }))
+      : market === "ou"
+        ? rep.totals.backtest.cuts.filter((c) => c.record.w + c.record.l > 0).map((c) => ({ label: c.label, w: c.record.w, l: c.record.l, p: c.record.p, be: 0.524 }))
+        : [...rep.su.methods, ...rep.su.bands].filter((m) => m.w + m.l > 0).map((m) => ({ label: m.label, w: m.w, l: m.l }));
   const ideas = (state?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && marketOf(d.id) === market);
   const entries: LogEntry[] = journal.flatMap((j) => {
     const text = `${j.title} ${j.why}`;
@@ -45,9 +58,8 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
       <Hero
         eyebrow="What changed, and why"
         title={<span id="picks-log">Learner log</span>}
-        sub="Every idea is tested on games after it was first tracked. It goes live only when it clears the bar, and comes back off if it starts losing."
+        sub={`Every idea counts only games after it was first tracked. It goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with a clear edge over ${AGAINST_SHORT[market]}, and comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "Tuesday 7am ET"}.`}
       />
-      <GoLiveSteps games="30+ games over 3+ weeks, judged on games it saw after registering." />
       <TrackingProgress
         rows={ideas
           .filter((d) => d.verdict !== "reject")
@@ -73,32 +85,14 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
         empty={`${MARKET_NAME[market]} ideas register at the next Tuesday review.`}
       />
       <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>{`What ${MARKET_NAME[market].toLowerCase()} is testing`}</h3>
-          <p className={s.p}>{AGAINST[market]}</p>
-        </div>
-        {ideas.length ? (
-          <ol className={s.log}>
-            {ideas.map((d) => (
-              <li key={d.id} className={s.logRow}>
-                <span className={s.logWhen}>{d.id.startsWith("both:") ? `Shared with ${OTHER[league]}` : MARKET_NAME[market]}</span>
-                <span className={`${s.logKind} ${d.id === state?.activatedFrom ? s.kLive : d.verdict === "reject" ? s.kBack : ""}`}>{VERDICT[d.verdict] ?? d.verdict}</span>
-                <span className={s.logText}>
-                  <b>{d.label}</b>
-                  <span>{d.why}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className={s.calm}>{`${MARKET_NAME[market]} ideas register at the next Tuesday review; from then on only later games count toward them.`}</p>
-        )}
-      </div>
-      <div className={s.section}>
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the next Tuesday review." />
       </div>
-      <p className={s.p}>{`Next review: ${state ? whenEt(state.nextReviewAt) : "Tuesday 7am ET"}.`}</p>
+      <div className={s.section}>
+        <h3 className={s.h2}>Cut comparisons</h3>
+        <p className={s.p}>{AGAINST[market]}</p>
+        <CutRanges title={`${LEAGUE_NAME[league]} ${MARKET_NAME[market].toLowerCase()}`} rows={cuts} open />
+      </div>
       <Background title="Review details: stake sizing, every idea being tested, scheduler health">
         <LearningPanel league={league} market={market} />
       </Background>

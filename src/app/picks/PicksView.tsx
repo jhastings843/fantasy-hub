@@ -84,7 +84,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
               </Link>
             ))}
           </nav>
-          <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />
+          {view !== "week" && <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />}
           {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
           {r.board.length > 0 && view === "week" && (
@@ -107,6 +107,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
         {view === "log" && <PicksLog league={league} market={market} />}
+        {view === "week" && <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />}
 
         <Background title="Budget and exposure">
           <RiskStrip r={r} coreStale={fresh?.stale ?? false} coreAt={fresh?.at ?? r.generatedAt} />

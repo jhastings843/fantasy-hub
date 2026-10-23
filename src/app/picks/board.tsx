@@ -269,6 +269,74 @@ export function ModelLineup({ title, aside, models }: { title: string; aside: st
   );
 }
 
+/** 90% Wilson range for a win rate. */
+function wilson(w: number, n: number, z = 1.645): [number, number] {
+  if (!n) return [0, 0];
+  const p = w / n;
+  const d = 1 + (z * z) / n;
+  const c = p + (z * z) / (2 * n);
+  const r = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+  return [(c - r) / d, (c + r) / d];
+}
+
+export interface CutRow {
+  label: string;
+  w: number;
+  l: number;
+  p?: number;
+  /** Break-even win rate at the price graded (0.524 at -110); omitted for mixed long prices. */
+  be?: number;
+  units?: number;
+  note?: string;
+}
+
+/**
+ * Cut comparisons, folded (the Ledger redesign): each cut's win rate on a 0-100% bar, its 90% range as
+ * a band, and the break-even tick. A band wholly right of the tick is the evidence a cut needs.
+ */
+export function CutRanges({ title, aside, rows, open }: { title: string; aside?: string; rows: CutRow[]; open?: boolean }) {
+  const pc = (x: number) => `${(x * 100).toFixed(1)}%`;
+  return (
+    <details className={s.lineupMore} open={open}>
+      <summary>
+        <span>{title}</span>
+        <span className={s.muted}>{aside ?? (rows.length ? `${rows.length} cuts · win rate, 90% range, break-even` : "No graded games yet")}</span>
+      </summary>
+      {rows.length ? (
+        <div className={s.cutList}>
+          {rows.map((c) => {
+            const n = c.w + c.l;
+            const [lo, hi] = wilson(c.w, n);
+            const rate = n ? c.w / n : 0;
+            const tone = c.be === undefined ? "" : hi < c.be ? s.cutBad : lo > c.be ? s.cutGood : "";
+            return (
+              <div key={c.label} className={s.cutRow}>
+                <div className={s.cutName}>
+                  <b>{c.label}</b>
+                  <small className={s.num}>{`${c.w}-${c.l}${c.p ? `-${c.p}` : ""}${n ? ` · range ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%` : ""}`}</small>
+                </div>
+                <div className={s.range} role="img" aria-label={`Win rate ${pc(rate)}, 90% range ${pc(lo)} to ${pc(hi)}${c.be !== undefined ? `, break-even ${pc(c.be)}` : ""}`}>
+                  <span className={s.rangeAxis} />
+                  {n > 0 && <span className={`${s.rangeBand} ${tone}`} style={{ left: pc(lo), width: pc(hi - lo) }} />}
+                  {c.be !== undefined && <span className={s.rangeBe} style={{ left: pc(c.be) }} />}
+                  {n > 0 && <span className={s.rangeDot} style={{ left: pc(rate) }} />}
+                </div>
+                <div className={s.cutStat}>
+                  <span className={c.be === undefined ? "" : rate >= c.be ? s.pos : s.neg}>{n ? pc(rate) : "·"}</span>
+                  <small>{c.units !== undefined ? `${c.units >= 0 ? "+" : "−"}${Math.abs(c.units).toFixed(1)}u` : c.be !== undefined ? `break-even ${pc(c.be)}` : ""}</small>
+                </div>
+              </div>
+            );
+          })}
+          <p className={s.thin}>The bar runs 0 to 100%. The band is the 90% range for the true win rate, the dot is the record so far, the dashed tick is break-even. A band wholly right of the tick is the evidence a cut needs.</p>
+        </div>
+      ) : (
+        <p className={s.calm}>Cut comparisons start once the first games are graded.</p>
+      )}
+    </details>
+  );
+}
+
 /** One model or slice the learner is tracking, with how far it is toward its gate. */
 export interface TrackRow {
   id: string;

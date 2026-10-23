@@ -56,6 +56,8 @@ interface Edge {
   line?: { at: number; ours: number; david?: number; fmt: (x: number) => string };
   more: [string, string][];
   result?: { won: boolean | null; text: string };
+  /** A live learner slice bets this one: the card shows a stake, not "tracked". */
+  staked?: boolean;
 }
 
 interface GameRowData {
@@ -96,26 +98,31 @@ function PropLine({ line }: { line: NonNullable<Edge["line"]> }) {
   );
 }
 
+/**
+ * One tracked edge, compact (the Ledger redesign): who, the bet, ours vs the
+ * market vs the edge. Dashed because an edge is tracked, never a stake, unless
+ * the read says a live slice bet it.
+ */
 function EdgeCard({ e }: { e: Edge }) {
   return (
-    <li className={s.betCard}>
-      <div className={s.betCardTop}>
-        <div style={{ minWidth: 0 }}>
-          <div className={s.betPickBig} style={{ fontSize: "clamp(28px, 4vw, 36px)" }}>
-            {e.player}
-          </div>
-          <div className={s.betWhen}>{`${e.bet} · ${e.game}${e.when ? ` · ${whenEt(e.when)}` : ""}`}</div>
-        </div>
+    <li className={s.edgeCard}>
+      <div className={s.edgeTop}>
         {e.result ? (
           <span className={`${s.readChip} ${e.result.won === true ? s.readW : e.result.won === false ? s.readL : ""}`}>{e.result.text}</span>
+        ) : e.staked ? (
+          <span className={`${s.readChip} ${s.readBet}`}>Bet · live slice</span>
         ) : (
-          <span className={s.lockChip}>{`Edge +${(e.gap * 100).toFixed(1)}`}</span>
+          <span className={`${s.readChip} ${s.readTrack}`}>Tracked · no stake</span>
         )}
+        <span className={s.muted}>{e.when ? whenEt(e.when) : ""}</span>
       </div>
-      {e.line && <PropLine line={e.line} />}
-      <dl className={s.facts}>
+      <div>
+        <div className={s.edgeWho}>{e.player}</div>
+        <div className={s.edgeBet}>{`${e.bet} · ${e.price} · ${e.game}`}</div>
+      </div>
+      <dl className={s.edgeTrio}>
         <div>
-          <dt>Our chance</dt>
+          <dt>Ours</dt>
           <dd>{pct(e.ours)}</dd>
         </div>
         <div>
@@ -123,13 +130,14 @@ function EdgeCard({ e }: { e: Edge }) {
           <dd>{pct(e.mkt)}</dd>
         </div>
         <div>
-          <dt>Price</dt>
-          <dd>{e.price}</dd>
+          <dt>Edge</dt>
+          <dd className={s.pos}>{`+${(e.gap * 100).toFixed(1)}`}</dd>
         </div>
       </dl>
-      {e.more.length > 0 && (
+      {(e.line || e.more.length > 0) && (
         <details className={s.why}>
           <summary>Every number</summary>
+          {e.line && <PropLine line={e.line} />}
           <dl className={s.kv}>
             {e.more.map(([k, v]) => (
               <div key={k} style={{ display: "contents" }}>
@@ -443,7 +451,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
         />
         <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=nba&v=log" unit={early ? `${early} more wait on 3 games` : "on games still to play"} />
         {edges.length > 0 && (
-          <ul className={s.betGrid} data-first-pick>
+          <ul className={s.edgeGrid} data-first-pick>
             {edges.slice(0, TOP).map((e) => (
               <EdgeCard key={e.key} e={e} />
             ))}
@@ -504,25 +512,12 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
       <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?v=log" unit="on games still to play" />
       {edges.length > 0 && (
         <>
-          <ul className={s.betGrid} data-first-pick>
+          <ul className={s.edgeGrid} data-first-pick>
             {edges.slice(0, TOP).map((e) => (
               <EdgeCard key={e.key} e={e} />
             ))}
           </ul>
-          <div className={s.mKey}>
-            <span>
-              <i className="tick" style={{ width: 2, height: 12, borderRadius: 0, background: "var(--ink)" }} />
-              DraftKings line
-            </span>
-            <span>
-              <i style={{ background: "var(--accent)" }} />
-              Ours (median)
-            </span>
-            <span>
-              <i style={{ background: "var(--david)" }} />
-              David
-            </span>
-          </div>
+          <p className={s.thin}>Every edge here is tracked with no stake until a slice goes live. Open &quot;Every number&quot; for the line chart: DraftKings&apos; line (tick), ours (oxblood), David (amber).</p>
         </>
       )}
       <div className={s.section}>
@@ -629,7 +624,7 @@ async function FirstBasketWeek({ season }: { season: number }) {
       />
       <PropStats edges={edges.length} graded={graded} learning={v.fb.learning} logHref="/props?m=fb&v=log" unit="on games still to play" />
       {edges.length > 0 && (
-        <ul className={s.betGrid} data-first-pick>
+        <ul className={s.edgeGrid} data-first-pick>
           {edges.slice(0, TOP).map((e) => (
             <EdgeCard key={e.key} e={e} />
           ))}
@@ -700,6 +695,11 @@ async function FirstTdWeek({ season }: { season: number }) {
     return opts.sort((a, b) => a.cost - b.cost)[0] ?? null;
   };
   const cost = (g: OurFtdStored, name: string) => best(g, name)?.cost ?? null;
+  // A bet is a player in a learner slice that has gone live, at Kalshi's cost (the learner grades on Kalshi). An edge alone is not a bet: most games have a few.
+  // Only games that kicked off after a slice went live: an earlier game was never bet, whatever the slice says now.
+  const since = new Map(v.learning.entries.filter((e) => e.status === "active" && e.activatedAt).map((e) => [e.id, e.activatedAt!]));
+  const keepsFor = (kickoff: string | undefined) =>
+    OUR_FTD_SLICES.filter(([id]) => since.has(id) && !!kickoff && Date.parse(kickoff) >= Date.parse(since.get(id)!)).map(([, , keep]) => keep);
   const edges: Edge[] = ahead
     .flatMap((g) =>
       pricedPlayers(g.game).flatMap((p): Edge[] => {
@@ -709,8 +709,10 @@ async function FirstTdWeek({ season }: { season: number }) {
         const team = g.game.teams.find((t) => t.team === p.team)!;
         const k = kalshi(g, p.name);
         const d = dkPrice(g, p.name);
+        const staked = k !== null && keepsFor(g.kickoff).some((keep) => keep(p, k, g.game));
         return [
           {
+            staked,
             key: `${g.game.slug}|${p.key}`,
             player: p.name,
             game: `${g.game.away} at ${g.game.home}`,
@@ -735,11 +737,6 @@ async function FirstTdWeek({ season }: { season: number }) {
     )
     .sort((a, b) => b.gap - a.gap);
   const graded = ftdKalshiRecord(v.graded);
-  // A bet is a player in a learner slice that has gone live, at Kalshi's cost (the learner grades on Kalshi). An edge alone is not a bet: most games have a few.
-  // Only games that kicked off after a slice went live: an earlier game was never bet, whatever the slice says now.
-  const since = new Map(v.learning.entries.filter((e) => e.status === "active" && e.activatedAt).map((e) => [e.id, e.activatedAt!]));
-  const keepsFor = (kickoff: string | undefined) =>
-    OUR_FTD_SLICES.filter(([id]) => since.has(id) && !!kickoff && Date.parse(kickoff) >= Date.parse(since.get(id)!)).map(([, , keep]) => keep);
   const rows: GameRowData[] = v.board.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
     const keeps = keepsFor(g.kickoff);
@@ -814,7 +811,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       />
       <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=ftd&v=log" unit="on games still to play" />
       {edges.length > 0 && (
-        <ul className={s.betGrid} data-first-pick>
+        <ul className={s.edgeGrid} data-first-pick>
           {edges.slice(0, TOP).map((e) => (
             <EdgeCard key={e.key} e={e} />
           ))}

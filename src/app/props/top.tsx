@@ -10,8 +10,8 @@ import { getOurFtdView, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
-import { GoLiveSteps, Hero, LearnerLog, ModelLineup, TrackingProgress, engineEntry, type LogEntry, type ModelRow } from "../picks/board";
-import { LearningBlock, trackRows } from "./learning";
+import { CutRanges, Hero, LearnerLog, ModelLineup, TrackingProgress, engineEntry, type LogEntry, type ModelRow } from "../picks/board";
+import { trackRows } from "./learning";
 import s from "../picks/picks.module.css";
 
 const TOP = 4;
@@ -265,9 +265,8 @@ export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "f
       <Hero
         eyebrow={`${want} · what changed, and why`}
         title={<span id="props-log">Learner log</span>}
-        sub="Every slice is tracked from the day it was first seen, on later games only. It goes live when it clears its gate and is rolled back if it starts losing."
+        sub={`Every slice is tracked from the day it was first seen, on later games only. It goes live at ${tab === "pp" || tab === "nba" ? "30+ games over 3+ weeks and 100+ bets" : "60+ games over 4+ weeks and 12+ winners (long prices)"} with a clear edge, and is rolled back if it starts losing.`}
       />
-      <GoLiveSteps games={tab === "pp" || tab === "nba" ? "30+ games over 3+ weeks and 100+ bets." : "60+ games over 4+ weeks and 12+ winners (long prices)."} />
       <TrackingProgress
         rows={items.flatMap((p) => trackRows(p.learning, items.length > 1 ? `${p.name}: ` : ""))}
         sub="Each one counts only games after it was first tracked, and bets for real once it clears its gate."
@@ -277,12 +276,20 @@ export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "f
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={[...entries, ...reviews].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20)} empty="Nothing recorded yet. Each section's first review runs at its next data pull." />
       </div>
-      {items.map((p) => (
-        <div key={p.name} className={s.section}>
-          <h3 className={s.h2}>{`What ${p.name} is testing`}</h3>
-          <LearningBlock v={p.learning} />
-        </div>
-      ))}
+      <div className={s.section}>
+        <h3 className={s.h2}>Cut comparisons</h3>
+        <p className={s.p}>Every slice&apos;s tracked bets since it was first seen, at the saved prices. Long-price markets (first TD, first basket) show units instead of a break-even line.</p>
+        {items.map((p, i) => (
+          <CutRanges
+            key={p.name}
+            title={p.name}
+            open={i === 0}
+            rows={p.learning.entries
+              .filter((e) => (e.ev?.bets ?? 0) > 0)
+              .map((e) => ({ label: e.label, w: e.ev!.wins, l: e.ev!.bets - e.ev!.wins, be: tab === "pp" || tab === "nba" ? 0.524 : undefined, units: e.ev!.units }))}
+          />
+        ))}
+      </div>
     </section>
   );
 }

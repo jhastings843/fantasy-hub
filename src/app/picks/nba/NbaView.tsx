@@ -6,7 +6,8 @@ import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { MIN_SAMPLE } from "@/lib/picks/engine";
 import { href, kickoffEt, line, price, rec, units, LOG_VIEW, NBA_VIEWS, whenEt, type View } from "../ui";
-import { Background, GoLiveSteps, Hero, LearnerLog, MarketKey, MarketLine, ModelLineup, Stats, TrackingProgress, type LogEntry } from "../board";
+import { Background, CutRanges, Hero, LearnerLog, ModelLineup, Stats, TrackingProgress, type LogEntry } from "../board";
+import { ReadLegend } from "../ats";
 import s from "../picks.module.css";
 
 // The NBA tab. One model (Sam) against the DraftKings line, tracked like
@@ -112,39 +113,6 @@ export function readGame(raw: NbaBoardGame, v: NbaPicksView | null) {
   return { g, done, r, tier, stake, pick, pickPrice };
 }
 
-function NbaBetCard({ x }: { x: ReturnType<typeof readGame> }) {
-  const { g, r, tier, stake, pick, pickPrice } = x;
-  return (
-    <li className={s.betCard}>
-      <div className={s.betCardTop}>
-        <div>
-          <div className={s.betPickBig}>{pick}</div>
-          <div className={s.betWhen}>{`${g.away.short} at ${g.home.short} · ${kickoffEt(g.tip)}`}</div>
-        </div>
-        <span className={s.lockChip}>{stake ? `Tier ${tier} bet` : `Tier ${tier} · tracking`}</span>
-      </div>
-      {r && g.line && <MarketLine market={g.line.home} sam={r.model} fmt={(n) => `${g.home.short} ${line(Math.round(n * 10) / 10)}`} pk={{ below: g.home.short, above: g.away.short }} />}
-      <dl className={s.facts}>
-        <div>
-          <dt>Sam vs market</dt>
-          <dd>{r ? `${r.edge.toFixed(1)} pts` : "·"}</dd>
-        </div>
-        <div>
-          <dt>Price</dt>
-          <dd>{`${price(pickPrice)} DK`}</dd>
-        </div>
-        <div>
-          <dt>Stake</dt>
-          <dd>{stake ? `${stake}u` : "none yet"}</dd>
-        </div>
-      </dl>
-      <details className={s.why}>
-        <summary>Every number</summary>
-        <NbaWhy g={g} done={x.done} />
-      </details>
-    </li>
-  );
-}
 
 function NbaRow({ x, day }: { x: ReturnType<typeof readGame>; day: string }) {
   const { g, r, tier, done, stake } = x;
@@ -164,17 +132,22 @@ function NbaRow({ x, day }: { x: ReturnType<typeof readGame>; day: string }) {
     ? ["Sam's side · no stake", s.readTrack]
     : [g.line ? "No model yet" : "No line yet", s.readPass];
   return (
-    <details className={s.gRow}>
+    <details className={`${s.gRow} ${s.ledger}`}>
       <summary>
         <span className={s.gGame}>
           {`${g.away.short} at ${g.home.short}`}
-          <span>{g.score ? `${g.away.abbr} ${g.score.away}, ${g.home.abbr} ${g.score.home}` : `${day} ${kickoffEt(g.tip)}`}</span>
+          {g.score && g.state !== "post" ? <span className={s.gLive}>Live</span> : null}
+          <span>{g.score ? `${g.state === "post" ? "Final " : ""}${g.away.abbr} ${g.score.away}, ${g.home.abbr} ${g.score.home}` : `${day} ${kickoffEt(g.tip)}`}</span>
         </span>
         <span className={s.gNum} data-k="Market">{g.line ? `${g.home.short} ${line(g.line.home)}` : "·"}</span>
         <span className={`${s.gNum} ${s.cSam}`} data-k="Sam">{r ? `${g.home.short} ${line(r.model)}` : "·"}</span>
-        <span className={s.gNum} data-k="Pick">{r ? x.pick : "·"}</span>
-        <span className={s.gNum} data-k="Edge">{r ? r.edge.toFixed(1) : "·"}</span>
-        <span className={`${s.readChip} ${read[1]}`}>{read[0]}</span>
+        <span className={s.gNum} data-k="Side">
+          {r ? x.pick : "None"}
+          {r && <small>{`edge ${r.edge.toFixed(1)} pts`}</small>}
+        </span>
+        <span className={s.ledgerRead}>
+          <span className={`${s.readChip} ${read[1]}`}>{read[0]}</span>
+        </span>
         <span className={s.chev} aria-hidden>
           ›
         </span>
@@ -189,12 +162,11 @@ function NbaRow({ x, day }: { x: ReturnType<typeof readGame>; day: string }) {
 function RowsTable({ rows }: { rows: { x: ReturnType<typeof readGame>; day: string }[] }) {
   return (
     <div className={s.gtable}>
-      <div className={s.gHead} aria-hidden>
+      <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
         <span>Game</span>
         <span>Market</span>
         <span>Sam</span>
         <span>Side</span>
-        <span>Edge</span>
         <span>Read</span>
         <span />
       </div>
@@ -421,9 +393,8 @@ function NbaLog({ v }: { v: NbaPicksView }) {
       <Hero
         eyebrow="NBA · what changed, and why"
         title={<span id="nba-log">Learner log</span>}
-        sub="NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered. The review runs weekly; games are daily, so evidence grows every night."
+        sub={`NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered, and goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks at t ${CRITERIA.MIN_T}+. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}.` : "The first review runs this week."}`}
       />
-      <GoLiveSteps games={`${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks against its parent cut, at t ${CRITERIA.MIN_T}+.`} />
       <TrackingProgress
         rows={v.hyps.map((h) => ({
           id: h.id,
@@ -440,30 +411,20 @@ function NbaLog({ v }: { v: NbaPicksView }) {
         empty="No NBA ideas registered yet. They register at the first weekly review."
       />
       <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>What NBA is testing</h3>
-          <p className={s.p}>{`Spreads and totals cuts on Sam's reads. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}.` : "The first review runs this week."}`}</p>
-        </div>
-        {v.hyps.length ? (
-          <ol className={s.log}>
-            {v.hyps.map((h) => (
-              <li key={h.id} className={s.logRow}>
-                <span className={s.logWhen}>{`since ${whenEt(h.registeredAt).split(",").slice(0, 2).join(",")}`}</span>
-                <span className={`${s.logKind} ${h.status === "active" ? s.kLive : h.status === "rolled-back" ? s.kBack : ""}`}>{h.status === "active" ? "Live" : h.status === "rolled-back" ? "Rolled back" : "Testing"}</span>
-                <span className={s.logText}>
-                  <b>{h.label}</b>
-                  <span>{`Against ${h.parentLabel.toLowerCase()}: ${h.cmp.n} game${h.cmp.n === 1 ? "" : "s"} over ${h.cmp.weeks} week${h.cmp.weeks === 1 ? "" : "s"}, ${h.cmp.mean >= 0 ? "+" : ""}${h.cmp.mean.toFixed(2)}u a game${h.cmp.t !== null ? `, t ${h.cmp.t.toFixed(2)}` : ""}.`}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className={s.calm}>No NBA ideas registered yet. They register at the first weekly review.</p>
-        )}
-      </div>
-      <div className={s.section}>
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the first weekly review." />
+      </div>
+      <div className={s.section}>
+        <h3 className={s.h2}>Cut comparisons</h3>
+        <p className={s.p}>Every NBA cut on Sam&apos;s reads, graded at the saved DraftKings number.</p>
+        {(["ats", "ou"] as const).map((mk, i) => (
+          <CutRanges
+            key={mk}
+            title={mk === "ats" ? "Spreads" : "Totals"}
+            open={i === 0}
+            rows={v.cuts.filter((c) => c.market === mk && c.w + c.l > 0).map((c) => ({ label: c.label, w: c.w, l: c.l, p: c.p, be: 0.524, units: c.units }))}
+          />
+        ))}
       </div>
     </section>
   );
@@ -506,7 +467,7 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
               </Link>
             ))}
           </nav>
-          {v && (
+          {v && view !== "week" && (
             <Stats
               label="NBA record, rule and learner"
               items={[
@@ -563,22 +524,10 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
               title={<span id="nba-slate">{best.length ? `${best.length} in the rule's tier today` : todayGames ? `${todayGames} games today, none in the rule's tier` : "No games today"}</span>}
               sub={samLine(b)}
             />
-            {best.length > 0 && (
-              <>
-                <ul className={s.betGrid} data-first-pick>
-                  {best.map(({ x }) => (
-                    <NbaBetCard key={x.g.id} x={x} />
-                  ))}
-                </ul>
-                <MarketKey />
-              </>
-            )}
             <div className={s.section}>
-              <div className={s.sectionHead}>
-                <h3 className={s.h2}>Market vs Sam</h3>
-                <p className={s.p}>Home spread, by tip time. Open a game for the total, moneyline and Sam&apos;s numbers.</p>
-              </div>
-              <RowsTable rows={upcoming} />
+              <ReadLegend />
+              <RowsTable rows={[...upcoming.filter(({ x }) => x.g.state === "in"), ...upcoming.filter(({ x }) => x.g.state !== "in")]} />
+              <p className={s.p}>Started games first, then by tip. Home spread throughout. Open a game for the total, moneyline and Sam&apos;s numbers.</p>
             </div>
             {last.length > 0 && (
               <div className={s.section}>
@@ -586,6 +535,17 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
                 <RowsTable rows={last} />
               </div>
             )}
+            {v && (
+            <Stats
+              label="NBA record, rule and learner"
+              items={[
+                { k: "Spreads, every Sam side", v: all && all.w + all.l + all.p ? units(all.units) : "0-0", sub: all ? rec(all) : "nothing graded", tone: all && all.w + all.l ? (all.units >= 0 ? "up" : "down") : undefined },
+                { k: "Rule tier 1", v: t1 ? t1.label : "None yet", sub: t1 ? rec(t1) : "nothing clears the bar", small: true },
+                { k: "Stakes", v: v.gate.live ? "Live" : "Tracking", sub: v.gate.live ? "NBA's own limits" : "until the go-live gate clears", small: true },
+                { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={nbaHref("log")}>Open the log</Link>, small: true },
+              ]}
+            />
+          )}
             <Background>
               <p className={s.p}>Once a game tips, Sam drops it and ESPN drops the odds, so its row keeps the numbers saved before tip: the ones it is graded on. Games run daily, so there is no weekly reset.</p>
             </Background>
