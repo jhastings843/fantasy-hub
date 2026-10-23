@@ -60,6 +60,8 @@ describe("PEM card", () => {
     expect(statedCount("Week 6 PEM picks. All 58 games, in kickoff order.")).toBe(58);
     const wk7 = "PEM has Notre Dame by 26.3 at BYU.\n\nThe full Week 7 card: all 59 games, PEM spreads, SU winners, PEM ATS picks and EDGE.";
     expect(cardKind(wk7)).toEqual({ week: 7, kind: "picks" });
+    expect(cardKind("Week 8 starts tonight.\n\nPEM has Tennessee winning at South Carolina.\n\nAll 56 games: PEM spreads, ATS picks and EDGE.")).toEqual({ week: 8, kind: "picks" });
+    expect(cardKind("Troy -14.5 is the line. That leads Week 8.\n\nAll 56 games, largest to smallest EDGE.")).toBeNull();
     expect(statedCount(wk7)).toBe(59);
   });
 

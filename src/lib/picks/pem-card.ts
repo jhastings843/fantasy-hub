@@ -127,5 +127,8 @@ export function cardKind(text: string): { week: number; kind: "picks" | "final" 
   // Week 7 on: the picks card goes out as "The full Week 7 card: all 59 games, PEM spreads..."
   const full = text.match(/full week (\d+) card/i);
   if (full) return { week: Number(full[1]), kind: "picks" };
+  // Week 8 on (2026-10-20): "Week 8 starts tonight. ... All 56 games: PEM spreads, ATS picks and EDGE."
+  const all = /all \d+ games: PEM spreads/i.test(text) ? text.match(/week (\d+)/i) : null;
+  if (all) return { week: Number(all[1]), kind: "picks" };
   return null;
 }

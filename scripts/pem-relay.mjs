@@ -34,12 +34,12 @@ function log(msg) {
   console.log(`${new Date().toISOString()} ${msg}`);
 }
 
-const isPicksCard = (text) => /week \d+ PEM picks|PEM week \d+ picks|full week \d+ card(?!, with every final)/i.test(text);
+const isPicksCard = (text) => /week \d+ PEM picks|PEM week \d+ picks|full week \d+ card(?!, with every final)|all \d+ games: PEM spreads/i.test(text);
 
 function latestPosts(user = "FansOfCFB") {
   const out = execFileSync(
     "opencli",
-    ["twitter", "tweets", user, "--limit", "40", "--window", "background", "--keep-tab", "false", "-f", "json"],
+    ["twitter", "tweets", user, "--limit", "100", "--window", "background", "--keep-tab", "false", "-f", "json"],
     { encoding: "utf8", timeout: 180_000, env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` } },
   );
   return JSON.parse(out);
