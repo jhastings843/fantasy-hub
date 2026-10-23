@@ -6,7 +6,7 @@ import { redisStore } from "@/lib/picks/learning/store";
 import type { JournalEntry } from "@/lib/picks/learning/review";
 import { Background, GoLiveSteps, Hero, LearnerLog, TrackingProgress, type LogEntry } from "./board";
 import { CRITERIA } from "@/lib/picks/learning/model";
-import { LearningPanel, VERDICT, marketOf } from "./learning";
+import { LearningPanel, OTHER, VERDICT, leagueOf, marketOf } from "./learning";
 import { whenEt, type Market } from "./ui";
 import s from "./picks.module.css";
 
@@ -34,7 +34,12 @@ const mentions = (m: Market, t: string) => (m === "ou" ? /total|over|under/i.tes
 export async function PicksLog({ league, market }: { league: League; market: Market }) {
   const [journal, state] = await Promise.all([redisStore.journal(60).catch(() => []), redisStore.state().catch(() => null)]);
   const ideas = (state?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && marketOf(d.id) === market);
-  const entries: LogEntry[] = journal.flatMap((j) => (KIND[j.kind] && mentions(market, `${j.title} ${j.why}`) ? [{ at: j.at, kind: KIND[j.kind]!, title: j.title, detail: j.why }] : []));
+  const entries: LogEntry[] = journal.flatMap((j) => {
+    const text = `${j.title} ${j.why}`;
+    const lg = leagueOf(text);
+    if (!KIND[j.kind] || !mentions(market, text) || (lg !== "both" && lg !== league)) return [];
+    return [{ at: j.at, kind: KIND[j.kind]!, title: lg === "both" ? `Shared with ${OTHER[league]} · ${j.title}` : j.title, detail: j.why }];
+  });
   return (
     <section className={s.section} aria-labelledby="picks-log">
       <Hero
@@ -53,7 +58,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
             const counted = /^insufficient evidence: [^;]*$/.test(d.why);
             return {
               id: d.id,
-              label: d.label,
+              label: d.id.startsWith("both:") ? `${d.label} (shared with ${OTHER[league]})` : d.label,
               status: d.verdict === "promote" ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
               games: n,
               needGames: CRITERIA.MIN_OPPORTUNITIES,
@@ -75,7 +80,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
           <ol className={s.log}>
             {ideas.map((d) => (
               <li key={d.id} className={s.logRow}>
-                <span className={s.logWhen}>{MARKET_NAME[market]}</span>
+                <span className={s.logWhen}>{d.id.startsWith("both:") ? `Shared with ${OTHER[league]}` : MARKET_NAME[market]}</span>
                 <span className={`${s.logKind} ${d.verdict === "promote" ? s.kLive : d.verdict === "reject" ? s.kBack : ""}`}>{VERDICT[d.verdict] ?? d.verdict}</span>
                 <span className={s.logText}>
                   <b>{d.label}</b>

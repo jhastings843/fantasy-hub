@@ -25,10 +25,22 @@ const EMPTY: { [k in Market]: string } = {
   ou: "Totals hypotheses register at the next Tuesday review: each refinement against both models agreeing, on later games.",
 };
 
+/**
+ * Which league a journal line is about, from the hypothesis id it names
+ * ("nfl:ats:…", "cfb:source:pem", "both:stake:…"). Lines naming none (a whole
+ * review, a policy rollback) cover both leagues. NFL and College learn on
+ * their own games; only stake sizing and calibration are shared (Jack,
+ * 2026-10-22: each league's log shows its own learning, shared items tagged).
+ */
+export const leagueOf = (t: string): League | "both" => {
+  const n = /\bnfl:/.test(t), c = /\bcfb:/.test(t);
+  return n === c ? "both" : n ? "nfl" : "cfb";
+};
+export const OTHER: { [l in League]: string } = { nfl: "College", cfb: "NFL" };
 export async function LearningPanel({ league, market }: { league: League; market: Market }) {
   const [state, journal, ops, active] = await Promise.all([
     redisStore.state().catch(() => null),
-    redisStore.journal(12).catch(() => []),
+    redisStore.journal(40).then((js) => js.filter((j) => { const lg = leagueOf(`${j.title} ${j.why}`); return lg === "both" || lg === league; }).slice(0, 12)).catch(() => []),
     loadOps().catch(() => ({})),
     redisStore.active(),
   ]);
