@@ -44,14 +44,17 @@ const odds = (o: number | null) => (o === null ? "parlay" : o > 0 ? `+${o}` : `�
 
 export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
   const [sort, setSort] = useState<{ k: Key; d: 1 | -1 }>({ k: "week", d: -1 });
+  // League filter above the sort (Jack, 2026-10-22): All is the default and always an option.
+  const leagues = useMemo(() => [...new Set(rows.map((r) => r.league))], [rows]);
+  const [league, setLeague] = useState<string>("All");
   const sorted = useMemo(
     () =>
-      [...rows].sort((a, b) => {
+      rows.filter((r) => league === "All" || r.league === league).sort((a, b) => {
         const x = VALUE[sort.k](a);
         const y = VALUE[sort.k](b);
         return (x < y ? -1 : x > y ? 1 : 0) * sort.d || b.week - a.week || a.position.localeCompare(b.position);
       }),
-    [rows, sort],
+    [rows, sort, league],
   );
   const head = (k: Key, label: string, num = false) => {
     const on = sort.k === k;
@@ -65,8 +68,20 @@ export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
     );
   };
   if (!rows.length) return <p className={s.calm}>No issued recommendation has settled yet.</p>;
+  const net = sorted.reduce((a, r) => a + r.net, 0);
+  const w = sorted.filter((r) => r.result === "W").length;
+  const l = sorted.filter((r) => r.result === "L").length;
+  const p = sorted.filter((r) => r.result === "P").length;
   return (
     <>
+      <div className={s.sortBar} role="group" aria-label="League">
+        <span className={s.sortLabel}>League</span>
+        {["All", ...leagues].map((x) => (
+          <button key={x} type="button" className={s.chip} aria-pressed={league === x} onClick={() => setLeague(x)}>
+            {x}
+          </button>
+        ))}
+      </div>
       <div className={s.sortBar} role="group" aria-label="Sort settled recommendations">
         <span className={s.sortLabel}>Sort</span>
         {PRESETS.map((p) => (
@@ -77,6 +92,7 @@ export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
       </div>
       <div className={s.tw}>
         <table className={s.table}>
+          <caption className={s.caption}>{`${league === "All" ? "All leagues" : league} · ${w}-${l}${p ? `-${p}` : ""} · ${units(net)}`}</caption>
           <thead>
             <tr>
               {head("week", "Week")}
