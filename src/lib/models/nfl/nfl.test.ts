@@ -117,4 +117,12 @@ describe("ourNflMarkets (DK lines, NE at CHI 2026-10-22, no prices posted)", () 
     expect(m.books[0]).toMatchObject({ line: at, over: -112, under: -112 });
     expect(extra[m.id]).toMatchObject({ price: "odds-api", espnLine: rec.current.line });
   });
+  it("takes both prices from the read at a moved line, never ESPN's lone side from its own line", () => {
+    const at = rec.current.line! + 1;
+    const oneSided = new Map([...lines].map(([k, l]) => [k, l === rec ? { ...l, current: { ...l.current, over: -130, under: null } } : l]));
+    const { markets, extra } = ourNflMarkets(oneSided, proj(rec.current.line!), names, () => ({ over: -105, under: -115, line: at, source: "odds-api" }), P);
+    const m = markets.find((x) => x.stat === "rec_yds")!;
+    expect(m.books[0]).toMatchObject({ line: at, over: -105, under: -115 });
+    expect(extra[m.id]).toMatchObject({ price: "odds-api", espnLine: rec.current.line });
+  });
 });

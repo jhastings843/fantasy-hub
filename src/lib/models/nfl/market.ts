@@ -52,10 +52,12 @@ export function ourNflMarkets(
     const espn = l.current.line;
     if (!stat || !pr || !who || espn === null) continue;
     const d = l.current.over !== null && l.current.under !== null ? null : david(who.name, stat, espn);
-    const line = d?.line ?? espn;
-    const over = l.current.over ?? d?.over ?? -110;
-    const under = l.current.under ?? d?.under ?? -110;
-    const source: NflMarketExtra["price"] = l.current.over !== null ? "espn" : d ? (d.source ?? "david") : "assumed";
+    // At a moved line both prices come from the read: ESPN's one posted side belongs to ESPN's line.
+    const moved = d?.line !== undefined && d.line !== espn;
+    const line = moved ? d!.line! : espn;
+    const over = moved ? d!.over : l.current.over ?? d?.over ?? -110;
+    const under = moved ? d!.under : l.current.under ?? d?.under ?? -110;
+    const source: NflMarketExtra["price"] = moved ? d!.source ?? "david" : l.current.over !== null ? "espn" : d ? (d.source ?? "david") : "assumed";
     const mean = pr.mean[stat];
     const ch = nflOverUnder(stat, Math.max(mean, 0.1), line, p);
     const fair = noVig(over, under);

@@ -59,7 +59,8 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
             return {
               id: d.id,
               label: d.id.startsWith("both:") ? `${d.label} (shared with ${OTHER[league]})` : d.label,
-              status: d.verdict === "promote" ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
+              // "promote" means it passed; only the idea the review actually switched in is live (one per review, and validation can still refuse it).
+              status: d.id === state?.activatedFrom ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
               games: n,
               needGames: CRITERIA.MIN_OPPORTUNITIES,
               weeks: wk,
@@ -81,7 +82,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
             {ideas.map((d) => (
               <li key={d.id} className={s.logRow}>
                 <span className={s.logWhen}>{d.id.startsWith("both:") ? `Shared with ${OTHER[league]}` : MARKET_NAME[market]}</span>
-                <span className={`${s.logKind} ${d.verdict === "promote" ? s.kLive : d.verdict === "reject" ? s.kBack : ""}`}>{VERDICT[d.verdict] ?? d.verdict}</span>
+                <span className={`${s.logKind} ${d.id === state?.activatedFrom ? s.kLive : d.verdict === "reject" ? s.kBack : ""}`}>{VERDICT[d.verdict] ?? d.verdict}</span>
                 <span className={s.logText}>
                   <b>{d.label}</b>
                   <span>{d.why}</span>

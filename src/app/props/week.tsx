@@ -733,10 +733,13 @@ async function FirstTdWeek({ season }: { season: number }) {
     return { w, l, p: 0, units };
   })();
   // A bet is a player in a learner slice that has gone live, at Kalshi's cost (the learner grades on Kalshi). An edge alone is not a bet: most games have a few.
-  const live = new Set(v.learning.entries.filter((e) => e.status === "active").map((e) => e.id));
-  const keeps = OUR_FTD_SLICES.filter(([id]) => live.has(id)).map(([, , keep]) => keep);
+  // Only games that kicked off after a slice went live: an earlier game was never bet, whatever the slice says now.
+  const since = new Map(v.learning.entries.filter((e) => e.status === "active" && e.activatedAt).map((e) => [e.id, e.activatedAt!]));
+  const keepsFor = (kickoff: string | undefined) =>
+    OUR_FTD_SLICES.filter(([id]) => since.has(id) && !!kickoff && Date.parse(kickoff) >= Date.parse(since.get(id)!)).map(([, , keep]) => keep);
   const rows: GameRowData[] = v.board.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
+    const keeps = keepsFor(g.kickoff);
     const bets = pricedPlayers(g.game).filter((p) => {
       const k = kalshi(g, p.name);
       return k !== null && keeps.some((keep) => keep(p, k, g.game));
