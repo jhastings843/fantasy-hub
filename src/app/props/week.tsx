@@ -272,7 +272,7 @@ function propRows(board: (OurStoredProps | OurNflStored)[], extraCol: (g: OurSto
       cells: [
         ["Props", `${g.game.markets.length}`],
         ["Edges", `${edges.length}`],
-        ["Top edge", top ? `${short(top.player)} ${sideWord(top.side!).charAt(0)}${top.line} ${SHORT[top.stat ?? ""] ?? top.statLabel}` : "·"],
+        ["Top edge", top ? `${short(top.player)} ${top.side === "over" ? "o" : "u"}${top.line} ${SHORT[top.stat ?? ""] ?? top.statLabel}` : "·"],
         ["Graded", net !== null ? u(net) : "·"],
       ],
       read: net !== null ? [net > 0 ? "Up" : net < 0 ? "Down" : "Even", net > 0 ? s.readW : net < 0 ? s.readL : ""] : edges.length ? ["Edges", s.readBet] : ["No edges", s.readPass],
