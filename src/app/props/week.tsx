@@ -14,7 +14,7 @@ import { getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
 import { getOurNflView, type OurNflStored } from "@/lib/models/nfl/store";
 import { getOurFtdView, type OurFtdStored } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
-import { ourSliceBets, record } from "@/lib/models/learn";
+import { OUR_FTD_SLICES, ourSliceBets, record } from "@/lib/models/learn";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
@@ -732,8 +732,15 @@ async function FirstTdWeek({ season }: { season: number }) {
       }
     return { w, l, p: 0, units };
   })();
+  // A bet is a player in a learner slice that has gone live, at Kalshi's cost (the learner grades on Kalshi). An edge alone is not a bet: most games have a few.
+  const live = new Set(v.learning.entries.filter((e) => e.status === "active").map((e) => e.id));
+  const keeps = OUR_FTD_SLICES.filter(([id]) => live.has(id)).map(([, , keep]) => keep);
   const rows: GameRowData[] = v.board.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
+    const bets = pricedPlayers(g.game).filter((p) => {
+      const k = kalshi(g, p.name);
+      return k !== null && keeps.some((keep) => keep(p, k, g.game));
+    });
     const vals = pricedPlayers(g.game).filter((p) => {
       const c = cost(g, p.name);
       return c !== null && p.p > c;
@@ -750,7 +757,7 @@ async function FirstTdWeek({ season }: { season: number }) {
         ["Edges", g.kalshi || g.dk ? `${vals.length}` : "no prices"],
         ["First TD", r ? (r.first.kind === "offense" ? r.first.scorer : "none") : "·"],
       ],
-      read: r ? (vals.some((p) => p.key === r.key) ? ["Hit", s.readW] : ["Missed", vals.length ? s.readL : s.readPass]) : vals.length ? ["Edge", s.readBet] : ["No edge", s.readPass],
+      read: bets.length ? (r ? (bets.some((p) => p.key === r.key) ? ["Hit", s.readW] : ["Missed", s.readL]) : ["Bet", s.readBet]) : ["No bet", s.readPass],
       body: (
         <div className={s.tw}>
           <table className={s.table}>
