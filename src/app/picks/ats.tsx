@@ -73,7 +73,7 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
   return (
     <dl className={s.kv}>
       <dt>Line now</dt>
-      <dd className={s.num}>{g.ref ? `${home} ${line(g.ref.line)} · ${g.ref.source}` : "none"}</dd>
+      <dd className={s.num}>{g.ref ? `${home} ${line(g.ref.line)} · ${g.ref.source}` : st === "started" || g.final ? "Closed at kickoff" : "none"}</dd>
       <dt>Sam model</dt>
       <dd className={s.num}>{g.sam ? `${home} ${line(Math.round(g.sam.model * 10) / 10)}` : "not posted"}</dd>
       <dt>David model</dt>
@@ -154,12 +154,17 @@ function readOf(g: BoardGame, r: PicksReport, live?: LiveGame): { chip: [string,
       ? { chip: [res === "W" ? "Won" : res === "L" ? "Lost" : "Push", res === "W" ? s.readW : res === "L" ? s.readL : ""], note: `${tier} · ${amt(g.issued.units)}` }
       : { chip: ["Final", s.readPass], note: res && g.side ? `Pick ${res === "W" ? "covered" : res === "L" ? "missed" : "pushed"}, no stake` : undefined };
   if (st === "started") {
-    if (!g.issued) return { chip: ["In progress", s.readLive] };
+    if (!g.issued) return live?.state === "post" ? { chip: ["Final", s.readPass], note: "Grading soon" } : { chip: ["In progress", s.readLive] };
     if (!live) return { chip: [`${tier} · ${amt(g.issued.units)}`, s.readBet], note: "In progress", noteCls: s.liveNote };
     // Live cover at the line it was sent at: home margin plus the home line, flipped for the away side.
     const m = live.home.score - live.away.score + g.issued.homeLine;
     const by = g.issued.side === "home" ? m : -m;
-    return { chip: [`${tier} · ${amt(g.issued.units)}`, s.readBet], note: by > 0 ? `Covering by ${by}` : by < 0 ? `Short by ${-by}` : "On the number", noteCls: by > 0 ? s.pos : by < 0 ? s.neg : s.liveNote };
+    const done = live.state === "post";
+    return {
+      chip: [`${tier} · ${amt(g.issued.units)}`, s.readBet],
+      note: by > 0 ? `${done ? "Covered" : "Covering"} by ${by}` : by < 0 ? `${done ? "Missed" : "Short"} by ${-by}` : "On the number",
+      noteCls: by > 0 ? s.pos : by < 0 ? s.neg : s.liveNote,
+    };
   }
   if (st === "sent") return { chip: [`${tier} · ${amt(g.issued!.units)}`, s.readBet], note: `Sent at ${price(g.issued!.price)}` };
   if (st === "early") return { chip: [`${tier} · not sent`, s.readPend], note: `Locks ${kickoffEt(g.held)}` };
@@ -187,10 +192,19 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
       <summary>
         <span className={s.gGame}>
           {`${name(g.away)} at ${home}`}
-          {st === "started" ? <span className={s.gLive}>Live</span> : <span>{g.final ? `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}` : kickoffEt(g.ref?.kickoff)}</span>}
-          {st === "started" && live && <span className={s.num}>{`${live.away.score}-${live.home.score} · ${live.state === "post" ? "Final" : live.detail}`}</span>}
+          {st === "started" && live?.state === "post" ? (
+            // Over on ESPN but not graded yet: say Final, never Live.
+            <span className={s.scoreLine}>{`Final ${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score}`}</span>
+          ) : st === "started" ? (
+            <>
+              <span className={s.gLive}>Live</span>
+              {live && <span className={s.scoreLine}>{`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`}</span>}
+            </>
+          ) : (
+            <span>{g.final ? `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}` : kickoffEt(g.ref?.kickoff)}</span>
+          )}
         </span>
-        <span className={s.gNum} data-k="Market">{m(g.ref?.line)}</span>
+        <span className={s.gNum} data-k="Market">{g.ref ? m(g.ref.line) : st === "started" || st === "final" ? "Closed" : "·"}</span>
         <span className={s.gNum} data-k="Sam · David">
           <span className={s.cSam}>{m(g.sam?.model)}</span>
           <small className={s.cDavid}>{m(g.david?.model)}</small>
