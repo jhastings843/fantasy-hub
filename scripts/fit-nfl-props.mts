@@ -11,11 +11,19 @@
 // game coming in; rushing, 8+ carries; passing, a QB with 20+ attempts.
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-nfl-props.mts
-// Needs .cache/nfl/stats_player_week_{2024,2025,2026}.csv and games.csv (nflverse).
-import { readFileSync, writeFileSync } from "node:fs";
+// Needs .cache/nfl/stats_player_week_{2024,2025,2026}.csv and games.csv (nflverse),
+// and .cache/nfl/air_{2024,2025,2026}.json (scripts/nfl-air.mts) for the depth
+// of target candidate.
+//
+// Candidate inputs (opponent defense, implied team total, depth of target) are
+// each fit on the train weeks from the same base, then the base and each
+// candidate get their own dispersion and calibration and are compared on both
+// test sets. KEEP lists the ones that earned a place (judged by hand on that
+// comparison: better on both tests for the stats they touch).
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { readGames, readStats, type NflRow } from "../src/lib/models/nfl/data";
-import { NflRunning, summarizeNfl, type NflSummary } from "../src/lib/models/nfl/history";
-import { NFL_STATS, nflMedian, nflOverUnder, projectNflGame, type NflParams, type NflPlayerInput, type NflStat, type NflTeamInput } from "../src/lib/models/nfl/props";
+import { NflRunning, nflPos, summarizeNfl, type NflSummary } from "../src/lib/models/nfl/history";
+import { NFL_STATS, impliedPoints, nflMedian, teamVolume, nflOverUnder, projectNflGame, type NflParams, type NflPlayerInput, type NflStat, type NflTeamInput } from "../src/lib/models/nfl/props";
 
 const rows = (s: number) => readStats(readFileSync(`.cache/nfl/stats_player_week_${s}.csv`, "utf8"));
 const games = new Map(readGames(readFileSync(".cache/nfl/games.csv", "utf8")).map((g) => [g.game, g]));
@@ -27,6 +35,7 @@ interface Case {
   game: string;
   home: string;
   margin: number | null;
+  total: number | null;
   players: NflPlayerInput[];
   teams: { [t: string]: NflTeamInput };
   absent: NflPlayerInput[];
@@ -34,18 +43,37 @@ interface Case {
   judged: { id: string; stat: NflStat; naive: number }[];
 }
 
+type Air = { [k: string]: [number, number] };
+const air = (s: number): Air => (existsSync(`.cache/nfl/air_${s}.json`) ? JSON.parse(readFileSync(`.cache/nfl/air_${s}.json`, "utf8")) : {});
+const ALLOWED = (["QB", "RB", "WR", "TE"] as const).flatMap((pos) => NFL_STATS.map((s) => `${pos}:${s}`));
+
 function build(season: number, prior: NflSummary): Case[] {
   const all = rows(season);
   const run = new NflRunning();
   const out: Case[] = [];
+  // Air yards: all of last season, then this season's games as they finish.
+  const airRun = new Map<string, { yds: number; tgt: number }>();
+  for (const [k, [yds, tgt]] of Object.entries(air(season - 1))) {
+    const a = airRun.get(k.split("|")[1]) ?? { yds: 0, tgt: 0 };
+    airRun.set(k.split("|")[1], { yds: a.yds + yds, tgt: a.tgt + tgt });
+  }
+  const airNow = air(season);
+  // What each defense allowed, per game, keyed "POS:stat".
+  const allowed = new Map<string, { [k: string]: number }[]>();
   for (const week of [...new Set(all.map((r) => r.week))].sort((a, b) => a - b)) {
     const wk = all.filter((r) => r.week === week);
     for (const game of new Set(wk.map((r) => r.game))) {
       const gr = wk.filter((r) => r.game === game);
       const meta = games.get(game);
       if (!meta) continue;
-      const players = gr.map((r) => run.player(r.id, r.team, r.pos, prior));
-      const teams = Object.fromEntries([meta.home, meta.away].map((t) => [t, run.team(t, prior)]));
+      const players = gr.map((r) => ({ ...run.player(r.id, r.team, r.pos, prior), ...(airRun.has(r.id) ? { air: { ...airRun.get(r.id)! } } : {}) }));
+      const allDef = [...allowed.values()].flat();
+      const league = Object.fromEntries(ALLOWED.map((k) => [k, allDef.reduce((a, d) => a + (d[k] ?? 0), 0) / (allDef.length || 1)]));
+      const defense = (t: string) => {
+        const xs = allowed.get(t) ?? [];
+        return { games: xs.length, allowed: Object.fromEntries(ALLOWED.map((k) => [k, xs.reduce((a, d) => a + (d[k] ?? 0), 0)])), league };
+      };
+      const teams = Object.fromEntries([meta.home, meta.away].map((t) => [t, { ...run.team(t, prior), defense: defense(t) }]));
       const played = new Set(gr.map((r) => r.id));
       const absent = [meta.home, meta.away].flatMap((t) => {
         const last = (run.teams.get(t) ?? []).slice(-3);
@@ -66,9 +94,23 @@ function build(season: number, prior: NflSummary): Case[] {
         if (car >= 8) judged.push({ id: pl.id, stat: "rush_yds", naive: avg((g) => g.rushYds, pl.prior?.rushYds) });
         if (pl.pos === "QB" && att >= 20) judged.push({ id: pl.id, stat: "pass_yds", naive: avg((g) => g.passYds, pl.prior?.passYds) });
       }
-      out.push({ season, week, game, home: meta.home, margin: meta.homeMargin, players, teams, absent, actual: new Map(gr.map((r) => [r.id, r])), judged });
+      out.push({ season, week, game, home: meta.home, margin: meta.homeMargin, total: meta.total, players, teams, absent, actual: new Map(gr.map((r) => [r.id, r])), judged });
     }
     run.addWeek(wk);
+    for (const game of new Set(wk.map((r) => r.game))) {
+      const gr = wk.filter((r) => r.game === game);
+      for (const def of new Set(gr.map((r) => r.opp))) {
+        const d: { [k: string]: number } = {};
+        for (const r of gr.filter((x) => x.opp === def)) for (const s of NFL_STATS) d[`${nflPos(r.pos)}:${s}`] = (d[`${nflPos(r.pos)}:${s}`] ?? 0) + ACTUAL[s](r);
+        allowed.set(def, [...(allowed.get(def) ?? []), d]);
+      }
+      for (const r of gr) {
+        const a = airNow[`${game}|${r.id}`];
+        if (!a) continue;
+        const cur = airRun.get(r.id) ?? { yds: 0, tgt: 0 };
+        airRun.set(r.id, { yds: cur.yds + a[0], tgt: cur.tgt + a[1] });
+      }
+    }
   }
   return out;
 }
@@ -100,7 +142,7 @@ let P: NflParams = {
 function project(cs: Case[], p: NflParams, base = base2025) {
   const out: { c: Case; id: string; stat: NflStat; naive: number; mean: number; y: number }[] = [];
   for (const c of cs) {
-    const pr = new Map(projectNflGame(c.players, c.teams, c.home, c.margin, base, p, c.absent).map((x) => [x.id, x]));
+    const pr = new Map(projectNflGame(c.players, c.teams, c.home, c.margin, base, p, c.absent, c.total).map((x) => [x.id, x]));
     for (const j of c.judged) out.push({ c, id: j.id, stat: j.stat, naive: j.naive, mean: pr.get(j.id)!.mean[j.stat], y: ACTUAL[j.stat](c.actual.get(j.id)!) });
   }
   return out;
@@ -182,28 +224,29 @@ say(`shares: kTgt ${P.kTgt}, kCar ${P.kCar}, kAtt ${P.kAtt}; efficiency: kCr ${P
 }
 
 // 3. Dispersion by over/under log loss at the naive line, then 4. calibration slope.
-const trainRows = project(train, P);
-for (const s of NFL_STATS) {
-  let b = { l: -Infinity, v: 0, w: 1 };
-  // Yardage: phi on a log grid for each power (variance phi x mean^pow).
-  const phis = (w: number) => Array.from({ length: 40 }, (_, i) => Math.round(Math.pow(10, -2.5 + (i * 4.5) / 39) * 1e4) / 1e4).filter((v) => v * Math.pow(60, w) > 50 && v * Math.pow(60, w) < 200000);
-  for (const w of s === "rec" ? [1] : [1, 1.25, 1.5, 1.75, 2])
-    for (const v of s === "rec" ? [1, 2, 3, 5, 8, 12, 20, 40, 100] : phis(w)) {
-      const p = { ...P, disp: { ...P.disp, [s]: v }, ...(s === "rec" ? {} : { pow: { ...P.pow, [s]: w } }) };
-      // Scored on what gets priced: the over/under at a line (the player's
-      // average to the half point), not the density, which chases the
-      // zero-yard games of a QB who left early and drags the median down.
-      const l = trainRows.filter((r) => r.stat === s).reduce((a, r) => {
-        const line = Math.floor(r.naive) + 0.5;
-        const po = Math.min(Math.max(nflOverUnder(s, Math.max(r.mean, 0.1), line, { ...p, calib: 1 }).over, 1e-6), 1 - 1e-6);
-        return a + (r.y > line ? Math.log(po) : Math.log(1 - po));
-      }, 0);
-      if (l > b.l) b = { l, v, w };
-    }
-  P = { ...P, disp: { ...P.disp, [s]: b.v }, ...(s === "rec" ? {} : { pow: { ...P.pow, [s]: b.w } }) };
-}
-say(`dispersion: receptions NB r ${P.disp.rec}; gamma variance phi x mean^pow: rec_yds ${P.disp.rec_yds} x mean^${P.pow.rec_yds}, rush_yds ${P.disp.rush_yds} x mean^${P.pow.rush_yds}, pass_yds ${P.disp.pass_yds} x mean^${P.pow.pass_yds}`);
-{
+function tail(P0: NflParams, quiet = false): NflParams {
+  let P = P0;
+  const trainRows = project(train, P);
+  for (const s of NFL_STATS) {
+    let b = { l: -Infinity, v: 0, w: 1 };
+    // Yardage: phi on a log grid for each power (variance phi x mean^pow).
+    const phis = (w: number) => Array.from({ length: 40 }, (_, i) => Math.round(Math.pow(10, -2.5 + (i * 4.5) / 39) * 1e4) / 1e4).filter((v) => v * Math.pow(60, w) > 50 && v * Math.pow(60, w) < 200000);
+    for (const w of s === "rec" ? [1] : [1, 1.25, 1.5, 1.75, 2])
+      for (const v of s === "rec" ? [1, 2, 3, 5, 8, 12, 20, 40, 100] : phis(w)) {
+        const p = { ...P, disp: { ...P.disp, [s]: v }, ...(s === "rec" ? {} : { pow: { ...P.pow, [s]: w } }) };
+        // Scored on what gets priced: the over/under at a line (the player's
+        // average to the half point), not the density, which chases the
+        // zero-yard games of a QB who left early and drags the median down.
+        const l = trainRows.filter((r) => r.stat === s).reduce((a, r) => {
+          const line = Math.floor(r.naive) + 0.5;
+          const po = Math.min(Math.max(nflOverUnder(s, Math.max(r.mean, 0.1), line, { ...p, calib: 1 }).over, 1e-6), 1 - 1e-6);
+          return a + (r.y > line ? Math.log(po) : Math.log(1 - po));
+        }, 0);
+        if (l > b.l) b = { l, v, w };
+      }
+    P = { ...P, disp: { ...P.disp, [s]: b.v }, ...(s === "rec" ? {} : { pow: { ...P.pow, [s]: b.w } }) };
+  }
+  if (!quiet) say(`dispersion: receptions NB r ${P.disp.rec}; gamma variance phi x mean^pow: rec_yds ${P.disp.rec_yds} x mean^${P.pow.rec_yds}, rush_yds ${P.disp.rush_yds} x mean^${P.pow.rush_yds}, pass_yds ${P.disp.pass_yds} x mean^${P.pow.pass_yds}`);
   let b = { l: Infinity, a: 1 };
   for (let a = 0.4; a <= 1.3001; a += 0.05) {
     let l = 0;
@@ -215,7 +258,139 @@ say(`dispersion: receptions NB r ${P.disp.rec}; gamma variance phi x mean^pow: r
     if (l < b.l) b = { l, a: Math.round(a * 100) / 100 };
   }
   P = { ...P, calib: b.a };
-  say(`calibration slope: ${P.calib}`);
+  if (!quiet) say(`calibration slope: ${P.calib}`);
+  return P;
+}
+
+/** Per stat on one set: MAE, Brier and over/under log loss at the season-average line. */
+function metrics(cs: Case[], p: NflParams, base: typeof base2025) {
+  const rs = project(cs, p, base);
+  return Object.fromEntries(
+    NFL_STATS.map((s) => {
+      const xs = rs.filter((r) => r.stat === s);
+      let br = 0, ll = 0;
+      for (const r of xs) {
+        const line = Math.floor(r.naive) + 0.5;
+        const y = r.y > line ? 1 : 0;
+        const po = Math.min(Math.max(nflOverUnder(s, Math.max(r.mean, 0.1), line, p).over, 1e-6), 1 - 1e-6);
+        br += (po - y) ** 2;
+        ll -= y ? Math.log(po) : Math.log(1 - po);
+      }
+      return [s, { n: xs.length, mae: mae(xs), brier: br / xs.length, ll: ll / xs.length }];
+    }),
+  ) as { [s in NflStat]: { n: number; mae: number; brier: number; ll: number } };
+}
+
+// 5. Candidate inputs, each fit on the train weeks from the base above.
+const BASE = P;
+// Opponent defense: pseudo-games per stat, each on its own stat.
+const kOpp: { [s in NflStat]?: number } = {};
+for (const s of NFL_STATS) {
+  let b = { e: err(BASE, [s]), v: undefined as number | undefined };
+  for (const v of [1, 2, 4, 8, 16, 32, 64, 128, 256]) {
+    const e = err({ ...BASE, kOpp: { [s]: v } }, [s]);
+    if (e < b.e) b = { e, v };
+  }
+  if (b.v !== undefined) kOpp[s] = b.v;
+}
+// Implied team total: elasticity of attempts and carries. Fit on the player
+// stats (all four); team volume error is printed alongside for reference.
+const implied = (() => {
+  const imp: number[] = [];
+  for (const c of train) if (c.total !== null && c.margin !== null) for (const t of Object.keys(c.teams)) imp.push(impliedPoints(c.total, c.margin * (t === c.home ? 1 : -1)));
+  const mean = Math.round((imp.reduce((a, x) => a + x, 0) / imp.length) * 100) / 100;
+  const teamErr = (e: number) => {
+    let a = 0, n = 0;
+    for (const c of train) {
+      for (const t of Object.keys(c.teams)) {
+        const margin = (c.margin ?? 0) * (t === c.home ? 1 : -1);
+        const rowsT = [...c.actual.values()].filter((r) => r.team === t);
+        const v = teamVolume(c.teams[t], margin, base2025, { ...BASE, implied: { e, mean } }, c.total !== null && c.margin !== null ? impliedPoints(c.total, margin) : null);
+        a += (v.att - rowsT.reduce((q, r) => q + r.att, 0)) ** 2 + (v.car - rowsT.reduce((q, r) => q + r.car, 0)) ** 2;
+        n++;
+      }
+    }
+    return a / n;
+  };
+  let b = { e: err(BASE, [...NFL_STATS]), v: 0 };
+  for (let i = -10; i <= 20; i++) {
+    const e = i / 20;
+    const x = err({ ...BASE, implied: { e, mean } }, [...NFL_STATS]);
+    if (x < b.e) b = { e: x, v: e };
+  }
+  say(`candidate implied total: league mean ${mean} points; fit e ${b.v} (train relative error ${err(BASE, [...NFL_STATS]).toFixed(4)} at 0, ${b.e.toFixed(4)} at ${b.v}); team volume error ${teamErr(0).toFixed(2)} at 0, ${teamErr(b.v).toFixed(2)} at ${b.v}`);
+  return { e: b.v, mean };
+})();
+// Depth of target: yards per target on aDOT from last season's (2024) receivers,
+// target-weighted least squares over players with 30+ targets, then k and w on train.
+const adot = (() => {
+  const prev = summarizeNfl(rows(2024)).players;
+  const sums = new Map<string, [number, number]>();
+  for (const [k, [y, t]] of Object.entries(air(2024))) {
+    const id = k.split("|")[1];
+    const s = sums.get(id) ?? [0, 0];
+    sums.set(id, [s[0] + y, s[1] + t]);
+  }
+  const pts: { x: number; y: number; w: number }[] = [];
+  for (const [id, [y, t]] of sums) {
+    const pl = prev[id];
+    if (!pl || pl.tgt < 30 || t < 30) continue;
+    pts.push({ x: y / t, y: pl.recYds / pl.tgt, w: pl.tgt });
+  }
+  const W = pts.reduce((a, q) => a + q.w, 0);
+  const mx = pts.reduce((a, q) => a + q.w * q.x, 0) / W;
+  const my = pts.reduce((a, q) => a + q.w * q.y, 0) / W;
+  const bb = pts.reduce((a, q) => a + q.w * (q.x - mx) * (q.y - my), 0) / pts.reduce((a, q) => a + q.w * (q.x - mx) ** 2, 0);
+  const all = [...sums.values()].reduce((a, s) => [a[0] + s[0], a[1] + s[1]], [0, 0]);
+  const q0 = { w: 0, a: Math.round((my - bb * mx) * 1000) / 1000, b: Math.round(bb * 1000) / 1000, k: 25, mean: Math.round((all[0] / all[1]) * 100) / 100 };
+  let b = { e: err(BASE, ["rec_yds"]), q: q0 };
+  for (const k of [10, 25, 50, 100, 200])
+    for (let w = 0.1; w <= 1.0001; w += 0.1) {
+      const q = { ...q0, k, w: Math.round(w * 10) / 10 };
+      const e = err({ ...BASE, adot: q }, ["rec_yds"]);
+      if (e < b.e) b = { e, q };
+    }
+  say(`candidate depth of target: ypt = ${q0.a} + ${q0.b} x aDOT (2024, ${pts.length} receivers), league aDOT ${q0.mean}; fit k ${b.q.k}, w ${b.q.w}`);
+  return b.q;
+})();
+say(`candidate opponent defense: pseudo-games ${NFL_STATS.map((s) => `${s} ${kOpp[s] ?? "off"}`).join(", ")}`);
+
+const VARIANTS: { name: string; p: NflParams }[] = [
+  { name: "base", p: BASE },
+  { name: "opponent", p: { ...BASE, kOpp } },
+  { name: "implied", p: { ...BASE, implied } },
+  { name: "adot", p: { ...BASE, adot } },
+];
+// Kept after the comparison (2026-10-26): the implied total, and the opponent
+// factor on passing yards and receptions only (on rushing it was worse on the
+// 2025 test, and train left receiving yards off). Depth of target was worse
+// on receiving yards in both tests, so it stays off.
+const KEEP_OPP: NflStat[] = ["pass_yds", "rec"];
+const kept: NflParams = { ...BASE, implied, kOpp: Object.fromEntries(KEEP_OPP.filter((s) => kOpp[s] !== undefined).map((s) => [s, kOpp[s]])) };
+VARIANTS.push({ name: "kept", p: kept });
+const SETS = [
+  { name: "2025 wk 10-18", cs: test, base: base2025 },
+  { name: "2026 wk 1-6", cs: s2026, base: base2026 },
+];
+say("\ncandidates (each with its own dispersion and calibration): MAE / Brier / log loss");
+const fitted = VARIANTS.map((v) => ({ ...v, p: tail(v.p, true) }));
+for (const set of SETS) {
+  say(`  ${set.name}`);
+  const ms = fitted.map((v) => metrics(set.cs, v.p, set.base));
+  for (const s of NFL_STATS) say(`    ${s} (n ${ms[0][s].n}): ${fitted.map((v, i) => `${v.name} ${ms[i][s].mae.toFixed(2)} / ${ms[i][s].brier.toFixed(4)} / ${ms[i][s].ll.toFixed(4)}`).join("; ")}`);
+}
+
+P = kept;
+say(`\nkept: implied total e ${P.implied?.e} (mean ${P.implied?.mean}); opponent pseudo-games ${JSON.stringify(P.kOpp)}`);
+P = tail(P);
+{
+  // What the live store gets until it passes the game total and each defense:
+  // these dispersions with today's means.
+  const bare = { ...P, implied: undefined, kOpp: undefined };
+  for (const set of SETS) {
+    const m = metrics(set.cs, bare, set.base);
+    say(`  without the new inputs, ${set.name}: ${NFL_STATS.map((s) => `${s} ${m[s].mae.toFixed(2)} / ${m[s].brier.toFixed(4)} / ${m[s].ll.toFixed(4)}`).join("; ")}`);
+  }
 }
 
 function report(name: string, cs: Case[], base: typeof base2025) {
@@ -224,16 +399,17 @@ function report(name: string, cs: Case[], base: typeof base2025) {
   const cal: { p: number; y: number }[] = [];
   for (const s of NFL_STATS) {
     const xs = rs.filter((r) => r.stat === s);
-    let br = 0;
+    let br = 0, ll = 0;
     for (const r of xs) {
       const line = Math.floor(r.naive) + 0.5;
       const y = r.y > line ? 1 : 0;
       const po = nflOverUnder(s, Math.max(r.mean, 0.1), line, P).over;
       br += (po - y) ** 2;
+      ll -= Math.log(Math.min(Math.max(y ? po : 1 - po, 1e-6), 1));
       cal.push({ p: po, y });
     }
     const coin = xs.reduce((a, r) => a + (0.5 - (r.y > Math.floor(r.naive) + 0.5 ? 1 : 0)) ** 2, 0);
-    say(`${s}: n ${xs.length}; MAE ours ${mae(xs).toFixed(2)} vs season average ${mae(xs, (r) => r.naive).toFixed(2)}; Brier at the average's line ${(br / xs.length).toFixed(4)} vs coin flip ${(coin / xs.length).toFixed(4)}; mean bias ${(xs.reduce((a, r) => a + r.mean - r.y, 0) / xs.length).toFixed(2)}`);
+    say(`${s}: n ${xs.length}; MAE ours ${mae(xs).toFixed(2)} vs season average ${mae(xs, (r) => r.naive).toFixed(2)}; Brier at the average's line ${(br / xs.length).toFixed(4)} vs coin flip ${(coin / xs.length).toFixed(4)}; log loss ${(ll / xs.length).toFixed(4)}; mean bias ${(xs.reduce((a, r) => a + r.mean - r.y, 0) / xs.length).toFixed(2)}`);
   }
   for (const s of ["rec_yds", "rush_yds", "pass_yds"] as const) {
     const xs = rs.filter((r) => r.stat === s).sort((a, b) => a.naive - b.naive);

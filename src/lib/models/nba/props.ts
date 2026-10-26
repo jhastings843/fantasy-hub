@@ -10,8 +10,16 @@
 // 2. Per-minute rates, empirical Bayes: (this season's total + k x prior rate)
 //    / (this season's minutes + k), the prior being last season's rate shrunk
 //    toward the position's league rate.
+//    Recent form: each game's weight halves every rateHalfLife games
+//    (weights scaled to average 1), per stat.
 // 3. Pace: the game's expected possessions (both teams' shrunk pace) over
 //    the player's own team's pace. Applied once, to every stat.
+// 3b. Opponent defense: what tonight's opponent has allowed the player's
+//    position group per minute this season, over the league's rate, shrunk
+//    toward 1 by kOpp pseudo-games, per stat. Per possession scored the same
+//    as per minute in the fit, and the opponent's own misses did worse than
+//    rebounds allowed, so per minute it is. Threes as attempts x a shrunk 3P%
+//    was tested and tied makes per minute, so makes per minute stays.
 // 4. Distribution: points normal with variance phi x mean; rebounds, assists
 //    and threes negative binomial (variance mean + mean^2 / r). A half-point
 //    line L is over when X >= floor(L) + 1.
@@ -106,6 +114,19 @@ export interface NbaParams {
    * marketW (unset, so 1) is the lever to fit once more boards are graded.
    */
   maxGap?: number;
+  /**
+   * Recent form: half-life in games of the weights on this season's per-minute
+   * rates, per stat (weights scaled to average 1, so k keeps its meaning).
+   * Missing or 0 means season totals, every game equal.
+   */
+  rateHalfLife?: Partial<{ [s in NbaStat]: number }>;
+  /**
+   * Opponent defense by position: pseudo-games pulling what tonight's opponent
+   * allows the player's position group per minute (over the league's) toward 1,
+   * per stat. Missing means no opponent factor. Needs TeamInput.allowed and the
+   * league table passed to projectGame.
+   */
+  kOpp?: Partial<{ [s in NbaStat]: number }>;
 }
 
 export interface PlayerInput {
@@ -125,6 +146,8 @@ export interface TeamInput {
   poss: number[];
   /** Last season's possessions per game, when the team has one. */
   priorPace?: number;
+  /** What the team has allowed this season before this game, by position, per minute (see Allowed). */
+  allowed?: Allowed;
 }
 
 export interface Projection {
@@ -150,16 +173,49 @@ export function projectMinutes(pl: PlayerInput, base: LeagueBase, p: NbaParams):
   return ((n * (sm / sw) + p.kMin * priorMin) / (n + p.kMin)) * p.minScale;
 }
 
+/** Weights on a run of games, oldest first: half-life h in games, scaled to average 1. No h (or 0) gives every game 1. */
+export function recencyWeights(n: number, h?: number): number[] {
+  if (!h || h <= 0 || n === 0) return Array(n).fill(1);
+  const w = Array.from({ length: n }, (_, i) => Math.pow(0.5, (n - 1 - i) / h));
+  const sw = w.reduce((a, x) => a + x, 0);
+  return w.map((x) => (x * n) / sw);
+}
+
 export function projectRates(pl: PlayerInput, base: LeagueBase, p: NbaParams): { [s in NbaStat]: number } {
-  const n = pl.games.reduce((a, x) => a + x.min, 0);
   const out = {} as { [s in NbaStat]: number };
   for (const s of NBA_STATS) {
+    const w = recencyWeights(pl.games.length, p.rateHalfLife?.[s]);
+    const n = pl.games.reduce((a, x, i) => a + w[i] * x.min, 0);
     const posRate = base.rate[pl.prior?.pos ?? pl.pos][s];
     const prior = pl.prior && pl.prior.min > 0 ? (pl.prior[s] + p.kPrior * posRate) / (pl.prior.min + p.kPrior) : posRate;
-    const cur = pl.games.reduce((a, x) => a + x[s], 0);
+    const cur = pl.games.reduce((a, x, i) => a + w[i] * x[s], 0);
     out[s] = (cur + p.k[s] * prior) / (n + p.k[s]);
   }
   return out;
+}
+
+/**
+ * What a team has allowed this season, by the scoring player's position group:
+ * the four stats and a denominator n (minutes, or possession-minutes), over
+ * `games` games. The league's table has the same shape.
+ */
+export interface Allowed {
+  games: number;
+  byPos: { [p in Pos]: { n: number } & { [s in NbaStat]: number } };
+}
+
+/**
+ * Opponent factor for one stat: the rate the opponent allows the position
+ * over the league's, shrunk toward 1 by k pseudo-games. 1 with no data or k
+ * missing.
+ */
+export function oppFactor(opp: Allowed | undefined, league: Allowed | undefined, pos: Pos, s: NbaStat, k: number | undefined): number {
+  if (!opp || !league || k === undefined || !Number.isFinite(k) || opp.games <= 0) return 1;
+  const o = opp.byPos[pos];
+  const l = league.byPos[pos];
+  if (!o.n || !l.n || !l[s]) return 1;
+  const ratio = o[s] / o.n / (l[s] / l.n);
+  return (opp.games * ratio + k) / (opp.games + k);
 }
 
 export function teamPace(t: TeamInput, base: LeagueBase, p: NbaParams): number {
@@ -225,6 +281,7 @@ export function projectGame(
   base: LeagueBase,
   p: NbaParams,
   absent: PlayerInput[] = [],
+  league?: Allowed,
 ): Projection[] {
   const spread = Math.abs(homeSpread ?? 0);
   const names = Object.keys(teams);
@@ -244,10 +301,11 @@ export function projectGame(
       if (gone.length) mins = shareMinutes(mins, mine.map((x) => x.pos), gone, p.normalize === "sharePos");
     }
     const pf = p.pace && pace[team] > 0 ? game / pace[team] : 1;
+    const opp = names.length === 2 ? teams[names[0] === team ? names[1] : names[0]].allowed : undefined;
     mine.forEach((pl, i) => {
       const r = projectRates(pl, base, p);
       const mean = {} as { [s in NbaStat]: number };
-      for (const s of NBA_STATS) mean[s] = mins[i] * r[s] * pf;
+      for (const s of NBA_STATS) mean[s] = mins[i] * r[s] * pf * oppFactor(opp, league, pl.prior?.pos ?? pl.pos, s, p.kOpp?.[s]);
       out.push({ id: pl.id, team, min: mins[i], mean });
     });
   }

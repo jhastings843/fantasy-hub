@@ -9,6 +9,7 @@ import type { StoredProps } from "@/lib/props/store";
 import { readMilestones, readPropBets, type PropBetRow } from "../lines";
 import { OUR_SECTION, fbCandidates, ourPropCandidates, type FbGradedBoard } from "../learn";
 import { compactGame, type EspnNbaSummary, type NbaGame } from "./box";
+import { allowedTables } from "./allowed";
 import { ROTATION_GAMES, ingest, rotation, type PlayerEntry, type SeasonSummary, type TeamEntry } from "./history";
 import { ourGame, ourMarkets, type OurMarketExtra } from "./market";
 import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } from "./props";
@@ -192,6 +193,8 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
   if (!prior) report.problems.push(`no prior season summary at ${K.prior(season)}: run scripts/seed-nba-models.mts`);
   report.gameModel = { saved: [], graded: [] };
   let ratings: Promise<GameRatings> | null = null;
+  // Opponent defense by position (props.ts kOpp): what each team has allowed in this season's finished games.
+  let allowed: ReturnType<typeof allowedTables> | null = null;
 
   for (const g of games.filter((x) => x.state === "pre" && x.tip && new Date(x.tip) > now && (!opts.only || opts.only.has(x.id)))) {
     const home = g.teams.find((t) => t.home);
@@ -245,8 +248,12 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
                 .map((x) => x.id);
         for (const id of new Set([...chosen, ...mine.filter((id) => dkIds.has(id))])) inputs.push(input(id));
       }
+      allowed ??= allowedTables(Object.values((await redis.hgetall<{ [id: string]: NbaGame }>(K.games(season))) ?? {}));
       const tIn = Object.fromEntries(
-        [away.abbr, home.abbr].map((t) => [t, { team: t, poss: teams[t]?.poss ?? [], ...(prior.pace[t] !== undefined ? { priorPace: prior.pace[t] } : {}) }]),
+        [away.abbr, home.abbr].map((t) => [
+          t,
+          { team: t, poss: teams[t]?.poss ?? [], ...(prior.pace[t] !== undefined ? { priorPace: prior.pace[t] } : {}), ...(allowed!.teams[t] ? { allowed: allowed!.teams[t] } : {}) },
+        ]),
       );
       // Rotation players listed Out: the fit hands their minutes to whoever is left ("share"), as the backtest did.
       const absent: PlayerInput[] = [];
@@ -265,11 +272,11 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
       // last season. A rookie or a player back from a lost season would
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
-      const projected = projectGame(inputs, tIn, spread, prior.base, P, absent);
+      const projected = projectGame(inputs, tIn, spread, prior.base, P, absent, allowed.league);
       const proj = new Map(projected.filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
       // Our game model: each side's projected points tonight minus with its full rotation (the Out list's cost).
       try {
-        const full = projectGame([...inputs, ...absent], tIn, spread, prior.base, P, []);
+        const full = projectGame([...inputs, ...absent], tIn, spread, prior.base, P, [], allowed.league);
         const pts = (ps: typeof projected, t: string) => ps.filter((x) => x.team === t).reduce((a, x) => a + x.mean.pts, 0);
         const avail = { home: pts(projected, home.abbr) - pts(full, home.abbr), away: pts(projected, away.abbr) - pts(full, away.abbr) };
         const outN = { home: absent.filter((x) => x.team === home.abbr).length, away: absent.filter((x) => x.team === away.abbr).length };

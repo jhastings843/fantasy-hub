@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { compactGame, type EspnNbaSummary } from "./box";
-import { emptyTables, expectedJumper, fbBets, fbBoard, fieldNoVig, firstBasketOf, foldFb, forecast, starterShares, tipSkill, type FbParams } from "./firstbasket";
+import { emptyTables, expectedJumper, fbBets, fbBoard, fieldNoVig, firstBasketOf, foldFb, forecast, openDefense, shareTarget, starterShares, tipSkill, type FbParams } from "./firstbasket";
 import { readPropBets, type PropBetRow } from "../lines";
 import FB from "./fb-params.json";
 
@@ -64,5 +64,37 @@ describe("DK First Basket (ATL at ORL 2026-10-21)", () => {
     expect(bets.length).toBe(edges.length);
     if (won) expect(bets.find((x) => x.id === won.id)!.net).toBeCloseTo(won.price! / 100, 2);
     expect(fbBets(b)).toEqual([]); // ungraded
+  });
+});
+
+describe("tested candidates (off by default)", () => {
+  const t = emptyTables();
+  foldFb(t, g);
+  const det = g.players.filter((p) => p.team === "DET" && p.starter).map((p) => p.id);
+  it("records the starters' opening attempts and the tip loser's record", () => {
+    const att = g.shots.filter((s) => g.players.find((p) => p.id === s.player)?.starter).length;
+    expect(t.open?.att).toBe(att);
+    expect(t.open?.made).toBe(1);
+    // Boston won the tip and Detroit scored first: Boston's opponent did not score first after Detroit lost.
+    expect(t.teams?.DET).toEqual({ lost: 1, oppFirst: 0 });
+  });
+  it("shareTarget is the field-goal share when wAtt is off, and sums to 1 when on", () => {
+    const off = shareTarget(t, det, P);
+    const fgm = det.map((id) => g.players.find((p) => p.id === id)!.fgm);
+    const sum = fgm.reduce((a, x) => a + x, 0);
+    off.forEach((x, i) => expect(x).toBeCloseTo(fgm[i] / sum, 12));
+    const on = shareTarget(t, det, { ...P, wAtt: 0.5, kAtt: 10, kQ: 5 });
+    expect(on.reduce((a, x) => a + x, 0)).toBeCloseTo(1, 12);
+    // The first-basket scorer took opening attempts, so his target rises.
+    const i = det.indexOf("3908845");
+    expect(on[i]).toBeGreaterThan(off[i]);
+  });
+  it("openDefense is 0 when off and moves P(first) when on", () => {
+    expect(openDefense(t, "DET", 0.64, P)).toBe(0);
+    expect(openDefense(t, "DET", 0.64, { ...P, kDef: 10 })).toBeLessThan(0);
+    const team = (x: string) => ({ team: x, starters: g.players.filter((p) => p.team === x && p.starter).map((p) => ({ id: p.id, pos: p.pos })) });
+    const a = forecast(t, team("DET"), team("BOS"), P).first;
+    const b = forecast(t, team("DET"), team("BOS"), { ...P, kDef: 10 }).first;
+    expect(b).not.toBeCloseTo(a, 6);
   });
 });

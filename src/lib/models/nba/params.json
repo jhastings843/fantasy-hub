@@ -3,9 +3,9 @@
   "kMin": 2,
   "minScale": 1.0,
   "k": {
-    "pts": 100,
+    "pts": 200,
     "reb": 400,
-    "ast": 100,
+    "ast": 200,
     "threes": 400
   },
   "kPrior": 100,
@@ -20,5 +20,17 @@
     "threes": 12
   },
   "calib": 0.95,
-  "maxGap": 0.06
+  "maxGap": 0.06,
+  "rateHalfLife": {
+    "pts": 20,
+    "reb": 15,
+    "ast": 10,
+    "threes": 20
+  },
+  "kOpp": {
+    "pts": 160,
+    "reb": 80,
+    "ast": 40,
+    "threes": 80
+  }
 }

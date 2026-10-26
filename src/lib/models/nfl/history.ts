@@ -126,3 +126,40 @@ export class NflRunning {
     return [...new Set((this.teams.get(t) ?? []).slice(-games).flatMap((g) => g.ids))];
   }
 }
+
+const ALLOWED_POS = ["QB", "RB", "WR", "TE"] as const;
+const ALLOWED_STAT: [string, (r: NflRow) => number][] = [
+  ["pass_yds", (r) => r.passYds],
+  ["rush_yds", (r) => r.rushYds],
+  ["rec_yds", (r) => r.recYds],
+  ["rec", (r) => r.rec],
+];
+
+/**
+ * What each defense allowed, from earlier games' rows: its games, its totals
+ * allowed keyed "POS:stat", and the league's average per team-game. The shape
+ * NflTeamInput.defense takes (the opponent-defense input, fit by
+ * scripts/fit-nfl-props.mts, which builds the same tables week by week).
+ *
+ *   defenseTables(rows).KC -> { games: 6, allowed: { "WR:rec_yds": 1010, ... }, league: { "WR:rec_yds": 151.2, ... } }
+ */
+export function defenseTables(rows: NflRow[]): { [team: string]: NonNullable<NflTeamInput["defense"]> } {
+  const perGame = new Map<string, { [k: string]: number }>(); // "game|defense" -> totals
+  for (const r of rows) {
+    const key = `${r.game}|${r.opp}`;
+    const d = perGame.get(key) ?? {};
+    for (const [s, f] of ALLOWED_STAT) d[`${nflPos(r.pos)}:${s}`] = (d[`${nflPos(r.pos)}:${s}`] ?? 0) + f(r);
+    perGame.set(key, d);
+  }
+  const keys = ALLOWED_POS.flatMap((p) => ALLOWED_STAT.map(([s]) => `${p}:${s}`));
+  const all = [...perGame.values()];
+  const league = Object.fromEntries(keys.map((k) => [k, all.reduce((a, d) => a + (d[k] ?? 0), 0) / (all.length || 1)]));
+  const out: { [team: string]: NonNullable<NflTeamInput["defense"]> } = {};
+  for (const [key, d] of perGame) {
+    const team = key.split("|")[1];
+    const t = (out[team] ??= { games: 0, allowed: Object.fromEntries(keys.map((k) => [k, 0])), league });
+    t.games++;
+    for (const k of keys) t.allowed[k] += d[k] ?? 0;
+  }
+  return out;
+}

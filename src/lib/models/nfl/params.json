@@ -15,13 +15,21 @@
   "disp": {
     "rec": 100,
     "rec_yds": 20.3092,
-    "rush_yds": 5.3798,
-    "pass_yds": 3.1623
+    "rush_yds": 15.5707,
+    "pass_yds": 34.5511
   },
   "pow": {
     "rec_yds": 1,
-    "rush_yds": 1.5,
-    "pass_yds": 1.5
+    "rush_yds": 1.25,
+    "pass_yds": 1
   },
-  "calib": 0.85
+  "calib": 0.85,
+  "implied": {
+    "e": 0.3,
+    "mean": 22.65
+  },
+  "kOpp": {
+    "pass_yds": 16,
+    "rec": 32
+  }
 }

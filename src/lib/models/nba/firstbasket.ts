@@ -13,6 +13,14 @@
 //
 // The tables are cumulative across seasons (a jumper's record carries over).
 // Every constant is fit by scripts/fit-first-basket.mts, walk forward. Pure.
+//
+// Tested and left off (2026-10-26, the fit's test split): blending each
+// starter's share of the opening attempts (every shot before the first make)
+// into the shrink target, weighting those attempts by his make rate on them,
+// and an opponent factor for how often a team gives up the first basket after
+// losing the tip. The first two lowered test log loss by under two standard
+// errors, the third by less. Each sits behind an optional FbParams field;
+// left out, the model is unchanged.
 
 import type { NbaGame } from "./box";
 import { implied } from "@/lib/props/parse";
@@ -21,15 +29,28 @@ export interface FbParams {
   kTip: number;
   beta: number;
   kShare: number;
+  /** Tested ideas, each off when left out (scripts/fit-first-basket.mts). */
+  /** Weight on the opening-attempts share in the shrink target (0 or missing: field goals only). */
+  wAtt?: number;
+  /** Pseudo-starts that fade a player's opening-attempts share toward his field-goal share. */
+  kAtt?: number;
+  /** Weight opening attempts by the player's make rate on them, shrunk by this many pseudo-attempts. */
+  kQ?: number;
+  /** Opponent opening defense: its record when it loses the tip, shrunk by this many pseudo-games. */
+  kDef?: number;
 }
 
 export interface FbTables {
   /** Tip record per jumper: jumps and wins. */
   tips: { [id: string]: { n: number; w: number } };
   /** Per starter: starts, starts where his team scored first, first baskets he made, field goals made in his starts. */
-  starts: { [id: string]: { n: number; teamFirst: number; first: number; fgm: number } };
+  starts: { [id: string]: { n: number; teamFirst: number; first: number; fgm: number; att?: number } };
   /** Games where the tip winner scored first, and games counted. */
   tipTeamFirst: { n: number; first: number };
+  /** Starters' opening attempts (every shot up to the first make) and the makes among them. */
+  open?: { att: number; made: number };
+  /** Per team: tips it lost, and how many of those its opponent scored first. */
+  teams?: { [team: string]: { lost: number; oppFirst: number } };
 }
 
 export const emptyTables = (): FbTables => ({ tips: {}, starts: {}, tipTeamFirst: { n: 0, first: 0 } });
@@ -50,7 +71,22 @@ export function foldFb(t: FbTables, g: NbaGame) {
     if (scored) {
       t.tipTeamFirst.n++;
       if (scored.team === winner) t.tipTeamFirst.first++;
+      const loser = [g.home, g.away].find((x) => x !== winner);
+      if (loser && (winner === g.home || winner === g.away)) {
+        const d = ((t.teams ??= {})[loser] ??= { lost: 0, oppFirst: 0 });
+        d.lost++;
+        if (scored.team === winner) d.oppFirst++;
+      }
     }
+  }
+  const starter = new Set(g.players.filter((p) => p.starter).map((p) => p.id));
+  for (const s of g.shots) {
+    if (!starter.has(s.player)) continue;
+    const r = (t.starts[s.player] ??= { n: 0, teamFirst: 0, first: 0, fgm: 0 });
+    r.att = (r.att ?? 0) + 1;
+    const o = (t.open ??= { att: 0, made: 0 });
+    o.att++;
+    if (s.made) o.made++;
   }
   for (const p of g.players) {
     if (!p.starter) continue;
@@ -100,23 +136,64 @@ export interface FbForecast {
   players: FbPlayer[];
 }
 
+/** Per-start rates scaled to sum to 1 across the starters; a starter with no starts gets the others' average. */
+function perStartShare(t: FbTables, starters: string[], val: (r: FbTables["starts"][string]) => number): number[] {
+  const per = starters.map((id) => {
+    const r = t.starts[id];
+    return r && r.n ? val(r) / r.n : NaN;
+  });
+  const known = per.filter(Number.isFinite);
+  const fill = known.length ? known.reduce((a, x) => a + x, 0) / known.length : 1;
+  const f = per.map((x) => (Number.isFinite(x) ? x : fill));
+  const sum = f.reduce((a, x) => a + x, 0) || 1;
+  return f.map((x) => x / sum);
+}
+
+/**
+ * What each starter's first-basket share shrinks toward: his share of the
+ * starters' field goals, blended (weight wAtt, faded by kAtt pseudo-starts)
+ * with his share of their opening attempts, those optionally weighted by his
+ * make rate on them shrunk to the league's by kQ pseudo-attempts.
+ */
+export function shareTarget(t: FbTables, starters: string[], p: FbParams): number[] {
+  const fg = perStartShare(t, starters, (r) => r.fgm);
+  const w = p.wAtt ?? 0;
+  if (!w) return fg;
+  const lg = t.open && t.open.att ? t.open.made / t.open.att : 0.45;
+  const att = perStartShare(t, starters, (r) => {
+    const a = r.att ?? 0;
+    return p.kQ === undefined ? a : (a * (r.first + p.kQ * lg)) / (a + p.kQ || 1);
+  });
+  const mix = starters.map((id, i) => {
+    const n = t.starts[id]?.n ?? 0;
+    const wi = p.kAtt === undefined ? w : (w * n) / (n + p.kAtt || 1);
+    return (1 - wi) * fg[i] + wi * att[i];
+  });
+  const s = mix.reduce((a, x) => a + x, 0) || 1;
+  return mix.map((x) => x / s);
+}
+
 /** Share of a team's first basket per starter. */
 export function starterShares(t: FbTables, starters: string[], p: FbParams): number[] {
-  const fgmPer = starters.map((id) => {
-    const r = t.starts[id];
-    return r && r.n ? r.fgm / r.n : NaN;
-  });
-  const known = fgmPer.filter(Number.isFinite);
-  const fill = known.length ? known.reduce((a, x) => a + x, 0) / known.length : 1;
-  const f = fgmPer.map((x) => (Number.isFinite(x) ? x : fill));
-  const sumF = f.reduce((a, x) => a + x, 0) || 1;
+  const target = shareTarget(t, starters, p);
   const raw = starters.map((id, i) => {
     const r = t.starts[id] ?? { n: 0, teamFirst: 0, first: 0, fgm: 0 };
-    const prior = f[i] / sumF;
-    return (r.first + p.kShare * prior) / (r.teamFirst + p.kShare || 1);
+    return (r.first + p.kShare * target[i]) / (r.teamFirst + p.kShare || 1);
   });
   const s = raw.reduce((a, x) => a + x, 0) || 1;
   return raw.map((x) => x / s);
+}
+
+/**
+ * How much likelier (log odds) a team's opponent is to score first after the
+ * team loses the tip, than the league's tip winner (a), shrunk by kDef
+ * pseudo-games. 0 when kDef is off.
+ */
+export function openDefense(t: FbTables, team: string, a: number, p: FbParams): number {
+  if (p.kDef === undefined) return 0;
+  const r = t.teams?.[team] ?? { lost: 0, oppFirst: 0 };
+  if (!r.lost) return 0;
+  return logit((r.oppFirst + p.kDef * a) / (r.lost + p.kDef)) - logit(a);
 }
 
 export function forecast(t: FbTables, home: FbTeam, away: FbTeam, p: FbParams): FbForecast {
@@ -124,7 +201,9 @@ export function forecast(t: FbTables, home: FbTeam, away: FbTeam, p: FbParams): 
   const ja = expectedJumper(t, away.starters);
   const tip = sigmoid(p.beta * ((jh ? tipSkill(t, jh, p) : 0) - (ja ? tipSkill(t, ja, p) : 0)));
   const a = (t.tipTeamFirst.first + 1) / (t.tipTeamFirst.n + 2);
-  const first = tip * a + (1 - tip) * (1 - a);
+  const aHome = p.kDef === undefined ? a : sigmoid(logit(a) + openDefense(t, away.team, a, p));
+  const aAway = p.kDef === undefined ? a : sigmoid(logit(a) + openDefense(t, home.team, a, p));
+  const first = tip * aHome + (1 - tip) * (1 - aAway);
   const players: FbPlayer[] = [];
   for (const [side, pt] of [
     [home, first],

@@ -239,6 +239,8 @@ for (const [lo, hi] of [[0, 0.2], [0.2, 0.3], [0.3, 0.4], [0.4, 0.5], [0.5, 0.6]
   if (b.length) say(`  ${lo.toFixed(1)}-${Math.min(hi, 1).toFixed(1)}: ${(b.reduce((a, c) => a + c.p, 0) / b.length).toFixed(3)} vs ${(b.reduce((a, c) => a + c.y, 0) / b.length).toFixed(3)}, n ${b.length}`);
 }
 
-writeFileSync("src/lib/models/nba/params.json", JSON.stringify(P, null, 2) + "\n");
+// Keep what this script does not fit (maxGap, and rateHalfLife / kOpp / k from scripts/fit-nba-props-inputs.mts): run that script after this one.
+const keep = JSON.parse(readFileSync("src/lib/models/nba/params.json", "utf8")) as Partial<NbaParams>;
+writeFileSync("src/lib/models/nba/params.json", JSON.stringify({ ...keep, ...P, ...(keep.maxGap !== undefined ? { maxGap: keep.maxGap } : {}), ...(keep.rateHalfLife ? { rateHalfLife: keep.rateHalfLife } : {}), ...(keep.kOpp ? { kOpp: keep.kOpp } : {}) }, null, 2) + "\n");
 writeFileSync(".cache/fit-nba-props.txt", log.join("\n") + "\n");
 console.log("\nwrote src/lib/models/nba/params.json");

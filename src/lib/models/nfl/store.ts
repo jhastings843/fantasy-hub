@@ -10,7 +10,7 @@ import type { StoredProps } from "@/lib/props/store";
 import { readPropBets, type PropBetRow } from "../lines";
 import { OUR_SECTION, ourPropCandidates } from "../learn";
 import { readStats, type NflRow } from "./data";
-import { NflRunning, type NflSummary } from "./history";
+import { NflRunning, defenseTables, type NflSummary } from "./history";
 import { ourNflMarkets, type NflMarketExtra } from "./market";
 import { fdProp, oddsPrice } from "./odds-api";
 import { morningOddsReads } from "./odds-api-store";
@@ -107,11 +107,13 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
 
   if (pre.length && prior && report.week) {
     let run: NflRunning | null = null;
+    let defense: ReturnType<typeof defenseTables> = {};
     try {
       const rows = (await nflverseRows(season)).filter((r) => r.week < report.week!);
       report.nflverseWeek = rows.reduce((a, r) => Math.max(a, r.week), 0);
       run = new NflRunning();
       for (const w of [...new Set(rows.map((r) => r.week))].sort((a, b) => a - b)) run.addWeek(rows.filter((r) => r.week === w));
+      defense = defenseTables(rows);
     } catch (e) {
       report.problems.push(`nflverse: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -195,12 +197,12 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
             else if (last.length === 3 && last.every((g) => g.ids.includes(id))) absent.push(input);
           }
         }
-        const teams = Object.fromEntries([A, H].map((t) => [t, run!.team(t, prior)]));
-        const margin = await homeMargin(e.id);
+        const teams = Object.fromEntries([A, H].map((t) => [t, { ...run!.team(t, prior), ...(defense[t] ? { defense: defense[t] } : {}) }]));
+        const { margin, total } = await homeLine(e.id);
         const proj = new Map<string, NflProjection>();
         // A market only gets our number with real history: 2+ games this season or 4+ last season (as the fit judged).
         const informed = new Set(players.filter((x) => x.games.length >= 2 || (x.prior?.games ?? 0) >= 4).map((x) => x.id));
-        for (const x of projectNflGame(players, teams, H, margin, prior.base, P, absent)) {
+        for (const x of projectNflGame(players, teams, H, margin, prior.base, P, absent, total)) {
           if (!informed.has(x.id)) continue;
           const eid = espnOf.get(x.id);
           if (eid) proj.set(eid, x);
@@ -265,16 +267,21 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
   return report;
 }
 
-/** Expected home margin from DraftKings' spread in ESPN's summary (positive: home favored). */
-export async function homeMargin(event: string): Promise<number | null> {
+/** Expected home margin (positive: home favored) and the total, from DraftKings' line in ESPN's summary. */
+export async function homeLine(event: string): Promise<{ margin: number | null; total: number | null }> {
   try {
-    const s = await json<{ pickcenter?: { provider?: { name?: string }; spread?: number; homeTeamOdds?: { favorite?: boolean } }[] }>(`${SITE}/summary?event=${event}`);
+    const s = await json<{ pickcenter?: { provider?: { name?: string }; spread?: number; overUnder?: number; homeTeamOdds?: { favorite?: boolean } }[] }>(`${SITE}/summary?event=${event}`);
     const pc = s.pickcenter?.find((p) => p.provider?.name === "DraftKings") ?? s.pickcenter?.[0];
-    if (typeof pc?.spread !== "number") return null;
-    return pc.homeTeamOdds?.favorite === false ? -Math.abs(pc.spread) : Math.abs(pc.spread);
+    const total = typeof pc?.overUnder === "number" ? pc.overUnder : null;
+    if (typeof pc?.spread !== "number") return { margin: null, total };
+    return { margin: pc.homeTeamOdds?.favorite === false ? -Math.abs(pc.spread) : Math.abs(pc.spread), total };
   } catch {
-    return null;
+    return { margin: null, total: null };
   }
+}
+
+export async function homeMargin(event: string): Promise<number | null> {
+  return (await homeLine(event)).margin;
 }
 
 export async function nflGradedList(season: number): Promise<GradedPropsGame[]> {

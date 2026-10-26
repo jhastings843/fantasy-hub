@@ -2,20 +2,29 @@
 //
 // 1. Team volume: pass attempts and carries per game, shrunk toward last
 //    season's (kTeam pseudo-games), moved by the expected margin from the
-//    market's spread (a leading team runs, a trailing one throws). Targets
-//    follow attempts at the league's targets-per-attempt.
+//    market's spread (a leading team runs, a trailing one throws), then
+//    scaled by the team's implied points from the market's total and spread,
+//    (total + margin) / 2, against the league mean, to the power e ("implied").
+//    Targets follow attempts at the league's targets-per-attempt.
 // 2. Player shares of targets, carries and attempts, empirical Bayes:
 //    (his count + k x prior share) / (team count in his games + k), the prior
 //    being last season's share, else his position's average share. Shares of
 //    rotation players who are out tonight can be handed to the rest ("share").
 // 3. Efficiency (yards per target, catch rate, yards per carry, yards per
 //    attempt), shrunk hard toward last season, itself shrunk toward the position.
-// 4. Distribution: receptions negative binomial; yardage gamma with variance
+// 4. Opponent defense: passing yards and receptions are scaled by what the
+//    opponent allowed to his position in its earlier games this season against
+//    the league average per team-game, shrunk toward 1 with kOpp pseudo-games
+//    per stat (none at week 1). Rushing and receiving yards are left alone:
+//    the fit found nothing there that held up out of sample.
+// 5. Distribution: receptions negative binomial; yardage gamma with variance
 //    phi x mean^pow (skewed, never negative; pow 1 to 2 is fit per stat). Yardage is priced from the CDF, so
 //    the median matters, not the mean. (The plan's Monte Carlo gives the
 //    same kind of skewed CDF; the closed form is deterministic and fast.)
 //
 // Every constant in NflParams is fit by scripts/fit-nfl-props.mts, walk forward.
+// Depth of target ("adot", air yards per target as the yards-per-target prior)
+// was tried and lost out of sample; it stays off.
 // Pure: no fetches, no Redis.
 
 import { calibrate, lgamma, nbPmf } from "../nba/props";
@@ -69,6 +78,19 @@ export interface NflParams {
   disp: { rec: number; rec_yds: number; rush_yds: number; pass_yds: number };
   pow: { rec_yds: number; rush_yds: number; pass_yds: number };
   calib: number;
+  /**
+   * Opponent defense, per stat: pseudo-games of league average added to what
+   * the opponent allowed to the player's position. A stat left out: no adjustment.
+   */
+  kOpp?: { [s in NflStat]?: number };
+  /** Team volume x (implied points / mean)^e. Absent or e 0: off. */
+  implied?: { e: number; mean: number };
+  /**
+   * Depth of target: the yards-per-target prior becomes (1 - w) x itself +
+   * w x (a + b x aDOT), aDOT shrunk toward `mean` with k pseudo-targets.
+   * Absent or w 0: off.
+   */
+  adot?: { w: number; a: number; b: number; k: number; mean: number };
 }
 
 export interface NflPlayerInput {
@@ -77,6 +99,8 @@ export interface NflPlayerInput {
   pos: NflPos;
   games: PlayerGame[];
   prior?: PriorPlayer;
+  /** Air yards and targets from play by play, earlier games (this season and last). */
+  air?: { yds: number; tgt: number };
 }
 
 export interface NflTeamInput {
@@ -84,6 +108,12 @@ export interface NflTeamInput {
   /** This season's games: attempts and carries. */
   games: { att: number; car: number }[];
   prior?: { att: number; car: number };
+  /**
+   * What this team's defense allowed in its earlier games this season, keyed
+   * "POS:stat" ("WR:rec_yds"): totals over `games`, and the league's average
+   * per team-game alongside.
+   */
+  defense?: { games: number; allowed: { [key: string]: number }; league: { [key: string]: number } };
 }
 
 export interface NflProjection {
@@ -97,12 +127,37 @@ export interface NflProjection {
 
 const sum = (xs: PlayerGame[], f: (g: PlayerGame) => number) => xs.reduce((a, g) => a + f(g), 0);
 
-export function teamVolume(t: NflTeamInput, margin: number, base: NflBase, p: NflParams): { att: number; car: number; tgt: number } {
+/** A team's implied points from the market: (total + its expected margin) / 2. */
+export function impliedPoints(total: number, margin: number): number {
+  return (total + margin) / 2;
+}
+
+/**
+ * How much a defense gives up to a position, relative to the league:
+ * (allowed + k x league) / ((games + k) x league). 1 with no games or no league.
+ */
+export function oppFactor(allowed: number, games: number, league: number, k: number): number {
+  if (!(league > 0) || games + k <= 0) return 1;
+  return (allowed + k * league) / ((games + k) * league);
+}
+
+/** Yards per target implied by depth of target: a + b x aDOT, aDOT shrunk toward the mean with k targets. */
+export function adotYpt(air: { yds: number; tgt: number } | undefined, q: NonNullable<NflParams["adot"]>): number {
+  const adot = ((air?.yds ?? 0) + q.k * q.mean) / ((air?.tgt ?? 0) + q.k);
+  return q.a + q.b * adot;
+}
+
+export function teamVolume(t: NflTeamInput, margin: number, base: NflBase, p: NflParams, implied: number | null = null): { att: number; car: number; tgt: number } {
   const n = t.games.length;
   const pa = t.prior?.att ?? base.att;
   const pc = t.prior?.car ?? base.car;
-  const att = (t.games.reduce((a, g) => a + g.att, 0) + p.kTeam * pa) / (n + p.kTeam) + p.margin.att * margin;
-  const car = (t.games.reduce((a, g) => a + g.car, 0) + p.kTeam * pc) / (n + p.kTeam) + p.margin.car * margin;
+  let att = (t.games.reduce((a, g) => a + g.att, 0) + p.kTeam * pa) / (n + p.kTeam) + p.margin.att * margin;
+  let car = (t.games.reduce((a, g) => a + g.car, 0) + p.kTeam * pc) / (n + p.kTeam) + p.margin.car * margin;
+  if (p.implied?.e && implied !== null && implied > 0) {
+    const f = Math.pow(implied / p.implied.mean, p.implied.e);
+    att *= f;
+    car *= f;
+  }
   return { att: Math.max(att, 10), car: Math.max(car, 8), tgt: Math.max(att, 10) * base.tgtPerAtt };
 }
 
@@ -119,11 +174,16 @@ export function playerRates(pl: NflPlayerInput, base: NflBase, p: NflParams) {
     return (num + k * prior) / (den + k);
   };
   const g = pl.games;
+  const q = p.adot;
+  const yptPrior = (pr && pr.tgt !== undefined ? (pr.recYds + p.kYpt * b.ypt) / (pr.tgt + p.kYpt) : b.ypt);
+  const ypt = q?.w
+    ? (sum(g, (x) => x.recYds) + p.kYpt * ((1 - q.w) * yptPrior + q.w * adotYpt(pl.air, q))) / (sum(g, (x) => x.tgt) + p.kYpt)
+    : eff(p.kYpt, sum(g, (x) => x.recYds), sum(g, (x) => x.tgt), pr?.recYds, pr?.tgt, b.ypt);
   return {
     tgtShare: share(p.kTgt, sum(g, (x) => x.tgt), sum(g, (x) => x.teamTgt), pr?.tgt, pr?.teamTgt, b.tgtShare),
     carShare: share(p.kCar, sum(g, (x) => x.car), sum(g, (x) => x.teamCar), pr?.car, pr?.teamCar, b.carShare),
     attShare: share(p.kAtt, sum(g, (x) => x.att), sum(g, (x) => x.teamAtt), pr?.att, pr?.teamAtt, b.attShare),
-    ypt: eff(p.kYpt, sum(g, (x) => x.recYds), sum(g, (x) => x.tgt), pr?.recYds, pr?.tgt, b.ypt),
+    ypt,
     cr: eff(p.kCr, sum(g, (x) => x.rec), sum(g, (x) => x.tgt), pr?.rec, pr?.tgt, b.cr),
     ypc: eff(p.kYpc, sum(g, (x) => x.rushYds), sum(g, (x) => x.car), pr?.rushYds, pr?.car, b.ypc),
     ypa: eff(p.kYpa, sum(g, (x) => x.passYds), sum(g, (x) => x.att), pr?.passYds, pr?.att, b.ypa),
@@ -134,7 +194,8 @@ export function playerRates(pl: NflPlayerInput, base: NflBase, p: NflParams) {
  * Every available player's projection for one game. `homeMargin` is the
  * expected home margin (positive: home favored). `absent` are rotation
  * players out tonight; with `share` on, their shares go to the rest of
- * their team in proportion.
+ * their team in proportion. `total` is the market's game total (implied
+ * points); each team's `defense` adjusts the other team's players.
  */
 export function projectNflGame(
   players: NflPlayerInput[],
@@ -144,11 +205,18 @@ export function projectNflGame(
   base: NflBase,
   p: NflParams,
   absent: NflPlayerInput[] = [],
+  total: number | null = null,
 ): NflProjection[] {
   const out: NflProjection[] = [];
   for (const team of Object.keys(teams)) {
     const margin = (homeMargin ?? 0) * (team === home ? 1 : -1);
-    const v = teamVolume(teams[team], margin, base, p);
+    const implied = total !== null && homeMargin !== null ? impliedPoints(total, margin) : null;
+    const v = teamVolume(teams[team], margin, base, p, implied);
+    const def = p.kOpp ? teams[Object.keys(teams).find((t) => t !== team) ?? ""]?.defense : undefined;
+    const opp = (pos: NflPos, stat: NflStat) => {
+      const k = p.kOpp?.[stat];
+      return def && k !== undefined ? oppFactor(def.allowed[`${pos}:${stat}`] ?? 0, def.games, def.league[`${pos}:${stat}`] ?? 0, k) : 1;
+    };
     const mine = players.filter((x) => x.team === team);
     const rates = mine.map((x) => playerRates(x, base, p));
     if (p.share) {
@@ -164,7 +232,20 @@ export function projectNflGame(
       const tgt = r.tgtShare * v.tgt;
       const car = r.carShare * v.car;
       const att = pl.pos === "QB" ? r.attShare * v.att : 0;
-      out.push({ id: pl.id, team, tgt, car, att, mean: { rec: tgt * r.cr, rec_yds: tgt * r.ypt, rush_yds: car * r.ypc, pass_yds: att * r.ypa } });
+      const pos = pl.prior?.pos ?? pl.pos;
+      out.push({
+        id: pl.id,
+        team,
+        tgt,
+        car,
+        att,
+        mean: {
+          rec: tgt * r.cr * opp(pos, "rec"),
+          rec_yds: tgt * r.ypt * opp(pos, "rec_yds"),
+          rush_yds: car * r.ypc * opp(pos, "rush_yds"),
+          pass_yds: att * r.ypa * opp(pos, "pass_yds"),
+        },
+      });
     });
   }
   return out;
