@@ -296,6 +296,26 @@ export const FTD_GATE: Gate = {
   rollbackT: 1.645,
 };
 
+/**
+ * NFL Anytime TD at DraftKings' price. Prices run -200 to +600, between props
+ * and first TD, and a game has 10 to 20 bets that move together (a shootout
+ * lifts every over), so it takes the props sample sizes plus 25 actual winners.
+ */
+export const ATTD_GATE: Gate = {
+  minGames: 30,
+  minWeeks: 3,
+  minBets: 100,
+  minWins: 25,
+  minT: 2.33,
+  minPairedT: 1.645,
+  maxNew: 2,
+  ddSd: 3,
+  ddSlack: 3,
+  moveMin: 20,
+  rollbackGames: 20,
+  rollbackT: 1.645,
+};
+
 // ------------------------------------------------------------------- views
 
 export interface EntryView extends Entry {

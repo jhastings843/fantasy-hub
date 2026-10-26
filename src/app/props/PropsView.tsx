@@ -6,10 +6,10 @@ import { DavidResearch, DavidResults, DavidWeek } from "./davidprops";
 import { OurNflResults } from "./ournfl";
 import { OurFtdResults } from "./ourftd";
 import { OurFirstBasketResults, OurNbaResults } from "./ournba";
-import { KotcResults, KotcWeek } from "./kotc";
+import { KotcLog, KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
-import { LottoResults, LottoToday } from "./lotto";
-import { AttdResults, AttdWeek } from "./attd";
+import { LottoLog, LottoResults, LottoToday } from "./lotto";
+import { AttdLog, AttdResults, AttdWeek } from "./attd";
 import { Background, PageHead, SecHead } from "../picks/board";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
@@ -58,9 +58,9 @@ export default async function PropsView({
   const sport = market === "nba" || market === "fb" || market === "kotc" || market === "lotto" ? "nba" : "nfl";
   // Only David's board has a Research view (NFL player props); our models keep theirs on Results and the Learner log.
   const base = sport === "nba" ? NBA_VIEWS : VIEWS;
-  // King of the Court has no learner yet (its numbers are graded nightly and refit between seasons), so no log view.
-  const views = base.filter((v) => v.id !== "research" || market === "pp").concat(market === "kotc" || market === "lotto" || market === "attd" ? [] : [LOG_VIEW]);
-  const shown: View = (market === "kotc" || market === "lotto" || market === "attd") && view === "log" ? "week" : market !== "pp" && view === "research" ? "results" : view;
+  // Every market has a learner log (King of the Court, lottos and Anytime TD from 2026-10-26).
+  const views = base.filter((v) => v.id !== "research" || market === "pp").concat([LOG_VIEW]);
+  const shown: View = market !== "pp" && view === "research" ? "results" : view;
   return (
     <main className={s.page}>
       <div className={s.wrap}>
@@ -73,7 +73,7 @@ export default async function PropsView({
           <div className={s.controlBar}>
             <nav className={s.chips} aria-label="Market">
               {ALL_MARKETS.map((m) => (
-                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown === "log" && (m.id === "kotc" || m.id === "lotto" || m.id === "attd") ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
+                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
                   {m.label}
                 </Link>
               ))}
@@ -95,6 +95,9 @@ export default async function PropsView({
         {market === "lotto" && shown === "results" && <LottoResults season={season} />}
         {market === "attd" && shown === "week" && <AttdWeek season={season} />}
         {market === "attd" && shown === "results" && <AttdResults season={season} />}
+        {market === "attd" && shown === "log" && <AttdLog season={season} />}
+        {market === "lotto" && shown === "log" && <LottoLog season={season} />}
+        {market === "kotc" && shown === "log" && <KotcLog season={season} />}
         {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
         {market === "kotc" && shown === "results" && <KotcResults season={season} />}
         {market === "pp" && shown === "results" && <OurNflResults season={season} />}

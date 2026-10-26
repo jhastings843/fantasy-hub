@@ -138,6 +138,48 @@ export async function OurFtdResults({ season }: { season: number }) {
       ) : (
         <p className={s.calm}>Nothing graded yet. Boards are graded from ESPN&apos;s scoring plays after each game.</p>
       )}
+      {v.graded.length > 0 && (
+        <div className={s.section}>
+          <div className={s.sectionHead}>
+            <h3 className={s.h2}>Every graded game</h3>
+            <p className={s.p}>Newest first. Value bets are every player whose chance beat the best price (Kalshi with fee, DraftKings or FanDuel), one unit each.</p>
+          </div>
+          <div className={s.tw}>
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>Game</th>
+                  <th>First TD</th>
+                  <th>We gave him</th>
+                  <th>Our pick</th>
+                  <th>Value bets</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...v.graded]
+                  .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""))
+                  .map((x) => {
+                    const bets = bestBets([x], (p, c) => p.p > c);
+                    const won = bets.filter((b) => b.win).length;
+                    const units = bets.reduce((a, b) => a + b.net, 0);
+                    const r = x.result;
+                    return (
+                      <tr key={x.slug}>
+                        <td>
+                          {`${x.game.away} at ${x.game.home}`} <span className={s.dim}>{`Wk ${x.week}`}</span>
+                        </td>
+                        <td>{r.first.kind === "offense" ? r.first.scorer : "No offensive TD first"}</td>
+                        <td className={s.num}>{r.p !== null ? `${pct(r.p)}${r.rank ? ` (#${r.rank})` : ""}` : "·"}</td>
+                        <td>{x.game.pick ? `${x.game.pick.name} ${r.pickHit ? "hit" : "missed"}` : "·"}</td>
+                        <td className={s.num}>{bets.length ? `${won} of ${bets.length}, ${u(units)}` : "none"}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <LearningBlock v={v.learning} />
     </section>
   );

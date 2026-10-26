@@ -14,7 +14,9 @@ import { ROTATION_GAMES, ingest, rotation, type PlayerEntry, type SeasonSummary,
 import { ourGame, ourMarkets, type OurMarketExtra } from "./market";
 import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } from "./props";
 import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFb, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
-import { runKotc, type KotcGameInput } from "./kotc-store";
+import { getKotcNights, runKotc, type KotcGameInput } from "./kotc-store";
+import { SECTIONS, kotcCandidates, lottoCandidates } from "../sections";
+import { rungsOf, tickets as lottoTickets } from "./lotto";
 import { gradeGameModel, ratingsNow, saveGameModel } from "./game-store";
 import type { GameRatings } from "./game";
 import PARAMS from "./params.json";
@@ -368,6 +370,9 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
     const cands = ourPropCandidates(await gradedList(season), ["pts", "reb", "ast", "threes"]);
     for (const j of await reviewIfDue(OUR_SECTION.nbaProps, season, nbaWeek(now, season), PROPS_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
     for (const j of await reviewIfDue(OUR_SECTION.nbaFirstBasket, season, nbaWeek(now, season), FTD_GATE, fbCandidates(await fbGraded(season)), now)) if (j.kind !== "registered") report.learning.push(`First Basket: ${j.text}`);
+    const every = await allBoards(season);
+    for (const j of await reviewIfDue(SECTIONS.nbaLotto, season, nbaWeek(now, season), FTD_GATE, lottoFor(every, season), now)) if (j.kind !== "registered") report.learning.push(`Lottos: ${j.text}`);
+    for (const j of await reviewIfDue(SECTIONS.nbaKotc, season, nbaWeek(now, season), PROPS_GATE, kotcCandidates(await getKotcNights(season), every, season), now)) if (j.kind !== "registered") report.learning.push(`King of the Court: ${j.text}`);
   } catch (e) {
     report.problems.push(`learning: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -457,4 +462,17 @@ export async function getOurNbaView(season: number, now = new Date()): Promise<O
     learning: sectionView(PROPS_GATE, state, ourPropCandidates(graded, ["pts", "reb", "ast", "threes"]), journal),
     fb: { graded: fbList, learning: sectionView(FTD_GATE, fbState, fbCandidates(fbList), fbJournal) },
   };
+}
+
+const lottoFor = (boards: OurStoredProps[], season: number) => {
+  const rungs = rungsOf(boards);
+  return lottoCandidates(rungs, lottoTickets(rungs), season);
+};
+
+/** The lotto and King of the Court learners: each section, judged on its gate (lottos on the long-price gate). */
+export async function getNbaSectionLearning(section: typeof SECTIONS.nbaLotto | typeof SECTIONS.nbaKotc, season: number): Promise<SectionView> {
+  const [state, journal, every] = await Promise.all([loadSection(section, season), loadJournal(section, season), allBoards(season)]);
+  return section === SECTIONS.nbaLotto
+    ? sectionView(FTD_GATE, state, lottoFor(every, season), journal)
+    : sectionView(PROPS_GATE, state, kotcCandidates(await getKotcNights(season), every, season), journal);
 }

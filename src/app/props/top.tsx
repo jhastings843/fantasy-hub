@@ -256,6 +256,19 @@ export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "f
   const want = { pp: "NFL props", ftd: "First TD", nba: "NBA props", fb: "First Basket" }[tab];
   const items = all?.filter((p) => p.name === want) ?? null;
   if (!items) return <p className={s.calm}>The learning sections couldn&apos;t be read just now. Try again in a minute.</p>;
+  const short = tab === "pp" || tab === "nba";
+  return (
+    <LearnerLogBody
+      want={want}
+      items={items}
+      gateText={short ? "30+ games over 3+ weeks and 100+ bets" : "60+ games over 4+ weeks and 12+ winners (long prices)"}
+      breakEven={short ? 0.524 : undefined}
+    />
+  );
+}
+
+/** The learner log for any section: progress toward the gate, the journal, and every slice's tracked record. */
+export function LearnerLogBody({ want, items, gateText, breakEven }: { want: string; items: { name: string; learning: SectionView }[]; gateText: string; breakEven?: number }) {
   const entries: LogEntry[] = items
     .flatMap((p) => p.learning.journal.filter((j) => j.kind !== "review" || /went live|rolled back|registered/i.test(j.text)).map((j) => engineEntry(j, p.name)))
     .sort((a, b) => b.at.localeCompare(a.at));
@@ -265,7 +278,7 @@ export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "f
       <Hero
         eyebrow={`${want} · what changed, and why`}
         title={<span id="props-log">Learner log</span>}
-        sub={`Every slice is tracked from the day it was first seen, on later games only. It goes live at ${tab === "pp" || tab === "nba" ? "30+ games over 3+ weeks and 100+ bets" : "60+ games over 4+ weeks and 12+ winners (long prices)"} with a clear edge, and is rolled back if it starts losing.`}
+        sub={`Every slice is tracked from the day it was first seen, on later games only. It goes live at ${gateText} with a clear edge, and is rolled back if it starts losing.`}
       />
       <TrackingProgress
         rows={items.flatMap((p) => trackRows(p.learning, items.length > 1 ? `${p.name}: ` : ""))}
@@ -286,7 +299,7 @@ export async function PropsLog({ tab, season }: { tab: "pp" | "ftd" | "nba" | "f
             open={i === 0}
             rows={p.learning.entries
               .filter((e) => (e.ev?.bets ?? 0) > 0)
-              .map((e) => ({ label: e.label, w: e.ev!.wins, l: e.ev!.bets - e.ev!.wins, be: tab === "pp" || tab === "nba" ? 0.524 : undefined, units: e.ev!.units }))}
+              .map((e) => ({ label: e.label, w: e.ev!.wins, l: e.ev!.bets - e.ev!.wins, be: breakEven, units: e.ev!.units }))}
           />
         ))}
       </div>

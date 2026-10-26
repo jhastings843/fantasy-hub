@@ -4,7 +4,9 @@
 // the prop of his we'd attach, and how to read the pool. Results: every
 // graded night against the board as it stood at the first tip.
 import type { PropMarket } from "@/lib/props/parse";
-import { getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
+import { getNbaSectionLearning, getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
+import { SECTIONS } from "@/lib/models/sections";
+import { LearnerLogBody } from "./top";
 import { getKotcNights, type KotcNight } from "@/lib/models/nba/kotc-store";
 import { whenEt } from "../picks/ui";
 import { Background, Hero, Stats } from "../picks/board";
@@ -226,5 +228,18 @@ export async function KotcResults({ season }: { season: number }) {
       )}
       <Backtest />
     </section>
+  );
+}
+
+export async function KotcLog({ season }: { season: number }) {
+  const learning = await getNbaSectionLearning(SECTIONS.nbaKotc, season).catch(() => null);
+  if (!learning) return <p className={s.calm}>The King of the Court learner couldn&apos;t be read just now.</p>;
+  return (
+    <LearnerLogBody
+      want="King of the Court (the prop we would tag)"
+      items={[{ name: "King of the Court", learning }]}
+      gateText="30+ nights over 3+ weeks and 100+ tagged props"
+      breakEven={0.524}
+    />
   );
 }

@@ -2,7 +2,9 @@
 // @TheModelManSam posts (Jack, 2026-10-26). Today: tonight's ticket from our
 // props model and the best-value long rungs. Results: every long rung graded
 // (do our long-shot chances beat DK's?) and every night's ticket.
-import { allBoards } from "@/lib/models/nba/store";
+import { allBoards, getNbaSectionLearning } from "@/lib/models/nba/store";
+import { SECTIONS } from "@/lib/models/sections";
+import { LearnerLogBody } from "./top";
 import { LEGS, STAKE, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
 import { etDate, implied } from "@/lib/props/parse";
 import { Background, Hero, Stats } from "../picks/board";
@@ -196,4 +198,10 @@ export async function LottoResults({ season }: { season: number }) {
       <Explainer />
     </section>
   );
+}
+
+export async function LottoLog({ season }: { season: number }) {
+  const learning = await getNbaSectionLearning(SECTIONS.nbaLotto, season).catch(() => null);
+  if (!learning) return <p className={s.calm}>The lotto learner couldn&apos;t be read just now.</p>;
+  return <LearnerLogBody want="Lottos" items={[{ name: "Lottos", learning }]} gateText="60+ games over 4+ weeks and 12+ winners (long prices)" />;
 }

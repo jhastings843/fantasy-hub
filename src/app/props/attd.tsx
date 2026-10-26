@@ -1,7 +1,8 @@
 // Anytime TD (NFL): our model (lib/models/nfl/anytime.ts) against DraftKings'
 // Anytime and 2+ TD prices from ESPN's odds feed. Paper only for now: edges
 // are graded flat 1u so a record exists before it makes picks or parlays.
-import { getOurFtdView, attdGraded } from "@/lib/models/nfl/ftd-store";
+import { getOurFtdView, attdGraded, getAttdLearning } from "@/lib/models/nfl/ftd-store";
+import { LearnerLogBody } from "./top";
 import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/nfl/anytime";
 import { implied } from "@/lib/props/parse";
 import { Background, Hero, Stats } from "../picks/board";
@@ -161,4 +162,10 @@ export async function AttdResults({ season }: { season: number }) {
       <Explainer />
     </section>
   );
+}
+
+export async function AttdLog({ season }: { season: number }) {
+  const learning = await getAttdLearning(season).catch(() => null);
+  if (!learning) return <p className={s.calm}>The Anytime TD learner couldn&apos;t be read just now.</p>;
+  return <LearnerLogBody want="Anytime TD" items={[{ name: "Anytime TD", learning }]} gateText="30+ games over 3+ weeks, 100+ bets and 25+ winners" />;
 }

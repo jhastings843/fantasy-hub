@@ -711,12 +711,14 @@ async function FirstTdWeek({ season }: { season: number }) {
     )
     .sort((a, b) => b.gap - a.gap);
   const graded = ftdBestRecord(v.graded);
-  const rows: GameRowData[] = v.board.map((g) => {
+  // The board holds games still to finish, soonest first; a graded game moves to Results (Jack, 2026-10-26).
+  const open = v.board.filter((g) => !g.result).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
+  const rows: GameRowData[] = open.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
     const keeps = keepsFor(g.kickoff);
     const bets = pricedPlayers(g.game).filter((p) => {
-      const k = kalshi(g, p.name);
-      return k !== null && keeps.some((keep) => keep(p, k, g.game));
+      const c = cost(g, p.name);
+      return c !== null && keeps.some((keep) => keep(p, c, g.game));
     });
     const vals = pricedPlayers(g.game).filter((p) => {
       const c = cost(g, p.name);
@@ -794,7 +796,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>Every game</h3>
-          <p className={s.p}>Open a game for every player: our chance against Kalshi&apos;s cost (fee in) and DraftKings&apos; price, which is read the morning of game day. It&apos;s an edge when our chance beats the cheaper of the two.</p>
+          <p className={s.p}>Games still to finish, soonest first; a game moves to Results once it is graded. Open one for every player: our chance against Kalshi&apos;s cost (fee in) and DraftKings&apos; price, read the morning of game day. It&apos;s an edge when our chance beats the best price.</p>
         </div>
         <GameTable head={["Scores first", "Likeliest", "Edges", "First TD"]} rows={rows} />
       </div>

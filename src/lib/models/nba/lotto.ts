@@ -33,6 +33,8 @@ export interface LottoBoard {
 
 export interface Rung extends LongRung {
   date: string;
+  /** Tip time (ISO). */
+  at: string;
   game: string;
   matchup: string;
   id: string;
@@ -81,6 +83,7 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
         out.push({
           ...r,
           date,
+          at: b.kickoff,
           game: b.espnId,
           matchup: `${b.away}@${b.home}`,
           id: m.id,

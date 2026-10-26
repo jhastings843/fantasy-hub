@@ -5,7 +5,8 @@ import { kalshiFirstTd, type KalshiGame } from "@/lib/firsttd/kalshi";
 import type { FtdGame } from "@/lib/firsttd/parse";
 import type { GradedGame } from "@/lib/firsttd/trends";
 import { nameKey } from "@/lib/props/grade";
-import { FTD_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
+import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
+import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
 import { addTotals, ftdGame, impliedPoints, tdTotals, type FtdParams, type TdLine } from "./firsttd";
@@ -225,6 +226,8 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
   try {
     const cands = ourFtdCandidates(await ftdGraded(season));
     for (const j of await reviewIfDue(OUR_SECTION.nflFirstTd, season, report.week ?? weeks.at(-1) ?? 0, FTD_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
+    const attd = attdCandidates(await attdGraded(season));
+    for (const j of await reviewIfDue(SECTIONS.nflAttd, season, report.week ?? weeks.at(-1) ?? 0, ATTD_GATE, attd, now)) if (j.kind !== "registered") report.learning.push(`Anytime TD: ${j.text}`);
   } catch (err) {
     report.problems.push(`learning: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -240,11 +243,11 @@ export async function ftdGraded(season: number): Promise<(GradedGame & Books & {
 }
 
 /** Every graded Anytime TD board, newest week first. */
-export async function attdGraded(season: number): Promise<AttdGraded[]> {
+export async function attdGraded(season: number): Promise<(AttdGraded & { at: string })[]> {
   const nums = ((await redis.smembers(FK.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.attd && g.attdResult ? [{ slug, week, rows: g.attd.rows, result: g.attdResult }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.attd && g.attdResult ? [{ slug, week, at: g.kickoff ?? g.capturedAt, rows: g.attd.rows, result: g.attdResult }] : [])))
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
 
@@ -263,4 +266,10 @@ export async function getOurFtdView(season: number): Promise<OurFtdView> {
   const graded = await ftdGraded(season);
   const [state, journal] = await Promise.all([loadSection(OUR_SECTION.nflFirstTd, season), loadJournal(OUR_SECTION.nflFirstTd, season)]);
   return { season, week, board, graded, learning: sectionView(FTD_GATE, state, ourFtdCandidates(graded), journal) };
+}
+
+/** Anytime TD's learner: its section, judged on ATTD_GATE. */
+export async function getAttdLearning(season: number): Promise<SectionView> {
+  const [state, journal, graded] = await Promise.all([loadSection(SECTIONS.nflAttd, season), loadJournal(SECTIONS.nflAttd, season), attdGraded(season)]);
+  return sectionView(ATTD_GATE, state, attdCandidates(graded), journal);
 }
