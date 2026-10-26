@@ -83,6 +83,20 @@ export function american(s: string | undefined): number | null {
 const athleteOf = (r: PropBetRow) => r.athlete?.$ref?.match(/athletes\/(\d+)/)?.[1];
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
 
+/** DraftKings' Anytime TD and 2+ TD prices (American) per ESPN athlete id, from an NFL propBets list. */
+export function readTdScorers(rows: PropBetRow[]): Map<string, { anytime?: number; two?: number }> {
+  const want: { [type: string]: "anytime" | "two" } = { "Anytime Touchdown Scorer": "anytime", "Player to score 2 or more touchdowns": "two" };
+  const out = new Map<string, { anytime?: number; two?: number }>();
+  for (const r of rows) {
+    const k = want[r.type?.name ?? ""];
+    const a = athleteOf(r);
+    const price = american(r.odds?.american?.value);
+    if (!k || !a || price === null) continue;
+    out.set(a, { ...out.get(a), [k]: price });
+  }
+  return out;
+}
+
 /** A propBets list read into one entry per (athlete, market type), kept types only. */
 export function readPropBets(rows: PropBetRow[], league: LinesLeague): Map<string, LiveLine> {
   const keep = new Set(ARCHIVE_TYPES[league]);

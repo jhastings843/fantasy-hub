@@ -9,6 +9,7 @@ import { OurFirstBasketResults, OurNbaResults } from "./ournba";
 import { KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
 import { LottoResults, LottoToday } from "./lotto";
+import { AttdResults, AttdWeek } from "./attd";
 import { Background, PageHead, SecHead } from "../picks/board";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
@@ -20,18 +21,19 @@ import s from "../picks/picks.module.css";
 // (market, then view, both in the URL), no stakes: everything here is
 // tracked and graded until a slice earns its way into the system.
 
-export type PropsMarket = "pp" | "ftd" | "nba" | "fb" | "kotc" | "lotto";
+export type PropsMarket = "pp" | "ftd" | "nba" | "fb" | "kotc" | "lotto" | "attd";
 /** Every market in one control, in the Ledger order, and each one's page title. */
 const ALL_MARKETS: { id: PropsMarket; label: string }[] = [
   { id: "pp", label: "NFL props" },
   { id: "ftd", label: "First TD" },
+  { id: "attd", label: "Anytime TD" },
   { id: "nba", label: "NBA props" },
   { id: "fb", label: "First Basket" },
   { id: "kotc", label: "King of the Court" },
   { id: "lotto", label: "Lottos" },
 ];
-const TITLE: { [k in PropsMarket]: string } = { pp: "NFL player props", ftd: "NFL First TD", nba: "NBA player props", fb: "NBA First Basket", kotc: "NBA King of the Court", lotto: "NBA lottos (paper)" };
-export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" || x === "lotto" ? x : "pp");
+const TITLE: { [k in PropsMarket]: string } = { pp: "NFL player props", ftd: "NFL First TD", nba: "NBA player props", fb: "NBA First Basket", kotc: "NBA King of the Court", lotto: "NBA lottos (paper)", attd: "NFL Anytime TD" };
+export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" || x === "lotto" || x === "attd" ? x : "pp");
 
 function href(m: PropsMarket, v: View) {
   const q = new URLSearchParams();
@@ -57,8 +59,8 @@ export default async function PropsView({
   // Only David's board has a Research view (NFL player props); our models keep theirs on Results and the Learner log.
   const base = sport === "nba" ? NBA_VIEWS : VIEWS;
   // King of the Court has no learner yet (its numbers are graded nightly and refit between seasons), so no log view.
-  const views = base.filter((v) => v.id !== "research" || market === "pp").concat(market === "kotc" || market === "lotto" ? [] : [LOG_VIEW]);
-  const shown: View = (market === "kotc" || market === "lotto") && view === "log" ? "week" : market !== "pp" && view === "research" ? "results" : view;
+  const views = base.filter((v) => v.id !== "research" || market === "pp").concat(market === "kotc" || market === "lotto" || market === "attd" ? [] : [LOG_VIEW]);
+  const shown: View = (market === "kotc" || market === "lotto" || market === "attd") && view === "log" ? "week" : market !== "pp" && view === "research" ? "results" : view;
   return (
     <main className={s.page}>
       <div className={s.wrap}>
@@ -71,7 +73,7 @@ export default async function PropsView({
           <div className={s.controlBar}>
             <nav className={s.chips} aria-label="Market">
               {ALL_MARKETS.map((m) => (
-                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown === "log" && (m.id === "kotc" || m.id === "lotto") ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
+                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown === "log" && (m.id === "kotc" || m.id === "lotto" || m.id === "attd") ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
                   {m.label}
                 </Link>
               ))}
@@ -86,11 +88,13 @@ export default async function PropsView({
           </div>
         </header>
 
-        {shown === "week" && market !== "lotto" && <PropsLineup tab={market} season={season} />}
-        {shown === "week" && market !== "kotc" && market !== "lotto" && <PropTabWeek tab={market} season={season} />}
-        {shown === "log" && market !== "kotc" && market !== "lotto" && <PropsLog tab={market} season={season} />}
+        {shown === "week" && market !== "lotto" && market !== "attd" && <PropsLineup tab={market} season={season} />}
+        {shown === "week" && market !== "kotc" && market !== "lotto" && market !== "attd" && <PropTabWeek tab={market} season={season} />}
+        {shown === "log" && market !== "kotc" && market !== "lotto" && market !== "attd" && <PropsLog tab={market} season={season} />}
         {market === "lotto" && shown === "week" && <LottoToday season={season} />}
         {market === "lotto" && shown === "results" && <LottoResults season={season} />}
+        {market === "attd" && shown === "week" && <AttdWeek season={season} />}
+        {market === "attd" && shown === "results" && <AttdResults season={season} />}
         {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
         {market === "kotc" && shown === "results" && <KotcResults season={season} />}
         {market === "pp" && shown === "results" && <OurNflResults season={season} />}
