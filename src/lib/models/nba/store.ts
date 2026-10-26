@@ -14,6 +14,8 @@ import { ourGame, ourMarkets, type OurMarketExtra } from "./market";
 import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } from "./props";
 import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFb, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
 import { runKotc, type KotcGameInput } from "./kotc-store";
+import { gradeGameModel, ratingsNow, saveGameModel } from "./game-store";
+import type { GameRatings } from "./game";
 import PARAMS from "./params.json";
 import FB_PARAMS from "./fb-params.json";
 
@@ -150,6 +152,8 @@ export interface OurNbaReport {
   learning: string[];
   problems: string[];
   kotc?: string[];
+  /** Our game model: games saved this run, games graded. */
+  gameModel?: { saved: string[]; graded: string[] };
 }
 
 export async function loadWeek(season: number, week: number): Promise<{ [id: string]: OurStoredProps }> {
@@ -180,6 +184,8 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
   const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
   const fbTables = (await redis.get<FbTables>(K.fb)) ?? emptyTables();
   if (!prior) report.problems.push(`no prior season summary at ${K.prior(season)}: run scripts/seed-nba-models.mts`);
+  report.gameModel = { saved: [], graded: [] };
+  let ratings: Promise<GameRatings> | null = null;
 
   for (const g of games.filter((x) => x.state === "pre" && x.tip && new Date(x.tip) > now && (!opts.only || opts.only.has(x.id)))) {
     const home = g.teams.find((t) => t.home);
@@ -253,7 +259,20 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
       // last season. A rookie or a player back from a lost season would
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
-      const proj = new Map(projectGame(inputs, tIn, spread, prior.base, P, absent).filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
+      const projected = projectGame(inputs, tIn, spread, prior.base, P, absent);
+      const proj = new Map(projected.filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
+      // Our game model: each side's projected points tonight minus with its full rotation (the Out list's cost).
+      try {
+        const full = projectGame([...inputs, ...absent], tIn, spread, prior.base, P, []);
+        const pts = (ps: typeof projected, t: string) => ps.filter((x) => x.team === t).reduce((a, x) => a + x.mean.pts, 0);
+        const avail = { home: pts(projected, home.abbr) - pts(full, home.abbr), away: pts(projected, away.abbr) - pts(full, away.abbr) };
+        const outN = { home: absent.filter((x) => x.team === home.abbr).length, away: absent.filter((x) => x.team === away.abbr).length };
+        ratings ??= ratingsNow(season);
+        const line = await saveGameModel(season, now, { event: g.id, home: home.abbr, away: away.abbr, tip: g.tip! }, avail, outN, await ratings);
+        if (line) report.gameModel.saved.push(line);
+      } catch (e) {
+        report.problems.push(`game model ${away.abbr}@${home.abbr}: ${e instanceof Error ? e.message : String(e)}`);
+      }
       const starterOf = new Map(inputs.map((x) => [x.id, x.starter ?? x.games.at(-1)?.starter ?? false]));
       const kotc: KotcGameInput = {
         spread,
@@ -316,6 +335,12 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
         report.problems.push(`grade ${id}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+  }
+
+  try {
+    report.gameModel.graded = await gradeGameModel(season, now);
+  } catch (e) {
+    report.problems.push(`game model grading: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {

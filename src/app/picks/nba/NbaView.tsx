@@ -8,6 +8,7 @@ import { MIN_SAMPLE } from "@/lib/picks/engine";
 import { href, kickoffEt, line, price, rec, units, LOG_VIEW, NBA_VIEWS, whenEt, type View } from "../ui";
 import { Background, CutRanges, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry } from "../board";
 import { ReadLegend } from "../ats";
+import { NbaGameModelCard } from "./game-model";
 import s from "../picks.module.css";
 
 // The NBA tab. One model (Sam) against the DraftKings line, tracked like
@@ -379,6 +380,7 @@ function NbaResearch({ v }: { v: NbaPicksView }) {
           ))}
         </ul>
       )}
+      <NbaGameModelCard season={v.season} />
     </section>
   );
 }
@@ -493,8 +495,8 @@ export default async function NbaView({ view = "week" }: { view?: View }) {
                     ? "Tier bets carry stakes under NBA's own limits."
                     : `Every Sam side is tracked at the saved DraftKings price with no stake. Go-live gate: ${v.gate.checks.map((c) => `${c.have} of ${c.need} ${c.label.toLowerCase()}`).join("; ")}.`,
                 },
-                { name: "Sam's NBA reads", role: "Spreads and totals, outside source", status: "input", note: "The only NBA input. Never stakes on its own." },
-                { name: "Our NBA game model", role: "Not built", status: "unavailable", note: "NBA picks use Sam only for now." },
+                { name: "Sam's NBA reads", role: "Spreads and totals, outside source", status: "input", note: "The input behind NBA tier picks. Never stakes on its own." },
+                { name: "Our NBA game model", role: "Spreads and totals, forward test", status: "collecting", note: "Built Oct 26. No edge at the close in the backtest, so it is tracked at the first price we had a number, with no stake. See Research." },
                 { name: "Pool picks", role: "Straight up", status: "unavailable", note: "No NBA pool, so NBA straight up is not tracked." },
               ]}
             />

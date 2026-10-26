@@ -1,6 +1,16 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
+## NBA game model: spreads and totals, forward test (2026-10-26)
+- Jack: "add nba spreads/totals" (the Who decides row said "Our NBA game model: Not built"; our NBA models were props, First Basket, King of the Court, injury repricer).
+- `src/lib/models/nba/game.ts` (pure): market-residual model like NFL's. Spread features: gap (results-only off/def/pace rating vs market margin), avail (props model's projected team points tonight minus with full recent rotation, home minus away), move (now vs open), rest, b2b, cover. Total features: gapT, availT, moveT, b2bT. `game-lines.ts` reads ESPN core odds open/close (DK, else ESPN BET; live feed skipped).
+- Data: `scripts/nba-history.mts` gained 2023 (warm-up box scores); `scripts/nba-lines-history.mts` caches open/close to .cache/nba-lines (2024-25 ESPN BET 1,232 games, 2025-26 DK 979 + ESPN BET 252).
+- Backtest `scripts/fit-nba-game.mts` (ratings + ridge on 2024-25, test 2025-26): spread at close 52.4% every game (no edge; RMSE line 13.920 vs ours 13.925). Totals: ridge shrank every weight to ~0; rating total alone 51.7% at close. At the open with who-played known: 54.1%, but that leaks (injury news after the open); without avail 50.7%, yet the close moved toward our lean +0.35 pts (t 5.6), b2b alone +0.73 (t 6.1). Same story as college: real line move, too small for -110 so far.
+- Live: `game-store.ts` `saveGameModel` is called inside runOurNbaProps for each game with a props board (so avail uses the Out list at that read); first save = judged price, later saves replace `last`. Ratings = `game-seed.json` (end of 2025-26) carried at 0.5 + this season's finals from `models:v1:nba:{season}:games`. `gradeGameModel` fills close + final. Redis `models:v1:nba:{season}:gamemodel`.
+- `game-track.ts`: signals lean, strong (|res| 1.02+), b2b (fade), total (rating over/under). Gate 150 games, 4 weeks, CLV t 1.645 -> "closer look". No stakes.
+- Page: Picks > NBA > Research, collapsed "Our game model" panel (`src/app/picks/nba/game-model.tsx`); Who decides row now "Spreads and totals, forward test".
+- First live save 2026-10-26 ~21:00Z from this Mac: 9 games. Grades start after tonight's finals on the next props run.
+
 ## David's college page redesign broke ingestion; Week 8 Saturday backfilled (2026-10-26, 85a1f52)
 - David rebuilt davidsasser.com/cfb Fri 10/23 ~11:40pm ET ("Projected margin" / "Vegas spread", no projected scores in markup). The text reader found 0 games: 41 of 44 Saturday Week 8 games were stored without his line, and the Saturday 10:30am send (it waited for his board, then gave up) had no college bets. NFL page unaffected.
 - Fix: `parseDavidBoard` (cfb) reads the RSC payload first (`davidCfbGames`: away/home names, `market.currentSpread`, `market.projected` home side, `projection` scores), old text layout as fallback. Model lines match all 56 stored pre-break copies exactly; totals = sum of rounded scores, as before. Shared `rscText`/`objectAt` now in `src/lib/rsc.ts` (props/david.ts uses them). Fixture `ds-cfb-board-wk8.html`.

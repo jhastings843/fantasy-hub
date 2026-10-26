@@ -9,7 +9,7 @@ import { compactGame, type EspnNbaSummary } from "../src/lib/models/nba/box";
 
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
 // Regular-season windows (start inclusive, end inclusive), filed under the first year.
-const WINDOW: { [s: number]: [string, string] } = { 2024: ["2024-10-22", "2025-04-13"], 2025: ["2025-10-21", "2026-04-12"], 2026: ["2026-10-20", "2027-04-11"] };
+const WINDOW: { [s: number]: [string, string] } = { 2023: ["2023-10-24", "2024-04-14"], 2024: ["2024-10-22", "2025-04-13"], 2025: ["2025-10-21", "2026-04-12"], 2026: ["2026-10-20", "2027-04-11"] };
 
 async function json<T>(url: string, tries = 3): Promise<T> {
   for (let i = 0; ; i++) {
