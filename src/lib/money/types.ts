@@ -332,6 +332,9 @@ export interface Weather {
   equity: number;
   cash: number;
   openCost: number;
+  /** Set when the bankroll was reset: bets placed before it are the earlier era, summarized here. */
+  eraStart?: string | null;
+  previousEra?: { bets: number; won: number; open: number; pnl: number } | null;
   record: { settled: number; won: number; pnl: number; staked: number };
   curve: { day: string; equity: number }[];
   open: WeatherBet[];

@@ -1067,7 +1067,7 @@ function WeatherTab({ w }: { w: Weather }) {
       <Stats
         label="Weather desk at a glance"
         items={[
-          { k: "Bankroll", v: usd(w.equity), sub: `${usd(w.equity - w.start, true)} from ${usd(w.start)}`, tone: w.equity > w.start ? "up" : w.equity < w.start ? "down" : undefined },
+          { k: "Bankroll", v: usd(w.equity), sub: `${usd(w.equity - w.start, true)} from ${usd(w.start)}${w.previousEra && w.eraStart ? `, reset ${when(w.eraStart)} (first run ${usd(w.previousEra.pnl, true)})` : ""}`, tone: w.equity > w.start ? "up" : w.equity < w.start ? "down" : undefined },
           { k: "Record", v: r.settled ? `${r.won}-${lost}` : "0-0", sub: `${w.open.length} open, ${usd(w.openCost)} staked` },
           { k: "Trust in its forecast", v: `${Math.round(w.trust.w * 100)}%`, sub: `market the rest${w.trust.days ? `, re-fit from ${w.trust.days} days` : ""}` },
           { k: "Last week's score", v: w.brake?.desk != null ? w.brake.desk.toFixed(3) : w.learned.desk != null ? w.learned.desk.toFixed(3) : "·", sub: w.brake?.market != null ? `market ${w.brake.market.toFixed(3)}, lower wins` : "Brier" },
