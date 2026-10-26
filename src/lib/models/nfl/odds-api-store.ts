@@ -66,7 +66,8 @@ export async function morningOddsReads(
     if (r) reads.set(g.espnId, r);
   }
   const key = process.env.ODDS_API_KEY;
-  const due = games.filter((g) => readDue(g.kickoff, now, reads.has(g.espnId)));
+  // A read from before the anytime TD market was added (no anytime field) gets one more read, once.
+  const due = games.filter((g) => readDue(g.kickoff, now, reads.get(g.espnId)?.anytime !== undefined));
   if (!key || !due.length) return { reads, note: key ? null : due.length ? "no ODDS_API_KEY: prices from David or -110" : null };
   const notes: string[] = [];
   try {
