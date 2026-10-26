@@ -10,18 +10,47 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { readGames, readStats, type NflRow } from "../src/lib/models/nfl/data";
 import { impliedPoints, tdTotals, type TdLine } from "../src/lib/models/nfl/firsttd";
-import { attdTeam, type AttdParams } from "../src/lib/models/nfl/anytime";
+import { attdTeam, type AttdLine, type AttdParams, type ZoneTotals } from "../src/lib/models/nfl/anytime";
 import FTD from "../src/lib/models/nfl/ftd-params.json";
 
 const rows: { [s: number]: NflRow[] } = Object.fromEntries([2023, 2024, 2025, 2026].filter((s) => existsSync(`.cache/nfl/stats_player_week_${s}.csv`)).map((s) => [s, readStats(readFileSync(`.cache/nfl/stats_player_week_${s}.csv`, "utf8"))]));
 const games = readGames(readFileSync(".cache/nfl/games.csv", "utf8"));
+// Red-zone and goal-line counts per player-game (scripts/nfl-zones.mts).
+const zones: { [k: string]: number[] } = Object.assign({}, ...[2023, 2024, 2025, 2026].filter((s) => existsSync(`.cache/nfl/zones_${s}.json`)).map((s) => JSON.parse(readFileSync(`.cache/nfl/zones_${s}.json`, "utf8"))));
+/** Zone totals per player over some rows, with his team's in the same games (as tdTotals). */
+function zoneTotals(rs: NflRow[]): Map<string, ZoneTotals> {
+  const team = new Map<string, number[]>();
+  for (const r of rs) {
+    const z = zones[`${r.game}|${r.id}`];
+    if (!z) continue;
+    const t = team.get(`${r.game}|${r.team}`) ?? [0, 0, 0, 0];
+    z.forEach((v, i) => (t[i] += v));
+    team.set(`${r.game}|${r.team}`, t);
+  }
+  const out = new Map<string, ZoneTotals>();
+  for (const r of rs) {
+    const z = zones[`${r.game}|${r.id}`] ?? [0, 0, 0, 0];
+    const t = team.get(`${r.game}|${r.team}`) ?? [0, 0, 0, 0];
+    const x = out.get(r.id) ?? { glCar: 0, rzCar: 0, rzTgt: 0, teamGlCar: 0, teamRzCar: 0, teamRzTgt: 0 };
+    x.glCar += z[0];
+    x.rzCar += z[1];
+    x.rzTgt += z[3];
+    x.teamGlCar += t[0];
+    x.teamRzCar += t[1];
+    x.teamRzTgt += t[3];
+    out.set(r.id, x);
+  }
+  return out;
+}
+const addZ = (a?: ZoneTotals, b?: ZoneTotals): ZoneTotals | undefined =>
+  a || b ? (Object.fromEntries((["glCar", "rzCar", "rzTgt", "teamGlCar", "teamRzCar", "teamRzTgt"] as const).map((k) => [k, (a?.[k] ?? 0) + (b?.[k] ?? 0)])) as unknown as ZoneTotals) : undefined;
 
 interface Case {
   season: number;
   week: number;
   team: string;
   pts: number;
-  list: TdLine[];
+  list: AttdLine[];
   /** TDs per listed player in this game. */
   tds: number[];
   /** The team's rushing + receiving TDs in this game (all players). */
@@ -33,6 +62,7 @@ for (const season of [2024, 2025, 2026]) {
   const cur = rows[season] ?? [];
   const prev = rows[season - 1] ?? [];
   const prevTot = tdTotals(prev);
+  const prevZ = zoneTotals(prev);
   const weeksDone = new Set(cur.map((r) => r.week));
   for (const g of games.filter((x) => x.season === season && weeksDone.has(x.week))) {
     if (g.total === null || g.homeMargin === null) continue;
@@ -40,6 +70,7 @@ for (const season of [2024, 2025, 2026]) {
     if (!inGame.length) continue;
     const before = cur.filter((r) => r.week < g.week);
     const curTot = tdTotals(before);
+    const curZ = zoneTotals(before);
     const pts = impliedPoints(g.total, g.homeMargin);
     for (const t of [g.home, g.away]) {
       const weeks = [...new Set(before.filter((r) => r.team === t).map((r) => r.week))].sort((a, b) => a - b).slice(-3);
@@ -51,12 +82,12 @@ for (const season of [2024, 2025, 2026]) {
           })();
       const here = new Map(inGame.filter((r) => r.team === t).map((r) => [r.id, r]));
       const ids = [...new Set(pool.map((r) => r.id))].filter((id) => here.has(id));
-      const list: TdLine[] = ids.map((id) => {
+      const list: AttdLine[] = ids.map((id) => {
         const a = prevTot.get(id);
         const b = curTot.get(id);
         const z = { rushTd: 0, recTd: 0, car: 0, tgt: 0, teamRushTd: 0, teamRecTd: 0, teamCar: 0, teamTgt: 0 };
         const sum = Object.fromEntries(Object.keys(z).map((k) => [k, ((a as never)?.[k] ?? 0) + ((b as never)?.[k] ?? 0)])) as typeof z;
-        return { id, name: (b ?? a)?.name ?? here.get(id)!.name, team: t, ...sum };
+        return { id, name: (b ?? a)?.name ?? here.get(id)!.name, team: t, ...sum, zone: addZ(prevZ.get(id), curZ.get(id)) };
       });
       cases.push({
         season,
@@ -102,11 +133,25 @@ const loss = (cs: Case[], p: AttdParams) => {
   for (const kTd of [2, 5, 10, 20, 40, 80])
     for (const kR of [10, 50, 200])
       for (const other of [0.03, 0.067, 0.1, 0.15]) {
-        const e = loss(train, { ...P, kTd, kR, other });
+        const e = loss(train, { ...P, kTd, kR, other, wRz: 0 });
         if (e < b.e) b = { e, kTd, kR, other };
       }
-  P = { ...P, kTd: b.kTd, kR: b.kR, other: b.other };
+  P = { ...P, kTd: b.kTd, kR: b.kR, other: b.other, wRz: 0 };
   say(`scorer: kTd ${P.kTd}, kR ${P.kR}, other ${P.other} (train log loss ${b.e.toFixed(4)})`);
+  const base = { A: loss(testA, P), B: loss(testB, P) };
+  let z = { e: b.e, wRz: 0, gGl: 0, kTd: P.kTd };
+  for (const wRz of [0, 0.25, 0.5, 0.75, 1])
+    for (const gGl of [0, 1, 2, 4])
+      for (const kTd of [5, 10, 20, 40, 80]) {
+        const e = loss(train, { ...P, wRz, gGl, kTd });
+        if (e < z.e) z = { e, wRz, gGl, kTd };
+      }
+  for (const [wRz, gGl, kTd] of [[0, 0, 40], [0.5, 0, 40], [1, 0, 40], [1, 2, 40], [1, 2, 10], [1, 0, 5], [0.5, 1, 20]])
+    say(`  wRz ${wRz} gGl ${gGl} kTd ${kTd}: train ${loss(train, { ...P, wRz, gGl, kTd }).toFixed(4)}, test 2025 ${loss(testA, { ...P, wRz, gGl, kTd }).toFixed(4)}, test 2026 ${loss(testB, { ...P, wRz, gGl, kTd }).toFixed(4)}`);
+  const withZ = { ...P, wRz: z.wRz, gGl: z.gGl, kTd: z.kTd };
+  say(`red zone: wRz ${z.wRz}, gGl ${z.gGl}, kTd ${z.kTd} (train ${z.e.toFixed(4)} vs ${b.e.toFixed(4)} without)`);
+  say(`  test 2025 wks 10-18: ${loss(testA, withZ).toFixed(4)} vs ${base.A.toFixed(4)} without; test 2026: ${loss(testB, withZ).toFixed(4)} vs ${base.B.toFixed(4)} without`);
+  P = withZ;
 }
 {
   let b = { e: Infinity, calib: 1 };
@@ -134,6 +179,8 @@ report("train", train);
 report("test 2025 wks 10-18", testA);
 report("test 2026", testB);
 
+// Our walk-forward chance for every 2026 player-game, to grade other sources (data/venom) on the same players.
+writeFileSync(".cache/attd-ours-2026.json", JSON.stringify(Object.fromEntries(testB.flatMap((c) => attdTeam(c.list, c.pts, P).map((x, i) => [`${c.week}|${c.list[i].name}`, { p: x.anytime, td: c.tds[i] }])))));
 writeFileSync("src/lib/models/nfl/attd-params.json", JSON.stringify(P, null, 2) + "\n");
 writeFileSync(".cache/fit-anytime-td.txt", log.join("\n") + "\n");
 console.log("\nwrote src/lib/models/nfl/attd-params.json");

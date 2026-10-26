@@ -46,3 +46,6 @@ next-env.d.ts
 .pem-relay/
 .cache/
 .scratch/
+
+# Venom Analytics picks: members-only data, local only (repo is public)
+data/venom/*.json

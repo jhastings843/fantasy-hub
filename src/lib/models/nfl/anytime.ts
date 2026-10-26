@@ -26,6 +26,48 @@ export interface AttdParams extends FtdParams {
   a: number;
   /** Log-odds scale on P(anytime): under 1 pulls toward 50/50. */
   calib?: number;
+  /** Weight of red-zone shares in the shrink target, 0 = carries and targets only (from 2026-10-26). */
+  wRz?: number;
+  /** Extra weight on goal-line carries inside the red-zone carry share. */
+  gGl?: number;
+}
+
+/** Red-zone (20 and in) and goal-line (5 and in) opportunities over the same games as a TdLine, his and his team's. */
+export interface ZoneTotals {
+  glCar: number;
+  rzCar: number;
+  rzTgt: number;
+  teamGlCar: number;
+  teamRzCar: number;
+  teamRzTgt: number;
+}
+
+export type AttdLine = TdLine & { zone?: ZoneTotals };
+
+/**
+ * scorerShares with red-zone usage in the shrink target: a player's TD share
+ * leans on where he gets the ball, not only how often. With wRz 0 it is
+ * scorerShares exactly.
+ */
+export function attdShares(lines: AttdLine[], p: AttdParams): number[] {
+  const w = p.wRz ?? 0;
+  if (!w || !lines.some((l) => l.zone)) return scorerShares(lines, p);
+  const g = p.gGl ?? 0;
+  const ref = [...lines].sort((a, b) => b.teamRushTd + b.teamRecTd - (a.teamRushTd + a.teamRecTd))[0];
+  const rush = (ref.teamRushTd + p.kR * p.rushShare) / (ref.teamRushTd + ref.teamRecTd + p.kR);
+  const raw = lines.map((l) => {
+    const z = l.zone;
+    const cs0 = l.teamCar ? l.car / l.teamCar : 0;
+    const ts0 = l.teamTgt ? l.tgt / l.teamTgt : 0;
+    const zc = z && z.teamRzCar + g * z.teamGlCar > 0 ? (z.rzCar + g * z.glCar) / (z.teamRzCar + g * z.teamGlCar) : cs0;
+    const zt = z && z.teamRzTgt > 0 ? z.rzTgt / z.teamRzTgt : ts0;
+    const cs = (1 - w) * cs0 + w * zc;
+    const ts = (1 - w) * ts0 + w * zt;
+    return { r: (l.rushTd + p.kTd * cs) / (l.teamRushTd + p.kTd || 1), c: (l.recTd + p.kTd * ts) / (l.teamRecTd + p.kTd || 1) };
+  });
+  const sr = raw.reduce((a, x) => a + x.r, 0) || 1;
+  const sc = raw.reduce((a, x) => a + x.c, 0) || 1;
+  return raw.map((x) => (1 - p.other) * (rush * (x.r / sr) + (1 - rush) * (x.c / sc)));
 }
 
 export interface AttdPlayer {
@@ -46,9 +88,9 @@ export function anytimeChances(m: number): { anytime: number; two: number } {
 }
 
 /** Every listed player's expected TDs and chances, given his team's implied points. */
-export function attdTeam(lines: TdLine[], teamPts: number, p: AttdParams): AttdPlayer[] {
+export function attdTeam(lines: AttdLine[], teamPts: number, p: AttdParams): AttdPlayer[] {
   const mean = p.a * Math.max(0, teamPts);
-  const sh = scorerShares(lines, p);
+  const sh = attdShares(lines, p);
   return lines.map((l, i) => {
     const m = mean * sh[i];
     const c = anytimeChances(m);
