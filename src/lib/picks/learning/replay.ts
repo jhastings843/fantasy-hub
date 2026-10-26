@@ -93,6 +93,8 @@ export interface DecisionRecord {
   settled: string[];
   /** "league:key" of every recent game final at the decision, both sports. */
   finalsKnown: string[];
+  /** Set when the decision was rebuilt after the fact (why), with a "reconstructed" issued record beside it. */
+  reconstructed?: string;
 }
 
 /**

@@ -118,8 +118,13 @@ export interface IssuedRecord {
   /** The picks policy the card was made under (policy.ts). */
   policyId?: string;
   issuedAt: string;
-  /** "issued": written at send time. "recovered": rebuilt later from the delivered email. */
-  provenance: "issued" | "recovered";
+  /**
+   * "issued": written at send time. "recovered": rebuilt later from the
+   * delivered email. "reconstructed": never emailed; rebuilt from the stored
+   * pregame data as the send would have made it had an input not failed
+   * (college Week 8 Saturday 2026, David's board unread after his redesign).
+   */
+  provenance: "issued" | "recovered" | "reconstructed";
   emailId?: string;
   subject: string;
   ruleVersion: string;
@@ -321,7 +326,7 @@ export function gradeIssued(
       const first = recs[0];
       return {
         ...first,
-        provenance: recs.some((x) => x.provenance === "recovered") ? "recovered" : "issued",
+        provenance: recs.some((x) => x.provenance === "recovered") ? "recovered" : recs.some((x) => x.provenance === "reconstructed") ? "reconstructed" : "issued",
         plays: recs.flatMap((x) => x.plays),
         su: recs.flatMap((x) => x.su),
         totals: recs.flatMap((x) => x.totals ?? []),

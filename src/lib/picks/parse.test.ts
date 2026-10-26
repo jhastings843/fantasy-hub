@@ -89,4 +89,14 @@ describe("David's pages", () => {
     const troy = b.rows.find((r) => r.home === "troy")!;
     expect(troy.line).toEqual({ market: -10.5, model: -11.4 });
   });
+  it("reads the college board after David's 2026-10-23 rebuild (RSC payload)", () => {
+    const b = parseDavidBoard("cfb", fx("ds-cfb-board-wk8.html"));
+    expect(b.week).toBe(8);
+    expect(b.season).toBe(2026);
+    expect(b.rows).toHaveLength(56);
+    // "Projected margin: Florida International -14.3", "Vegas spread: Florida International −10.0".
+    expect(b.rows.find((r) => r.away === "middle tennessee")).toMatchObject({ home: "florida international", line: { market: -10, model: -14.3 }, modelTotal: 42.2 });
+    // Away favorite: "South Alabama -0.3", "South Alabama −3.0".
+    expect(b.rows.find((r) => r.away === "south alabama")!.line).toEqual({ market: 3, model: 0.3 });
+  });
 });

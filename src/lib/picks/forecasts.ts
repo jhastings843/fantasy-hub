@@ -26,6 +26,8 @@ export interface ForecastSnapshot {
   ref?: RefLine;
   /** Public betting splits and the opening line at this read (splits.ts), when the feed had the game. */
   splits?: Splits;
+  /** Set when a field was filled in after the fact (why). College Week 8 2026: David's line, lost to his page redesign. */
+  backfilled?: string;
   /** Our own NFL spread model at this read (lib/models/nfl/spread.ts), tracked only. From 2026-10-21. */
   ours?: OurLine;
 }

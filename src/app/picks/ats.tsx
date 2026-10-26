@@ -638,7 +638,7 @@ export function AtsResults({ r }: { r: PicksReport }) {
                     staked.length ? `${staked.length} settled bet${staked.length === 1 ? "" : "s"}, ${amt(lw!.risked)} risked` : "No settled staked bets",
                     early.length ? `first email, before stakes: ${rec(earlyRec)}, not counted here` : "",
                     w.pending ? `${w.pending} pending, listed once final` : "",
-                    w.provenance === "recovered" ? "recovered from the email" : "",
+                    w.provenance === "recovered" ? "recovered from the email" : w.provenance === "reconstructed" ? "includes a card rebuilt from stored data that was never emailed" : "",
                   ].filter(Boolean).join(" · ")}
                 </p>
                 {staked.length ? (

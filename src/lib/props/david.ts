@@ -17,6 +17,7 @@
 // The page is a server-rendered React app; the whole slate rides in its RSC
 // payload as one JSON object ({"slate": {...}}), so no scraping of markup.
 
+import { objectAt, rscText } from "@/lib/rsc";
 import { implied, payout, type PropMarket, type PropsGame, type Side, type Stat } from "./parse";
 import { nameKey, settle, type EspnBoxTeam, type Outcome } from "./grade";
 import { MIN_BETS, type Verdict } from "./trends";
@@ -63,35 +64,11 @@ export interface DavidSlate {
   props: DavidProp[];
 }
 
-/** The JSON object starting at `from` (a "{"), by brace matching outside strings. */
-function objectAt(s: string, from: number): string | null {
-  let depth = 0;
-  let inStr = false;
-  for (let i = from; i < s.length; i++) {
-    const c = s[i];
-    if (inStr) {
-      if (c === "\\") i++;
-      else if (c === '"') inStr = false;
-    } else if (c === '"') inStr = true;
-    else if (c === "{") depth++;
-    else if (c === "}" && --depth === 0) return s.slice(from, i + 1);
-  }
-  return null;
-}
-
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
 
 /** Read the slate out of the page's RSC payload. Null when it isn't there. */
 export function parseDavidSlate(html: string): DavidSlate | null {
-  // Each rsc.push("...") argument is a JSON string; join them and decode once.
-  let rsc = "";
-  for (const m of html.matchAll(/\.rsc\.push\(("(?:[^"\\]|\\.)*")\)/g)) {
-    try {
-      rsc += JSON.parse(m[1]) as string;
-    } catch {
-      /* not a string chunk */
-    }
-  }
+  const rsc = rscText(html);
   const at = rsc.indexOf('{"slate":');
   const raw = at >= 0 ? objectAt(rsc, at) : null;
   if (!raw) return null;
