@@ -160,6 +160,12 @@ export async function loadWeek(season: number, week: number): Promise<{ [id: str
   return (await redis.hgetall<{ [id: string]: OurStoredProps }>(K.week(season, week))) ?? {};
 }
 
+/** Every saved board this season, for the lotto shadow (lotto.ts reads only boards that carry long rungs). */
+export async function allBoards(season: number): Promise<OurStoredProps[]> {
+  const weeks = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
+  return (await Promise.all(weeks.map((w) => loadWeek(season, w)))).flatMap((h) => Object.values(h));
+}
+
 export interface RunOptions {
   /** Only these ESPN event ids (a news reprice); grading, King of the Court and the review are skipped. */
   only?: Set<string>;

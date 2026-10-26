@@ -32,6 +32,37 @@ export interface OurMarketExtra {
   games?: number;
   /** Set when an alternate line was nearer even money than the main line: the main line it replaced. */
   main?: { line: number; over: number | null; under: number | null };
+  /** DK's long-shot rungs on the full-game ladder (+250 and longer, boards from 2026-10-26 on), for the lotto shadow. */
+  longs?: LongRung[];
+}
+
+/** One "N+" rung DK prices at LONG_MIN or longer: our chance of the over, blended and raw. */
+export interface LongRung {
+  line: number;
+  over: number;
+  ours: number;
+  raw: number;
+}
+
+/** The long-shot band the lotto shadow tracks: +250 to +2000 (Sam's legs ran +300 to +830). */
+export const LONG_MIN = 250;
+export const LONG_MAX = 2000;
+
+/**
+ * Our chance on each long rung of the ladder. DK prices these over-only, so the
+ * vig is taken out with the main line's overround, as nearestEven does; that
+ * understates the long rungs' bigger hold, so their fair chance reads a touch high.
+ *
+ *   longRungs([{ line: 19.5, over: 400 }], 1.05, pts mean 14) -> [{ line: 19.5, over: 400, ours, raw }]
+ */
+export function longRungs(stat: NbaStat, mean: number, ladder: { line: number; over: number }[], round: number | null, p: NbaParams): LongRung[] {
+  return ladder
+    .filter((r) => r.over >= LONG_MIN && r.over <= LONG_MAX)
+    .map((r) => {
+      const raw = overUnder(stat, Math.max(mean, 0.01), r.line, p).over;
+      const fair = round ? Math.min(0.99, implied(r.over) / round) : null;
+      return { line: r.line, over: r.over, ours: r3(blend(raw, fair, p.marketW ?? 1)), raw: r3(raw) };
+    });
 }
 
 const EVEN = implied(-110);
@@ -104,9 +135,12 @@ export function ourMarkets(
     const pr = proj.get(l.athlete);
     const who = names.get(l.athlete);
     if (!stat || !pr || !who || l.current.line === null) continue;
-    const pick = nearestEven({ line: l.current.line, over: l.current.over, under: l.current.under }, fullGameLadder(alts.get(`${l.athlete}|${l.type}`) ?? [], l.current as { line: number; over: number | null }));
+    const ladder = fullGameLadder(alts.get(`${l.athlete}|${l.type}`) ?? [], l.current as { line: number; over: number | null });
+    const pick = nearestEven({ line: l.current.line, over: l.current.over, under: l.current.under }, ladder);
     const { line, over, under } = pick;
     const mean = pr.mean[stat];
+    const round = l.current.over !== null && l.current.under !== null ? implied(l.current.over) + implied(l.current.under) : null;
+    const longs = longRungs(stat, mean, ladder, round, p);
     const raw = overUnder(stat, Math.max(mean, 0.01), line, p);
     const fair = pick.fairOver !== null ? { over: pick.fairOver, under: 1 - pick.fairOver } : null;
     const bo = blend(raw.over, fair?.over ?? null, p.marketW ?? 1);
@@ -144,6 +178,7 @@ export function ourMarkets(
       min: r1(pr.min),
       ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}),
       ...(pick.alt ? { main: { line: l.current.line, over: l.current.over, under: l.current.under } } : {}),
+      ...(longs.length ? { longs } : {}),
     };
   }
   markets.sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1) || a.id.localeCompare(b.id));

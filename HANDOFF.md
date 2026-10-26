@@ -33,6 +33,13 @@
 - `parseEventOdds` reads both books (`parseBook`); `OddsRead.fd` (reads from 2026-10-22). `fdProp` gives FanDuel's own line and prices. NFL board `extra[id].fd`; First TD `fd` prices. DK's price still decides the NFL prop edge; FanDuel is shown ("FanDuel pays more" / "better line at FanDuel" / "same as DK"). First TD's cheapest price now considers Kalshi, DK and FanDuel.
 - First FanDuel read: Thu 10/22 9am ET (NE at CHI).
 
+## NBA lotto shadow (2026-10-26)
+- Jack, after @TheModelManSam's 3-leg "N+ points" lottos (+18,000 to +23,000; DK-implied about 1 in 200): "create our own lotto system and shadow track". Paper only: never in emails, bets or the learner.
+- `market.longRungs`: every board now saves DK's full-game ladder rungs at +250 to +2000 (`LONG_MIN`/`LONG_MAX`) in `extra[id].longs` with our chance (blended toward DK via marketW, vig taken out with the main line's overround) and the raw model chance. Boards before 2026-10-26 have none.
+- `lotto.ts` (pure): `rungsOf` grades every rung from the saved result's `actual` (players with 3+ games); `ticket` = each game's best-value rung (ours x decimal - 1 > 0), top 3 games, product price, 0.1u; a void leg drops out. Built from each game's last pregame copy (a late leg can carry news after the first tip). `summarize`: rung hit rate vs ours vs DK by chance band, value rungs at 1u, tickets.
+- Page: Props > Lottos (`m=lotto`, `src/app/props/lotto.tsx`): Today (ticket + best-value rungs), Results (calibration bands, tickets). No learner log.
+- Read: the rung bands are the real test (thousands a week); tickets need most of a season. If "Ours said" isn't closer to "Hit" than "DK said" after a few weeks, drop it.
+
 ## NBA injury news repricer (2026-10-21, 339e443, deployed)
 - Jack chose it from the research (pros like Calvin, Circles Off 08:51: price teammates' props the minute a player is ruled out, before the book moves).
 - `src/lib/models/nba/news.ts` (pure): `readFeed` (ESPN league injuries feed, id from the player link), `changes` (new Out, or back from Out; only "Out" counts), `affected` (teammate markets whose mean moved 0.3+, with DK price, no-vig chance, our chance, edge flag = clears + 3 games), `followup` (DK at the last pregame copy: line move our way, no-vig move our way, outcome).

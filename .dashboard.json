@@ -304,7 +304,8 @@
     "2026-10-21: NBA King of the Court: slate Monte Carlo on our props model, board saved until first tip and graded nightly, Props tab, 158-night backtest, crowd fit on 39 sourced DK payouts (backers about proportional to our chance).",
     "2026-10-21: NFL spread model built and backtested (no edge vs close over 3,121 games), now forward-tested at early prices with CLV on the NFL Research panel.",
     "2026-10-26: money audit. NBA props fixes deployed (gap cap, minutes haircut off, 3+ game record). Weather tab notes the bankroll reset.",
-    "2026-10-26: NBA injury news Pushover pushes paused; edges logged on the pulse only (d182e95, deployed)."
+    "2026-10-26: NBA injury news Pushover pushes paused; edges logged on the pulse only (d182e95, deployed).",
+    "2026-10-26: NBA lotto shadow (Props > Lottos): long-shot rungs saved and graded, one paper 3-leg ticket a night."
   ],
   "tags": [
     "personal",
