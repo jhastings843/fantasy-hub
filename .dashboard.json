@@ -303,7 +303,8 @@
     "2026-10-21: NBA picks now take the side Sam posts (his own line), graded at DK, with a 'crossed' flag when DK moves through his number. Fixes OKC at SA showing Spurs while Sam had Thunder. 8c278f4, live.",
     "2026-10-21: NBA King of the Court: slate Monte Carlo on our props model, board saved until first tip and graded nightly, Props tab, 158-night backtest, crowd fit on 39 sourced DK payouts (backers about proportional to our chance).",
     "2026-10-21: NFL spread model built and backtested (no edge vs close over 3,121 games), now forward-tested at early prices with CLV on the NFL Research panel.",
-    "2026-10-26: money audit. NBA props fixes deployed (gap cap, minutes haircut off, 3+ game record). Weather tab notes the bankroll reset."
+    "2026-10-26: money audit. NBA props fixes deployed (gap cap, minutes haircut off, 3+ game record). Weather tab notes the bankroll reset.",
+    "2026-10-26: NBA injury news Pushover pushes paused; edges logged on the pulse only (d182e95, deployed)."
   ],
   "tags": [
     "personal",
