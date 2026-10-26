@@ -7,7 +7,7 @@ import { getOurNflView } from "@/lib/models/nfl/store";
 import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { ourSliceBets, record } from "@/lib/models/learn";
-import { ftdKalshiRecord } from "../props/week";
+import { ftdBestRecord } from "../props/week";
 import { PageHead, SecHead, Stats } from "../picks/board";
 import { LEAGUE_NAME, line } from "../picks/ui";
 import RecordsTable, { type IssuedRow } from "./RecordsTable";
@@ -94,7 +94,7 @@ export default async function RecordsPage() {
     shadow.push({ what: "NFL props, every tracked edge", href: "/props", w: x.w, l: x.l, p: x.p, units: x.units, basis: "1u at each saved price" });
   }
   if (ftd) {
-    const x = ftdKalshiRecord(ftd.graded);
+    const x = ftdBestRecord(ftd.graded);
     shadow.push({ what: "NFL First TD, edges at Kalshi's cost", href: "/props?m=ftd", ...x, basis: "1u at Kalshi's cost, fee in" });
   }
   const sam = nbaPicks?.cuts.find((c) => c.id === "ats:all");

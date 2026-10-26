@@ -52,7 +52,7 @@ export async function ourPropsWeeks(now = new Date()): Promise<OurPropsWeek[]> {
     [ourPropCandidates(nbaG, [...STATS_NBA]), "edge:all", sNba],
     [fbCandidates(fbG), "fb:all", sFb],
     [ourPropCandidates(nflG, [...STATS_NFL]), "edge:all", sNfl],
-    [ourFtdCandidates(ftdG), "ftd:value", sFtd],
+    [ourFtdCandidates(ftdG), "ftdb:value", sFtd],
   ];
   const weeks = new Map<string, OurPropsWeek>();
   const wk = (b: Bet) => {

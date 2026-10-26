@@ -18,6 +18,7 @@ import { getOurFtdView, type OurFtdStored } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
 import { OUR_FTD_SLICES, ourSliceBets, record } from "@/lib/models/learn";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
+import { bestBets, bestCost, bookPrice } from "@/lib/models/nfl/ftd-price";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats } from "../picks/board";
@@ -641,22 +642,16 @@ async function FirstBasketWeek({ season }: { season: number }) {
 
 /* ----------------------------------------------------------- first TD --- */
 
-/** Every First TD edge at Kalshi's cost (fee in), graded: the shadow record the learner reads. Shared with Records. */
-export function ftdKalshiRecord(graded: Awaited<ReturnType<typeof getOurFtdView>>["graded"]) {
+/** Every First TD edge at the best price (Kalshi with fee, DK or FanDuel), graded: the shadow record the learner reads. Shared with Records. */
+export function ftdBestRecord(graded: Awaited<ReturnType<typeof getOurFtdView>>["graded"]) {
   let w = 0;
   let l = 0;
   let units = 0;
-  for (const x of graded)
-    for (const p of pricedPlayers(x.game)) {
-      const k = kalshiFor(x.kalshi, p.name);
-      if (!k?.ask) continue;
-      const c = kalshiCost(k.ask);
-      if (c >= 1 || p.p <= c) continue;
-      const won = x.result.key === p.key;
-      if (won) w++;
-      else l++;
-      units += won ? (1 - c) / c : -1;
-    }
+  for (const b of bestBets(graded, (p, c) => p.p > c)) {
+    if (b.win) w++;
+    else l++;
+    units += b.net;
+  }
   return { w, l, p: 0, units };
 }
 
@@ -669,30 +664,12 @@ async function FirstTdWeek({ season }: { season: number }) {
     const k = kalshiFor(g.kalshi, name);
     return k?.ask ? kalshiCost(k.ask) : null;
   };
-  // DraftKings' First TD price (The Odds API, read the morning of game day), keyed by the full name squashed:
-  // "J.Chase" matches the one key that starts with "j" and ends with "chase".
-  const bookPrice = (book: OurFtdStored["dk"], name: string): number | null => {
-    if (!book) return null;
-    const [ini, ...rest] = name.split(".");
-    const last = nameKey(rest.join(" "));
-    const hits = Object.keys(book.prices).filter((k) => k.startsWith(ini.toLowerCase()) && k.endsWith(last));
-    return hits.length === 1 ? book.prices[hits[0]] : null;
-  };
   const dkPrice = (g: OurFtdStored, name: string) => bookPrice(g.dk, name);
   const fdPrice = (g: OurFtdStored, name: string) => bookPrice(g.fd, name);
-  /** The cheapest of Kalshi's cost, DraftKings' and FanDuel's break-evens, and where it is. */
-  const best = (g: OurFtdStored, name: string): { cost: number; where: string } | null => {
-    const k = kalshi(g, name);
-    const opts: { cost: number; where: string }[] = [];
-    if (k !== null) opts.push({ cost: k, where: `${Math.round(k * 100)}¢ Kalshi` });
-    const d = dkPrice(g, name);
-    if (d !== null) opts.push({ cost: implied(d), where: `${am(d)} DK` });
-    const f = fdPrice(g, name);
-    if (f !== null) opts.push({ cost: implied(f), where: `${am(f)} FanDuel` });
-    return opts.sort((a, b) => a.cost - b.cost)[0] ?? null;
-  };
+  /** The cheapest of Kalshi's cost, DraftKings' and FanDuel's break-evens, and where it is (the price the record grades at). */
+  const best = (g: OurFtdStored, name: string) => bestCost(g, name);
   const cost = (g: OurFtdStored, name: string) => best(g, name)?.cost ?? null;
-  // A bet is a player in a learner slice that has gone live, at Kalshi's cost (the learner grades on Kalshi). An edge alone is not a bet: most games have a few.
+  // A bet is a player in a learner slice that has gone live, at the best price (the learner grades there too). An edge alone is not a bet: most games have a few.
   // Only games that kicked off after a slice went live: an earlier game was never bet, whatever the slice says now.
   const since = new Map(v.learning.entries.filter((e) => e.status === "active" && e.activatedAt).map((e) => [e.id, e.activatedAt!]));
   const keepsFor = (kickoff: string | undefined) =>
@@ -733,7 +710,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       }),
     )
     .sort((a, b) => b.gap - a.gap);
-  const graded = ftdKalshiRecord(v.graded);
+  const graded = ftdBestRecord(v.graded);
   const rows: GameRowData[] = v.board.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
     const keeps = keepsFor(g.kickoff);

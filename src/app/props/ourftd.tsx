@@ -3,7 +3,8 @@
 import { updated } from "./updated";
 import { nameKey } from "@/lib/props/grade";
 import { getOurFtdView, type OurFtdStored, type OurFtdView } from "@/lib/models/nfl/ftd-store";
-import { kalshiCost, kalshiFor, marketBets } from "@/lib/firsttd/trends";
+import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
+import { bestBets, bestCost } from "@/lib/models/nfl/ftd-price";
 import { OUR_FTD_SLICES } from "@/lib/models/learn";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
@@ -25,7 +26,8 @@ function Card({ g }: { g: OurFtdStored }) {
     const k = kalshiFor(g.kalshi, p.name);
     const cost = k?.ask ? kalshiCost(k.ask) : null;
     const dk = g.dk?.prices[nameKey(p.name)];
-    return { p, cost, dk, value: cost !== null && p.p > cost };
+    const b = bestCost(g, p.name);
+    return { p, cost, dk, value: b !== null && p.p > b.cost };
   });
   const values = rows.filter((r) => r.value).length;
   const r = g.result;
@@ -41,7 +43,7 @@ function Card({ g }: { g: OurFtdStored }) {
             <span className={s.ftdPickName}>{g.game.pick ? `${g.game.pick.name} ${pct(g.game.pick.p)}` : "–"}</span>
             <span className={`${s.dim} ${s.num}`}>{g.game.teams.map((t) => `${t.team} ${pct(t.pFirst)}`).join(" · ")}</span>
           </span>
-          <span className={s.ftdOdds}>{g.kalshi ? (values ? `${values} above Kalshi's cost` : "None above Kalshi's cost") : "No Kalshi market"}</span>
+          <span className={s.ftdOdds}>{g.kalshi || g.dk || g.fd ? (values ? `${values} above the best price` : "None above the best price") : "No prices yet"}</span>
           <span className={s.ftdFlags}>
             {r && <span className={`${s.resChip} ${r.bucket === "priced" ? s.resW : s.resP}`}>{r.first.kind === "offense" ? r.first.scorer : "No offensive TD first"}</span>}
             <span className={s.chev} aria-hidden>
@@ -114,7 +116,7 @@ export async function OurFtdResults({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return null;
   const tiles = OUR_FTD_SLICES.slice(0, 3).map(([id, label, keep]) => {
-    const bets = marketBets(v.graded, keep);
+    const bets = bestBets(v.graded, keep);
     return { id, label, w: bets.filter((b) => b.win).length, n: bets.length, units: bets.reduce((a, b) => a + b.net, 0) };
   });
   const teamRight = v.graded.filter((x) => x.result.team && [...x.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0].team === x.result.team).length;
@@ -124,7 +126,7 @@ export async function OurFtdResults({ season }: { season: number }) {
         <h2 className={s.h2} id="our-ftd-results">
           Our model: results
         </h2>
-        <p className={s.p}>Every graded board, one contract per bet at Kalshi&apos;s ask with its fee.</p>
+        <p className={s.p}>Every graded board, one unit per bet at the best price: Kalshi&apos;s ask with its fee, or DraftKings or FanDuel when cheaper (books from Oct 21 on).</p>
       </div>
       {v.graded.length ? (
         <div className={s.tiles}>

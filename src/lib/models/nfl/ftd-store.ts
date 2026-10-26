@@ -13,6 +13,7 @@ import { nflverseRows } from "./store";
 import { morningOddsReads } from "./odds-api-store";
 import PARAMS from "./ftd-params.json";
 import ATTD_PARAMS from "./attd-params.json";
+import type { Books } from "./ftd-price";
 import { attdTeam, boxTds, gradeAttd, type AttdGraded, type AttdParams, type AttdResult, type AttdRow } from "./anytime";
 import { readTdScorers, type PropBetRow } from "../lines";
 import type { EspnBoxTeam } from "@/lib/props/grade";
@@ -230,11 +231,11 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
   return report;
 }
 
-export async function ftdGraded(season: number): Promise<(GradedGame & { slug: string; week: number })[]> {
+export async function ftdGraded(season: number): Promise<(GradedGame & Books & { slug: string; week: number })[]> {
   const nums = ((await redis.smembers(FK.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ slug, week, game: g.game, result: g.result, kalshi: g.kalshi, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ slug, week, game: g.game, result: g.result, kalshi: g.kalshi, dk: g.dk, fd: g.fd, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
 
@@ -251,7 +252,7 @@ export interface OurFtdView {
   season: number;
   week: number | null;
   board: OurFtdStored[];
-  graded: (GradedGame & { slug: string; week: number })[];
+  graded: (GradedGame & Books & { slug: string; week: number })[];
   learning: SectionView;
 }
 
