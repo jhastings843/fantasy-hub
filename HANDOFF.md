@@ -7,6 +7,8 @@
 - Fanatics: paid Odds API plans only (bookmaker list says so); returns empty on the free key. Kept in the request.
 - Live check 2026-10-26: NFL read 15 games named (DK + FD), DAL@PHI under 43.5 -102 FanDuel vs DK -105. College read named 39 games against Week 8 core names; check Saturday's run reports how many of the day's games got a match (`shop` in the picks-day response).
 - Credits: 79 of 500 used in Oct after these test reads. Expected ~40-60/month added (estimate). Jack offered a second Odds API account; not used (one key per app, possible ToS issue, not needed).
+- Alt-line worked example (Jack: NYG +10 at -105 was available and hit): T1 p 0.544 at +10.5; nflverse 2010+ favorites of 9-12 win by exactly 10 in 17/430 (3.95%), so +10 turns that into a push. EV: +10.5 -112 +2.94%, +10.5 -110 +3.83% (bet), +10 -105 +2.42% (pass, worse than the main line), +10 needs -102 for 1u. It hit because NYG won outright. Kelly with a push: f = (b w - l) / (b (w + l)).
+- ON HOLD (Jack, 2026-10-26): alt lines, NBA price shopping, Fanatics (paid Odds API plan). Don't start any of them unless he asks.
 - Not built (Jack chose "shop main lines first"): alt lines. Next step would be a half-point value table from nflverse/cfbfastR margins, then take an alt only when price gain beats the cover chance lost.
 - Note: forecast archive snapshots now carry the shopped prices when a read is fresh (ref.shop keeps DK's).
 
