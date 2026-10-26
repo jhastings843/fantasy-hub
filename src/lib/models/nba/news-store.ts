@@ -2,7 +2,6 @@ import "server-only";
 import { redis } from "@/lib/redis/client";
 import { etDate, nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { settle } from "@/lib/props/grade";
-import { push } from "@/lib/notify/pushover";
 import { affected, changes, followup, readFeed, type Affected, type FeedEntry, type Followup, type StatusChange } from "./news";
 import { K, loadWeek, runOurNbaProps, scoreboard, type OurStoredProps } from "./store";
 import type { PlayerEntry } from "./history";
@@ -19,7 +18,6 @@ const EVENTS = (s: number) => `news:v1:nba:${s}:events`;
 const ROTATION_MIN = 15;
 /** Games repriced per run, so one pulse stays inside its time. */
 const MAX_GAMES = 3;
-const APP = process.env.APP_URL ?? "https://fantasy-hub-tan.vercel.app";
 
 export interface NewsEvent {
   id: string;
@@ -106,7 +104,8 @@ export async function runNbaNews(now = new Date()): Promise<string> {
     lines.push(`${away}@${home}: ${who}; ${hit.length} props moved, ${edges.length} edges${r.problems.length ? ` (${r.problems.join("; ")})` : ""}`);
     if (edges.length) {
       const fmt = (a: Affected) => `${a.player} ${a.side} ${a.line} ${a.stat}${a.price !== null ? ` ${a.price > 0 ? "+" : ""}${a.price}` : ""}: ours ${a.after} (${Math.round(a.chance * 100)}%)`;
-      await push({ title: `NBA news: ${who}`, message: edges.map(fmt).join("\n"), url: `${APP}/props?m=nba`, urlTitle: "Open NBA props" });
+      // Pushover paused (Jack, 2026-10-26): edges go to the pulse log only. Events still save to Redis for the page.
+      lines.push(`edges: ${edges.map(fmt).join("; ")}`);
     }
   }
   await save();
