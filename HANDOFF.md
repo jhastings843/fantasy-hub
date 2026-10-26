@@ -33,6 +33,15 @@
 - `parseEventOdds` reads both books (`parseBook`); `OddsRead.fd` (reads from 2026-10-22). `fdProp` gives FanDuel's own line and prices. NFL board `extra[id].fd`; First TD `fd` prices. DK's price still decides the NFL prop edge; FanDuel is shown ("FanDuel pays more" / "better line at FanDuel" / "same as DK"). First TD's cheapest price now considers Kalshi, DK and FanDuel.
 - First FanDuel read: Thu 10/22 9am ET (NE at CHI).
 
+## Venom ideas tested, learners everywhere, First TD at the best price (2026-10-26, evening)
+- Venom-inspired inputs, each walk forward, kept only if test improved (three helper agents, reruns verified):
+  - NFL props: implied team total (team volume x (implied/22.65)^0.3; helps every stat) and opponent defense (pseudo-games pass_yds 16, rec 32; rush and rec yds off). Depth of target tested, off. 2026 test: pass_yds MAE 66.90 -> 65.27, Brier .2490 -> .2433. Live: store passes the game total (homeLine) and `defenseTables(rows)` (nfl/history.ts).
+  - NBA props: recent form (`rateHalfLife` pts 20, reb 15, ast 10, threes 20 games; k pts/ast 200) and opponent defense by position (`kOpp` pts 160, reb 80, ast 40, threes 80). Every stat better on test (e.g. pts log loss .6723 -> .6690). Threes as attempts x make% tied, off. Live: `allowedTables` (nba/allowed.ts) from the season's games hash. NOTE fit-nba-props.mts now keeps rateHalfLife/kOpp/maxGap when it rewrites params; run fit-nba-props-inputs.mts after it.
+  - First Basket: opening-attempt share (closest, -0.0064 test log loss, 1.8 SE), shot quality, opponent opening defense: all off (fields exist, default off).
+- Learner sections added (lib/models/sections.ts): `nfl-attd-ours` (ATTD_GATE: props sizes + 25 winners; slices value/edge5/edge10/short/long at DK), `nba-lotto-ours` (FTD_GATE; rung slices by value, price band, stat, plus the nightly ticket), `nba-kotc-ours` (PROPS_GATE; the prop we'd tag for our top 10/5/3/favorite). Reviews run in runOurFirstTd and runOurNbaProps; Log views on all three tabs (LearnerLogBody in top.tsx).
+- First TD: record, results tiles and learner grade at the best price (Kalshi with fee, DK or FanDuel; lib/models/nfl/ftd-price.ts). New slice ids `ftdb:*` so evidence restarted. Board shows only games not yet graded, soonest first; Results lists every graded game.
+- Odds API: a game-day read taken before the anytime market gets one re-read (used for MNF Oct 26, ~6 credits).
+
 ## NFL Anytime TD (2026-10-26)
 - Jack: "add an ATTD tab for nfl props where we can find edges; it can make its own picks/parlays at some point." Paper only for now (no picks, no parlays, no learner section yet).
 - Model `src/lib/models/nfl/anytime.ts`: team rush+rec TDs ~ Poisson(a x implied pts), player share from firsttd.scorerShares, P(anytime) = 1 - e^-m (log-odds calib), P(2+) Poisson. Fit `scripts/fit-anytime-td.mts` -> `attd-params.json` (a 0.1094, kTd 40, kR 50, other 0.03, calib 0.96; `.cache/fit-anytime-td.txt`). Walk forward: log loss 0.431 / 0.448 vs flat 0.474 / 0.487 (2025 wks 10-18, 2026). Known miss: 30-50% players score ~8 pts under what we say in both tests, hence `ATTD_EDGE` 0.05.

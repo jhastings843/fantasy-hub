@@ -307,7 +307,8 @@
     "2026-10-26: NBA injury news Pushover pushes paused; edges logged on the pulse only (d182e95, deployed).",
     "2026-10-26: NBA lotto shadow (Props > Lottos): long-shot rungs saved and graded, one paper 3-leg ticket a night.",
     "2026-10-26: NFL Anytime TD tab (model, DK prices via Odds API morning read, graded paper record).",
-    "2026-10-26: Venom NFL ATTD backfill (wks 1-7) graded: ours beats Venom (0.604 vs 0.623 log loss); tracked via /venom skill, no weight. Red-zone shares tested: no gain."
+    "2026-10-26: Venom NFL ATTD backfill (wks 1-7) graded: ours beats Venom (0.604 vs 0.623 log loss); tracked via /venom skill, no weight. Red-zone shares tested: no gain.",
+    "2026-10-26: Venom-idea inputs tested (kept: NFL implied total + opp defense; NBA recent form + opp defense by position); learner logs on ATTD, Lottos, KOTC; First TD graded at best price; First TD board cleaned."
   ],
   "tags": [
     "personal",
