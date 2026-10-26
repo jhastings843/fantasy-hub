@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { compactGame, type EspnNbaSummary } from "./box";
 import { ingest, rotation, summarize, type PlayerEntry, type TeamEntry } from "./history";
 import { cdf, lgamma, nbPmf, overUnder, projectGame, shareMinutes, toTeamMinutes, type LeagueBase, type NbaParams, type PlayerInput } from "./props";
-import { nearestEven, noVig, ourMarkets } from "./market";
+import { blend, nearestEven, noVig, ourMarkets } from "./market";
 import { fullGameLadder, readMilestones, readPropBets, type PropBetRow } from "../lines";
 import { ourPropCandidates } from "../learn";
 import PARAMS from "./params.json";
@@ -146,15 +146,32 @@ describe("ourMarkets (DK lines, ATL at ORL 2026-10-21)", () => {
     // Athlete 6478: Total Points 8.5 at -113/-113. A 12-point projection is an over edge; 8.5 is none.
     const names = new Map([["6478", { name: "Test Player", team: "ORL" }]]);
     const proj = (pts: number) => new Map([["6478", { id: "6478", team: "ORL", min: 25, mean: { pts, reb: 3, ast: 2, threes: 1 } }]]);
-    const hi = ourMarkets(lines, proj(12), names, P).markets.find((m) => m.stat === "pts")!;
+    const raw = { ...P, maxGap: undefined };
+    const hi = ourMarkets(lines, proj(12), names, raw).markets.find((m) => m.stat === "pts")!;
     expect(hi.line).toBe(8.5);
     expect(hi.side).toBe("over");
     expect(hi.clears).toBe(true);
     expect(hi.books[0]).toMatchObject({ book: "DraftKings", over: -113, under: -113, win: true });
     expect(hi.gap).toBeGreaterThan(0);
-    const even = ourMarkets(lines, proj(8.5), names, P).markets.find((m) => m.stat === "pts")!;
+    const even = ourMarkets(lines, proj(8.5), names, raw).markets.find((m) => m.stat === "pts")!;
     expect(even.side).toBeNull();
     expect(even.clears).toBe(false);
+  });
+  it("calls no edge when our chance is far from DK's (Jack, 2026-10-26)", () => {
+    // 8.5 at -113/-113, DK no-vig 50%. A 9.5 projection is about 56.5% (gap 6.5): with maxGap 0.06, none.
+    // At 9.2 the gap is about 4.4 and beats the 53.1% break-even: an edge.
+    const names = new Map([["6478", { name: "Test Player", team: "ORL" }]]);
+    const proj = (pts: number) => new Map([["6478", { id: "6478", team: "ORL", min: 25, mean: { pts, reb: 3, ast: 2, threes: 1 } }]]);
+    const at = (pts: number) => ourMarkets(lines, proj(pts), names, P).markets.find((m) => m.stat === "pts")!;
+    expect(at(12).side).toBeNull();
+    expect(at(9.5).side).toBeNull();
+    expect(at(9.2).side).toBe("over");
+    expect(at(9.2).gap).toBeLessThanOrEqual(0.06);
+  });
+  it("pulls our chance toward DK's in log-odds", () => {
+    expect(blend(0.7, 0.5, 0.3)).toBeCloseTo(0.563, 3);
+    expect(blend(0.7, null, 0.3)).toBe(0.7);
+    expect(blend(0.7, 0.5, 1)).toBe(0.7);
   });
 });
 

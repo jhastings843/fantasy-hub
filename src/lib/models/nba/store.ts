@@ -1,7 +1,7 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { etDate, nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
-import { gradeGame, type EspnBoxTeam } from "@/lib/props/grade";
+import { etDate, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
+import { gradeGame, type EspnBoxTeam, type GradedGame } from "@/lib/props/grade";
 import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import type { GradedPropsGame } from "@/lib/props/trends";
@@ -373,11 +373,27 @@ async function homeSpread(event: string): Promise<number | null> {
   }
 }
 
+/** NBA games a player needs this season before his prop counts: on the card, in the record and in learning. */
+export const CARD_GAMES = 3;
+
+/**
+ * Only the props the card shows (CARD_GAMES+ games, read from the saved board).
+ * Jack (2026-10-26): the record had counted every edge, and on 10/25 224 of 234
+ * came from players with 2 games, whose minutes were still last season's.
+ */
+export function carded(g: Pick<OurStoredProps, "game" | "extra">, result: GradedGame): { game: PropsGame; result: GradedGame } {
+  const keep = (id: string) => (g.extra?.[id]?.games ?? 0) >= CARD_GAMES;
+  return {
+    game: { ...g.game, markets: g.game.markets.filter((m) => keep(m.id)) },
+    result: { ...result, markets: result.markets.filter((m) => keep(m.id)) },
+  };
+}
+
 export async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, ...carded(g, g.result), first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
     .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? "") || a.slug.localeCompare(b.slug));
 }
 

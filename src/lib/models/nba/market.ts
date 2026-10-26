@@ -3,9 +3,11 @@
 // learning and the page treat our model like any other source.
 //
 // Per market: `model` is our projected mean, `line` and `books` are DK's,
-// `side` is the side whose chance beats DK's break-even at its price (a
-// model edge, null when neither does), `gap` is that side's chance minus
-// DK's no-vig chance, and `lean` is the side we make likelier.
+// `side` is the side whose chance beats DK's break-even at its price by
+// minEdge (a model edge, null when neither does), `gap` is that side's chance
+// minus DK's no-vig chance, and `lean` is the side we make likelier. From
+// 2026-10-26 a gap over maxGap is no edge, and marketW can pull our chance
+// toward DK's (blend) once there are enough graded boards to fit it.
 
 import { STAT_LABEL, implied, type PropMarket, type PropsGame, type Side } from "@/lib/props/parse";
 import { fullGameLadder, type LiveLine } from "../lines";
@@ -22,6 +24,8 @@ export interface OurMarketExtra {
   /** Our chance of the over and the under (pushes excluded on whole lines). */
   over: number;
   under: number;
+  /** Our model's own over chance before the pull toward DK (boards from 2026-10-26 on; over/under are blended). */
+  raw?: number;
   /** Projected minutes behind the number. */
   min: number;
   /** Games this season behind it (missing on boards saved before 2026-10-21 evening). */
@@ -67,6 +71,21 @@ export function noVig(over: number, under: number): { over: number; under: numbe
   return { over: o / (o + u), under: u / (o + u) };
 }
 
+/**
+ * Our chance pulled toward DK's: log-odds of DK's no-vig chance plus `w` times
+ * our disagreement with it. Without DK's two-sided price there is nothing to
+ * lean on and our own chance stands.
+ *
+ *   blend(0.70, 0.50, 0.3) -> 0.563   // a 20-point disagreement keeps 6.3 of it
+ *   blend(0.70, null, 0.3) -> 0.70
+ */
+export function blend(ours: number, dk: number | null, w: number): number {
+  if (dk === null || w >= 1) return ours;
+  const lo = (x: number) => Math.log(x / (1 - x));
+  const c = (x: number) => Math.min(0.999, Math.max(0.001, x));
+  return 1 / (1 + Math.exp(-(lo(c(dk)) + w * (lo(c(ours)) - lo(c(dk))))));
+}
+
 const r1 = (x: number) => Math.round(x * 10) / 10;
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 
@@ -88,14 +107,18 @@ export function ourMarkets(
     const pick = nearestEven({ line: l.current.line, over: l.current.over, under: l.current.under }, fullGameLadder(alts.get(`${l.athlete}|${l.type}`) ?? [], l.current as { line: number; over: number | null }));
     const { line, over, under } = pick;
     const mean = pr.mean[stat];
-    const ch = overUnder(stat, Math.max(mean, 0.01), line, p);
+    const raw = overUnder(stat, Math.max(mean, 0.01), line, p);
     const fair = pick.fairOver !== null ? { over: pick.fairOver, under: 1 - pick.fairOver } : null;
-    // A side is a model edge when its chance beats DK's break-even at its own price.
+    const bo = blend(raw.over, fair?.over ?? null, p.marketW ?? 1);
+    const ch = { over: bo, under: 1 - bo };
+    const wild = fair !== null && p.maxGap !== undefined && Math.abs(raw.over - fair.over) > p.maxGap;
+    // A side is a model edge when its blended chance beats DK's break-even at its own price by minEdge.
     const ev = (s: Side) => {
       const price = s === "over" ? over : under;
       return price === null ? -1 : ch[s] - implied(price);
     };
-    const side: Side | null = ev("over") > 0 && ev("over") >= ev("under") ? "over" : ev("under") > 0 ? "under" : null;
+    const floor = p.minEdge ?? 0;
+    const side: Side | null = wild ? null : ev("over") > floor && ev("over") >= ev("under") ? "over" : ev("under") > floor ? "under" : null;
     const lean: Side | null = ch.over > ch.under ? "over" : ch.under > ch.over ? "under" : null;
     const id = `${stat}|${who.name}`;
     markets.push({
@@ -117,6 +140,7 @@ export function ourMarkets(
     extra[id] = {
       over: r3(ch.over),
       under: r3(ch.under),
+      ...(ch.over !== raw.over ? { raw: r3(raw.over) } : {}),
       min: r1(pr.min),
       ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}),
       ...(pick.alt ? { main: { line: l.current.line, over: l.current.over, under: l.current.under } } : {}),

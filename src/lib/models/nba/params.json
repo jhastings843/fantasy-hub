@@ -1,7 +1,7 @@
 {
   "halfLife": 3,
   "kMin": 2,
-  "minScale": 0.93,
+  "minScale": 1.0,
   "k": {
     "pts": 100,
     "reb": 400,
@@ -19,5 +19,6 @@
     "ast": 20,
     "threes": 12
   },
-  "calib": 0.95
+  "calib": 0.95,
+  "maxGap": 0.06
 }

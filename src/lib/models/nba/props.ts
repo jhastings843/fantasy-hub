@@ -89,6 +89,23 @@ export interface NbaParams {
    * ends because they don't carry the projection's own error.
    */
   calib: number;
+  /**
+   * Jack (2026-10-26): how far our chance moves off DK's no-vig chance, in
+   * log-odds (0 = DK's, 1 = ours alone). Unshrunk, the model disagreed with DK
+   * by a median 6.8 points and lost 6.4% on its biggest edges, while DK's line
+   * out-predicts our mean on points and rebounds. Missing means 1 (old boards).
+   */
+  marketW?: number;
+  /** A side is an edge only when its chance beats DK's break-even by this much (default 0). */
+  minEdge?: number;
+  /**
+   * No edge when our chance is more than this far from DK's no-vig chance.
+   * Jack (2026-10-26), first 40 games: gaps of 3 to 6 points went 172-147,
+   * +5.5u; gaps of 6 or more went 521-512, -66.6u (77% of all edges). A big
+   * gap was the model being wrong (minutes, news), not DK. Thin evidence, so
+   * marketW (unset, so 1) is the lever to fit once more boards are graded.
+   */
+  maxGap?: number;
 }
 
 export interface PlayerInput {
