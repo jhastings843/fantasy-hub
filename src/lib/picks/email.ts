@@ -4,6 +4,7 @@ import type { UpdateDiff } from "./update";
 import type { JournalEntry } from "./learning/review";
 import type { Push } from "@/lib/notify/pushover";
 import { fmtUnits } from "./units";
+import { priceWithBook } from "./shop";
 
 /** A quoted price; an unquoted one is said so, never shown as -110. */
 const price = (p?: number) => (p === undefined ? "no price" : p > 0 ? `+${p}` : `${p}`);
@@ -65,7 +66,7 @@ function playRows(r: PicksReport, games: BoardGame[]): string {
       const chip = `<span style="background:${g.tier === "t1" ? PALETTE.accent : PALETTE.goodBg};color:${g.tier === "t1" ? "#fff" : PALETTE.accent};border:1px solid ${g.tier === "t1" ? PALETTE.accent : PALETTE.goodBorder};border-radius:4px;padding:1px 6px;font:600 11px/1.4 ${FONT};">${g.stake}U</span>`;
       return `${head}<tr>
   <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};width:52px;">${chip}</td>
-  <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(`${name(team)} ${line(lineFor)} (${price(p)})`)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">vs ${escapeHtml(name(opp))}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
+  <td style="padding:7px 8px;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(`${name(team)} ${line(lineFor)} (${priceWithBook(price(p), g.ref, g.side)})`)}<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">vs ${escapeHtml(name(opp))}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
   <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:400 12px/1.4 ${FONT};color:${PALETTE.muted};white-space:nowrap;">${g.tier === "t1" ? "Tier 1" : "Tier 2"}${g.pemPick ? " · PEM" : ""}</td>
 </tr>`;
     })
@@ -401,7 +402,7 @@ export function buildTodayEmail(input: { date: string; leagues: TodayLeague[]; a
       const totals = diff.addedTotals
         .map(
           (g) => `<tr>
-  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(g.play!)} (${escapeHtml(price(g.price))})<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${name(g.away)} at ${name(g.home)}`)}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
+  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(g.play!)} (${escapeHtml(priceWithBook(price(g.price), g.ref, g.side))})<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${name(g.away)} at ${name(g.home)}`)}${g.ref?.kickoff ? ` · ${escapeHtml(when(g.ref.kickoff))}` : ""}</div></td>
   <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 13px/1.4 ${FONT};color:${PALETTE.accent};white-space:nowrap;">${g.stake}u</td>
 </tr>`,
         )
@@ -421,7 +422,7 @@ ${small(feedsLine(r))}`);
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line and price. Each is graded at the line and price shown; a better number elsewhere only helps. ${sizingNote(input.leagues[0]?.r ?? null)} Units are risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line, at the best price of DraftKings and FanDuel on that same line (the book is named when it isn't DraftKings). Each is graded at the line and price shown; a better number elsewhere only helps. ${sizingNote(input.leagues[0]?.r ?? null)} Units are risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject };
@@ -437,9 +438,9 @@ export function todayPush(input: { date: string; leagues: TodayLeague[]; appUrl:
     const name = (k: string) => r.names[k] ?? k;
     for (const g of diff.added.slice().sort((a, b) => (a.ref?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? ""))) {
       const team = g.side === "home" ? g.home : g.away;
-      lines.push(`${league} ${name(team)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)} · ${g.stake}u (${price(g.price)})${g.ref?.kickoff ? ` · ${when(g.ref.kickoff).replace(/^\w+ /, "")}` : ""}`);
+      lines.push(`${league} ${name(team)} ${line(g.side === "home" ? g.homeLine! : -g.homeLine!)} · ${g.stake}u (${priceWithBook(price(g.price), g.ref, g.side)})${g.ref?.kickoff ? ` · ${when(g.ref.kickoff).replace(/^\w+ /, "")}` : ""}`);
     }
-    for (const g of diff.addedTotals) lines.push(`${league} ${g.play} · ${g.stake}u (${price(g.price)})`);
+    for (const g of diff.addedTotals) lines.push(`${league} ${g.play} · ${g.stake}u (${priceWithBook(price(g.price), g.ref, g.side)})`);
     for (const o of diff.off) lines.push(`OFF ${league} ${name(o.sent.side === "home" ? o.sent.home : o.sent.away)}: ${o.reason}`);
     for (const o of diff.totalsOff) lines.push(`OFF ${league} ${o.sent.play}: ${o.reason}`);
   }

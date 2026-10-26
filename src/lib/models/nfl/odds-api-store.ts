@@ -15,6 +15,16 @@ const K = {
   usage: "oddsapi:v1:usage",
 };
 
+/** Record the account's usage from a response's headers (any caller of the API, so the monthly stop sees every credit). */
+export async function saveOddsUsage(h: Headers, at: string): Promise<OddsUsage | null> {
+  const used = num(h, "x-requests-used");
+  const remaining = num(h, "x-requests-remaining");
+  if (used === undefined || remaining === undefined) return null;
+  const u = { used, remaining, at };
+  await redis.set(K.usage, u);
+  return u;
+}
+
 export interface OddsUsage {
   used: number;
   remaining: number;

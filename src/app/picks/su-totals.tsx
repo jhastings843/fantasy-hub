@@ -4,6 +4,7 @@ import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
 import { kickoffEt, n, price, rec, units } from "./ui";
+import { priceWithBook } from "@/lib/picks/shop";
 import { Background, Hero, SecHead } from "./board";
 import { ReadLegend } from "./ats";
 import { findGame, type LiveGame } from "@/lib/live/espn";
@@ -262,7 +263,7 @@ export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[]
       {g.stake ? (
         <>
           <dt>Stake</dt>
-          <dd className={s.num}>{`${g.stake}u at ${price(g.price)}`}</dd>
+          <dd className={s.num}>{`${g.stake}u at ${priceWithBook(price(g.price), g.ref, g.side)}`}</dd>
         </>
       ) : null}
     </dl>
@@ -281,8 +282,8 @@ export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[]
     if (g.issued) return { chip: [`Totals · ${g.issued.units}u`, s.readBet], note: startedOf.has(`${g.away}@${g.home}`) ? "In progress" : `Sent at ${price(g.issued.price)}` };
     if (endedOf(g)) return { chip: ["Final", s.readPass], note: "Grading soon" };
     if (startedOf.has(`${g.away}@${g.home}`)) return { chip: ["In progress", s.readLive] };
-    if (g.stake) return { chip: ["Totals · not sent", s.readPend], note: g.held ? `Locks ${kickoffEt(g.held)}` : `${g.stake}u at ${price(g.price)}` };
-    if (g.tier === "t1") return { chip: ["Close call", s.readTrack], note: `Priced out at ${price(g.price)}` };
+    if (g.stake) return { chip: ["Totals · not sent", s.readPend], note: g.held ? `Locks ${kickoffEt(g.held)}` : `${g.stake}u at ${priceWithBook(price(g.price), g.ref, g.side)}` };
+    if (g.tier === "t1") return { chip: ["Close call", s.readTrack], note: `Priced out at ${priceWithBook(price(g.price), g.ref, g.side)}` };
     if (g.tier === "lean") return { chip: [`Lean ${ou(g.side).toLowerCase()} · no stake`, s.readTrack] };
     if (g.tier === "split") return { chip: ["Split", s.readPass] };
     if (g.tier === "one") return { chip: ["One model", s.readPass] };

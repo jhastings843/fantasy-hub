@@ -1,6 +1,15 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
+## Price shopping on the bet gate (2026-10-26)
+- Jack: tier picks at DK -112/-115 were passes while other books had -110 (NFL Week 7 NYG +10.5). Checked: NYG was Tier 1 "Agree on road dog" 12-2, shrunk p 0.544, worstPrice -110, DK -112 -> pass; at -110 it is 1u. College Week 8 Sat: Wisconsin +3 (T2, p 0.548, needs -112) was -115 at DK -> would bet at -110. Sacramento State +14.5 (T1 p 0.527, needs -102) and NFL PHI +4.5 (T2 p 0.509, no price works) fail on record, not price.
+- Built: `src/lib/picks/shop.ts` (pure) + `shop-store.ts`. The Odds API sport odds endpoint, spreads+totals, books draftkings,fanduel,fanatics = 2 credits a read per sport. `runToday` (9am bets run) calls `refreshShop` for each sport playing today before `refreshPicks` (at most every 90 min, respects MONTHLY_STOP 450 via shared `oddsapi:v1:usage`; `saveOddsUsage` exported from odds-api-store). `getQuotes` applies the latest read while under 3h old (`shopLines`): each side's price = best of Jack's books AT DK'S OWN NUMBER; `RefLine.shop` names the book per side and keeps DK's own prices. Sizing, issued price and units then use the shopped price; email, push and the picks page say "-110 FanDuel".
+- Fanatics: paid Odds API plans only (bookmaker list says so); returns empty on the free key. Kept in the request.
+- Live check 2026-10-26: NFL read 15 games named (DK + FD), DAL@PHI under 43.5 -102 FanDuel vs DK -105. College read named 39 games against Week 8 core names; check Saturday's run reports how many of the day's games got a match (`shop` in the picks-day response).
+- Credits: 79 of 500 used in Oct after these test reads. Expected ~40-60/month added (estimate). Jack offered a second Odds API account; not used (one key per app, possible ToS issue, not needed).
+- Not built (Jack chose "shop main lines first"): alt lines. Next step would be a half-point value table from nflverse/cfbfastR margins, then take an alt only when price gain beats the cover chance lost.
+- Note: forecast archive snapshots now carry the shopped prices when a read is fresh (ref.shop keeps DK's).
+
 ## NBA game model: spreads and totals, forward test (2026-10-26)
 - Jack: "add nba spreads/totals" (the Who decides row said "Our NBA game model: Not built"; our NBA models were props, First Basket, King of the Court, injury repricer).
 - `src/lib/models/nba/game.ts` (pure): market-residual model like NFL's. Spread features: gap (results-only off/def/pace rating vs market margin), avail (props model's projected team points tonight minus with full recent rotation, home minus away), move (now vs open), rest, b2b, cover. Total features: gapT, availT, moveT, b2bT. `game-lines.ts` reads ESPN core odds open/close (DK, else ESPN BET; live feed skipped).

@@ -537,6 +537,19 @@ export interface RefLine {
   source: string;
   /** When we read it (the feed carries no quote time of its own). */
   fetchedAt: string;
+  /**
+   * Set when FanDuel or Fanatics beat DraftKings' price at DraftKings' own
+   * number (shop.ts): the prices above are then the best, this names each
+   * shopped side's book and keeps DraftKings' own prices.
+   */
+  shop?: {
+    at: string;
+    home?: string;
+    away?: string;
+    over?: string;
+    under?: string;
+    dk: { homePrice?: number; awayPrice?: number; overPrice?: number; underPrice?: number };
+  };
 }
 
 export interface BoardGame {

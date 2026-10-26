@@ -22,6 +22,7 @@ import { pemCompare, researchRows } from "./research";
 import { TOTALS_EDGE, type TotalsSeen, totalsBacktest } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
+import { shopLines } from "./shop-store";
 import { type PicksCore, type PicksReport, type Quotes, type SizedCandidate, compose, exposureFrom, heldCandidates } from "./compose";
 import { loadActivePolicy } from "./policy-store";
 import { sourceState, suInForce, totalsAllowed } from "./policy";
@@ -435,7 +436,7 @@ export async function getQuotes(league: League, season: number, week: number | n
     if (cached?.fetchedAt && Date.now() - new Date(cached.fetchedAt).getTime() < QUOTES_TTL_S * 1000) return cached;
   }
   try {
-    const lines = await currentLines(league, season, week);
+    const lines = await shopLines(league, week, await currentLines(league, season, week));
     const prev = await redis.get<Quotes>(k).catch(() => null);
     const q: Quotes = { fetchedAt: new Date().toISOString(), lines: [...lines, ...carryStarted(prev?.lines ?? [], lines, new Date())] };
     await redis.set(k, q, { ex: 7 * 24 * 3600 }).catch(() => {});

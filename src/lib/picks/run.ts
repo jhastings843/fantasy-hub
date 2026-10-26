@@ -2,7 +2,8 @@ import "server-only";
 import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
 import { etClock } from "@/lib/pulse/tempo";
-import { refreshPicks } from "./report";
+import { getPicksCore, refreshPicks } from "./report";
+import { refreshShop } from "./shop-store";
 import { saveDecisions } from "./decisions-store";
 import { type DecisionRecord, toDecision } from "./learning/replay";
 import { buildPicksEmail, buildTodayEmail, todayPush, type TodayLeague } from "./email";
@@ -212,10 +213,17 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   // week's boards are up).
   const leagues: TodayLeague[] = [];
   const notReady: string[] = [];
+  const shopNotes: string[] = [];
   let reserved = 0;
   for (const league of ["nfl", "cfb"] as const) {
     const name = league === "nfl" ? "NFL" : "college";
     const playsToday = (PLAY_DAYS[league] as readonly number[]).includes(clock.day);
+    // Shop Jack's other books before the quotes are re-read, so a -112 at
+    // DraftKings can size at FanDuel's or Fanatics' -110 (2 credits a read).
+    if (playsToday && !dry) {
+      const core = (await getPicksCore(league).catch(() => null))?.value;
+      shopNotes.push(`${name}: ${await refreshShop(league, core ? [...new Set(core.rows.flatMap((x) => [x.home, x.away]))] : [], now)}`);
+    }
     const r = await refreshPicks(league, league === "cfb" ? { reserved } : undefined).catch(() => null);
     if (!r?.week) {
       if (playsToday) notReady.push(`${name} board unreadable`);
@@ -252,7 +260,7 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
       if (!(await saveDecisionsBounded(decisions, dayMark))) return Response.json({ ok: true, skipped: true, reason: "No bets today, but couldn't record today's sizing decision; retrying next pulse." });
       await recordSent(id, season, day, { sentAt: now.toISOString(), subject: `no bets today, not sent${notReady.length ? ` (${notReady.join(", ")})` : ""}` });
     }
-    return Response.json({ ok: true, skipped: true, reason: "No bets today and nothing sent is off." });
+    return Response.json({ ok: true, skipped: true, reason: "No bets today and nothing sent is off.", shop: shopNotes });
   }
 
   const subject = `${test ? "[Test] " : ""}${email.subject}`;
@@ -273,5 +281,5 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   });
   if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
   const pushed = out.sent ? await push(todayPush({ date, leagues, appUrl })) : { pushed: false, reason: "email not sent" };
-  return Response.json({ ok: true, sent: out.sent, subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason });
+  return Response.json({ ok: true, sent: out.sent, subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason, shop: shopNotes });
 }

@@ -7,6 +7,7 @@ import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import Link from "next/link";
 import TierChecker from "./TierChecker";
+import { priceWithBook } from "@/lib/picks/shop";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
@@ -54,7 +55,7 @@ function stakeWhy(g: BoardGame, r: PicksReport): string {
   const cut = g.tier === "t1" ? r.strategies.rule : g.tier === "t2" ? r.strategies.second : null;
   if (cut?.activated) return "Held to 1u: this cut was activated by the strategy review, so a bigger stake waits on its results from here on.";
   if (r.policy?.staking?.kind === "flat") return `Flat ${r.policy.staking.flatUnits}u: every pick that passes the price check bets the same, while quarter Kelly is tracked in shadow. No limit cut it.`;
-  return `Standard quarter-Kelly stake for this tier at ${price(g.price)}. No limit cut it.`;
+  return `Standard quarter-Kelly stake for this tier at ${priceWithBook(price(g.price), g.ref, g.side)}. No limit cut it.`;
 }
 
 /** Why a qualifying pick is not a bet: no price, the price check, or a size under 1u. */
@@ -63,7 +64,7 @@ function pricedWhy(g: BoardGame): string {
   if (g.eligible) return "Passes the price check, but the current sizing policy puts it under 1u, and anything under 1u is not a bet.";
   const worst = g.p !== undefined ? worstPrice(g.p) : null;
   const need = worst === null ? "a plus-money price" : `${price(worst)} or better`;
-  return `At ${price(g.price)} the tier's estimated edge is too thin for a 1u bet. It would need ${need}.`;
+  return `At ${priceWithBook(price(g.price), g.ref, g.side)}, the best of DraftKings and FanDuel on this line, the tier's estimated edge is too thin for a 1u bet. It would need ${need}.`;
 }
 
 /** Every reason behind a game's call: the line, each model, tier, chance, price, stake or why no bet. */
@@ -100,7 +101,7 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
       {g.price !== undefined && g.p !== undefined && (
         <>
           <dt>Price</dt>
-          <dd className={s.num}>{`${price(g.price)} quoted · estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit`}</dd>
+          <dd className={s.num}>{`${priceWithBook(price(g.price), g.ref, g.side)} quoted · estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit`}</dd>
         </>
       )}
       {(st === "bet" || st === "early") && (
@@ -168,7 +169,7 @@ function readOf(g: BoardGame, r: PicksReport, live?: LiveGame): { chip: [string,
   }
   if (st === "sent") return { chip: [`${tier} · ${amt(g.issued!.units)}`, s.readBet], note: `Sent at ${price(g.issued!.price)}` };
   if (st === "early") return { chip: [`${tier} · not sent`, s.readPend], note: `Locks ${kickoffEt(g.held)}` };
-  if (st === "bet") return { chip: [`${tier} · not sent`, s.readPend], note: `${amt(g.stake ?? 0)} at ${price(g.price)}` };
+  if (st === "bet") return { chip: [`${tier} · not sent`, s.readPend], note: `${amt(g.stake ?? 0)} at ${priceWithBook(price(g.price), g.ref, g.side)}` };
   if (st === "priced") {
     const worst = g.p !== undefined ? worstPrice(g.p) : null;
     return { chip: ["Close call", s.readTrack], note: `Now ${price(g.price)} · needs ${worst === null ? "plus money" : price(worst)}` };

@@ -185,7 +185,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
       david: r.davidTotal,
       ref:
         r.ref?.total !== undefined
-          ? { total: r.ref.total, source: r.ref.source, fetchedAt: r.ref.fetchedAt, overPrice: r.ref.overPrice, underPrice: r.ref.underPrice, kickoff: r.ref.kickoff }
+          ? { total: r.ref.total, source: r.ref.source, fetchedAt: r.ref.fetchedAt, overPrice: r.ref.overPrice, underPrice: r.ref.underPrice, kickoff: r.ref.kickoff, ...(r.ref.shop ? { shop: { over: r.ref.shop.over, under: r.ref.shop.under } } : {}) }
           : undefined,
     })),
     tb.rule,

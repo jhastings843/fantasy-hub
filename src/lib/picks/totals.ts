@@ -244,6 +244,8 @@ export interface TotalsRef {
   overPrice?: number;
   underPrice?: number;
   kickoff?: string;
+  /** Which of Jack's books the over/under price is from, when not DraftKings (shop.ts). */
+  shop?: { over?: string; under?: string };
 }
 
 export function totalsBoard(
