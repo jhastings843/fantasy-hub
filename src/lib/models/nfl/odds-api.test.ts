@@ -33,6 +33,7 @@ const body = {
         },
         { key: "player_receptions", outcomes: [{ name: "Over", description: "Ja'Marr Chase", price: -130, point: 6.5 }] },
         { key: "player_1st_td", outcomes: [{ name: "Yes", description: "Ja'Marr Chase", price: 650 }, { name: "No", description: "Ja'Marr Chase", price: -1200 }] },
+        { key: "player_anytime_td", outcomes: [{ name: "Yes", description: "Ja'Marr Chase", price: 110 }, { name: "No", description: "Ja'Marr Chase", price: -150 }] },
       ],
     },
   ],
@@ -53,6 +54,7 @@ describe("The Odds API reads", () => {
   });
   it("reads First TD yes prices, not the no side", () => {
     expect(Object.values(r.firstTd)).toEqual([650]);
+    expect(r.anytime).toEqual({ jamarrchase: 110 });
   });
   it("keeps FanDuel apart, at its own line, both sides only", () => {
     expect(fdProp(r, "Ja'Marr Chase", "rec_yds")).toEqual({ line: 79.5, over: -105, under: -125 });

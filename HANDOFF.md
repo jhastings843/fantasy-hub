@@ -33,6 +33,13 @@
 - `parseEventOdds` reads both books (`parseBook`); `OddsRead.fd` (reads from 2026-10-22). `fdProp` gives FanDuel's own line and prices. NFL board `extra[id].fd`; First TD `fd` prices. DK's price still decides the NFL prop edge; FanDuel is shown ("FanDuel pays more" / "better line at FanDuel" / "same as DK"). First TD's cheapest price now considers Kalshi, DK and FanDuel.
 - First FanDuel read: Thu 10/22 9am ET (NE at CHI).
 
+## NFL Anytime TD (2026-10-26)
+- Jack: "add an ATTD tab for nfl props where we can find edges; it can make its own picks/parlays at some point." Paper only for now (no picks, no parlays, no learner section yet).
+- Model `src/lib/models/nfl/anytime.ts`: team rush+rec TDs ~ Poisson(a x implied pts), player share from firsttd.scorerShares, P(anytime) = 1 - e^-m (log-odds calib), P(2+) Poisson. Fit `scripts/fit-anytime-td.mts` -> `attd-params.json` (a 0.1094, kTd 40, kR 50, other 0.03, calib 0.96; `.cache/fit-anytime-td.txt`). Walk forward: log loss 0.431 / 0.448 vs flat 0.474 / 0.487 (2025 wks 10-18, 2026). Known miss: 30-50% players score ~8 pts under what we say in both tests, hence `ATTD_EDGE` 0.05.
+- Live: rides on `runOurFirstTd` (same lists and implied points): `OurFtdStored.attd` rows (ours, DK anytime, DK 2+), graded from the box score (`boxTds`: rush, rec, kick and punt return TDs; absent = void) into `attdResult`. Prices: ESPN's feed lists Anytime/2+ TD players but carried NO prices (checked 2026-10-26, no NFL player market had prices that evening), so DK anytime comes from The Odds API morning read: `player_anytime_td` added (6 credits a read, Jack OK'd, ~+65/month estimate). 2+ TD price only if ESPN ever carries it. First priced game: Week 9 Thursday (MNF Oct 26's read had already run).
+- Page: Props > Anytime TD (`m=attd`, `src/app/props/attd.tsx`): edges, per-game tables, Results with calibration bands and flat 1u edge record.
+- Venom Analytics (whop.com/venom-analytics-23d5): MLB home-run tool only, no public API, ToS bans scripts/scrapers/reverse engineering/database compilation. Not wired in.
+
 ## NBA lotto shadow (2026-10-26)
 - Jack, after @TheModelManSam's 3-leg "N+ points" lottos (+18,000 to +23,000; DK-implied about 1 in 200): "create our own lotto system and shadow track". Paper only: never in emails, bets or the learner.
 - `market.longRungs`: every board now saves DK's full-game ladder rungs at +250 to +2000 (`LONG_MIN`/`LONG_MAX`) in `extra[id].longs` with our chance (blended toward DK via marketW, vig taken out with the main line's overround) and the raw model chance. Boards before 2026-10-26 have none.

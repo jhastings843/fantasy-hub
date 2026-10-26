@@ -305,7 +305,8 @@
     "2026-10-21: NFL spread model built and backtested (no edge vs close over 3,121 games), now forward-tested at early prices with CLV on the NFL Research panel.",
     "2026-10-26: money audit. NBA props fixes deployed (gap cap, minutes haircut off, 3+ game record). Weather tab notes the bankroll reset.",
     "2026-10-26: NBA injury news Pushover pushes paused; edges logged on the pulse only (d182e95, deployed).",
-    "2026-10-26: NBA lotto shadow (Props > Lottos): long-shot rungs saved and graded, one paper 3-leg ticket a night."
+    "2026-10-26: NBA lotto shadow (Props > Lottos): long-shot rungs saved and graded, one paper 3-leg ticket a night.",
+    "2026-10-26: NFL Anytime TD tab (model, DK prices via Odds API morning read, graded paper record)."
   ],
   "tags": [
     "personal",

@@ -24,7 +24,9 @@ export const ODDS_MARKET: { [s in NflStat]: string } = {
   rec: "player_receptions",
 };
 export const FIRST_TD = "player_1st_td";
-export const MARKETS = [...Object.values(ODDS_MARKET), FIRST_TD];
+/** Anytime TD (Jack, 2026-10-26): a sixth market, so a read is at most 6 credits. */
+export const ANYTIME_TD = "player_anytime_td";
+export const MARKETS = [...Object.values(ODDS_MARKET), FIRST_TD, ANYTIME_TD];
 /** DraftKings plus FanDuel (Jack, 2026-10-21): up to 10 books count as one region, so the second book costs nothing. */
 export const BOOKS = ["draftkings", "fanduel"];
 
@@ -35,10 +37,12 @@ export interface OddsRead {
   props: { [k: string]: { line: number; over: number; under: number } };
   /** nameKey -> DK's First TD price. */
   firstTd: { [k: string]: number };
+  /** nameKey -> DK's Anytime TD price (reads from 2026-10-27 on). */
+  anytime?: { [k: string]: number };
   /** Credits this read cost, from the API's x-requests-last header. */
   cost?: number;
   /** FanDuel's numbers from the same read (reads from 2026-10-22 on), same shape: its own line, any line. */
-  fd?: { props: OddsRead["props"]; firstTd: OddsRead["firstTd"] };
+  fd?: { props: OddsRead["props"]; firstTd: OddsRead["firstTd"]; anytime?: OddsRead["anytime"] };
 }
 
 interface OddsOutcome {
@@ -54,14 +58,15 @@ interface OddsEventOdds {
 const STAT_OF = new Map(Object.entries(ODDS_MARKET).map(([s, m]) => [m, s as NflStat]));
 
 /** One book's props and First TD prices from an event-odds response. */
-function parseBook(json: unknown, book: string): { props: OddsRead["props"]; firstTd: OddsRead["firstTd"] } {
-  const out: { props: OddsRead["props"]; firstTd: OddsRead["firstTd"] } = { props: {}, firstTd: {} };
+function parseBook(json: unknown, book: string): { props: OddsRead["props"]; firstTd: OddsRead["firstTd"]; anytime: { [k: string]: number } } {
+  const out = { props: {} as OddsRead["props"], firstTd: {} as OddsRead["firstTd"], anytime: {} as { [k: string]: number } };
   const b = (json as OddsEventOdds)?.bookmakers?.find((x) => x.key === book);
   for (const m of b?.markets ?? []) {
-    if (m.key === FIRST_TD) {
+    if (m.key === FIRST_TD || m.key === ANYTIME_TD) {
+      const into = m.key === FIRST_TD ? out.firstTd : out.anytime;
       for (const o of m.outcomes ?? []) {
         const who = o.description ?? o.name;
-        if (who && typeof o.price === "number" && o.name !== "No") out.firstTd[nameKey(who)] = o.price;
+        if (who && typeof o.price === "number" && o.name !== "No") into[nameKey(who)] = o.price;
       }
       continue;
     }
@@ -87,7 +92,7 @@ function parseBook(json: unknown, book: string): { props: OddsRead["props"]; fir
 export function parseEventOdds(json: unknown, at: string): OddsRead {
   const dk = parseBook(json, "draftkings");
   const fd = parseBook(json, "fanduel");
-  return { at, ...dk, ...(Object.keys(fd.props).length || Object.keys(fd.firstTd).length ? { fd } : {}) };
+  return { at, ...dk, ...(Object.keys(fd.props).length || Object.keys(fd.firstTd).length || Object.keys(fd.anytime).length ? { fd } : {}) };
 }
 
 /** FanDuel's line and prices on a prop, whatever its line. */

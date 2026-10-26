@@ -170,7 +170,9 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
             rows.push(...(d.items ?? []));
             if (!d.pageCount || page >= d.pageCount) break;
           }
+          // ESPN lists the market but has carried no prices so far; The Odds API's game-day morning read fills the anytime price.
           const dk = new Map([...readTdScorers(rows)].flatMap(([id, x]) => (espnName.has(id) ? [[espnName.get(id)!, x] as const] : [])));
+          for (const [k, price] of Object.entries(reads.get(e.id)?.anytime ?? {})) if (dk.get(k)?.anytime === undefined) dk.set(k, { ...dk.get(k), anytime: price });
           const players = [A, H].flatMap((T) =>
             attdTeam(lists[T] ?? [], T === H ? pts.home : pts.away, AP).map((x): AttdRow => {
               const key = nameKey(x.name);
@@ -178,6 +180,12 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
               return { ...x, key, ...(q?.anytime !== undefined ? { dk: q.anytime } : {}), ...(q?.two !== undefined ? { dk2: q.two } : {}) };
             }),
           );
+          // Keep prices from an earlier read of the day once the morning read has aged out.
+          const was = new Map((old?.attd?.rows ?? []).map((r) => [r.key, r]));
+          for (const r of players) {
+            if (r.dk === undefined && was.get(r.key)?.dk !== undefined) r.dk = was.get(r.key)!.dk;
+            if (r.dk2 === undefined && was.get(r.key)?.dk2 !== undefined) r.dk2 = was.get(r.key)!.dk2;
+          }
           if (players.length) attd = { at: now.toISOString(), rows: players.sort((a, b) => b.anytime - a.anytime) };
         } catch (err) {
           report.problems.push(`${A}@${H} anytime TD: ${err instanceof Error ? err.message : String(err)}`);
