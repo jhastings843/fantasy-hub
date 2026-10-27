@@ -154,7 +154,9 @@ export function planBudget(input: BudgetInput): BudgetPlan {
     );
   }
 
-  weeklyCap = Math.max(0, Math.min(weeklyCap, remaining));
+  // Bids are whole dollars, so the ceiling is too. A $67.5 cap printed as
+  // "Week ceiling $68" next to "Commit up to $67".
+  weeklyCap = Math.floor(Math.max(0, Math.min(weeklyCap, remaining)));
 
   const maxSingleBid =
     phase === "field"

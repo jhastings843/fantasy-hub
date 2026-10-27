@@ -123,9 +123,11 @@ export function seasonOutlook(input: OutlookInput): SeasonOutlook {
   return {
     spent: input.budget - input.remaining,
     remaining: input.remaining,
-    holdFloor: now.holdFloor,
-    onPace: input.remaining >= now.holdFloor,
-    aheadBy: input.remaining - now.holdFloor,
+    // Whole dollars, so "hold $753 ... $68 ahead" with $820 left cannot print:
+    // the reader does that subtraction and the rounded parts must add up.
+    holdFloor: Math.round(now.holdFloor),
+    onPace: input.remaining >= Math.round(now.holdFloor),
+    aheadBy: input.remaining - Math.round(now.holdFloor),
     next,
     inversionWeek,
     pacingOffWeek,
