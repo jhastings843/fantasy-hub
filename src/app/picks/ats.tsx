@@ -7,7 +7,7 @@ import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import Link from "next/link";
 import TierChecker from "./TierChecker";
-import { priceWithBook } from "@/lib/picks/shop";
+import { bookOf, priceWithBook } from "@/lib/picks/shop";
 import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
@@ -185,7 +185,7 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
   const name = (k: string) => r.names[k] ?? k;
   const st = statusOf(g);
   const home = name(g.home);
-  const m = (x?: number) => (x === undefined ? "·" : `${home} ${line(Math.round(x * 10) / 10)}`);
+  const num = (x?: number) => (x === undefined ? "·" : line(Math.round(x * 10) / 10));
   const rd = readOf(g, r, live);
   const side = g.side && g.homeLine !== undefined ? pickText(g, name) : g.tier === "split" && g.read ? "Models split" : "None";
   return (
@@ -205,10 +205,18 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
             <span>{g.final ? `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}` : kickoffEt(g.ref?.kickoff)}</span>
           )}
         </span>
-        <span className={s.gNum} data-k="Market">{g.ref ? m(g.ref.line) : st === "started" || st === "final" ? "Closed" : "·"}</span>
-        <span className={s.gNum} data-k="Sam · David">
-          <span className={s.cSam}>{m(g.sam?.model)}</span>
-          <small className={s.cDavid}>{m(g.david?.model)}</small>
+        <span className={s.gNum} data-k="Market">
+          {g.ref ? (
+            <span>
+              {`${home} `}
+              <span style={{ whiteSpace: "nowrap" }}>{line(g.ref.line)}</span>
+            </span>
+          ) : st === "started" || st === "final" ? "Closed" : "·"}
+        </span>
+        {/* Home-side numbers only: the Market column already names the team, and long college names wrapped and clipped here. */}
+        <span className={s.gNum} data-k={`Sam · David (${home})`}>
+          <span className={s.cSam} style={{ whiteSpace: "nowrap" }}>{`Sam ${num(g.sam?.model)}`}</span>
+          <small className={s.cDavid} style={{ whiteSpace: "nowrap" }}>{`David ${num(g.david?.model)}`}</small>
         </span>
         <span className={s.gNum} data-k="Side">
           {side}
@@ -732,6 +740,7 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
       ) : (
         <p className={s.calm}>No cut qualifies as the rule yet.</p>
       )}
+      {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} />}
       <details className={s.details} open>
         <summary>Every cut tested</summary>
         <div className={s.board}>
@@ -918,6 +927,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
   const avg = models.length ? models.reduce((a, x) => a + x, 0) / models.length : null;
   const tot = r.totals.board.find((t) => t.home === g.home && t.away === g.away);
   const worst = g.p !== undefined ? worstPrice(g.p) : null;
+  const sentPrice = st === "sent" ? g.issued?.price : undefined;
   const eyebrow = `${["bet", "sent", "early"].includes(st) ? "Best bet" : STATUS_TEXT[st]} · ${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` Week ${r.week}` : ""}`;
   return (
     <section className={s.section} aria-labelledby="game">
@@ -959,9 +969,13 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
         </div>
         <div className={s.edgeCard}>
           <span className={s.eyebrow}>Price</span>
-          <b className={s.closePick} style={{ textTransform: "none" }}>{g.price !== undefined ? `${price(g.price)} at DraftKings` : "No price yet"}</b>
+          <b className={s.closePick} style={{ textTransform: "none" }}>
+            {sentPrice !== undefined ? `Sent at ${price(sentPrice)}` : g.price !== undefined ? `${price(g.price)} at ${bookOf(g.ref, g.side) ?? "DraftKings"}` : "No price yet"}
+          </b>
           <span className={s.p}>
-            {g.p !== undefined && g.price !== undefined
+            {sentPrice !== undefined && g.p !== undefined
+              ? `Estimated edge ${((g.p * decimal(sentPrice) - 1) * 100).toFixed(1)}% per unit at the sent price.${g.price !== undefined && g.price !== sentPrice ? ` The price has since moved to ${price(g.price)} at ${bookOf(g.ref, g.side) ?? "DraftKings"}; your bet keeps ${price(sentPrice)}.` : ""}`
+              : g.p !== undefined && g.price !== undefined
               ? `Estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit. ${
                   worst === null
                     ? "It needs plus money to be a bet."
@@ -1000,5 +1014,58 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
         </dl>
       </Background>
     </section>
+  );
+}
+
+/** Tracked only: every tier pick at -115 or better, 1u flat, bet or not (price-shadow.ts). */
+function PriceShadowPanel({ x, name }: { x: NonNullable<PicksReport["priceShadow"]>; name: (k: string) => string }) {
+  const tone = (u: number) => (u > 0 ? s.pos : u < 0 ? s.neg : undefined);
+  const tiles: [string, typeof x.all][] = [
+    [`Every tier pick, ${x.cap} or better`, x.all],
+    ["The ones we bet", x.bet],
+    ["Not bet (price gate or limits)", x.passed],
+  ];
+  return (
+    <details className={s.details}>
+      <summary>{`Ignore the odds: every tier pick at ${x.cap} or better (${rec(x.all)}, ${units(x.all.actual)})`}</summary>
+      <div className={s.detailsBody}>
+        <p className={s.p}>
+          {`Tracked only. Each week's frozen Tier 1 and Tier 2, every pick bet at 1u whenever its price was ${x.cap} or better, at the last pregame line and price on file. Weeks ${x.weeks.join(", ") || "none yet"}.${x.overCap ? ` ${x.overCap} pick${x.overCap === 1 ? "" : "s"} priced worse than ${x.cap} left out.` : ""}`}
+        </p>
+        {tiles.map(([label, r]) => (
+          <p key={label} className={s.p}>
+            <strong>{label}:</strong> <span className={s.num}>{rec(r)}</span>
+            {n(r) ? <> · {pct(r)} · <span className={`${s.num} ${tone(r.actual) ?? ""}`}>{units(r.actual)}</span></> : null}
+          </p>
+        ))}
+      </div>
+      {x.rows.length > 0 && (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Wk</th>
+                <th>Pick</th>
+                <th>Price</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {x.rows.map((g) => (
+                <tr key={`${g.week}:${g.away}@${g.home}`}>
+                  <td className={s.num}>{g.week}</td>
+                  <td>
+                    {`${name(g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine : -g.homeLine)}`}
+                    <div className={s.thin}>{`${g.tier === "t1" ? "Tier 1" : "Tier 2"}${g.bet ? " · bet" : " · not bet"}`}</div>
+                  </td>
+                  <td className={`${s.num} ${s.nw}`}>{price(g.price)}</td>
+                  <td className={`${s.num} ${s.nw} ${g.units !== undefined ? tone(g.units) ?? "" : ""}`}>{g.result ? `${g.result} ${units(g.units ?? 0)}` : "·"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </details>
   );
 }

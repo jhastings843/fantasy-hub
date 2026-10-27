@@ -18,6 +18,7 @@ import { type IssuedRecord, type IssuedWeek, confirmed, gradeIssued, issuedClv }
 import { type UnitReport, unitReport } from "./units";
 import { firstSends } from "./update";
 import { heldUntil } from "./hold";
+import type { PriceShadow } from "./price-shadow";
 import { kelly, shrunk, sizeAt, wantStakes } from "./staking";
 import { type CandidateInfo, type DecisionRecord, type SizingCandidate, recentKeys } from "./learning/replay";
 import type { PemCompareRow, ResearchRow } from "./research";
@@ -78,6 +79,8 @@ export interface PicksCore {
   closes: [string, ClosingLine][];
   /** The policy the core's strategies were built under. */
   policyId: string;
+  /** Tracked only: every tier pick at -115 or better, bet or not (price-shadow.ts). */
+  priceShadow?: PriceShadow;
   /** When this week's rule was frozen (the Tuesday review), or null while it is provisional. */
   ruleSet?: { at: string; throughWeek: number | null } | null;
 }

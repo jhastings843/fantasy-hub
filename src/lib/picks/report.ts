@@ -15,7 +15,7 @@ import {
 import { pemWeeks } from "./pem";
 import { clvTable } from "./closing";
 import { closingLines, currentLines } from "./closing-store";
-import { issuedGames } from "./issued";
+import { confirmed, issuedGames } from "./issued";
 import { loadIssued, loadIssuedStrict } from "./issued-store";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "./limits";
 import { pemCompare, researchRows } from "./research";
@@ -35,11 +35,13 @@ import { fetchSplits } from "./splits-feed";
 import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
 import { loadRuleFreeze, saveRuleFreeze } from "./rule-freeze";
+import { priceShadow } from "./price-shadow";
 import { redisStore } from "./learning/store";
 import {
   type BoardGame,
   type PemLine,
   type RefLine,
+  type StrategyBoard,
   gradeGame,
   join,
   key,
@@ -302,7 +304,8 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   const thisWeek = week ? rows.map((r) => ({ week, home: r.home, away: r.away })) : [];
   // Last week as the board had it, so its games grade from ESPN finals
   // before the sites post their records (Tuesday's rule needs all of it).
-  const lastRows = week ? rowsFromForecasts(await loadForecasts(league, season), week - 1) : [];
+  const snaps = await loadForecasts(league, season);
+  const lastRows = week ? rowsFromForecasts(snaps, week - 1) : [];
   const lastWeek = week ? lastRows.map((r) => ({ week: week - 1, home: r.home, away: r.away })) : [];
   const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam, ...lastWeek, ...thisWeek]);
   const finals = new Map(j.graded.map((g) => [key(g), g.final]));
@@ -334,6 +337,18 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
       board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" }),
     });
   }
+  // Shadow, tracked only: every tier pick at -115 or better, replayed on each week's frozen rule.
+  const shadowWeeks = [...new Set(snaps.map((x) => x.week))].filter((w) => !week || w <= week);
+  const freezes = await Promise.all(shadowWeeks.map((w) => (w === week ? Promise.resolve(frozen) : loadRuleFreeze(league, season, w))));
+  const betKeys = new Map(confirmed(issued).flatMap((r) => r.plays.filter((p) => p.shownInEmail && p.units).map((p) => [key({ week: r.week, home: p.home, away: p.away }), p.side] as const)));
+  const shadow = priceShadow(
+    league,
+    snaps,
+    freezes.flatMap((f) => (f ? [[f.week, f.board] as [number, StrategyBoard]] : [])),
+    finals,
+    betKeys,
+    league === "cfb" ? { pem: sourceState(policy, "pem") === "veto" } : {},
+  );
   const s = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" });
   // Straight up uses the method in force (policy.suInForce), which only the
   // strategy review changes, on games after registration; not this season's best record.
@@ -395,6 +410,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     finals: [...finals],
     closes: [...closes],
     policyId: frozen?.policyId ?? policy.id,
+    priceShadow: shadow,
     ruleSet: frozen ? { at: frozen.reviewAt, throughWeek: frozen.throughWeek } : null,
   };
 }
