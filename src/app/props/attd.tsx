@@ -7,7 +7,7 @@ import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/
 import { implied, payout } from "@/lib/props/parse";
 import { attdStaked } from "@/lib/models/sections";
 import { Background, SecHead } from "../picks/board";
-import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } from "./week";
+import { EdgeCard, Gate, GameTable, PropStats, endedOnEspn, type Edge, type GameRowData } from "./week";
 import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
@@ -115,6 +115,7 @@ export async function AttdWeek({ season }: { season: number }) {
     .sort((a, b) => Number(!!b.staked) - Number(!!a.staked) || b.gap - a.gap);
   const live = learning.entries.filter((e) => e.status === "active").map((e) => e.label);
   const priced = (rows: AttdRow[]) => rows.filter((r) => r.dk !== undefined).length;
+  const ended = await endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: g.attdResult })), "nfl");
   const rows: GameRowData[] = open.map((g) => {
     const e = g.attd!.rows.filter((r) => attdEdges(r).length);
     const top = g.attd!.rows[0];
@@ -123,6 +124,7 @@ export async function AttdWeek({ season }: { season: number }) {
       title: `${g.game.away} at ${g.game.home}`,
       when: g.kickoff,
       live: !!g.kickoff && Date.parse(g.kickoff) <= now,
+      final: ended.has(g.game.slug),
       cells: [
         ["Likeliest", top ? `${top.name} ${pct(top.anytime)}` : "·"],
         ["Priced", `${priced(g.attd!.rows)}`],

@@ -64,12 +64,21 @@ export interface GameRowData {
   when?: string;
   /** Started and not graded yet: sorts to the top with a Live tag. */
   live?: boolean;
+  /** ESPN calls it final but the grading run hasn't caught up: a Final tag, in kickoff order. */
+  final?: boolean;
   cells: [string, string][];
   read: [string, string];
   body: ReactNode;
 }
 
 const started = (kickoff: string | undefined, graded: unknown) => !graded && !!kickoff && Date.parse(kickoff) <= nowMs();
+
+/** Started, ungraded games that ESPN already calls final (the next grading run settles them). */
+export async function endedOnEspn(games: { slug: string; kickoff?: string; espnId?: string; graded: unknown }[], sport: "nfl" | "nba"): Promise<Set<string>> {
+  const ask = games.filter((g) => g.espnId && started(g.kickoff, g.graded));
+  const ended = await Promise.all(ask.map(async (g) => ((await liveBox(sport, g.espnId!).catch(() => null))?.game?.state === "post" ? g.slug : null)));
+  return new Set(ended.filter((x): x is string => !!x));
+}
 
 /** Our number and the market's line on one track, like the Picks market line. */
 function PropLine({ line }: { line: NonNullable<Edge["line"]> }) {
@@ -161,12 +170,12 @@ export function GameTable({ head, rows }: { head: string[]; rows: GameRowData[] 
         <span>Read</span>
         <span />
       </div>
-      {[...rows.filter((r) => r.live), ...rows.filter((r) => !r.live)].map((r) => (
+      {[...rows.filter((r) => r.live && !r.final), ...rows.filter((r) => !r.live || r.final)].map((r) => (
         <details key={r.key} className={s.gRow}>
           <summary>
             <span className={s.gGame}>
               {r.title}
-              {r.live ? <span className={s.gLive}>Live</span> : r.when && <span>{whenEt(r.when)}</span>}
+              {r.final ? <span>Final</span> : r.live ? <span className={s.gLive}>Live</span> : r.when && <span>{whenEt(r.when)}</span>}
             </span>
             {r.cells.map(([k, v]) => (
               <span key={k} className={s.gNum} data-k={k}>
@@ -722,6 +731,7 @@ async function FirstTdWeek({ season }: { season: number }) {
   const graded = ftdBestRecord(v.graded);
   // The board holds games still to finish, soonest first; a graded game moves to Results (Jack, 2026-10-26).
   const open = v.board.filter((g) => !g.result).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
+  const ended = await endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: g.result })), "nfl");
   const rows: GameRowData[] = open.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
     const keeps = keepsFor(g.kickoff);
@@ -739,6 +749,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       title: `${g.game.away} at ${g.game.home}`,
       when: g.kickoff,
       live: started(g.kickoff, r),
+      final: ended.has(g.game.slug),
       cells: [
         ["Scores first", fav ? `${fav.team} ${pct(fav.pFirst)}` : "·"],
         ["Likeliest", g.game.pick ? `${g.game.pick.name} ${pct(g.game.pick.p)}` : "·"],

@@ -24,6 +24,9 @@ on:
     # Tuesday, Wednesday and Friday 6:30pm ET: picks up the new week soon after
     # Sam posts it (the daily 8am snapshot is the other pass).
     - cron: "30 22 * * 2,3,5"
+    # About 1:30am ET Fri, Mon and Tue (12:30am in EST): grades the Thursday, Sunday
+    # and Monday night games by morning instead of 6:30pm the next day (Jack, 2026-10-27).
+    - cron: "30 5 * * 1,2,5"
   workflow_dispatch:
 
 jobs:
