@@ -32,6 +32,10 @@ export interface FtdParams {
   rushShare: number;
   /** Share of a team's TDs scored by players not on its list (data). */
   other: number;
+  /** Power on the listed players' shares, renormalized: above 1 favors the likeliest scorers. Absent or 1: off. */
+  sharp?: number;
+  /** Weight on last season's TD history next to this season's (1: counted the same, as before). */
+  wPrev?: number;
 }
 
 /** A player's TD history: his TDs and opportunities, and his team's in the same games. */
@@ -83,7 +87,12 @@ export function scorerShares(lines: TdLine[], p: FtdParams): number[] {
   });
   const sr = raw.reduce((a, x) => a + x.r, 0) || 1;
   const sc = raw.reduce((a, x) => a + x.c, 0) || 1;
-  return raw.map((x) => (1 - p.other) * (rush * (x.r / sr) + (1 - rush) * (x.c / sc)));
+  const sh = raw.map((x) => rush * (x.r / sr) + (1 - rush) * (x.c / sc));
+  const g = p.sharp ?? 1;
+  if (g === 1) return sh.map((x) => (1 - p.other) * x);
+  const pw = sh.map((x) => Math.pow(x, g));
+  const sp = pw.reduce((a, x) => a + x, 0) || 1;
+  return pw.map((x) => ((1 - p.other) * x) / sp);
 }
 
 /** "Jaxon Smith-Njigba" to "J.Smith-Njigba", the first TD tracker's name form (sameName reads it). */
@@ -157,9 +166,9 @@ export function tdTotals(rs: NflRow[]): Map<string, Omit<TdLine, "team">> {
 }
 
 /** Two players' totals added (last season plus this one). */
-export function addTotals(a: Omit<TdLine, "team"> | undefined, b: Omit<TdLine, "team"> | undefined): Omit<TdLine, "team"> | null {
+export function addTotals(a: Omit<TdLine, "team"> | undefined, b: Omit<TdLine, "team"> | undefined, wPrev = 1): Omit<TdLine, "team"> | null {
   const x = b ?? a;
   if (!x) return null;
   const k = ["rushTd", "recTd", "car", "tgt", "teamRushTd", "teamRecTd", "teamCar", "teamTgt"] as const;
-  return { id: x.id, name: x.name, ...(Object.fromEntries(k.map((f) => [f, (a?.[f] ?? 0) + (b?.[f] ?? 0)])) as { [f in (typeof k)[number]]: number }) };
+  return { id: x.id, name: x.name, ...(Object.fromEntries(k.map((f) => [f, wPrev * (a?.[f] ?? 0) + (b?.[f] ?? 0)])) as { [f in (typeof k)[number]]: number }) };
 }
