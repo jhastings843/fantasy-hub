@@ -330,6 +330,10 @@
     {
       "date": "2026-10-27",
       "note": "SEASON VALUE, BYES, STACKS. (1) season-value.ts: rest-of-season rate was preseason/17 all year (Likely 9.3 while scoring 16.1, TE3); now blends season-to-date PPG under league scoring (getSeasonToDate) with the preseason rate as 4 games of prior. (2) getByeWeeks never found a bye: Sleeper lists all 32 teams, bye teams just project 0, and the lookahead skipped the current week. Now a team with no player >0 is on bye, current week included (byesFrom). (3) A chain's targets must be worth >= the drop over the season unless the week is red. (4) STACK_LIMIT 2: a weekly piece that would be a 3rd starter from one NFL team leaves the card; an endgame piece stays with the stack named. Week 8 card: Likely kept, Wan'Dale (TEN with Tate, Pollard) gone, QB-depth chain gone, Jeanty $85, St. Brown $85. 1457 tests pass."
+    },
+    {
+      "date": "2026-10-27",
+      "note": "DROP POOL IS SEASON-BASED. Drops came from players not starting THIS week, so byes (SF, NYG week 8) put Kittle/Likely/Nabers in the drop pool while Fannin and Boston were protected. Now the pool is players outside the best season lineup (rosPoints), plus the starter a chain replaces. Week 8: drops Corum and Boston, Kittle kept."
     }
   ],
   "tags": [

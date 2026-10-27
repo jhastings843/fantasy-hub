@@ -686,10 +686,20 @@ export function buildBidCard(input: RecommendInput): BidCard {
     byNeed.set(key, list);
   }
 
-  // Drops come from the players who are not in your best lineup, worst first.
-  // Each chain gets its own, so no two chains can fight over the same roster
-  // spot and no chain can drop a starter.
+  // Drops come from the players who are not in your best lineup OVER THE
+  // SEASON, worst first, plus the starter a chain replaces. Each chain gets its
+  // own, so no two chains fight over one roster spot.
+  //
+  // This used to be "not starting this week", which made byes decide the
+  // drops: week 8 put Kittle, Likely and Nabers on the bench (SF and NYG off)
+  // and offered Kittle up while Fannin and Boston, the two weakest players on
+  // the roster for the season and the very starters the chains replace, were
+  // protected for starting one Sunday.
   const lineup = bestLineup(rosterLineup, rosterPositions);
+  const seasonLineup = bestLineup(myPlayers.map((p) => asLineup(p, true)), rosterPositions);
+  const seasonStarterIds = new Set(
+    seasonLineup.slots.map((s) => s.player?.playerId).filter(Boolean) as string[],
+  );
   const startingIds = new Set(
     lineup.slots.map((s) => s.player?.playerId).filter(Boolean) as string[],
   );
@@ -699,8 +709,12 @@ export function buildBidCard(input: RecommendInput): BidCard {
   // An IR player can't be the drop: it frees the IR slot, not a roster spot.
   const reserve = new Set(input.reserveIds ?? []);
   const droppable = myPlayers
-    .filter((p) => !startingIds.has(p.playerId) && !reserve.has(p.playerId))
+    .filter((p) => !seasonStarterIds.has(p.playerId) && !reserve.has(p.playerId))
     .sort((a, b) => a.rosPoints - b.rosPoints);
+  // Dropping someone who starts THIS week costs this week's points, unless he
+  // is the starter the chain's claim replaces.
+  const canDrop = (p: PoolPlayer, targets: BidTarget[]) =>
+    !startingIds.has(p.playerId) || targets.some((t) => t.displaces?.playerId === p.playerId);
 
   // At a position cap (two QBs), a claim there must drop that position, and
   // other chains must leave that drop alone. Capped chains pick first.
@@ -719,7 +733,8 @@ export function buildBidCard(input: RecommendInput): BidCard {
   const dropFor = new Map<BidTarget[], PoolPlayer | null>();
   for (const targets of [...picked.filter((x) => cappedPos(x)), ...picked.filter((x) => !cappedPos(x))]) {
     const pos = cappedPos(targets);
-    const drop = droppable.find((p) => !used.has(p.playerId) && (!pos || p.position === pos)) ?? null;
+    const drop =
+      droppable.find((p) => !used.has(p.playerId) && (!pos || p.position === pos) && canDrop(p, targets)) ?? null;
     if (drop) used.add(drop.playerId);
     dropFor.set(targets, drop);
   }

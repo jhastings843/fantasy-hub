@@ -914,6 +914,22 @@ describe("season value and stacks (week 8)", () => {
     }
   });
 
+  it("does not let a bye make a season starter the drop", () => {
+    // Kittle: 0 this week (bye), 13 a week for the season. Fannin: starting
+    // this week at 10, worth 9 for the season. A TE claim over Fannin should
+    // drop Fannin, never Kittle.
+    const roster = [
+      ...myPlayers.filter((p) => p.playerId !== "te" && p.playerId !== "bench1"),
+      player("fannin", "TE", 10, { rosPoints: 9 }),
+      player("kittle", "TE", 0, { rosPoints: 13 }),
+    ];
+    const card = buildBidCard(
+      input({ myPlayers: roster, candidates: [player("newte", "TE", 16, { rosPoints: 15 })] }),
+    );
+    const drops = card.chains.map((c) => c.drop?.playerId);
+    expect(drops).not.toContain("kittle");
+  });
+
   it("keeps a weekly piece off the card when he would be a third starter from one team", () => {
     const roster = myPlayers.map((p) =>
       p.playerId === "wr1" || p.playerId === "rb1" ? { ...p, team: "TEN" } : p,
