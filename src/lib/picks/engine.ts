@@ -571,6 +571,8 @@ export interface BoardGame {
    */
   basis: "reference" | "source" | "started";
   ref?: RefLine;
+  /** Kicked off: the last quote before kickoff. The read uses it; nothing is staked at it. */
+  lastRef?: RefLine;
   /** Picked side and the home-side line it was picked at (plays only). */
   side?: "home" | "away";
   homeLine?: number;
@@ -637,7 +639,7 @@ function withoutPem(t: CutTest): CutTest {
 
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; started?: boolean }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; lastRef?: RefLine; started?: boolean }[],
   s: StrategyBoard,
   suMethod = "avg",
   /** Sources the strategy review made vetoes (policy source "veto"): a rule bet one disagrees with is skipped. */
@@ -646,15 +648,17 @@ export function tierBoard(
   return rows.map((row) => {
     // A game that has kicked off is never actionable, whatever the cache says.
     const basis: BoardGame["basis"] = row.started ? "started" : row.ref ? "reference" : "source";
-    const su = straightUp(row.sam, row.david, league, suMethod, row.ref?.line);
+    // The line the models are judged at: the live quote, or for a started game its last one.
+    const atRef = row.ref ?? row.lastRef;
+    const su = straightUp(row.sam, row.david, league, suMethod, atRef?.line);
     const team = (side: "home" | "away") => (side === "home" ? row.home : row.away);
     if (!row.sam || !row.david) {
       const only = row.sam ? "Sam" : "David";
       const m = (row.sam ?? row.david) as ModelLine;
-      const at = row.ref?.line ?? m.market;
+      const at = atRef?.line ?? m.market;
       return { ...row, basis, tier: "one", play: `${only} only: ${team(m.model < at ? "home" : "away")}`, su };
     }
-    const r = row.ref ? readAt(row.ref.line, row.sam, row.david, row.pem) : read(row.sam, row.david, row.pem);
+    const r = atRef ? readAt(atRef.line, row.sam, row.david, row.pem) : read(row.sam, row.david, row.pem);
     const pemMissing = league === "cfb" && !row.pem;
     // A rule that needs PEM, on a game PEM has not covered, is undecided, not a "no".
     const waiting = (cut: CutResult | null): boolean =>
@@ -665,7 +669,7 @@ export function tierBoard(
     });
 
     // Veto sources: Harris's side at the line the board reads (PEM's comes from the read).
-    const at = row.ref?.line ?? (row.sam.market + row.david.market) / 2;
+    const at = atRef?.line ?? (row.sam.market + row.david.market) / 2;
     const harrisSide = row.harris === undefined || row.harris === at ? undefined : row.harris < at ? "home" : "away";
     if (!r.agree || !r.side || r.line === undefined) {
       const splitPlay = `Sam: ${team(r.samSide)} · David: ${team(r.davidSide)}`;
@@ -676,7 +680,7 @@ export function tierBoard(
         // there is one, otherwise the source line of the model PEM sided with
         // (the same number the backtest grades pem-split at).
         const m = r.pemSide === r.samSide ? row.sam : row.david;
-        const homeLine = row.ref ? row.ref.line : m.market;
+        const homeLine = atRef ? atRef.line : m.market;
         const l = r.pemSide === "home" ? homeLine : -homeLine;
         // PEM's own side can't be vetoed by PEM; Harris can veto it.
         if (veto.harris && harrisSide && harrisSide !== r.pemSide) return { ...row, basis, read: r, tier: "split", play: splitPlay, su, vetoedBy: "Harris" };

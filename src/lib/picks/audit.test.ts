@@ -398,3 +398,24 @@ describe("hold: no stakes until 9am ET on the game's own day", () => {
     expect(r.board.find((g) => g.home === "H1")!.held).toBe("2026-10-18T13:00:00.000Z");
   });
 });
+
+describe("a game that has kicked off keeps the last quote it was judged at", () => {
+  // Week 9 WKU-Delaware: Sam's site still said WKU +2.5, David's and DraftKings -1.5.
+  // After kickoff the read fell back to each site's own number, and the edge jumped from 2.4 to 4.4.
+  const row = { home: "H1", away: "A1", sam: { market: 2.5, model: -4.9 }, david: { market: -1.5, model: -2.8 }, samTotal: 53.7, davidTotal: 49.6 };
+  const quotes = { fetchedAt: "2026-10-16T00:20:00Z", lines: [quote(1, { line: -1.5, total: 51.5, kickoff: TNF })] };
+  const after = new Date("2026-10-16T00:30:00Z");
+
+  it("reads the started game at the last DraftKings line, not the sites' own numbers", () => {
+    const g = compose({ core: core([row]), quotes, issued: [], exposure: noExposure, now: after }).board[0];
+    expect(g.basis).toBe("started");
+    expect(g.read?.avgEdge).toBeCloseTo(2.35, 2);
+    expect(g.read?.maxEdge).toBeCloseTo(3.4, 2);
+  });
+
+  it("never stakes a started game, spread or total", () => {
+    const r = compose({ core: core([row]), quotes, issued: [], exposure: noExposure, now: after });
+    expect(sumStakes(r)).toBe(0);
+    expect(r.board[0].ref).toBeUndefined();
+  });
+});

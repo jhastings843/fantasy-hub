@@ -160,13 +160,16 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   const week = core.week;
   let started = 0;
   const coreFinals = new Map(core.finals);
-  const refOf = (home: string, away: string): { ref?: RefLine; started?: boolean } => {
+  const refOf = (home: string, away: string): { ref?: RefLine; lastRef?: RefLine; started?: boolean } => {
     if (!week) return {};
     const ref = lines.get(key({ week, home, away }));
     // A final counts as kicked off even after ESPN drops the game's line.
     if (coreFinals.has(key({ week, home, away })) || (ref?.kickoff && new Date(ref.kickoff).getTime() <= nowMs)) {
       started++;
-      return { started: true };
+      // Never a quote to bet at, but the read stays at the last line it was
+      // judged at; the sites' own numbers can be days old (Week 9 WKU: Sam's
+      // +2.5 against DraftKings' -1.5 doubled the edge at kickoff).
+      return ref ? { started: true, lastRef: ref } : { started: true };
     }
     return stale ? {} : { ref };
   };

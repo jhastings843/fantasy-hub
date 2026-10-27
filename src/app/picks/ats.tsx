@@ -74,7 +74,7 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
   return (
     <dl className={s.kv}>
       <dt>Line now</dt>
-      <dd className={s.num}>{g.ref ? `${home} ${line(g.ref.line)} · ${g.ref.source}` : st === "started" || g.final ? "Closed at kickoff" : "none"}</dd>
+      <dd className={s.num}>{g.ref ? `${home} ${line(g.ref.line)} · ${g.ref.source}` : g.lastRef ? `${home} ${line(g.lastRef.line)} at kickoff · ${g.lastRef.source}` : st === "started" || g.final ? "Closed at kickoff" : "none"}</dd>
       <dt>Sam model</dt>
       <dd className={s.num}>{g.sam ? `${home} ${line(Math.round(g.sam.model * 10) / 10)}` : "not posted"}</dd>
       <dt>David model</dt>
@@ -220,6 +220,11 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
         <span className={s.gNum} data-k="Market">
           {g.ref ? (
             `${home} ${line(g.ref.line)}`
+          ) : g.lastRef ? (
+            <>
+              {`${home} ${line(g.lastRef.line)}`}
+              <small>closed</small>
+            </>
           ) : st === "started" || st === "final" ? "Closed" : "·"}
         </span>
         {/* Home-side numbers only: the Market column already names the team, and long college names wrapped and clipped here. */}
