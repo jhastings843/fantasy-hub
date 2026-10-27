@@ -21,7 +21,7 @@ import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { bestBets, bestCost, bookPrice } from "@/lib/models/nfl/ftd-price";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
-import { Background, Hero, SecHead, Stats } from "../picks/board";
+import { Background, Hero, SecHead, Stats, type Stat } from "../picks/board";
 import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
 
@@ -213,7 +213,8 @@ function fdNote(fd: { line: number; over: number; under: number } | undefined, m
 }
 
 /** The four numbers on every Props tab: edges now, the record, the closest slice, the learner. */
-export function PropStats({ edges, graded, learning, logHref, unit }: { edges: number; graded: { w: number; l: number; p: number; units: number }; learning: SectionView; logHref: string; unit: string }) {
+/** `extra` takes the third tile; the learner link then folds into the gate tile, so it stays one row of four. */
+export function PropStats({ edges, graded, learning, logHref, unit, extra }: { edges: number; graded: { w: number; l: number; p: number; units: number }; learning: SectionView; logHref: string; unit: string; extra?: Stat }) {
   const best = Math.max(0, ...learning.entries.map((e) => e.ev?.games ?? 0));
   const live = learning.entries.filter((e) => e.status === "active").length;
   const testing = learning.entries.filter((e) => e.status === "collecting").length;
@@ -224,8 +225,14 @@ export function PropStats({ edges, graded, learning, logHref, unit }: { edges: n
       items={[
         { k: "Edges now", v: `${edges}`, sub: unit },
         { k: "Every edge so far", v: n ? u(graded.units) : "0-0", sub: n ? `${graded.w}-${graded.l}${graded.p ? `-${graded.p}` : ""} at the saved price` : "first grades pending", tone: n ? (graded.units >= 0 ? "up" : "down") : undefined },
-        { k: live ? "Live slices" : "Closest to a bet", v: live ? `${live}` : `${best} of ${learning.gate.minGames}`, sub: live ? "bets for real" : "games a slice needs", small: true },
-        { k: "Learner", v: `${testing} slices testing`, sub: <Link href={logHref}>Open the log</Link>, small: true },
+        ...(extra ? [extra] : []),
+        {
+          k: live ? "Live slices" : "Closest to a bet",
+          v: live ? `${live}` : `${best} of ${learning.gate.minGames}`,
+          sub: extra ? <>{live ? "bets for real" : "games a slice needs"} · <Link href={logHref}>{testing} testing</Link></> : live ? "bets for real" : "games a slice needs",
+          small: true,
+        },
+        ...(extra ? [] : [{ k: "Learner", v: `${testing} slices testing`, sub: <Link href={logHref}>Open the log</Link>, small: true }]),
       ]}
     />
   );
@@ -798,6 +805,9 @@ async function FirstTdWeek({ season }: { season: number }) {
       ),
     };
   });
+  const fav = ftdWay(v.graded, "ftdb:pick", "Our favorite every game");
+  const favTeam = v.graded.filter((x) => x.result.team && [...x.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0].team === x.result.team).length;
+  const favTile: Stat = { ...fav, sub: v.graded.length ? `${fav.sub.replace(", 1u a bet at the best price", "")} · team scored first ${favTeam} of ${v.graded.length}` : fav.sub };
   return (
     <section className={s.section} aria-labelledby="ftd-week">
       <Hero
@@ -805,11 +815,8 @@ async function FirstTdWeek({ season }: { season: number }) {
         title={<span id="ftd-week">{v.learning.entries.some((e) => e.status === "active") ? "First TD bets live" : "No First TD bets yet"}</span>}
         sub={`Which team scores first comes from the market's total and spread, drive by drive; the scorer from each team's TD shares. Priced against Kalshi and, from the morning of game day, DraftKings. ${edges.length ? `${edges.length} players beat the cheaper price.` : "Nobody beats the cheaper price right now."}`}
       />
-      <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=ftd&v=log" unit="on games still to play" />
-      <Stats
-        label="Two ways to bet it"
-        items={[ftdWay(v.graded, "ftdb:pick", "Bet our favorite every game"), ftdWay(v.graded, "ftdb:value", "Bet every value (ours above the best price)"), { k: "Our favored team scored first", v: `${v.graded.filter((x) => x.result.team && [...x.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0].team === x.result.team).length} of ${v.graded.length}`, sub: "games graded", small: true }]}
-      />
+      {/* "Every edge so far" is already the bet-every-value record, so it isn't repeated. */}
+      <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=ftd&v=log" unit="on games still to play" extra={favTile} />
       {edges.length > 0 && (
         <ul className={s.edgeGrid} data-first-pick>
           {edges.slice(0, TOP).map((e) => (
