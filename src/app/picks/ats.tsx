@@ -180,6 +180,18 @@ function readOf(g: BoardGame, r: PicksReport, live?: LiveGame): { chip: [string,
   return { chip: [g.tier === "split" ? "Split" : "Pass", s.readPass], note: r.league && g.read && g.tier !== "split" ? `Edge ${g.read.avgEdge.toFixed(1)}` : undefined };
 }
 
+/** "Kennesaw State +2.5" may wrap, but never between "State" and "+2.5": the last word stays with the line. */
+function keepLine(text: string) {
+  const words = text.split(" ");
+  if (words.length < 3) return <span style={{ whiteSpace: "nowrap" }}>{text}</span>;
+  return (
+    <span>
+      {`${words.slice(0, -2).join(" ")} `}
+      <span style={{ whiteSpace: "nowrap" }}>{words.slice(-2).join(" ")}</span>
+    </span>
+  );
+}
+
 /** One game in the ledger: matchup, market, both models, our side and the read; opens to every reason. */
 function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGame }) {
   const name = (k: string) => r.names[k] ?? k;
@@ -207,19 +219,16 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
         </span>
         <span className={s.gNum} data-k="Market">
           {g.ref ? (
-            <span>
-              {`${home} `}
-              <span style={{ whiteSpace: "nowrap" }}>{line(g.ref.line)}</span>
-            </span>
+            `${home} ${line(g.ref.line)}`
           ) : st === "started" || st === "final" ? "Closed" : "·"}
         </span>
         {/* Home-side numbers only: the Market column already names the team, and long college names wrapped and clipped here. */}
-        <span className={s.gNum} data-k={`Sam · David (${home})`}>
+        <span className={s.gNum} data-k="Models">
           <span className={s.cSam} style={{ whiteSpace: "nowrap" }}>{`Sam ${num(g.sam?.model)}`}</span>
           <small className={s.cDavid} style={{ whiteSpace: "nowrap" }}>{`David ${num(g.david?.model)}`}</small>
         </span>
         <span className={s.gNum} data-k="Side">
-          {side}
+          {/ [+−-]?(\d|PK)/.test(side) ? keepLine(side) : side}
           {g.read && <small>{`edge ${g.read.avgEdge.toFixed(1)} pts`}</small>}
         </span>
         <span className={s.ledgerRead}>
