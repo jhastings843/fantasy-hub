@@ -5,7 +5,7 @@
 // every long rung graded (do our long-shot chances beat DK's?).
 import { allBoards, getNbaSectionLearning } from "@/lib/models/nba/store";
 import { SECTIONS, rungStaked, ticketStaked } from "@/lib/models/sections";
-import { LEGS, STAKE, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
+import { LEGS, STAKE, recipeRecords, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
 import { etDate, implied } from "@/lib/props/parse";
 import { Background, SecHead } from "../picks/board";
 import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } from "./week";
@@ -244,6 +244,7 @@ export async function LottoResults({ season }: { season: number }) {
           </div>
         </div>
       )}
+      <RecipeTable rungs={d.rungs} />
       {graded.length > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Every ticket" aside="Newest first" />
@@ -259,4 +260,47 @@ export async function LottoLog({ season }: { season: number }) {
   const learning = await getNbaSectionLearning(SECTIONS.nbaLotto, season).catch(() => null);
   if (!learning) return <p className={s.calm}>The lotto learner couldn&apos;t be read just now.</p>;
   return <LearnerLogBody want="Lottos" items={[{ name: "Lottos", learning }]} gateText="60+ games over 4+ weeks and 12+ winners (long prices)" />;
+}
+
+/** Every ticket recipe side by side (lotto.ts RECIPES): tracked only, fixed up front, the original first. */
+function RecipeTable({ rungs }: { rungs: Rung[] }) {
+  const rows = recipeRecords(rungs, etDate(new Date()));
+  return (
+    <div className={s.pageFrame}>
+      <SecHead title="Ticket recipes" aside={`${rows.length} built every night, paper only, ${STAKE}u each`} />
+      <p className={s.p}>
+        Same rungs, different ways to build the ticket: 2 to 5 legs, each leg the game&apos;s best value, likeliest or longest price
+        (value rungs only). The list was fixed before any results, so the winner can&apos;t be picked after the fact. With a dozen recipes
+        one will look good by luck: trust a recipe only when its hits run ahead of what our chances expected over many nights.
+      </p>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>Recipe</th>
+              <th>Hit</th>
+              <th>Net</th>
+              <th>Tonight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((x, i) => (
+              <tr key={x.recipe.id}>
+                <td>
+                  {x.recipe.label}
+                  {i === 0 && <div className={s.thin}>the original</div>}
+                </td>
+                <td className={s.num}>
+                  {x.n ? `${x.won} of ${x.n}` : "·"}
+                  {x.n > 0 && <div className={s.thin}>{`expected ${x.expected.toFixed(2)}`}</div>}
+                </td>
+                <td className={`${s.num} ${x.net > 0 ? s.pos : x.net < 0 ? s.neg : ""}`}>{x.n ? u(x.net) : "·"}</td>
+                <td className={s.num}>{x.tonight !== undefined ? am(x.tonight) : "·"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }

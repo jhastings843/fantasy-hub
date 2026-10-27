@@ -99,16 +99,41 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
   return out;
 }
 
-/** The night's ticket: each game's best-value rung (positive value only), one per player, the top LEGS games. Null when fewer than LEGS games qualify. */
-export function ticket(date: string, rungs: Rung[]): Ticket | null {
+/**
+ * How a ticket is built (Jack, 2026-10-27: test a bunch while the evidence
+ * collects). Every recipe takes one rung per game, positive value only:
+ * - value:  the game's best-value rung, games ranked by value (the original ticket)
+ * - chance: the game's likeliest rung, games ranked by our chance
+ * - long:   the game's longest price, games ranked by price
+ * The list is fixed up front so a lucky recipe can't be picked after the fact.
+ */
+export type Pick = "value" | "chance" | "long";
+export interface Recipe {
+  id: string;
+  label: string;
+  legs: number;
+  pick: Pick;
+}
+const PICK_LABEL: { [k in Pick]: string } = { value: "best value", chance: "likeliest", long: "longest price" };
+export const RECIPES: Recipe[] = [2, 3, 4, 5].flatMap((legs) =>
+  (["value", "chance", "long"] as const).map((pick) => ({ id: `l${legs}-${pick}`, label: `${legs} legs, ${PICK_LABEL[pick]}`, legs, pick })),
+);
+/** The original nightly ticket, the one the learner and the Today page follow. */
+export const DEFAULT_RECIPE: Recipe = RECIPES.find((r) => r.id === `l${LEGS}-value`)!;
+
+const score: { [k in Pick]: (r: Rung) => number } = { value: (r) => r.ev, chance: (r) => r.ours, long: (r) => r.over };
+
+/** The night's ticket under a recipe: one positive-value rung per game, the top games. Null when too few games qualify. */
+export function ticket(date: string, rungs: Rung[], recipe: Recipe = DEFAULT_RECIPE): Ticket | null {
+  const by = score[recipe.pick];
   const best = new Map<string, Rung>();
   for (const r of rungs) {
     if (r.date !== date || r.ev <= 0) continue;
     const cur = best.get(r.game);
-    if (!cur || r.ev > cur.ev) best.set(r.game, r);
+    if (!cur || by(r) > by(cur)) best.set(r.game, r);
   }
-  const legs = [...best.values()].sort((a, b) => b.ev - a.ev || a.id.localeCompare(b.id)).slice(0, LEGS);
-  if (legs.length < LEGS) return null;
+  const legs = [...best.values()].sort((a, b) => by(b) - by(a) || a.id.localeCompare(b.id)).slice(0, recipe.legs);
+  if (legs.length < recipe.legs) return null;
   const standing = legs.filter((l) => l.hit !== "void");
   const graded = legs.every((l) => l.hit !== null);
   const d = standing.reduce((a, l) => a * dec(l.over), 1);
@@ -164,8 +189,40 @@ export function summarize(rungs: Rung[], tickets: Ticket[]): LottoSummary {
   };
 }
 
-/** Every night's ticket, newest first. */
-export function tickets(rungs: Rung[]): Ticket[] {
+/** Every night's ticket under a recipe (the original by default), newest first. */
+export function tickets(rungs: Rung[], recipe: Recipe = DEFAULT_RECIPE): Ticket[] {
   const dates = [...new Set(rungs.map((r) => r.date))].sort().reverse();
-  return dates.map((d) => ticket(d, rungs)).filter((x): x is Ticket => x !== null);
+  return dates.map((d) => ticket(d, rungs, recipe)).filter((x): x is Ticket => x !== null);
+}
+
+export interface RecipeRecord {
+  recipe: Recipe;
+  /** Graded tickets. */
+  n: number;
+  won: number;
+  /** Hits our chances expected, and DraftKings' (vig in). */
+  expected: number;
+  book: number;
+  /** At STAKE a ticket. */
+  net: number;
+  /** Tonight's ticket price, when there is one. */
+  tonight?: number;
+}
+
+/** Every recipe's record, the original first. Tracked only. */
+export function recipeRecords(rungs: Rung[], today?: string): RecipeRecord[] {
+  return RECIPES.map((recipe) => {
+    const all = tickets(rungs, recipe);
+    const t = all.filter((x) => x.outcome !== null);
+    const tonight = today ? all.find((x) => x.date === today && x.outcome === null) : undefined;
+    return {
+      recipe,
+      n: t.length,
+      won: t.filter((x) => x.outcome === "W").length,
+      expected: t.reduce((a, x) => a + x.chance, 0),
+      book: t.reduce((a, x) => a + x.book, 0),
+      net: t.reduce((a, x) => a + (x.outcome === "W" ? STAKE * payout(x.price) : -STAKE), 0),
+      ...(tonight ? { tonight: tonight.price } : {}),
+    };
+  }).sort((a, b) => (a.recipe === DEFAULT_RECIPE ? -1 : b.recipe === DEFAULT_RECIPE ? 1 : 0));
 }

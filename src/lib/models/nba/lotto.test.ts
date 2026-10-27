@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
+import { RECIPES, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
 import { LONG_MAX, LONG_MIN, longRungs } from "./market";
 import PARAMS from "./params.json";
 import type { NbaParams } from "./props";
@@ -76,5 +76,32 @@ describe("lotto ticket", () => {
     const t = tickets(rungsOf(g))[0];
     expect(t.outcome).toBe("L");
     expect(summarize(rungsOf(g), [t]).tickets.net).toBeCloseTo(-0.1, 6);
+  });
+});
+
+describe("ticket recipes", () => {
+  const tip = "2026-10-27T23:10:00Z";
+  const boards = [
+    board("1", tip, "Tyson", [{ line: 14.5, over: 420, ours: 0.25 }], 20), // value 0.30, hits
+    board("2", tip, "Hardaway", [{ line: 14.5, over: 500, ours: 0.2 }, { line: 19.5, over: 900, ours: 0.12 }], 16), // 14.5 hits, 19.5 misses
+    board("3", tip, "Jakucionis", [{ line: 14.5, over: 630, ours: 0.16 }], 10), // misses
+  ];
+  const rungs = rungsOf(boards);
+  const by = (id: string) => RECIPES.find((r) => r.id === id)!;
+
+  it("is a fixed list of 12, the original first", () => {
+    expect(RECIPES).toHaveLength(12);
+    expect(recipeRecords(rungs)[0].recipe.id).toBe("l3-value");
+  });
+  it("picks each game's leg by the recipe", () => {
+    expect(ticket("2026-10-27", rungs, by("l2-chance"))!.legs.map((l) => `${l.player} ${l.line}`)).toEqual(["Tyson 14.5", "Hardaway 14.5"]);
+    expect(ticket("2026-10-27", rungs, by("l2-long"))!.legs.map((l) => `${l.player} ${l.line}`)).toEqual(["Hardaway 19.5", "Jakucionis 14.5"]);
+    expect(ticket("2026-10-27", rungs, by("l4-value"))).toBeNull(); // only 3 games
+  });
+  it("grades each recipe on its own", () => {
+    const rec = Object.fromEntries(recipeRecords(rungs).map((x) => [x.recipe.id, x]));
+    expect(rec["l2-chance"]).toMatchObject({ n: 1, won: 1 });
+    expect(rec["l2-long"]).toMatchObject({ n: 1, won: 0, net: -0.1 });
+    expect(rec["l5-value"].n).toBe(0);
   });
 });

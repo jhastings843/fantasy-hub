@@ -1,6 +1,12 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
+## Price shadow, lotto recipes, Records rule (2026-10-27)
+- RULE (Jack, 2026-10-27): when props plays (NFL/NBA props, First TD, Anytime TD, First Basket, King of the Court, lottos) start going out in an email, add a Props section to /records (src/app/records/page.tsx) in the same change: issued props graded at the saved price, kept apart from the football issued totals and from the shadow table. Today nothing props is sent; a live learner slice only marks plays as "a bet" on the Props pages.
+- Price shadow (`src/lib/picks/price-shadow.ts`, deployed 835c532): every Tier 1/2 pick at -115 or better, 1u, from the forecast archive's last pregame read + each week's rule freeze. Picks > Research "Ignore the odds". Reconstruction 10/27: NFL wk 6-8 5-9 -4.19u (bet 2-0, not bet 3-9); college wk 7-9 11-20 -9.95u (bet 2-9, not bet 9-11), 11 wk 9 pending.
+- Lotto recipes (`lotto.ts` RECIPES): 12 fixed ticket builds (2-5 legs x best value / likeliest / longest price), paper only, table on Lottos > Results. The original (3 legs, best value) still drives Today, the learner and `lotto:ticket`. Recipes are NOT in the learner on purpose (12 lottery-variance candidates would promote one by luck); judge by hits vs expected over a season.
+- Game page Price card shows the sent price once sent; ledger model column shows numbers only.
+
 ## Pool tiebreakers and Sam's NBA label (2026-10-26, 3a4456e + 9ece878, deployed)
 - `optimizeStandings` (picks/pool.ts) takes `tiebreak: { mean, sd, mine? }`. Rivals carry `tb` from Sleeper's `tiebreaker.value` (pool-store `fieldPicks`). Ties at the top are settled by closest guess to a drawn total, and picks and guess are chosen together (guesses tried: mean plus or minus 20). If no guess was entered, that entry loses the tiebreak. SD comes from `totalSpread(season games)`, with 13.5 as the fallback (an estimate). Mean is the models' average.
 - Week 7 MNF check (in the tests): DAL with a guess of 50 had about a 42% win chance. Jack's locked PHI with 47 had about 7%.
