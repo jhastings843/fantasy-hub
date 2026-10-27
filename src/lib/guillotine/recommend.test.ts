@@ -8,6 +8,8 @@ import {
   startersByPosition,
   strictlyDescending,
   hasFreeReplacement,
+  sentences,
+  fitUnderCap,
 } from "./recommend";
 import type { RecommendInput } from "./recommend";
 import { buildMarket } from "./market";
@@ -307,7 +309,45 @@ describe("buildBidCard", () => {
         ],
       }),
     );
-    expect(card.maxPossibleSpend).toBeLessThanOrEqual(Math.ceil(budget.weeklyCap));
+    expect(card.maxPossibleSpend).toBeLessThanOrEqual(budget.weeklyCap);
+  });
+
+  // Week 8: laddering and the strict bid order lifted bids after the cap was
+  // applied, and the card promised $69 against a $68 ceiling.
+  it("holds the cap after the ladder and the strict order adjust bids", () => {
+    for (const remaining of [60, 75, 90, 120, 200, 820]) {
+      const budget = planBudget({
+        budget: 1000,
+        remaining,
+        teamsAlive: 9,
+        totalTeams: 16,
+        posture: "yellow",
+        rivalRemaining: [661, 587, 470, 460, 307, 200, 150, 90],
+      });
+      const card = buildBidCard(
+        input({
+          budget,
+          candidates: [
+            player("rbA", "RB", 22, { rosPoints: 40 }),
+            player("rbB", "RB", 21, { rosPoints: 39 }),
+            player("rbC", "RB", 12),
+            player("wrA", "WR", 21, { rosPoints: 38 }),
+            player("wrB", "WR", 19),
+            player("wrC", "WR", 18),
+            player("qbA", "QB", 19, { rosPoints: 45 }),
+            player("qbB", "QB", 18.5, { rosPoints: 44 }),
+            player("qbC", "QB", 18.2),
+          ],
+        }),
+      );
+      // Under $1 the card sits the week out, so there is no cap to hold.
+      if (!card.sitOut) expect(card.maxPossibleSpend).toBeLessThanOrEqual(budget.weeklyCap);
+      for (const chain of card.chains) {
+        for (let i = 1; i < chain.targets.length; i++) {
+          expect(chain.targets[i].bid).toBeLessThan(chain.targets[i - 1].bid);
+        }
+      }
+    }
   });
 
   it("counts the worst case as one win per chain, not one per claim", () => {
@@ -347,7 +387,7 @@ describe("buildBidCard", () => {
     );
     const reason = card.chains[0].targets[0].reason;
     expect(reason).toContain("Questionable");
-    expect(reason).toContain("bye week 9");
+    expect(reason).toContain("Bye week 9");
   });
 
   it("shows at most three chains", () => {
@@ -814,5 +854,44 @@ describe("hasFreeReplacement", () => {
   });
   it("says no when he is the only one left at that level", () => {
     expect(hasFreeReplacement(qb("a", 18.3), [qb("a", 18.3), qb("b", 12.0)])).toBe(false);
+  });
+});
+
+describe("sentences", () => {
+  it("capitalises clauses and never doubles a period after a name", () => {
+    expect(
+      sentences(["Adds 6.1 to your lineup over Harold Fannin Jr.", "projects among the best RBs left", "listed Out"]),
+    ).toBe("Adds 6.1 to your lineup over Harold Fannin Jr. Projects among the best RBs left. Listed Out.");
+  });
+  it("drops empty clauses", () => {
+    expect(sentences(["Band-aid", ""])).toBe("Band-aid.");
+  });
+});
+
+describe("fitUnderCap", () => {
+  const chain = (bids: number[]) =>
+    ({ need: "", drop: null, targets: bids.map((bid) => ({ bid, walkAway: bid })) }) as unknown as Parameters<typeof fitUnderCap>[0][number];
+
+  // The week 8 card exactly: $33 + $33 + $3 = $69 against a $68 ceiling.
+  it("trims the week 8 card to the ceiling without breaking chain order", () => {
+    const chains = [chain([33, 32, 4, 1]), chain([33, 18, 13, 1]), chain([3, 2, 1])];
+    const out = fitUnderCap(chains, 68);
+    const worst = out.reduce((s, c) => s + c.targets[0].bid, 0);
+    expect(worst).toBe(68);
+    expect(out).toHaveLength(3);
+    for (const c of out) {
+      for (let i = 1; i < c.targets.length; i++) expect(c.targets[i].bid).toBeLessThan(c.targets[i - 1].bid);
+    }
+    expect(out[1].targets[0].bid).toBe(32);
+  });
+
+  it("drops the last chain when no top bid has room", () => {
+    const out = fitUnderCap([chain([3, 2, 1]), chain([2, 1])], 4);
+    expect(out).toHaveLength(1);
+  });
+
+  it("leaves a card already under the cap alone", () => {
+    const chains = [chain([10, 5])];
+    expect(fitUnderCap(chains, 68)[0].targets[0].bid).toBe(10);
   });
 });

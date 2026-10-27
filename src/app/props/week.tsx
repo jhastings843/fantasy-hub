@@ -593,7 +593,7 @@ async function FirstBasketWeek({ season }: { season: number }) {
         ["Edges", `${e.length}`],
         ["First basket", scorer ?? "·"],
       ],
-      read: res !== undefined ? (e.some((x) => x.id === res?.player) ? ["Hit", s.readW] : ["Missed", e.length ? s.readL : s.readPass]) : e.length ? [`${e.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
+      read: res !== undefined ? (e.some((x) => x.id === res?.player) ? ["Hit", s.readW] : e.length ? ["Missed", s.readL] : ["No edges", s.readPass]) : e.length ? [`${e.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
       body: (
         <div className={s.tw}>
           <table className={s.table}>

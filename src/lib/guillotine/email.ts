@@ -1,5 +1,7 @@
 import { emailPage } from "@/lib/email/shell";
+import { submittedLineupNote } from "./fragility";
 import { TIER_LABEL } from "./market";
+import { sentences } from "./recommend";
 import type { Posture } from "./chop-line";
 import type { WeeklyFaabReport } from "./types";
 
@@ -105,7 +107,14 @@ function chainBlock(
                   <span style="font-weight:400;color:${PALETTE.muted};font-size:12px;">${escapeHtml(target.player.position)}${target.player.team ? " " + escapeHtml(target.player.team) : ""}</span>${flags}
                 </div>
                 <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">
-                  ${escapeHtml(TIER_LABEL[target.tier])}${target.weekGain > 0 ? `. Adds ${target.weekGain.toFixed(1)} to your lineup` : ""}${target.displaces ? ` over ${escapeHtml(target.displaces.name)}` : ""}.
+                  ${escapeHtml(
+                    sentences([
+                      TIER_LABEL[target.tier],
+                      target.weekGain > 0
+                        ? `Adds ${target.weekGain.toFixed(1)} to your lineup${target.displaces ? ` over ${target.displaces.name}` : " by filling an empty slot"}`
+                        : "",
+                    ]),
+                  )}
                 </div>
                 <div style="font-size:12px;line-height:1.6;color:${PALETTE.body};padding-top:6px">${escapeHtml(target.reason)}</div>${
                   // A player carrying a tag the beat has already cleared, or
@@ -382,7 +391,23 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
     </tr>
   </table>`;
 
-  const notes = [...report.league.scoringNotes, ...report.caveats];
+  // A lineup left with holes is the one thing on the card that is free to fix
+  // and costs the most if missed (week 8: set lineup 64.4 against a best of
+  // 110.7). It used to sit last, under "Worth knowing"; it leads now.
+  const lineupNote = submittedLineupNote(report.me.fragility);
+  const lineupAlert = lineupNote
+    ? `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${POSTURE_COLOR.red.bg};border:1px solid ${POSTURE_COLOR.red.border};border-radius:12px;margin-bottom:16px;">
+    <tr>
+      <td style="padding:14px 18px;">
+        <div style="font:600 10px/1.3 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:${POSTURE_COLOR.red.ink};">Fix your lineup first</div>
+        <div style="font:400 14px/1.6 -apple-system,sans-serif;color:${PALETTE.ink};padding-top:6px;">${escapeHtml(lineupNote)}</div>
+      </td>
+    </tr>
+  </table>`
+    : "";
+
+  const notes = [...report.league.scoringNotes, ...report.caveats.filter((c) => c !== lineupNote)];
   const notesBlock = notes.length
     ? `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${PALETTE.hairline};border-radius:12px;background:#fafafa;margin-bottom:20px;">
@@ -400,7 +425,7 @@ export function renderEmail(report: WeeklyFaabReport, appUrl: string): string {
   </table>`
     : "";
 
-  return wrap(verdict + chopLine + claims + pacing + seasonBlock + notesBlock, report, link);
+  return wrap(lineupAlert + verdict + chopLine + claims + pacing + seasonBlock + notesBlock, report, link);
 }
 
 function wrap(inner: string, report: WeeklyFaabReport, link: string): string {

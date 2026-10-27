@@ -382,15 +382,9 @@ function reasonFor(
 
   if (player.fromChoppedRoster) parts.push("Off this week's chopped roster");
 
-  if (weekGain > 0) {
-    parts.push(
-      displacesName
-        ? `Adds ${weekGain.toFixed(1)} to your lineup, replacing ${displacesName}`
-        : `Adds ${weekGain.toFixed(1)} to your lineup by filling an empty slot`,
-    );
-  } else {
-    parts.push("Does not crack your lineup this week");
-  }
+  // The gain itself is on the card line above the reason ("Adds 6.1 to your
+  // lineup over X"), so only the no-gain case is said here.
+  if (weekGain <= 0) parts.push("Does not crack your lineup this week");
 
   if (tier === "championship") {
     parts.push(
@@ -427,7 +421,49 @@ function reasonFor(
     }
   }
 
-  return parts.join(". ") + ".";
+  return sentences(parts);
+}
+
+/**
+ * Bring a card's worst case (one win per chain) back under the week's cap
+ * without breaking the strict bid order inside a chain. Dollars come off a
+ * chain's top bid where it has room over its own fallback, last chain first;
+ * the last chain is dropped only when no top bid can give.
+ */
+export function fitUnderCap(chains: BidChain[], cap: number): BidChain[] {
+  const worst = (list: BidChain[]) =>
+    list.reduce((sum, c) => sum + Math.max(0, ...c.targets.map((t) => t.bid)), 0);
+  let out = chains;
+  while (worst(out) > cap && out.length > 0) {
+    const giver = [...out].reverse().find((c) => {
+      const [top, next] = c.targets;
+      return top && top.bid > (next ? next.bid + 1 : MIN_BID);
+    });
+    if (giver) {
+      const top = giver.targets[0];
+      top.bid -= 1;
+      if (top.walkAway < top.bid) top.walkAway = top.bid;
+    } else if (out.length > 1) {
+      out = out.slice(0, -1);
+    } else {
+      break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Join clauses into sentences. Each clause is capitalised, and a clause that
+ * already ends in a period (a name like "Harold Fannin Jr.") does not get a
+ * second one: the week 8 email printed "Fannin Jr.. projects among".
+ */
+export function sentences(parts: string[]): string {
+  return parts
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => p[0].toUpperCase() + p.slice(1))
+    .map((p) => (/[.!?]$/.test(p) ? p : p + "."))
+    .join(" ");
 }
 
 /**
@@ -713,6 +749,11 @@ export function buildBidCard(input: RecommendInput): BidCard {
     ladderChain(chain.targets, competition, rivals.length > 0);
     strictlyDescending(chain.targets);
   }
+  maxPossibleSpend = worstCase(chains);
+
+  // Laddering and the strict order can lift bids after the cap was enforced
+  // above (week 8: $69 worst case against a $68 ceiling).
+  chains = fitUnderCap(chains, budget.weeklyCap);
   maxPossibleSpend = worstCase(chains);
 
   const sitOut = chains.length === 0 || budget.weeklyCap < 1;

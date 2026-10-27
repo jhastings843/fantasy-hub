@@ -5,6 +5,7 @@
   "status": "active",
   "status_detail": "Multi-league fantasy football tools. Every tool lives under /l/[leagueId] with leagues auto-discovered from Sleeper and format detected from settings.type (including type 3, which is Sleeper's undocumented guillotine code). Four live leagues: Dah Dynasty League (dynasty, in season), 2026 Half PPR (redraft, drafts Sep 7), Sunday Scaries #2 (redraft, full PPR, in season), and Dah Chopped League (guillotine, 16 teams, $1000 FAAB, still pre-draft). Guillotine leagues get a weekly FAAB advisor at /l/[id]/faab, /api/faab and a Tuesday email. Written playbooks with sources at /strategy. His rankings moved off Substack to the FantasyPros platform on 2026-09-17 and are read from there by week rather than by post, per scoring, so each league finally reads a list in its own scoring. SURVIVOR is a live recommendation engine at /survivor and /api/survivor: no-vig moneylines from ESPN, real public pick percentages from Yahoo, first-place equity scoring and a season-long Hungarian assignment for future value. TWO POOLS now, 500 entries and 30, tracked apart: separate burned teams, separate logged distributions, separate chalk factors, one shared data pull. Switcher on the page, ?pool=<id>|all on the API, one labelled card per pool in the Thursday email. Each pool carries a POSTURE, computed from expected entries alive at week 18, which breaks ties toward safety in a pool that will thin to one entry and toward leverage in one that will split. Week 1 live: 500 pool takes JAX, 30 pool takes LAC. A PULSE now keeps it current: /api/pulse called every fifteen minutes by GitHub Actions, tiered by the Eastern clock (live gameday, hourly, overnight), plus five scheduled emails through one shell and a Sunday 11:45 exception alarm that stays silent when nothing is wrong.",
   "next_steps": [
+    "Still open from the audit: survivor POST, survivor entries and refresh routes have no login.",
     "POOL TIEBREAK (2026-10-26): next mid-week Sunday, check the pool card shows 'Tiebreaker to enter' with a number and win chance. Rule assumed closest guess, over or under; confirm in Sleeper's pool settings.",
     "NBA PROPS (2026-10-26): edges now only within 6 pts of DK no-vig (maxGap), minScale 1.0, record/learning count only 3+ game players. Check ~Nov 2: edge count per slate, over/under mix near 50/50, units. Then fit marketW (blend toward DK) and add a recalibration job.",
     "PRICE SHOPPING (2026-10-26): 9am bets run now shops DK vs FanDuel (Fanatics needs a paid Odds API plan) at DK's line. Thu 10/29: check the picks-day response 'shop' notes and that any shopped bet shows '-110 FanDuel'. Sat: check college games named. Alt lines not built yet.",
@@ -101,7 +102,7 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-26",
+  "last_worked": "2026-10-27",
   "notes": [
     "2026-10-26: Pool solver settles ties by each entry's real Sleeper tiebreaker (closest guess, SD from this season's total misses) and recommends Jack's tiebreaker number (3a4456e). Sam's NBA reader accepts his 'Sam's line' label, which had dropped MIN@CLE and IND@MIL (9ece878). Both deployed.",
     "2026-10-26: Anytime TD, Lottos and King of the Court now act on their learners: a slice that clears its gate marks its plays as bets on the tab from that moment (helpers attdStaked/rungStaked/ticketStaked/kotcStakedTop in models/sections.ts), and all three are on /learning. Nothing live yet; first reviews pending.",
@@ -311,7 +312,11 @@
     "2026-10-26: NBA lotto shadow (Props > Lottos): long-shot rungs saved and graded, one paper 3-leg ticket a night.",
     "2026-10-26: NFL Anytime TD tab (model, DK prices via Odds API morning read, graded paper record).",
     "2026-10-26: Venom NFL ATTD backfill (wks 1-7) graded: ours beats Venom (0.604 vs 0.623 log loss); tracked via /venom skill, no weight. Red-zone shares tested: no gain.",
-    "2026-10-26: Venom-idea inputs tested (kept: NFL implied total + opp defense; NBA recent form + opp defense by position); learner logs on ATTD, Lottos, KOTC; First TD graded at best price; First TD board cleaned."
+    "2026-10-26: Venom-idea inputs tested (kept: NFL implied total + opp defense; NBA recent form + opp defense by position); learner logs on ATTD, Lottos, KOTC; First TD graded at best price; First TD board cleaned.",
+    "2026-10-27: Overnight audit (Astra) + fixes (Claude) on branch audit-fixes-2026-10-27 in ~/Projects/.audit-fixes/fantasy-hub. Uncommitted, not deployed. See ~/Projects/.audit-fixes/REPORT.md.",
+    "2026-10-27: Shipped the audit fixes (7d4ff8b), Vercel production Ready; checked live: pulse without the secret 401, Sleeper probe 404. 1,439 tests pass.",
+    "2026-10-27: MNF (DAL@PHI) showed live all Tuesday: NFL props only grade at first-td's Tue 6:30pm ET run. Ran first-td by hand; graded. Schedule gap still open.",
+    "2026-10-27: Night games grade ~1:30am ET (first-td cron 30 5 * * 1,2,5); First TD and Anytime TD tables show Final once ESPN does (0fd5256)."
   ],
   "tags": [
     "personal",
