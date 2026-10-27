@@ -167,7 +167,8 @@ export function parseSamNba(html: string, index: Map<string, string>): SamNbaSta
     const names = [...art.matchAll(/class="nm">([^<]+)</g)].map((m) => m[1]);
     const pts = [...art.matchAll(/class="pts">([\d.]+)</g)].map((m) => Number(m[1]));
     const vegas = art.match(/Vegas line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
-    const model = art.match(/Model line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
+    // His number is labeled "Model line" on most cards and "Sam's line" on some (MIN at CLE, 10-26).
+    const model = art.match(/(?:Model|Sam(?:&rsquo;|&#39;|’|')s) line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
     if (names.length < 2 || !model) continue;
     const away = key(names[0]);
     const home = key(names[1]);

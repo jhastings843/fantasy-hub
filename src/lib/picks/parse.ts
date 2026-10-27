@@ -212,7 +212,8 @@ export function parseSamBoard(league: League, html: string): Board {
     // Projected points, away then home, in the same order as the names.
     const pts = [...art.matchAll(/class="pts">([\d.]+)</g)].map((m) => Number(m[1]));
     const vegas = art.match(/Vegas line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
-    const model = art.match(/Model line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
+    // "Model line" on most cards; his NBA page also says "Sam's line" (10-26), so read either.
+    const model = art.match(/(?:Model|Sam(?:&rsquo;|&#39;|’|')s) line<\/span><span class="val[^"]*">([^<]+)</)?.[1];
     const id = art.match(/game\/(\d{4})_(\d+)_/);
     if (id) season = Number(id[1]);
     if (names.length < 2 || !vegas || !model) continue;

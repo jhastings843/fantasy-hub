@@ -66,6 +66,12 @@ describe("Sam's NBA page", () => {
     expect(r.rows[2]).toMatchObject({ home: "SA", away: "OKC", model: 0 });
   });
 
+  it("reads his number when the card labels it \"Sam's line\" (MIN at CLE, 10-26)", () => {
+    const html = card("Boston Celtics", "Detroit Pistons", "Boston Celtics -1.5", "Detroit Pistons -3", [110, 113]).replace("Model line", "Sam&rsquo;s line");
+    const r = parseSamNba(html, index);
+    expect(r.state === "live" && r.rows[0]).toMatchObject({ home: "DET", away: "BOS", model: -3 });
+  });
+
   it("says unread when the page is up but has no cards it knows", () => {
     expect(parseSamNba("<html><body><table><tr><td>BOS</td></tr></table></body></html>", index).state).toBe("unread");
   });
