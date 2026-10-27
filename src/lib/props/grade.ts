@@ -9,7 +9,9 @@
 //   the pure model, without his market read.
 // A player missing from the box score didn't play: the market is void, as a
 // book would void it. A player in the box score with no line in a table had
-// zero of that stat (a back with no catches).
+// zero of that stat (a back with no catches). A player in a table whose
+// column is missing or unreadable is unknown (NaN), and the game waits for a
+// complete box score instead of grading against zero.
 
 import { implied, payout, playPrice, type League, type NbaStat, type NflStat, type PropMarket, type PropsGame, type Side, type Stat } from "./parse";
 
@@ -48,7 +50,8 @@ export function boxStats(players: EspnBoxTeam[]): Map<string, { [s in NflStat]: 
         for (const [key, stat] of want[table.name ?? ""] ?? []) {
           const i = keys.indexOf(key);
           const v = i >= 0 ? Number(a.stats?.[i]) : NaN;
-          if (Number.isFinite(v)) r[stat] = v;
+          // In the table but the column is missing or unreadable: unknown, not zero.
+          r[stat] = Number.isFinite(v) ? v : NaN;
         }
       }
     }
@@ -151,6 +154,7 @@ export function gradeGame(
   let voids = 0;
   const markets: GradedMarket[] = g.markets.map((m) => {
     const actual = m.stat ? box.get(nameKey(m.player))?.[m.stat] : undefined;
+    if (actual !== undefined && Number.isNaN(actual)) throw new Error(`${m.player} ${m.stat} is missing from the box score; grading later`);
     if (actual === undefined) {
       voids++;
       return { id: m.id, actual: null, play: null, lean: null };

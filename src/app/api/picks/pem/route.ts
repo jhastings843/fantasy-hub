@@ -17,7 +17,7 @@ export const maxDuration = 300;
 function authorized(request: Request): boolean {
   const given = request.headers.get("authorization");
   const secrets = [process.env.CRON_SECRET, process.env.PEM_RELAY_SECRET].filter(Boolean);
-  return secrets.length === 0 || secrets.some((s) => given === `Bearer ${s}`);
+  return secrets.some((s) => given === `Bearer ${s}`);
 }
 
 export async function POST(request: Request) {

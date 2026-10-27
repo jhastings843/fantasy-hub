@@ -19,7 +19,7 @@ export const maxDuration = 300;
 // pages. Runs once per format per week unless forced.
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

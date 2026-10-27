@@ -47,14 +47,14 @@ import { settleFinishedWeeks } from "@/lib/scorecard/run";
 import { GET } from "./route";
 
 async function run() {
-  const res = await GET(new Request("http://localhost/api/snapshot"));
+  const res = await GET(new Request("http://localhost/api/snapshot", { headers: { authorization: "Bearer test-secret" } }));
   return { status: res.status, body: await res.json() };
 }
 
 describe("GET /api/snapshot", () => {
   beforeEach(() => {
     process.env.SLEEPER_USERNAME = "jack";
-    delete process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "test-secret";
     vi.mocked(recordGradeSnapshot).mockResolvedValue(true);
     vi.mocked(runThursdayEmail).mockResolvedValue(Response.json({ sent: false, reason: "not Thursday" }));
     vi.mocked(settleFinishedWeeks).mockResolvedValue({ graded: 0 } as never);
@@ -106,5 +106,13 @@ describe("GET /api/snapshot", () => {
     vi.mocked(runThursdayEmail).mockRejectedValue(new Error("Resend refused: 403"));
     const { status } = await run();
     expect(status).toBe(200);
+  });
+});
+
+describe("GET /api/snapshot auth", () => {
+  it("refuses every call when CRON_SECRET is not set", async () => {
+    delete process.env.CRON_SECRET;
+    const res = await GET(new Request("http://localhost/api/snapshot"));
+    expect(res.status).toBe(401);
   });
 });

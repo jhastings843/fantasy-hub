@@ -22,6 +22,11 @@ export const maxDuration = 60;
 //   ?pool=<id>          one pool's record
 //   ?league=<id>&leg=N  every entry's picks for that week
 export async function GET(request: Request) {
+  // A diagnostic that answers with Jack's Sleeper session, so it only runs
+  // locally, the same way /api/sleeper/test does.
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "disabled outside development" }, { status: 404 });
+  }
   if (!sleeperTokenConfigured()) {
     return NextResponse.json(
       { ok: false, error: "SLEEPER_TOKEN is not set on this deployment." },

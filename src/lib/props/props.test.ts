@@ -50,6 +50,16 @@ describe("grading props", () => {
     expect(settle("under", 3, 3)).toBe("P");
   });
 
+  it("a receiving column missing from the box score is unknown, and grading waits", () => {
+    const cut = JSON.parse(JSON.stringify(box)) as EspnBoxTeam[];
+    for (const t of cut) for (const table of t.statistics ?? []) if (table.name === "receiving") table.keys = (table.keys ?? []).map((k) => (k === "receivingYards" ? "gone" : k));
+    const st = boxStats(cut);
+    expect(st.get("georgepickens")?.rec).toBe(9);
+    expect(Number.isNaN(st.get("georgepickens")?.rec_yds)).toBe(true);
+    const game: PropsGame = { ...g, markets: [{ ...g.markets.find((m) => m.stat === "rec_yds")!, player: "George Pickens", team: "DAL" }] };
+    expect(() => gradeGame(game, cut)).toThrow(/missing from the box score/);
+  });
+
   it("grades plays and leans at the playing book, voids a player who didn't play", () => {
     const game: PropsGame = {
       ...g,

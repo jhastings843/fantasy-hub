@@ -17,12 +17,11 @@ export const dynamic = "force-dynamic";
 // at. Runs daily from the Vercel cron in vercel.json; the dashboard also
 // records on render, so history keeps filling even if a cron run is missed.
 //
-// Set CRON_SECRET in the project env to lock this down. Vercel sends it as a
-// bearer token on scheduled runs. With no secret set the route stays open,
-// which is fine for a single-user app but worth knowing.
+// Vercel sends CRON_SECRET as a bearer token on scheduled runs. With no secret
+// set the route refuses every call, so a missing env var can't leave it open.
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

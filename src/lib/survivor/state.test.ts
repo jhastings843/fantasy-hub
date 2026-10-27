@@ -120,3 +120,22 @@ describe("savePool", () => {
     expect(saved.myPicks).toEqual({ "1": "JAX" });
   });
 });
+
+describe("savePool when the store can't be read", () => {
+  it("throws instead of writing defaults over the saved history", async () => {
+    const store = memoryStore({ [MAIN]: { myPicks: { "1": "BUF" }, usedTeams: ["BUF"] } });
+    const flaky: PoolStore = {
+      async get() {
+        throw new Error("redis timeout");
+      },
+      set: store.set,
+    };
+    await expect(savePool(2026, "main", { name: "Renamed" }, flaky)).rejects.toThrow("redis timeout");
+    expect(store.data.get(MAIN)).toEqual({ myPicks: { "1": "BUF" }, usedTeams: ["BUF"] });
+  });
+
+  it("still shows defaults on a read so the page renders", async () => {
+    const flaky: PoolStore = { async get() { throw new Error("redis timeout"); }, async set() {} };
+    expect((await getPool(2026, "main", flaky)).myPicks).toEqual(poolMeta("main").defaults?.myPicks ?? {});
+  });
+});

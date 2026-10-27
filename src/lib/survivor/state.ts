@@ -40,29 +40,36 @@ export async function getPool(
   poolId: string = DEFAULT_POOL_ID,
   store: PoolStore = redisStore,
 ): Promise<PoolConfig> {
+  try {
+    return await readPool(season, poolId, store);
+  } catch {
+    const meta = poolMeta(poolId);
+    return { ...DEFAULT_POOL, name: meta.name, ...meta.defaults };
+  }
+}
+
+// Throws when the store can't be read. Saving must use this: falling back to
+// defaults there would write them over the real history after one bad read.
+async function readPool(season: number, poolId: string, store: PoolStore): Promise<PoolConfig> {
   const meta = poolMeta(poolId);
   const seeded: PoolConfig = { ...DEFAULT_POOL, name: meta.name, ...meta.defaults };
 
-  try {
-    let stored = await store.get<Stored>(KEY(season, poolId));
-    // Only the main pool has a pre-pool-id history to inherit. Letting another
-    // pool read it would strike teams off a board where they are available.
-    if (!stored && poolId === DEFAULT_POOL_ID) {
-      stored = await store.get<Stored>(LEGACY_KEY(season));
-    }
-    if (!stored) return seeded;
-
-    const { ownershipOverride, ...rest } = stored;
-    return {
-      ...seeded,
-      ...rest,
-      // ownershipOverride was written when the tool assumed live pool picks
-      // were visible. Same shape, so carry anything stored under it forward.
-      weeklyPicks: { ...(ownershipOverride ?? {}), ...(rest.weeklyPicks ?? {}) },
-    };
-  } catch {
-    return seeded;
+  let stored = await store.get<Stored>(KEY(season, poolId));
+  // Only the main pool has a pre-pool-id history to inherit. Letting another
+  // pool read it would strike teams off a board where they are available.
+  if (!stored && poolId === DEFAULT_POOL_ID) {
+    stored = await store.get<Stored>(LEGACY_KEY(season));
   }
+  if (!stored) return seeded;
+
+  const { ownershipOverride, ...rest } = stored;
+  return {
+    ...seeded,
+    ...rest,
+    // ownershipOverride was written when the tool assumed live pool picks
+    // were visible. Same shape, so carry anything stored under it forward.
+    weeklyPicks: { ...(ownershipOverride ?? {}), ...(rest.weeklyPicks ?? {}) },
+  };
 }
 
 export async function savePool(
@@ -71,7 +78,7 @@ export async function savePool(
   patch: Partial<PoolConfig>,
   store: PoolStore = redisStore,
 ): Promise<PoolConfig> {
-  const current = await getPool(season, poolId, store);
+  const current = await readPool(season, poolId, store);
   const next: PoolConfig = { ...current, ...patch };
   next.usedTeams = [...new Set(next.usedTeams)];
   next.weeklyPicks = next.weeklyPicks ?? {};

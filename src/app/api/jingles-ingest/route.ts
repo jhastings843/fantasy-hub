@@ -68,7 +68,7 @@ export async function GET(request: Request) {
   }
 
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     // Reading the last run is harmless; triggering work is not.
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }

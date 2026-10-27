@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const league = params.get("league") === "cfb" ? "cfb" : "nfl";
   if (params.get("refresh") === "1") {
     const secret = process.env.CRON_SECRET;
-    if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+    if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
       return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
     return Response.json({ ok: true, report: await refreshPicks(league) });

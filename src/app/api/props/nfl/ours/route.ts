@@ -9,7 +9,7 @@ export const maxDuration = 120;
 // TD and props workflow (first-td.yml). Same bearer secret as the other cron routes.
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const report = await runOurNflProps();

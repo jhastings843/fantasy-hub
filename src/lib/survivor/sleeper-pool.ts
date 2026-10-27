@@ -114,8 +114,13 @@ export async function listPools(limit = 25): Promise<GraphQlResult<UserPool[]>> 
   return { ok: true, data: res.data?.get_user_pools ?? [] };
 }
 
+// Ids go straight into the query text, so anything but a plain id is refused
+// rather than letting a quote close the string and add selections.
+const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
 /** One pool, including whatever its metadata carries. */
 export async function getPoolById(poolId: string): Promise<GraphQlResult<UserPool | null>> {
+  if (!SAFE_ID.test(poolId)) return { ok: false, error: "pool id must be letters, digits, dashes or underscores" };
   const res = await sleeperGraphQl<{ get_user_pool_by_id: UserPool | null }>(
     `{ get_user_pool_by_id(pool_id: "${poolId}") {
         pool_id pool_type sport status created metadata
@@ -138,6 +143,7 @@ export async function getLegPicks(
   /** The weekly pick'em only returns picks when this is true (checked 2026-10-09); survivor leaves it off. */
   includeTiebreaker = false,
 ): Promise<GraphQlResult<Record<string, unknown>>> {
+  if (!SAFE_ID.test(leagueId) || !SAFE_ID.test(legId)) return { ok: false, error: "league and leg ids must be letters, digits, dashes or underscores" };
   const res = await sleeperGraphQl<{ get_pickem_picks_for_league: Record<string, unknown> }>(
     `{ get_pickem_picks_for_league(league_id: "${leagueId}", leg_id: "${legId}", include_tiebreaker: ${includeTiebreaker}) }`,
   );

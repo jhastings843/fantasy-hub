@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
   const secret = process.env.CRON_SECRET;
   const dry = params.get("dry") === "1";
-  if (secret && !dry && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!dry && (!secret || request.headers.get("authorization") !== `Bearer ${secret}`)) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

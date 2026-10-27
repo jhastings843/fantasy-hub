@@ -83,6 +83,8 @@ export function gradeBet(b: MoneyBet, g: FinalGame): { outcome: Outcome; actual:
     // Not in the box score: he didn't play, and a book voids it.
     if (!row) return { outcome: "void", actual: `${b.player} not in the box score` };
     const v = row[b.stat];
+    // In the box score but the stat didn't come through: settle on a later read.
+    if (!Number.isFinite(v)) return null;
     return { outcome: settle(b.side, b.line, v), actual: `${v} ${STAT_LABEL[b.stat]}` };
   }
   return null;
