@@ -1,6 +1,11 @@
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
+## Pool tiebreakers and Sam's NBA label (2026-10-26, 3a4456e + 9ece878, deployed)
+- `optimizeStandings` (picks/pool.ts) takes `tiebreak: { mean, sd, mine? }`. Rivals carry `tb` from Sleeper's `tiebreaker.value` (pool-store `fieldPicks`). Ties at the top are settled by closest guess to a drawn total, and picks and guess are chosen together (guesses tried: mean plus or minus 20). If no guess was entered, that entry loses the tiebreak. SD comes from `totalSpread(season games)`, with 13.5 as the fallback (an estimate). Mean is the models' average.
+- Week 7 MNF check (in the tests): DAL with a guess of 50 had about a 42% win chance. Jack's locked PHI with 47 had about 7%.
+- Sam's NBA cards sometimes label his number "Sam's line" instead of "Model line". `parseSamNba` and `parseSamBoard` accept both.
+
 ## Price shopping on the bet gate (2026-10-26)
 - Jack: tier picks at DK -112/-115 were passes while other books had -110 (NFL Week 7 NYG +10.5). Checked: NYG was Tier 1 "Agree on road dog" 12-2, shrunk p 0.544, worstPrice -110, DK -112 -> pass; at -110 it is 1u. College Week 8 Sat: Wisconsin +3 (T2, p 0.548, needs -112) was -115 at DK -> would bet at -110. Sacramento State +14.5 (T1 p 0.527, needs -102) and NFL PHI +4.5 (T2 p 0.509, no price works) fail on record, not price.
 - Built: `src/lib/picks/shop.ts` (pure) + `shop-store.ts`. The Odds API sport odds endpoint, spreads+totals, books draftkings,fanduel,fanatics = 2 credits a read per sport. `runToday` (9am bets run) calls `refreshShop` for each sport playing today before `refreshPicks` (at most every 90 min, respects MONTHLY_STOP 450 via shared `oddsapi:v1:usage`; `saveOddsUsage` exported from odds-api-store). `getQuotes` applies the latest read while under 3h old (`shopLines`): each side's price = best of Jack's books AT DK'S OWN NUMBER; `RefLine.shop` names the book per side and keeps DK's own prices. Sizing, issued price and units then use the shopped price; email, push and the picks page say "-110 FanDuel".
