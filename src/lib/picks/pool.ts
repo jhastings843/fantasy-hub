@@ -43,6 +43,20 @@ export interface PoolResult {
   chalkExpectedCorrect: number;
   trials: number;
   entrants: number;
+  /** Mid-week, when the tiebreak game is known: the total to enter and what it does. */
+  tiebreak?: TiebreakPick;
+}
+
+export interface TiebreakPick {
+  /** The total to enter (or the one already entered, once its game has started). */
+  value: number;
+  /** True when the game has started and the number can't change. */
+  fixed: boolean;
+  /** Win chance entering the models' total instead, for comparison. */
+  atMean: number;
+  /** The total distribution the ties were settled on. */
+  mean: number;
+  sd: number;
 }
 
 export const MAX_FLIPS = 4;
@@ -158,6 +172,42 @@ export interface Rival {
   base: number;
   /** null = not picked yet (drawn from the field share); "none" = can no longer pick (game started). */
   picks: ("home" | "away" | "none" | null)[];
+  /** The rival's tiebreaker guess (total points); null = none entered, which loses every tiebreak. */
+  tb?: number | null;
+}
+
+/**
+ * The pool's tiebreaker: entries tied on correct picks are separated by who
+ * guessed the tiebreak game's total points closest, over or under (assumed:
+ * Sleeper's settings only say "total points"; an exact tie splits evenly). The total is drawn from
+ * a normal around `mean` (the models' average) with `sd` from this season's
+ * misses. `mine` set = the game has started and Jack's guess is locked.
+ */
+export interface TiebreakModel {
+  mean: number;
+  sd: number;
+  mine?: number | null;
+}
+
+/** Guesses tried for Jack: the mean plus or minus this many points. */
+const TB_RANGE = 20;
+
+/** A normal draw (Box-Muller) from the seeded uniform. */
+const normal = (rand: () => number) => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+
+/** Our share of a tie at the top: everyone tied guessed, the closest to `total` wins. */
+function tieShare(mine: number | null, rivals: (number | null)[], total: number): number {
+  if (!rivals.length) return 1;
+  if (mine === null) return rivals.some((r) => r !== null) ? 0 : 1 / (rivals.length + 1);
+  const d = Math.abs(mine - total);
+  let tied = 1;
+  for (const r of rivals) {
+    if (r === null) continue;
+    const e = Math.abs(r - total);
+    if (e < d) return 0;
+    if (e === d) tied++;
+  }
+  return 1 / tied;
 }
 
 /**
@@ -166,13 +216,21 @@ export interface Rival {
  * Each trial draws the outcomes (and a rival's missing picks from the field
  * share), giving the best rival total M and how many share it; our total S
  * then wins outright above M and splits the tiebreaker evenly at M. Started
- * games keep Jack's locked pick; only open games are searched. Pure.
+ * games keep Jack's locked pick; only open games are searched.
+ *
+ * With `tiebreak`, ties at M are settled by the rivals' real guesses against
+ * a drawn total, and each candidate entry is scored at Jack's best guess (or
+ * his locked one), so picks and guess are chosen together: tied with one
+ * rival who guessed 51, a guess of 50 takes every total of 50 or less. Pure.
+ *
+ *   optimizeStandings([DAL@PHI 34%], 9, [{ base: 9, picks: ["away"], tb: 51 }, { base: 9, picks: ["home"], tb: 42 }, ...], { tiebreak: { mean: 46, sd: 13 } })
+ *     -> { picks: ["away"], tiebreak: { value: 50, ... }, winChance: 0.43 }
  */
 export function optimizeStandings(
   games: LiveGame[],
   myBase: number,
   rivals: Rival[],
-  opts: { trials?: number; seed?: number } = {},
+  opts: { trials?: number; seed?: number; tiebreak?: TiebreakModel } = {},
 ): PoolResult {
   const trials = opts.trials ?? 20000;
   const G = games.length;
@@ -180,10 +238,16 @@ export function optimizeStandings(
   const homeWon = new Uint8Array(trials * G);
   const top = new Int32Array(trials);
   const ties = new Int32Array(trials);
+  const tbm = opts.tiebreak;
+  const totals = new Float64Array(trials);
+  /** Per trial, the guesses of the rivals tied at the top (only kept with a tiebreak model). */
+  const topTbs: (number | null)[][] = [];
   for (let t = 0; t < trials; t++) {
     for (let g = 0; g < G; g++) homeWon[t * G + g] = rand() < games[g].pHome ? 1 : 0;
+    if (tbm) totals[t] = Math.max(0, Math.round(tbm.mean + tbm.sd * normal(rand)));
     let M = -1;
     let c = 0;
+    let tbs: (number | null)[] = [];
     for (const r of rivals) {
       let s = r.base;
       for (let g = 0; g < G; g++) {
@@ -195,21 +259,51 @@ export function optimizeStandings(
       if (s > M) {
         M = s;
         c = 1;
-      } else if (s === M) c++;
+        if (tbm) tbs = [r.tb ?? null];
+      } else if (s === M) {
+        c++;
+        if (tbm) tbs.push(r.tb ?? null);
+      }
     }
     top[t] = M;
     ties[t] = c;
+    if (tbm) topTbs.push(tbs);
   }
-  const evalEntry = (picks: Int8Array /* 1 home, 0 away, -1 none */) => {
-    let sum = 0;
+  const guesses = !tbm
+    ? []
+    : tbm.mine !== undefined
+      ? [tbm.mine]
+      : Array.from({ length: 2 * TB_RANGE + 1 }, (_, i) => Math.max(0, Math.round(tbm.mean) - TB_RANGE + i));
+  /** Win chance of an entry, at its best guess when a tiebreak model is set. */
+  const score = (picks: Int8Array /* 1 home, 0 away, -1 none */) => {
+    let outright = 0;
+    const tiedTrials: number[] = [];
     for (let t = 0; t < trials; t++) {
       let S = myBase;
       const o = t * G;
       for (let g = 0; g < G; g++) if (picks[g] >= 0 && picks[g] === homeWon[o + g]) S++;
-      sum += S > top[t] ? 1 : S === top[t] ? 1 / (ties[t] + 1) : 0;
+      if (S > top[t]) outright++;
+      else if (S === top[t]) tiedTrials.push(t);
     }
-    return sum / trials;
+    if (!tbm) {
+      const split = tiedTrials.reduce((a, t) => a + 1 / (ties[t] + 1), 0);
+      return { v: (outright + split) / trials, guess: null as number | null, atMean: 0 };
+    }
+    const at = (guess: number | null) => tiedTrials.reduce((a, t) => a + tieShare(guess, topTbs[t], totals[t]), 0);
+    let guess = guesses[0];
+    let bestTie = -1;
+    for (const x of guesses) {
+      const v = at(x);
+      // Ties on chance go to the guess nearest the mean.
+      if (v > bestTie + 1e-9 || (Math.abs(v - bestTie) <= 1e-9 && x !== null && guess !== null && Math.abs(x - tbm.mean) < Math.abs(guess - tbm.mean))) {
+        bestTie = v;
+        guess = x;
+      }
+    }
+    const atMean = tbm.mine !== undefined ? bestTie : at(Math.round(tbm.mean));
+    return { v: (outright + bestTie) / trials, guess, atMean: (outright + atMean) / trials };
   };
+  const evalEntry = (picks: Int8Array) => score(picks).v;
   const chalk = new Int8Array(G);
   for (let g = 0; g < G; g++) {
     const gm = games[g];
@@ -235,6 +329,7 @@ export function optimizeStandings(
     cur[bestG] ^= 1;
     best = bestV;
   }
+  const final = tbm ? score(cur) : null;
   const exp = (p: Int8Array) => games.reduce((s, gm, g) => s + (p[g] === 1 ? gm.pHome : p[g] === 0 ? 1 - gm.pHome : 0), myBase);
   return {
     picks: Array.from(cur, (x) => (x === 1 ? "home" : "away") as "home" | "away"),
@@ -249,7 +344,23 @@ export function optimizeStandings(
     chalkExpectedCorrect: Math.round(exp(chalk) * 100) / 100,
     trials,
     entrants: rivals.length + 1,
+    ...(tbm && final && final.guess !== null
+      ? { tiebreak: { value: final.guess, fixed: tbm.mine !== undefined, atMean: final.atMean, mean: tbm.mean, sd: tbm.sd } }
+      : {}),
   };
+}
+
+/**
+ * How far a game's total points land from its closing market total, as a
+ * standard deviation, from this season's finals. Null with fewer than `min`
+ * games (the caller falls back).
+ */
+export function totalSpread(games: { completed: boolean; homeScore: number | null; awayScore: number | null; overUnder?: number | null }[], min = 30): number | null {
+  const miss = games.flatMap((g) =>
+    g.completed && g.homeScore != null && g.awayScore != null && typeof g.overUnder === "number" ? [g.homeScore + g.awayScore - g.overUnder] : [],
+  );
+  if (miss.length < min) return null;
+  return Math.round(Math.sqrt(miss.reduce((a, x) => a + x * x, 0) / miss.length) * 10) / 10;
 }
 
 /**

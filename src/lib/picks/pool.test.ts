@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { entryRecords, estimatedPublicHome, gradeTeams, tiebreakTotal,
-  optimizeStandings, optimizePool, type PoolGame } from "./pool";
+  optimizeStandings, optimizePool, totalSpread, type PoolGame } from "./pool";
 
 const game = (i: number, pHome: number, publicHome = estimatedPublicHome(pHome)): PoolGame => ({ key: `g${i}`, home: `H${i}`, away: `A${i}`, pHome, publicHome });
 
@@ -130,5 +130,55 @@ describe("tiebreakTotal", () => {
     expect(tiebreakTotal({ david: 41.6 }, null)).toEqual({ total: 42, basis: "david", david: 41.6, market: undefined });
     expect(tiebreakTotal(null, 44.5)).toEqual({ total: 45, basis: "market", market: 44.5 });
     expect(tiebreakTotal(null, null)).toBeNull();
+  });
+});
+
+describe("optimizeStandings with real tiebreakers", () => {
+  // Week 7 Monday night as it stood (2026-10-26): DAL at PHI, PHI 34%. Jack
+  // and three rivals at 9. #11 has DAL (guess 51); #34 (42) and #45 (56) have
+  // PHI; the 8s on DAL can only reach 9.
+  const mnf = [{ key: "DAL@PHI", home: "PHI", away: "DAL", pHome: 0.34, publicHome: 0.3 }];
+  const rivals = [
+    { base: 9, picks: ["away" as const], tb: 51 },
+    { base: 9, picks: ["home" as const], tb: 42 },
+    { base: 9, picks: ["home" as const], tb: 56 },
+    { base: 8, picks: ["away" as const], tb: 45 },
+    { base: 8, picks: ["away" as const], tb: null },
+  ];
+  const tiebreak = { mean: 46, sd: 13.5 };
+
+  it("takes DAL and guesses just under the one rival it ties", () => {
+    const r = optimizeStandings(mnf, 9, rivals, { trials: 20000, tiebreak });
+    expect(r.picks).toEqual(["away"]);
+    expect(r.tiebreak?.value).toBe(50);
+    // Matches the hand calculation: 66% x P(total <= 50) = about 42%.
+    expect(r.winChance).toBeCloseTo(0.42, 1);
+    expect(r.tiebreak!.atMean).toBeLessThan(r.winChance);
+  });
+
+  it("scores a locked guess as entered", () => {
+    // PHI with 47 against 42 and 56: wins only when the total lands 45 to 51.
+    const r = optimizeStandings([{ ...mnf[0], locked: true, mine: "home" }], 9, rivals, { trials: 20000, tiebreak: { ...tiebreak, mine: 47 } });
+    expect(r.tiebreak).toMatchObject({ value: 47, fixed: true });
+    expect(r.winChance).toBeCloseTo(0.07, 1);
+  });
+
+  it("a rival with no guess loses the tiebreak", () => {
+    const r = optimizeStandings([g2()], 9, [{ base: 10, picks: ["none"], tb: null }], { trials: 2000, tiebreak: { mean: 45, sd: 13 } });
+    expect(r.winChance).toBe(0);
+    const s = optimizeStandings([g2(0.5)], 9, [{ base: 9, picks: ["none"], tb: null }], { trials: 4000, tiebreak: { mean: 45, sd: 13 } });
+    expect(s.winChance).toBeCloseTo(1, 5);
+  });
+});
+
+function g2(pHome = 0.5) {
+  return { key: "X@Y", home: "Y", away: "X", pHome, publicHome: 0.5, locked: true, mine: null };
+}
+
+describe("totalSpread", () => {
+  it("is the root mean square miss against the market total, null when too few", () => {
+    const g = (h: number, a: number, ou: number) => ({ completed: true, homeScore: h, awayScore: a, overUnder: ou });
+    expect(totalSpread([g(20, 20, 43), g(30, 20, 46)], 2)).toBe(3.5);
+    expect(totalSpread([g(20, 20, 43)], 2)).toBeNull();
   });
 });

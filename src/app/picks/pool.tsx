@@ -72,13 +72,20 @@ export async function PoolCard() {
           <div className={`${s.tileV} ${s.num}`}>{pct(1 / v.entrants)}</div>
           <div className={s.tileK}>An average entry&apos;s share</div>
         </div>
-        {v.tiebreaker && (
-          <div className={s.tile}>
-            <div className={`${s.tileV} ${s.num}`}>{v.tiebreaker.total}</div>
-            <div
-              className={s.tileK}
-            >{`Tiebreaker: total points, ${v.tiebreaker.game} (${tiebreakBasis(v.tiebreaker)})`}</div>
+        {r.tiebreak && v.tiebreaker ? (
+          <div className={`${s.tile} ${s.good}`}>
+            <div className={`${s.tileV} ${s.num}`}>{r.tiebreak.value}</div>
+            <div className={s.tileK}>{tiebreakNote(r.tiebreak, v.tiebreaker, v.standings?.myTb ?? null)}</div>
           </div>
+        ) : (
+          v.tiebreaker && (
+            <div className={s.tile}>
+              <div className={`${s.tileV} ${s.num}`}>{v.tiebreaker.total}</div>
+              <div
+                className={s.tileK}
+              >{`Tiebreaker: total points, ${v.tiebreaker.game} (${tiebreakBasis(v.tiebreaker)})`}</div>
+            </div>
+          )
         )}
       </div>
       {r.upsets.length > 0 && (
@@ -159,10 +166,17 @@ export async function PoolCard() {
         </div>
       </details>
       <p className={s.thin}>
-        {`Win chances: the market's no-vig moneyline odds (ESPN). Field: ${v.fieldNote}. Entrants: ${v.entrants} (${v.entrantsSource}). ${r.trials.toLocaleString()} simulated weeks; ties count as an even tiebreaker split.${v.standings ? ` Solved from the real board: you have ${v.standings.mine} correct, the leader ${v.standings.leader}, with ${v.standings.rivals} other entries' actual picks on the games left.` : v.started ? ` ${v.started} game${v.started === 1 ? " has" : "s have"} already started and ${v.started === 1 ? "isn't" : "aren't"} included.` : ""} Pick'em only: no stake, not in units.`}
+        {`Win chances: the market's no-vig moneyline odds (ESPN). Field: ${v.fieldNote}. Entrants: ${v.entrants} (${v.entrantsSource}). ${r.trials.toLocaleString()} simulated weeks; ${r.tiebreak ? `ties settled by each tied entry's real tiebreaker guess, closest to the final total wins (total drawn around ${r.tiebreak.mean}, give or take ${r.tiebreak.sd} points, this season's typical miss)` : "ties count as an even tiebreaker split"}.${v.standings ? ` Solved from the real board: you have ${v.standings.mine} correct, the leader ${v.standings.leader}, with ${v.standings.rivals} other entries' actual picks on the games left.` : v.started ? ` ${v.started} game${v.started === 1 ? " has" : "s have"} already started and ${v.started === 1 ? "isn't" : "aren't"} included.` : ""} Pick'em only: no stake, not in units.`}
       </p>
     </section>
   );
+}
+
+/** The tiebreak tile once the real guesses are in: the number to enter and what it's worth. */
+function tiebreakNote(t: NonNullable<PoolView["result"]["tiebreak"]>, tb: NonNullable<PoolView["tiebreaker"]>, mine: number | null): string {
+  if (t.fixed) return `Your tiebreaker (locked), ${tb.game}`;
+  const yours = mine === null ? "You haven't entered one" : mine === t.value ? "Matches what you entered" : `You entered ${mine}`;
+  return `Tiebreaker to enter, ${tb.game}: best against the tied entries' guesses. ${yours}. The models' ${tb.total} would win ${pct(t.atMean)}.`;
 }
 
 function tiebreakBasis(t: NonNullable<PoolView["tiebreaker"]>): string {
