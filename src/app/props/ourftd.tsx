@@ -5,6 +5,8 @@ import { nameKey } from "@/lib/props/grade";
 import { getOurFtdView, type OurFtdStored, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { bestBets, bestCost } from "@/lib/models/nfl/ftd-price";
+import { GameTable, type GameRowData } from "./week";
+import { SecHead } from "../picks/board";
 import { OUR_FTD_SLICES } from "@/lib/models/learn";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
@@ -139,45 +141,65 @@ export async function OurFtdResults({ season }: { season: number }) {
         <p className={s.calm}>Nothing graded yet. Boards are graded from ESPN&apos;s scoring plays after each game.</p>
       )}
       {v.graded.length > 0 && (
-        <div className={s.section}>
-          <div className={s.sectionHead}>
-            <h3 className={s.h2}>Every graded game</h3>
-            <p className={s.p}>Newest first. Value bets are every player whose chance beat the best price (Kalshi with fee, DraftKings or FanDuel), one unit each.</p>
-          </div>
-          <div className={s.tw}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>Game</th>
-                  <th>First TD</th>
-                  <th>We gave him</th>
-                  <th>Our pick</th>
-                  <th>Value bets</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...v.graded]
-                  .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""))
-                  .map((x) => {
-                    const bets = bestBets([x], (p, c) => p.p > c);
-                    const won = bets.filter((b) => b.win).length;
-                    const units = bets.reduce((a, b) => a + b.net, 0);
-                    const r = x.result;
-                    return (
-                      <tr key={x.slug}>
-                        <td>
-                          {`${x.game.away} at ${x.game.home}`} <span className={s.dim}>{`Wk ${x.week}`}</span>
-                        </td>
-                        <td>{r.first.kind === "offense" ? r.first.scorer : "No offensive TD first"}</td>
-                        <td className={s.num}>{r.p !== null ? `${pct(r.p)}${r.rank ? ` (#${r.rank})` : ""}` : "·"}</td>
-                        <td>{x.game.pick ? `${x.game.pick.name} ${r.pickHit ? "hit" : "missed"}` : "·"}</td>
-                        <td className={s.num}>{bets.length ? `${won} of ${bets.length}, ${u(units)}` : "none"}</td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
+        <div className={s.pageFrame}>
+          <SecHead title="Graded" aside="Newest first · value bets at the best price (Kalshi with fee, DK or FanDuel), 1u each" />
+          <GameTable
+            head={["First TD", "We gave him", "Our pick", "Value bets"]}
+            rows={[...v.graded]
+              .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""))
+              .map((x): GameRowData => {
+                // The same bets bestBets grades: every priced player whose chance beats his best price.
+                const bets = pricedPlayers(x.game).flatMap((pl) => {
+                  const c = bestCost(x, pl.name);
+                  return c && c.cost < 1 && pl.p > c.cost ? [{ pl, c, win: x.result.key === pl.key, net: x.result.key === pl.key ? (1 - c.cost) / c.cost : -1 }] : [];
+                });
+                const won = bets.filter((b) => b.win).length;
+                const units = bets.reduce((a, b) => a + b.net, 0);
+                const r = x.result;
+                return {
+                  key: x.slug,
+                  title: `${x.game.away} at ${x.game.home}`,
+                  when: x.kickoff,
+                  cells: [
+                    ["First TD", r.first.kind === "offense" ? r.first.scorer : "none"],
+                    ["We gave him", r.p !== null ? `${pct(r.p)}${r.rank ? ` (#${r.rank})` : ""}` : "·"],
+                    ["Our pick", x.game.pick ? `${x.game.pick.name} ${r.pickHit ? "hit" : "missed"}` : "·"],
+                    ["Value bets", bets.length ? `${won} of ${bets.length}, ${u(units)}` : "none"],
+                  ],
+                  read: !bets.length ? ["No bet", s.readPass] : won ? ["Hit", s.readW] : ["Missed", s.readL],
+                  body: (
+                    <div className={s.tw}>
+                      <table className={s.table}>
+                        <thead>
+                          <tr>
+                            <th>Value bet</th>
+                            <th>Ours</th>
+                            <th>Best price</th>
+                            <th>Result</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bets.length ? (
+                            bets.map((b, i) => (
+                              <tr key={`${b.pl.key}|${i}`}>
+                                <td>{`${b.pl.name} ${b.pl.team}`}</td>
+                                <td className={s.num}>{pct(b.pl.p)}</td>
+                                <td className={s.num}>{b.c.where}</td>
+                                <td className={s.num}>{b.win ? "scored first" : "lost"}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} className={s.dim}>Nobody beat the best price.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  ),
+                };
+              })}
+          />
         </div>
       )}
       <LearningBlock v={v.learning} />

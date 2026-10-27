@@ -4,9 +4,10 @@
 // real bets. The full boards sit below it, every game one click deep.
 import type { SectionView } from "@/lib/learning/engine";
 import { implied } from "@/lib/props/parse";
-import { getOurNbaView, type OurNbaView } from "@/lib/models/nba/store";
+import { getNbaSectionLearning, getOurNbaView, type OurNbaView } from "@/lib/models/nba/store";
 import { getOurNflView, type OurNflView } from "@/lib/models/nfl/store";
-import { getOurFtdView, type OurFtdView } from "@/lib/models/nfl/ftd-store";
+import { getAttdLearning, getOurFtdView, type OurFtdView } from "@/lib/models/nfl/ftd-store";
+import { SECTIONS } from "@/lib/models/sections";
 import { noVig } from "@/lib/models/nba/market";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { pricedPlayers } from "@/lib/firsttd/parse";
@@ -182,7 +183,33 @@ const LINEUP: { [k in "pp" | "ftd" | "nba" | "fb"]: { product: string; model: st
   nba: { product: "NBA props", model: "Hobby Hub NBA prop model", role: "Points, rebounds, assists and threes", prices: "A player needs 3 games this season before an edge counts." },
   fb: { product: "First Basket", model: "Hobby Hub First Basket model", role: "Tip chance and each starter's share of first shots", prices: "DraftKings prices read the morning of the game." },
 };
-export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb" | "kotc"; season: number }) {
+export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb" | "kotc" | "attd" | "lotto"; season: number }) {
+  if (tab === "attd" || tab === "lotto") {
+    const learning = await (tab === "attd" ? getAttdLearning(season) : getNbaSectionLearning(SECTIONS.nbaLotto, season)).catch(() => null);
+    const live = learning?.entries.filter((e) => e.status === "active") ?? [];
+    const best = learning?.entries.filter((e) => e.status === "collecting").reduce((a, e) => Math.max(a, e.ev?.games ?? 0), 0) ?? 0;
+    const name = tab === "attd" ? "Hobby Hub Anytime TD model" : "Hobby Hub NBA prop model, long rungs";
+    const role = tab === "attd" ? "Each team's TDs from the market's total and spread, then each player's share" : "Our chance on DraftKings' +250 to +2000 \"N+\" rungs, and one 3-leg ticket a night";
+    const prices = tab === "attd" ? "DraftKings' anytime prices come from the game-day morning read." : "DraftKings' ladders come with every props read.";
+    return (
+      <ModelLineup
+        title={`Who decides ${tab === "attd" ? "Anytime TD" : "Lottos"}`}
+        aside={live.length ? "Live slices set stakes. Everything else is tracked." : "Nothing here carries a stake."}
+        models={[
+          {
+            name,
+            role,
+            status: !learning ? "unavailable" : live.length ? "active" : "collecting",
+            note: !learning
+              ? "Couldn't read this model's learning just now."
+              : live.length
+                ? `${live.length} slice${live.length === 1 ? " is" : "s are"} live: ${live.map((e) => e.label).join(", ")}. ${prices}`
+                : `Edges are tracked only: no slice has cleared its gate (closest ${best} of ${learning.gate.minGames} games). ${prices}`,
+          },
+        ]}
+      />
+    );
+  }
   if (tab === "kotc")
     return (
       <ModelLineup

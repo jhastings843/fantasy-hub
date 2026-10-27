@@ -137,7 +137,8 @@ export default async function TodayPage() {
       return {
         key: `nba-${raw.id}`,
         league: "NBA",
-        pick: x.r ? x.pick : `${raw.away.short} at ${raw.home.short}`,
+        // No saved read, or a read with no side (readGame then falls back to the matchup): nothing to show, so the card is left out.
+        pick: x.r && x.pick !== `${raw.away.short} at ${raw.home.short}` ? x.pick : "",
         game: `${raw.away.short} at ${raw.home.short} · ${raw.away.abbr} ${raw.score?.away ?? 0}, ${raw.home.abbr} ${raw.score?.home ?? 0}`,
         when: "",
         kickoff: raw.tip,

@@ -88,7 +88,7 @@ export default async function PropsView({
           </div>
         </header>
 
-        {shown === "week" && market !== "lotto" && market !== "attd" && <PropsLineup tab={market} season={season} />}
+        {shown === "week" && <PropsLineup tab={market} season={season} />}
         {shown === "week" && market !== "kotc" && market !== "lotto" && market !== "attd" && <PropTabWeek tab={market} season={season} />}
         {shown === "log" && market !== "kotc" && market !== "lotto" && market !== "attd" && <PropsLog tab={market} season={season} />}
         {market === "lotto" && shown === "week" && <LottoToday season={season} />}

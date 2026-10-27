@@ -39,7 +39,7 @@ const NBA_CARD_GAMES = 3;
 const nowMs = () => Date.now();
 
 /** One edge, whatever the market: a prop side, a first basket or a first TD at Kalshi. */
-interface Edge {
+export interface Edge {
   key: string;
   player: string;
   game: string;
@@ -58,7 +58,7 @@ interface Edge {
   staked?: boolean;
 }
 
-interface GameRowData {
+export interface GameRowData {
   key: string;
   title: string;
   when?: string;
@@ -101,7 +101,7 @@ function PropLine({ line }: { line: NonNullable<Edge["line"]> }) {
  * market vs the edge. Dashed because an edge is tracked, never a stake, unless
  * the read says a live slice bet it.
  */
-function EdgeCard({ e }: { e: Edge }) {
+export function EdgeCard({ e }: { e: Edge }) {
   return (
     <li className={s.edgeCard}>
       <div className={s.edgeTop}>
@@ -150,7 +150,7 @@ function EdgeCard({ e }: { e: Edge }) {
   );
 }
 
-function GameTable({ head, rows }: { head: string[]; rows: GameRowData[] }) {
+export function GameTable({ head, rows }: { head: string[]; rows: GameRowData[] }) {
   return (
     <div className={s.gtable}>
       <div className={s.gHead} aria-hidden>
@@ -204,7 +204,7 @@ function fdNote(fd: { line: number; over: number; under: number } | undefined, m
 }
 
 /** The four numbers on every Props tab: edges now, the record, the closest slice, the learner. */
-function PropStats({ edges, graded, learning, logHref, unit }: { edges: number; graded: { w: number; l: number; p: number; units: number }; learning: SectionView; logHref: string; unit: string }) {
+export function PropStats({ edges, graded, learning, logHref, unit }: { edges: number; graded: { w: number; l: number; p: number; units: number }; learning: SectionView; logHref: string; unit: string }) {
   const best = Math.max(0, ...learning.entries.map((e) => e.ev?.games ?? 0));
   const live = learning.entries.filter((e) => e.status === "active").length;
   const testing = learning.entries.filter((e) => e.status === "collecting").length;
@@ -222,7 +222,7 @@ function PropStats({ edges, graded, learning, logHref, unit }: { edges: number; 
   );
 }
 
-function Gate({ learning, label }: { learning: SectionView; label: string }) {
+export function Gate({ learning, label }: { learning: SectionView; label: string }) {
   return (
     <Background title={`How ${label} edges become bets: every slice and the exact bar`}>
       <LearningBlock v={learning} />
