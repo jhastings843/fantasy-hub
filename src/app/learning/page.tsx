@@ -7,6 +7,7 @@ import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { loadSection } from "@/lib/learning/store";
 import { PROPS_SECTION } from "@/lib/props/learn";
 import { OUR_SECTION } from "@/lib/models/learn";
+import { SECTIONS } from "@/lib/models/sections";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionState } from "@/lib/learning/engine";
 import type { ReviewState } from "@/lib/picks/learning/review";
@@ -81,7 +82,7 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
   const nbaSeason = nbaSeasonOfDate(new Date());
-  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd] = await Promise.all([
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
@@ -90,6 +91,9 @@ export default async function LearningPage() {
     loadSection(OUR_SECTION.nbaFirstBasket, nbaSeason),
     loadSection(OUR_SECTION.nflProps, season),
     loadSection(OUR_SECTION.nflFirstTd, season),
+    loadSection(SECTIONS.nflAttd, season),
+    loadSection(SECTIONS.nbaLotto, nbaSeason),
+    loadSection(SECTIONS.nbaKotc, nbaSeason),
   ]);
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
@@ -162,6 +166,9 @@ export default async function LearningPage() {
         { name: "NFL player props (David)", loop: ENGINE, href: "/props?v=research", ...engineRow(davidOnly) },
         { name: "NBA player props (our model)", loop: `${ENGINE}. Games are daily and graded overnight; the review runs once per Monday-to-Sunday week`, href: "/props?m=nba&v=results", ...engineRow(ourNbaProps) },
         { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 2.33", href: "/props?m=nba&v=results", ...engineRow(ourFb) },
+        { name: "NFL anytime TD (our model)", loop: "Shared engine, Anytime TD gate: 30+ games over 3+ weeks, 100+ bets and 25+ winners. A live slice's players are marked as bets", href: "/props?m=attd&v=log", ...engineRow(attd) },
+        { name: "NBA lottos (our model)", loop: "Shared engine, long-price gate: 60+ games over 4+ weeks, 12+ winners. A live slice's rungs, or the nightly ticket, are marked as bets", href: "/props?m=lotto&v=log", ...engineRow(lotto) },
+        { name: "NBA King of the Court (our model)", loop: `${ENGINE}. Judged per night; a live slice marks the tagged props of our top N as bets`, href: "/props?m=kotc&v=log", ...engineRow(kotc) },
       ],
     },
   ];

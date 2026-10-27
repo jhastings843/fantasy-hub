@@ -4,7 +4,7 @@
 // cards, every game, graded nights, the four numbers and the gate. Results:
 // every long rung graded (do our long-shot chances beat DK's?).
 import { allBoards, getNbaSectionLearning } from "@/lib/models/nba/store";
-import { SECTIONS } from "@/lib/models/sections";
+import { SECTIONS, rungStaked, ticketStaked } from "@/lib/models/sections";
 import { LEGS, STAKE, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
 import { etDate, implied } from "@/lib/props/parse";
 import { Background, SecHead } from "../picks/board";
@@ -41,7 +41,7 @@ function Explainer() {
         So the real test is the rung table on Results: every long rung DraftKings posts (+250 to +2000 on the full-game ladder) graded
         against the box score, thousands a week. The nightly ticket is the fun part: the best-value rung in each game (our chance times
         DK&apos;s payout), one per player, top {LEGS} games, {STAKE}u at the product of the prices. It is built from each game&apos;s
-        last pregame read, so a late game&apos;s leg can carry news from after the first tip. Never emailed or bet.
+        last pregame read, so a late game&apos;s leg can carry news from after the first tip. Never emailed, and not a bet until its learner slice goes live.
       </p>
     </Background>
   );
@@ -121,7 +121,12 @@ export async function LottoToday({ season }: { season: number }) {
   const today = etDate(new Date());
   const t = d.tickets.find((x) => x.date === today) ?? null;
   const todays = d.rungs.filter((r) => r.date === today);
-  const best = todays.filter((r) => r.hit === null && r.ev > 0 && Date.parse(r.at) > now).sort((a, b) => b.ev - a.ev).slice(0, TOP);
+  // A live slice's rungs are bets and always shown; tracked rungs fill the rest of the top.
+  const open = todays.filter((r) => r.hit === null && r.ev > 0 && Date.parse(r.at) > now);
+  const bets = open.filter((r) => rungStaked(learning.entries, r)).length;
+  const best = open.sort((a, b) => Number(rungStaked(learning.entries, b)) - Number(rungStaked(learning.entries, a)) || b.ev - a.ev).slice(0, Math.max(TOP, bets));
+  const ticketBet = !!t && ticketStaked(learning.entries, t.legs[0]?.at);
+  const live = learning.entries.filter((e) => e.status === "active").map((e) => e.label);
   const byGame = new Map<string, Rung[]>();
   for (const r of todays) byGame.set(r.game, [...(byGame.get(r.game) ?? []), r]);
   const games: GameRowData[] = [...byGame.values()]
@@ -147,11 +152,11 @@ export async function LottoToday({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="lotto-today">
       <div className={s.pageFrame}>
-        <SecHead id="lotto-today" title={t ? `Tonight's ticket · ${am(t.price)}` : "Tonight's ticket"} aside={t ? `We give it ${pct(t.chance)}, DraftKings ${pct(t.book)} · ${STAKE}u, paper only` : "Needs a rung with value in 3 games"} />
+        <SecHead id="lotto-today" title={t ? `Tonight's ticket · ${am(t.price)}` : "Tonight's ticket"} aside={t ? `We give it ${pct(t.chance)}, DraftKings ${pct(t.book)} · ${STAKE}u, ${ticketBet ? "a bet (its slice is live)" : "paper only"}` : "Needs a rung with value in 3 games"} />
         {t ? (
           <ul className={s.edgeGrid} data-first-pick>
             {t.legs.map((r, i) => (
-              <EdgeCard key={`leg${i}`} e={rungEdge(r, `leg ${i + 1}`)} />
+              <EdgeCard key={`leg${i}`} e={{ ...rungEdge(r, `leg ${i + 1}`), staked: ticketBet }} />
             ))}
           </ul>
         ) : (
@@ -159,11 +164,11 @@ export async function LottoToday({ season }: { season: number }) {
         )}
       </div>
       <div className={s.pageFrame}>
-        <SecHead title="Tracked edges" aside="Best-value long rungs tonight · no stakes" />
+        <SecHead title={bets ? "Bets and tracked edges" : "Tracked edges"} aside={bets ? `${bets} bet${bets === 1 ? "" : "s"} from live slices (${live.join("; ")}) · the rest tracked` : "Best-value long rungs tonight · no stakes"} />
         {best.length ? (
           <ul className={s.edgeGrid}>
             {best.map((r) => (
-              <EdgeCard key={`${r.game}|${r.id}|${r.line}`} e={rungEdge(r)} />
+              <EdgeCard key={`${r.game}|${r.id}|${r.line}`} e={{ ...rungEdge(r), staked: rungStaked(learning.entries, r) }} />
             ))}
           </ul>
         ) : (
@@ -181,7 +186,7 @@ export async function LottoToday({ season }: { season: number }) {
         </div>
       )}
       <div className={s.pageFrame}>
-        <SecHead title="How it is doing" aside="Tracked, never staked" />
+        <SecHead title="How it is doing" aside={live.length ? "Value rungs at 1u; bets once a slice went live" : "Tracked, never staked"} />
         <PropStats edges={best.length} graded={{ w: sum.rungs.edge.hits, l: sum.rungs.edge.n - sum.rungs.edge.hits, p: 0, units: sum.rungs.edge.net }} learning={learning} logHref="/props?m=lotto&v=log" unit="value rungs still to tip" />
       </div>
       <Gate learning={learning} label="lotto" />

@@ -642,6 +642,15 @@ async function FirstBasketWeek({ season }: { season: number }) {
 
 /* ----------------------------------------------------------- first TD --- */
 
+/** One First TD strategy's record at the best price, as a stat: won-lost and units, 1u a bet. */
+function ftdWay(graded: Awaited<ReturnType<typeof getOurFtdView>>["graded"], id: string, k: string) {
+  const keep = OUR_FTD_SLICES.find(([x]) => x === id)![2];
+  const bets = bestBets(graded, keep);
+  const w = bets.filter((b) => b.win).length;
+  const units = bets.reduce((a, b) => a + b.net, 0);
+  return { k, v: bets.length ? u(units) : "·", sub: bets.length ? `${w}-${bets.length - w}, 1u a bet at the best price` : "first grades pending", tone: bets.length ? (units >= 0 ? ("up" as const) : ("down" as const)) : undefined };
+}
+
 /** Every First TD edge at the best price (Kalshi with fee, DK or FanDuel), graded: the shadow record the learner reads. Shared with Records. */
 export function ftdBestRecord(graded: Awaited<ReturnType<typeof getOurFtdView>>["graded"]) {
   let w = 0;
@@ -786,6 +795,10 @@ async function FirstTdWeek({ season }: { season: number }) {
         sub={`Which team scores first comes from the market's total and spread, drive by drive; the scorer from each team's TD shares. Priced against Kalshi and, from the morning of game day, DraftKings. ${edges.length ? `${edges.length} players beat the cheaper price.` : "Nobody beats the cheaper price right now."}`}
       />
       <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=ftd&v=log" unit="on games still to play" />
+      <Stats
+        label="Two ways to bet it"
+        items={[ftdWay(v.graded, "ftdb:pick", "Bet our favorite every game"), ftdWay(v.graded, "ftdb:value", "Bet every value (ours above the best price)"), { k: "Our favored team scored first", v: `${v.graded.filter((x) => x.result.team && [...x.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0].team === x.result.team).length} of ${v.graded.length}`, sub: "games graded", small: true }]}
+      />
       {edges.length > 0 && (
         <ul className={s.edgeGrid} data-first-pick>
           {edges.slice(0, TOP).map((e) => (

@@ -5,7 +5,7 @@
 // graded night against the board as it stood at the first tip.
 import type { PropMarket } from "@/lib/props/parse";
 import { getNbaSectionLearning, getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
-import { SECTIONS } from "@/lib/models/sections";
+import { SECTIONS, kotcStakedTop } from "@/lib/models/sections";
 import { LearnerLogBody } from "./top";
 import { getKotcNights, type KotcNight } from "@/lib/models/nba/kotc-store";
 import { whenEt } from "../picks/ui";
@@ -81,7 +81,7 @@ function Backtest() {
 }
 
 export async function KotcWeek({ season }: { season: number }) {
-  const [nights, v] = await Promise.all([getKotcNights(season).catch(() => null), getOurNbaView(season).catch(() => null)]);
+  const [nights, v, learning] = await Promise.all([getKotcNights(season).catch(() => null), getOurNbaView(season).catch(() => null), getNbaSectionLearning(SECTIONS.nbaKotc, season).catch(() => null)]);
   if (!nights) return <p className={s.calm}>King of the Court couldn&apos;t be read just now.</p>;
   const now = nowMs();
   const n = [...nights].sort((a, b) => a.date.localeCompare(b.date)).find((x) => !x.result && Date.parse(x.firstTip) > now - 6 * 3_600_000) ?? null;
@@ -98,6 +98,8 @@ export async function KotcWeek({ season }: { season: number }) {
   const top = n.board.rows[0];
   const started = Date.parse(n.firstTip) <= now;
   const rows = n.board.rows.slice(0, ROWS);
+  // A live learner slice turns our top N's tagged props into bets (Jack, 2026-10-26).
+  const betTop = learning ? kotcStakedTop(learning.entries, n.firstTip) : 0;
   return (
     <section className={s.section} aria-labelledby="kotc-today">
       <Hero
@@ -117,7 +119,7 @@ export async function KotcWeek({ season }: { season: number }) {
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>Chance to be king</h3>
-          <p className={s.p}>Top {ROWS} by chance to lead the slate in PRA. Ceiling is his 90th percentile night. The prop is his biggest model edge at -200 or longer (it qualifies for the promo); a dash means none, so any qualifying prop of his works.</p>
+          <p className={s.p}>Top {ROWS} by chance to lead the slate in PRA. Ceiling is his 90th percentile night. The prop is his biggest model edge at -200 or longer (it qualifies for the promo); a dash means none, so any qualifying prop of his works.{betTop ? ` A learner slice is live, so the props of our top ${betTop === 1 ? "pick" : betTop} are bets tonight.` : " Tracked only: no prop here is a bet until a learner slice clears its gate."}</p>
         </div>
         <div className={s.tw}>
           <table className={s.table}>
@@ -132,7 +134,7 @@ export async function KotcWeek({ season }: { season: number }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {rows.map((r, i) => {
                 const g = n.games.find((x) => x.id === r.game);
                 const a = attach(boards, r.name);
                 return (
@@ -144,7 +146,10 @@ export async function KotcWeek({ season }: { season: number }) {
                     <td className={s.num}>{pct(r.top3)}</td>
                     <td className={s.num}>{r.pra.toFixed(1)}</td>
                     <td className={s.num}>{r.p90}</td>
-                    <td className={s.num}>{a ? `${a.text} · edge ${Math.round(a.gap * 100)} pts` : "·"}</td>
+                    <td className={s.num}>
+                      {a ? `${a.text} · edge ${Math.round(a.gap * 100)} pts` : "·"}
+                      {a && i < betTop && <b className={s.pos}> · Bet</b>}
+                    </td>
                   </tr>
                 );
               })}

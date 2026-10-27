@@ -5,6 +5,7 @@
 import { getOurFtdView, attdGraded, getAttdLearning } from "@/lib/models/nfl/ftd-store";
 import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/nfl/anytime";
 import { implied, payout } from "@/lib/props/parse";
+import { attdStaked } from "@/lib/models/sections";
 import { Background, SecHead } from "../picks/board";
 import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } from "./week";
 import { LearnerLogBody } from "./top";
@@ -74,6 +75,12 @@ function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: strin
   );
 }
 
+/** The tab's edges, plus the anytime side when a live slice bets a player under the tab's edge rule. */
+const withBet = (r: AttdRow, bet: boolean) => {
+  const es = attdEdges(r);
+  return bet && !es.some((x) => x.side === "anytime") ? [...es, ...attdEdges(r, -1).filter((x) => x.side === "anytime")] : es;
+};
+
 export async function AttdWeek({ season }: { season: number }) {
   const [v, graded, learning] = await Promise.all([getOurFtdView(season).catch(() => null), attdGraded(season).catch(() => []), getAttdLearning(season).catch(() => null)]);
   if (!v || !learning) return <p className={s.calm}>The Anytime TD board couldn&apos;t be read just now.</p>;
@@ -83,8 +90,9 @@ export async function AttdWeek({ season }: { season: number }) {
   const edges: Edge[] = ahead
     .flatMap((g) =>
       g.attd!.rows.flatMap((r) =>
-        attdEdges(r).map(
+        withBet(r, attdStaked(learning.entries, g.kickoff, r.anytime, r.dk)).map(
           (x): Edge => ({
+            staked: x.side === "anytime" && attdStaked(learning.entries, g.kickoff, r.anytime, r.dk),
             key: `${g.game.slug}|${r.key}|${x.side}`,
             player: `${r.name} ${r.team}`,
             game: `${g.game.away} at ${g.game.home}`,
@@ -104,7 +112,8 @@ export async function AttdWeek({ season }: { season: number }) {
         ),
       ),
     )
-    .sort((a, b) => b.gap - a.gap);
+    .sort((a, b) => Number(!!b.staked) - Number(!!a.staked) || b.gap - a.gap);
+  const live = learning.entries.filter((e) => e.status === "active").map((e) => e.label);
   const priced = (rows: AttdRow[]) => rows.filter((r) => r.dk !== undefined).length;
   const rows: GameRowData[] = open.map((g) => {
     const e = g.attd!.rows.filter((r) => attdEdges(r).length);
@@ -151,7 +160,7 @@ export async function AttdWeek({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="attd-week">
       <div className={s.pageFrame}>
-        <SecHead id="attd-week" title="Tracked edges" aside={`Our chance beats DK's break-even by ${Math.round(ATTD_EDGE * 100)}+ points · no stakes`} />
+        <SecHead id="attd-week" title="Tracked edges" aside={live.length ? `Bets live: ${live.join("; ")} · the rest tracked` : `Our chance beats DK's break-even by ${Math.round(ATTD_EDGE * 100)}+ points · no stakes`} />
         {edges.length > 0 ? (
           <ul className={s.edgeGrid} data-first-pick>
             {edges.slice(0, TOP).map((e) => (
@@ -173,7 +182,7 @@ export async function AttdWeek({ season }: { season: number }) {
         </div>
       )}
       <div className={s.pageFrame}>
-        <SecHead title="How it is doing" aside="Tracked, never staked" />
+        <SecHead title="How it is doing" aside={live.length ? "Edges at 1u; bets once a slice went live" : "Tracked, never staked"} />
         <PropStats edges={edges.length} graded={{ w: anytime.won, l: anytime.n - anytime.won, p: 0, units: anytime.net }} learning={learning} logHref="/props?m=attd&v=log" unit="on games still to play" />
       </div>
       <Gate learning={learning} label="Anytime TD" />

@@ -117,7 +117,9 @@ export async function OurFtdWeek({ season }: { season: number }) {
 export async function OurFtdResults({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return null;
-  const tiles = OUR_FTD_SLICES.slice(0, 3).map(([id, label, keep]) => {
+  // Our favorite first (Jack: "if we bet our model's favorite, how many units?"), then the value bets.
+  const order = ["ftdb:pick", "ftdb:value", "ftdb:value3"];
+  const tiles = order.map((want) => OUR_FTD_SLICES.find(([id]) => id === want)!).map(([id, label, keep]) => {
     const bets = bestBets(v.graded, keep);
     return { id, label, w: bets.filter((b) => b.win).length, n: bets.length, units: bets.reduce((a, b) => a + b.net, 0) };
   });

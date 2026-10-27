@@ -17,7 +17,7 @@
 //
 //   attdCandidates([{ slug, week, at, rows, result }]) -> [{ id: "attd:value", bets: [...] }, ...]
 
-import type { Bet, Candidate } from "@/lib/learning/engine";
+import type { Bet, Candidate, Entry } from "@/lib/learning/engine";
 import { implied, nbaWeek, payout } from "@/lib/props/parse";
 import type { AttdGraded } from "./nfl/anytime";
 import { STAKE, type Rung, type Ticket } from "./nba/lotto";
@@ -148,4 +148,40 @@ export function kotcCandidates(nights: KotcNight[], boards: OurStoredProps[], se
       });
     }),
   }));
+}
+
+// --------------------------------------------------- live slices mark bets
+//
+// Jack, 2026-10-26: these three learn like the rest, so a slice that clears its
+// gate changes the board: from the moment it went live, a play it keeps is a
+// bet (the card says so), not a tracked edge. A play that started before the
+// slice went live was never bet, whatever the slice says now. A rolled-back
+// slice stops marking. Pure.
+
+type LiveEntry = Pick<Entry, "id" | "status" | "activatedAt">;
+
+/** Ids of slices live for a play starting at `at`. */
+const liveFor = (entries: LiveEntry[], at: string | undefined) =>
+  new Set(entries.filter((e) => e.status === "active" && e.activatedAt && at && Date.parse(at) >= Date.parse(e.activatedAt)).map((e) => e.id));
+
+/** Anytime TD: a live slice keeps this player at DK's price. */
+export function attdStaked(entries: LiveEntry[], kickoff: string | undefined, ours: number, price: number | undefined): boolean {
+  if (price === undefined) return false;
+  const live = liveFor(entries, kickoff);
+  return ATTD_SLICES.some(([id, , keep]) => live.has(id) && keep(ours, price));
+}
+
+/** Lottos: a live rung slice keeps this rung. */
+export function rungStaked(entries: LiveEntry[], r: Pick<Rung, "over" | "ev" | "stat" | "at">): boolean {
+  const live = liveFor(entries, r.at);
+  return LOTTO_SLICES.some(([id, , keep]) => live.has(id) && keep(r as Rung));
+}
+
+/** Lottos: the nightly ticket's slice is live for a night tipping at `at`. */
+export const ticketStaked = (entries: LiveEntry[], at: string | undefined) => liveFor(entries, at).has("lotto:ticket");
+
+/** King of the Court: how many of our top players get their prop bet tonight (the widest live slice), 0 when none. */
+export function kotcStakedTop(entries: LiveEntry[], firstTip: string): number {
+  const live = liveFor(entries, firstTip);
+  return Math.max(0, ...KOTC_SLICES.filter(([id]) => live.has(id)).map(([, , top]) => top));
 }

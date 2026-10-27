@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attdCandidates, lottoCandidates, taggedProp } from "./sections";
+import { attdCandidates, attdStaked, kotcStakedTop, lottoCandidates, rungStaked, taggedProp, ticketStaked } from "./sections";
 import type { Rung } from "./nba/lotto";
 
 describe("Anytime TD slices", () => {
@@ -38,5 +38,33 @@ describe("King of the Court tagged prop", () => {
     } as never;
     expect(taggedProp([board], "Jokic")).toEqual({ id: "pts|Jokic", net: 0.667 }); // -250 does not qualify
     expect(taggedProp([board], "Embiid")).toBeNull();
+  });
+});
+
+describe("Live slices mark bets", () => {
+  const entry = (id: string, status: "active" | "collecting" | "rolled-back", activatedAt?: string) =>
+    ({ id, label: id, status, registeredAt: "2026-10-01T00:00:00Z", registeredWeek: 1, ...(activatedAt ? { activatedAt } : {}) }) as never;
+  const live = "2026-10-27T12:00:00Z";
+
+  it("Anytime TD: only a live slice that keeps the player, on games after it went live", () => {
+    const es = [entry("attd:edge10", "active", live), entry("attd:value", "collecting")];
+    expect(attdStaked(es, "2026-10-28T17:00:00Z", 0.5, 150)).toBe(true); // 50% vs 40%
+    expect(attdStaked(es, "2026-10-28T17:00:00Z", 0.45, 150)).toBe(false); // 5 points only
+    expect(attdStaked(es, "2026-10-26T17:00:00Z", 0.5, 150)).toBe(false); // kicked off before it went live
+    expect(attdStaked([entry("attd:edge10", "rolled-back", live)], "2026-10-28T17:00:00Z", 0.5, 150)).toBe(false);
+  });
+
+  it("Lottos: rung slices and the ticket", () => {
+    const rung = { over: 800, ev: 0.2, stat: "reb", at: "2026-10-28T23:00:00Z" } as never;
+    expect(rungStaked([entry("lotto:long", "active", live)], rung)).toBe(true);
+    expect(rungStaked([entry("lotto:pts", "active", live)], rung)).toBe(false);
+    expect(ticketStaked([entry("lotto:ticket", "active", live)], "2026-10-28T23:00:00Z")).toBe(true);
+    expect(ticketStaked([entry("lotto:value", "active", live)], "2026-10-28T23:00:00Z")).toBe(false);
+  });
+
+  it("King of the Court: the widest live top-N, 0 when none", () => {
+    const es = [entry("kotc:top3", "active", live), entry("kotc:fav", "active", live), entry("kotc:top10", "collecting")];
+    expect(kotcStakedTop(es, "2026-10-28T23:00:00Z")).toBe(3);
+    expect(kotcStakedTop(es, "2026-10-26T23:00:00Z")).toBe(0);
   });
 });
