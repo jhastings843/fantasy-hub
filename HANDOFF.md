@@ -1,3 +1,21 @@
+# Systems review plan (2026-10-27, from Jack's notes in the "Hobby Hub Systems Review" artifact)
+
+Artifact: https://claude.ai/artifact/DyhAJRDBgUecUKzJih5TMm. Jack's per-section notes live in its db, collection `notes` (read with ArtifactData list). All 24 sections reviewed.
+
+Decisions (Jack, 2026-10-27):
+- Picks change limit: one change per PART per week (rule, sources, staking, totals, straight up each get a slot), same evidence bar. Sources (PEM/Harris) move at any review once evidence clears.
+- Props learners (NFL props, First TD, First Basket, NBA props): free with guardrails. They may add slices, auto-refit models and tune their own bars; every change must beat current on games it was not fit on, auto rollback, weekly unit-loss cap pauses it.
+- Learning frequency: grade continuously, review after each slate (football after Sun/Mon/Thu, NBA daily). Evidence bars unchanged.
+- Venom: judged like PEM (cuts/out/veto after 30+ bets over 3+ weeks).
+- Build a college ratings model and projected scores (spread, total, win chance) from NFL, college and NBA models; tracked first, enter reviews as sources after a forward test.
+- Our NFL spread model: ratings update every final; structural self-changes tested every 4 weeks.
+- Order: (1) bugs, (2) learning/autonomy, (3) UI pass across all pages. Money projects (trade-bot stock books, trends learner, weather-desk rework, kalshi-phil no bets) get their own sessions after.
+
+Stage 1 bugs: CFB line moved and was not caught (Sam/David spreads differ on tonight's game); First TD learner log bugging; Sam's NBA lines missing (recheck Sam on a schedule only when a game today lacks his line); dynasty waiver research fails every Tuesday since 10-06 ("Waiver research named no players"); Anytime TD "Graded" unclear on W/L.
+Stage 3 UI (applies everywhere): team logos, even row spacing, game time under teams (channel if easy), board = upcoming only, finished games to Results (expandable), results split by market and sport, research/learner pages match NFL's, single edge column (side only), 'Ignore the odds' toward bottom, NFL expand uses full width, compact strategy review summary, a 'how our model works' view. Plus: NBA totals + straight up sections, KOTC prop-to-tag for every top-30 player vs DK and crowd, Lottos two records (singles, parlay of the day), trade finder ('offer this trade to X, here's why'), Guillotine injuries/byes/IR handling (check Kittle vs Fannin), pick'em per-slate learning, splits captured 60 to 30 min pre-kick, judged as a cut over 100 games.
+
+Done 2026-10-27: price shadow deployed (tests 1462 pass).
+
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 
