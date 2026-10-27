@@ -15,7 +15,8 @@ import { lastWeekFor } from "./results";
 import { assessFragility, submittedLineupNote, type Fragility } from "./fragility";
 import { buildMarket, type ObservedBid, type Tier } from "./market";
 import { buildLearning, roomProfiles, saveWeek, type LearnInput } from "./learn-build";
-import { getByeWeeks, getSeasonRates, getWeekProjections } from "./projections";
+import { getByeWeeks, getSeasonRates, getSeasonToDate, getWeekProjections } from "./projections";
+import { blendRates } from "./season-value";
 import { buildBidCard, finalFourBars } from "./recommend";
 import { bestLineup, slotAccepts } from "./lineup";
 import { availability, injuryFor } from "./availability";
@@ -213,13 +214,17 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     );
   }
 
-  const [weekProjections, seasonRates, byes, state, results] = await Promise.all([
+  const [weekProjections, preseasonRates, toDate, byes, state, results] = await Promise.all([
     getWeekProjections(leagueId, profile.season, week, scoring),
     getSeasonRates(leagueId, profile.season, scoring),
+    getSeasonToDate(leagueId, profile.season, week - 1, scoring).catch(() => ({})),
     getByeWeeks(leagueId, profile.season, week, scoring),
     readLeagueState(leagueId, week, rosters, budgetTotal),
     seasonResults(leagueId, week - 1),
   ]);
+  // Every "rest of season" number below reads this, so drops, tiers and the
+  // final-four bars all see what players have actually done (season-value.ts).
+  const seasonRates = blendRates(preseasonRates, toDate, weekProjections);
 
   if (Object.keys(weekProjections).length === 0) {
     return fallbackReport(
@@ -356,7 +361,8 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     position: p.position,
     points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints,
     name: p.name,
-    injuryStatus: p.injuryStatus,
+    // A bye reads as "bye" in the lineup warning, not as a mystery 0.0.
+    injuryStatus: p.injuryStatus ?? (p.byeWeek === week ? "bye" : null),
   }));
   const fragility = assessFragility({
     players: myPlayersForFragility,

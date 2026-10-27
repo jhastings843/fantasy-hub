@@ -137,6 +137,15 @@ const MAX_CHAINS = 3;
 /** Fallbacks per chain, so a lost claim still lands something. */
 const MAX_TARGETS_PER_CHAIN = 4;
 
+/**
+ * Starters from one NFL team, at most. A third makes one bad real game (a
+ * blowout, a backup QB, weather) sink three slots at once, and in a format
+ * where one low week ends the season that is the risk the sources rank eighth
+ * of the ten ways people get chopped. Week 8 offered Wan'Dale Robinson (TEN)
+ * to a lineup already starting Carnell Tate and Tony Pollard (TEN).
+ */
+export const STACK_LIMIT = 2;
+
 /** Sleeper's smallest legal bid in every league Jack plays. */
 const MIN_BID = 1;
 
@@ -452,6 +461,10 @@ export function fitUnderCap(chains: BidChain[], cap: number): BidChain[] {
   return out;
 }
 
+function ordinalSuffix(n: number): string {
+  return n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+}
+
 /**
  * Join clauses into sentences. Each clause is capitalised, and a clause that
  * already ends in a period (a name like "Harold Fannin Jr.") does not get a
@@ -562,6 +575,13 @@ export function buildBidCard(input: RecommendInput): BidCard {
   // Competition per target, kept for the chain ladder below.
   const competition = new Map<string, { contested: number; supply: number }>();
 
+  // NFL teams already in your best lineup, for the stack limit.
+  const startersByTeam = new Map<string, PoolPlayer[]>();
+  for (const s of bestLineup(rosterLineup, rosterPositions).slots) {
+    const p = s.player ? myPlayers.find((m) => m.playerId === s.player!.playerId) : undefined;
+    if (p?.team) startersByTeam.set(p.team, [...(startersByTeam.get(p.team) ?? []), p]);
+  }
+
   const scored = candidates
     .map((player) => {
       const plays = playsProbability(player);
@@ -623,8 +643,21 @@ export function buildBidCard(input: RecommendInput): BidCard {
             ? ` Depth only: another ${player.position} about as good is still free, and every chop adds more, so this is a minimum bid.`
             : ""),
       };
+      // The stack limit. A weekly piece that would be a third starter from one
+      // team leaves the card; an endgame piece stays, with the stack named, since
+      // his value is the final four and the lineup will change by then.
+      const sameTeam = (player.team ? (startersByTeam.get(player.team) ?? []) : []).filter(
+        (p) => p.playerId !== target.displaces?.playerId,
+      );
+      if (sameTeam.length >= STACK_LIMIT) {
+        if (tier !== "championship") return null;
+        const nth = sameTeam.length + 1;
+        const with_ = sameTeam.map((p) => p.name).join(" and ");
+        target.reason += ` Would be your ${nth}${ordinalSuffix(nth)} ${player.team} starter with ${with_}, so one bad ${player.team} game hits all of them.`;
+      }
       return target;
     })
+    .filter((t): t is BidTarget => t !== null)
     // A stash that adds nothing and is not a top-32 player is not worth a line
     // on the card. There are always dozens of them and none of them matter.
     .filter((t) => t.weekGain > 0 || t.tier === "championship")
@@ -696,12 +729,21 @@ export function buildBidCard(input: RecommendInput): BidCard {
     .filter((targets) => !(cappedPos(targets) && !dropFor.get(targets)))
     .map((targets) => {
       const drop = dropFor.get(targets) ?? null;
+      // Season, not week: a claim has to be worth more for the rest of the
+      // season than the player it drops. Week 8 offered Isaiah Likely as a drop
+      // because NYG was on bye, for band-aids worth less than him every week
+      // after. Only a red week, where Sunday is the whole season, may trade
+      // down.
+      const worthIt = targets.filter(
+        (t) => !drop || posture === "red" || t.player.rosPoints >= drop.rosPoints,
+      );
       return {
-        need: needLabel(targets, emptySlots),
+        need: needLabel(worthIt, emptySlots),
         drop: drop ? { playerId: drop.playerId, name: drop.name } : null,
-        targets,
+        targets: worthIt,
       };
-    });
+    })
+    .filter((c) => c.targets.length > 0);
 
   // Worst case is one win per chain, since a chain cannot win twice.
   const worstCase = (list: BidChain[]) =>

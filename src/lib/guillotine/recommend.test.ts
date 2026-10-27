@@ -10,6 +10,7 @@ import {
   hasFreeReplacement,
   sentences,
   fitUnderCap,
+  STACK_LIMIT,
 } from "./recommend";
 import type { RecommendInput } from "./recommend";
 import { buildMarket } from "./market";
@@ -31,7 +32,8 @@ function player(
     playerId: id,
     name: `Player ${id}`,
     position,
-    team: "NE",
+    // One team per player, so only the stack-limit tests ever build a stack.
+    team: `T${id}`,
     weekPoints,
     rosPoints: weekPoints,
     injuryStatus: null,
@@ -893,5 +895,48 @@ describe("fitUnderCap", () => {
   it("leaves a card already under the cap alone", () => {
     const chains = [chain([10, 5])];
     expect(fitUnderCap(chains, 68)[0].targets[0].bid).toBe(10);
+  });
+});
+
+describe("season value and stacks (week 8)", () => {
+  it("never drops a player worth more for the season than the claim", () => {
+    // A TE on bye this week (0 now, 16 a week for the season) on the bench,
+    // and a band-aid WR who helps this week only.
+    const roster = [...myPlayers.filter((p) => p.playerId !== "bench1"), player("likely", "TE", 0, { rosPoints: 16 })];
+    const card = buildBidCard(
+      input({ myPlayers: roster, candidates: [player("bandaid", "WR", 9, { rosPoints: 6 })] }),
+    );
+    const drops = card.chains.map((c) => c.drop?.playerId);
+    expect(drops).not.toContain("likely");
+    for (const c of card.chains) {
+      const dropped = roster.find((p) => p.playerId === c.drop?.playerId);
+      for (const t of c.targets) expect(t.player.rosPoints).toBeGreaterThanOrEqual(dropped?.rosPoints ?? 0);
+    }
+  });
+
+  it("keeps a weekly piece off the card when he would be a third starter from one team", () => {
+    const roster = myPlayers.map((p) =>
+      p.playerId === "wr1" || p.playerId === "rb1" ? { ...p, team: "TEN" } : p,
+    );
+    const card = buildBidCard(
+      input({
+        myPlayers: roster,
+        candidates: [player("wandale", "WR", 9, { team: "TEN" }), player("other", "WR", 8.5)],
+      }),
+    );
+    const ids = card.chains.flatMap((c) => c.targets.map((t) => t.player.playerId));
+    expect(ids).not.toContain("wandale");
+    expect(ids).toContain("other");
+  });
+
+  it(`allows a stack of ${STACK_LIMIT} and an endgame piece past it, with the stack named`, () => {
+    const roster = myPlayers.map((p) =>
+      p.playerId === "wr1" || p.playerId === "rb1" ? { ...p, team: "TEN" } : p,
+    );
+    const card = buildBidCard(
+      input({ myPlayers: roster, candidates: [player("star", "WR", 20, { team: "TEN", rosPoints: 40 })] }),
+    );
+    const star = card.chains.flatMap((c) => c.targets).find((t) => t.player.playerId === "star");
+    expect(star?.reason).toContain("3rd TEN starter");
   });
 });

@@ -1,7 +1,9 @@
 import "server-only";
 import { cached } from "@/lib/redis/cached";
 import { redis } from "@/lib/redis/client";
+import { getWeekStats } from "@/lib/sleeper/stats";
 import { scoreStatLine, type ScoringSettings } from "./scoring";
+import type { SeasonToDate } from "./season-value";
 
 // Sleeper's projection feed, scored under one league's settings.
 //
@@ -160,15 +162,19 @@ export function getSeasonRates(
 
 const REGULAR_SEASON_WEEKS = 17;
 
-/** How many weeks ahead byes are worth knowing about. */
+/** How many weeks ahead byes are worth knowing about, after this one. */
 const BYE_LOOKAHEAD = 3;
 
 /**
  * Bye weeks by NFL team, derived rather than hardcoded.
  *
- * A team on bye has no projected players that week, so the weeks a team is
- * missing from the feed are its byes. This costs a few extra fetches and is
- * worth it: a hardcoded bye table is wrong every season, and silently.
+ * A team on bye has nobody projected to score that week. This used to look
+ * for teams MISSING from the feed, but Sleeper lists all 32 teams every week
+ * and gives a team on bye zero across the board, so no bye was ever found and
+ * the table was empty all season. It also started the lookahead at next week,
+ * so this week's bye (Likely and Nabers, week 8) was invisible even in
+ * principle. Now: a team with no player projected above zero is on bye, and
+ * this week counts.
  */
 export function getByeWeeks(
   leagueId: string,
@@ -177,38 +183,71 @@ export function getByeWeeks(
   scoring: ScoringSettings,
 ): Promise<Record<string, number>> {
   return cached(
-    `guillotine:v1:byes:${leagueId}:${season}:from${fromWeek}`,
+    `guillotine:v2:byes:${leagueId}:${season}:from${fromWeek}`,
     TTL_WEEK,
     async () => {
-      const weeks = Array.from({ length: BYE_LOOKAHEAD }, (_, i) => fromWeek + i + 1).filter(
+      const weeks = Array.from({ length: BYE_LOOKAHEAD + 1 }, (_, i) => fromWeek + i).filter(
         (w) => w <= REGULAR_SEASON_WEEKS,
       );
-
       const perWeek = await Promise.all(
-        weeks.map(async (week) => {
-          const projections = await getWeekProjections(leagueId, season, week, scoring);
-          const teams = new Set<string>();
-          for (const p of Object.values(projections)) {
-            if (p.team) teams.add(p.team);
-          }
-          return { week, teams };
-        }),
+        weeks.map(async (week) => ({
+          week,
+          projections: Object.values(await getWeekProjections(leagueId, season, week, scoring)),
+        })),
       );
+      return byesFrom(perWeek);
+    },
+  );
+}
 
-      // A team present in some lookahead week but absent from another is on bye
-      // in the week it is missing. Teams absent from all of them are not on
-      // bye, they are outside the horizon.
-      const everSeen = new Set<string>();
-      for (const { teams } of perWeek) {
-        for (const t of teams) everSeen.add(t);
-      }
+/** The pure half of getByeWeeks: the first week in the window each team has nobody projected. */
+export function byesFrom(
+  perWeek: { week: number; projections: { team?: string | null; points: number }[] }[],
+): Record<string, number> {
+  const everSeen = new Set<string>();
+  const scoringTeams = perWeek.map(({ week, projections }) => {
+    const teams = new Set<string>();
+    for (const p of projections) {
+      if (!p.team) continue;
+      everSeen.add(p.team);
+      if (p.points > 0) teams.add(p.team);
+    }
+    return { week, teams };
+  });
+  const byes: Record<string, number> = {};
+  for (const team of everSeen) {
+    const off = scoringTeams.find(({ teams }) => !teams.has(team));
+    if (off) byes[team] = off.week;
+  }
+  return byes;
+}
 
-      const byes: Record<string, number> = {};
-      for (const team of everSeen) {
-        const missing = perWeek.find(({ teams }) => !teams.has(team));
-        if (missing) byes[team] = missing.week;
+/**
+ * What every player has actually scored this season, under this league's
+ * scoring, through the last completed week. Feeds season-value.ts.
+ */
+export function getSeasonToDate(
+  leagueId: string,
+  season: string,
+  throughWeek: number,
+  scoring: ScoringSettings,
+): Promise<Record<string, SeasonToDate>> {
+  return cached(
+    `guillotine:v1:todate:${leagueId}:${season}:${throughWeek}`,
+    TTL_SEASON,
+    async () => {
+      const weeks = Array.from({ length: Math.max(0, throughWeek) }, (_, i) => i + 1);
+      const rows = await Promise.all(weeks.map((w) => getWeekStats(season, w).catch(() => ({}))));
+      const out: Record<string, SeasonToDate> = {};
+      for (const week of rows) {
+        for (const [id, stats] of Object.entries(week)) {
+          if (!stats.gp) continue;
+          const t = (out[id] ??= { points: 0, games: 0 });
+          t.points += scoreStatLine(stats, scoring);
+          t.games += 1;
+        }
       }
-      return byes;
+      return out;
     },
   );
 }

@@ -325,6 +325,11 @@
     {
       "date": "2026-10-27",
       "note": "ROSTER-STRENGTH PACING + LEARNER FIX. (1) budget.ts: a bottom-third roster (by projection rank) in the field phase holds Fantasy Life's weak-roster 65% instead of the season curve, and a yellow week caps at 20% (RotoWire's championship-starter price) instead of 8%. Only loosens, never tightens. Week 8: cap $67 -> $170, Jeanty $33 -> $84, St. Brown $33 -> $83. (2) learn-build.ts saveWeek checked leg week-1 for waivers, which always has a run (Sleeper files a week's run under its own leg), so NO card was saved all season: chop grades and shadow strategies were empty. Now checks leg `week`; week 8 card saved. Waivers in this league process Thu ~3:04am, not Tuesday night."
+    },
+    "2026-10-27: First TD stats merged to one row of four (dropped the duplicate bet-every-value tile), f4ff0ca. First Basket no-edge games read 'No edges'.",
+    {
+      "date": "2026-10-27",
+      "note": "SEASON VALUE, BYES, STACKS. (1) season-value.ts: rest-of-season rate was preseason/17 all year (Likely 9.3 while scoring 16.1, TE3); now blends season-to-date PPG under league scoring (getSeasonToDate) with the preseason rate as 4 games of prior. (2) getByeWeeks never found a bye: Sleeper lists all 32 teams, bye teams just project 0, and the lookahead skipped the current week. Now a team with no player >0 is on bye, current week included (byesFrom). (3) A chain's targets must be worth >= the drop over the season unless the week is red. (4) STACK_LIMIT 2: a weekly piece that would be a 3rd starter from one NFL team leaves the card; an endgame piece stays with the stack named. Week 8 card: Likely kept, Wan'Dale (TEN with Tate, Pollard) gone, QB-depth chain gone, Jeanty $85, St. Brown $85. 1457 tests pass."
     }
   ],
   "tags": [
