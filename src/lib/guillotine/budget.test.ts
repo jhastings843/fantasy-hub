@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planBudget, phaseFor } from "./budget";
+import { planBudget, phaseFor, strengthFor } from "./budget";
 import type { BudgetInput } from "./budget";
 
 // Dah Chopped: 16 teams, $1000 budget.
@@ -121,5 +121,44 @@ describe("planBudget", () => {
       rivalRemaining: [700, 300],
     });
     expect(plan.notes.some((n) => n.includes("cannot afford to chase"))).toBe(true);
+  });
+});
+
+describe("roster strength", () => {
+  const base = {
+    budget: 1000,
+    remaining: 820,
+    teamsAlive: 9,
+    totalTeams: 16,
+    posture: "yellow" as const,
+    rivalRemaining: [661, 587, 470, 460, 307, 200, 150, 90],
+  };
+
+  // Week 8: 2nd lowest of 9, $820 left. The curve alone held $753 and capped
+  // the week at $67; the weak-roster hold is $650, so the week opens to $170.
+  it("loosens pacing for a bottom-third roster", () => {
+    const plan = planBudget({ ...base, rankFromBottom: 2 });
+    expect(plan.holdFloor).toBe(650);
+    expect(plan.weeklyCap).toBe(170);
+    expect(plan.notes.join(" ")).toContain("bottom third");
+  });
+
+  it("leaves middle and top rosters on the season curve", () => {
+    const curve = planBudget(base);
+    expect(planBudget({ ...base, rankFromBottom: 5 }).weeklyCap).toBe(curve.weeklyCap);
+    expect(planBudget({ ...base, rankFromBottom: 9 }).weeklyCap).toBe(curve.weeklyCap);
+    expect(curve.weeklyCap).toBe(67);
+  });
+
+  it("caps a weak yellow week at 20% of budget", () => {
+    const plan = planBudget({ ...base, remaining: 1000, rankFromBottom: 1 });
+    expect(plan.weeklyCap).toBe(200);
+  });
+
+  it("splits the field into thirds", () => {
+    expect(strengthFor(3, 9)).toBe("bottom");
+    expect(strengthFor(4, 9)).toBe("middle");
+    expect(strengthFor(7, 9)).toBe("top");
+    expect(strengthFor(undefined, 9)).toBeNull();
   });
 });

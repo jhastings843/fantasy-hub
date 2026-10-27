@@ -41,9 +41,14 @@ interface SavedWeek {
  * Save this week's card and chop odds while they are still a forecast.
  *
  * The report is rebuilt on every page view, so this runs often. It writes
- * until the week's waivers have run (leg week - 1 has any waiver record) and
+ * until the week's waivers have run (leg `week` has any waiver record) and
  * never after, so the saved card is the last one before the auctions, not one
  * redrawn from the rosters the auctions produced.
+ *
+ * Sleeper files a week's waiver run under that week's own leg: week 7's run
+ * (Thu 10/22) is in leg 7, and leg 8 is empty until week 8's run. This used to
+ * check leg week - 1, which always has a run in it, so no card was saved all
+ * season and the chop grades and shadow strategies had nothing to grade.
  */
 export async function saveWeek(
   leagueId: string,
@@ -59,7 +64,7 @@ export async function saveWeek(
     // Straight from Sleeper, not the 30-minute cache: a cached pre-run feed
     // would let a post-waiver card overwrite the real forecast. Any waiver
     // record, failed or complete, means the run has happened.
-    const res = await fetch(`https://api.sleeper.app/v1/league/${leagueId}/transactions/${week - 1}`, { cache: "no-store" });
+    const res = await fetch(`https://api.sleeper.app/v1/league/${leagueId}/transactions/${week}`, { cache: "no-store" });
     if (!res.ok) return;
     const leg = (await res.json()) as LearnTransaction[];
     if (leg.some((t) => t.type === "waiver")) return;

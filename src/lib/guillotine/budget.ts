@@ -43,6 +43,33 @@ const GREEN_WEEK_CEILING = 0.02;
 /** One real fix, not a shopping spree. */
 const YELLOW_WEEK_CEILING = 0.08;
 
+/**
+ * Fantasy Life's hold targets by roster strength: top four 80-95%, middle
+ * four 65-80%, bottom four 50-65%. The conservative end of each band, and
+ * only ever used to loosen the season curve for a weak roster, never to
+ * tighten it for a strong one. Week 8 is why: projected 2nd lowest of 9 with
+ * $820 left, the curve alone held $753 and capped the week at $67, while the
+ * by-strength rule says a bottom team can be down to $650 already.
+ */
+const STRENGTH_HOLD = { bottom: 0.65, middle: 0.8, top: 0.95 } as const;
+
+/**
+ * A yellow week for a bottom-third roster: enough for one championship
+ * starter at RotoWire's price (20% of budget), rather than 8% spread thin.
+ */
+const WEAK_YELLOW_CEILING = 0.2;
+
+export type Strength = keyof typeof STRENGTH_HOLD;
+
+/** Thirds of the field, from projection rank counted from the bottom (1 = lowest). */
+export function strengthFor(rankFromBottom: number | undefined, teamsAlive: number): Strength | null {
+  if (!rankFromBottom || rankFromBottom < 1 || teamsAlive < 3) return null;
+  const third = Math.ceil(teamsAlive / 3);
+  if (rankFromBottom <= third) return "bottom";
+  if (rankFromBottom > teamsAlive - third) return "top";
+  return "middle";
+}
+
 // Fantasy Index recommends holding ~5% back for bye and injury emergencies.
 // There is deliberately no such clause here: while the field is large the hold
 // curve already keeps 47% or more of the budget in reserve, so a 5% floor can
@@ -65,6 +92,8 @@ export interface BudgetInput {
   posture: Posture;
   /** Every other surviving team's remaining FAAB. */
   rivalRemaining: number[];
+  /** Where this roster projects this week, counted from the bottom (1 = lowest). */
+  rankFromBottom?: number;
 }
 
 export interface BudgetPlan {
@@ -128,10 +157,19 @@ export function planBudget(input: BudgetInput): BudgetPlan {
   const totalEliminations = Math.max(1, totalTeams - 1);
   const done = (totalEliminations - eliminationsRemaining) / totalEliminations;
 
-  const holdFloor = budget * interpolateHold(done);
-  const paceCap = Math.max(0, remaining - holdFloor);
-
   const notes: string[] = [];
+
+  const curveHold = budget * interpolateHold(done);
+  const strength = phase === "field" ? strengthFor(input.rankFromBottom, teamsAlive) : null;
+  const strengthHold = strength ? budget * STRENGTH_HOLD[strength] : Infinity;
+  const holdFloor = Math.min(curveHold, strengthHold);
+  const paceCap = Math.max(0, remaining - holdFloor);
+  const weakRoster = strength === "bottom" && strengthHold < curveHold;
+  if (weakRoster) {
+    notes.push(
+      `Your roster projects in the bottom third, so pacing follows Fantasy Life's hold for weak rosters (${Math.round(STRENGTH_HOLD.bottom * 100)}% of budget) instead of the season curve (${Math.round((curveHold / budget) * 100)}%). Weak rosters that sit on money get chopped holding it.`,
+    );
+  }
   let weeklyCap: number;
 
   if (phase === "duel" || phase === "endgame") {
@@ -146,7 +184,7 @@ export function planBudget(input: BudgetInput): BudgetPlan {
       `Pacing is overridden because you are in danger. The ceiling is ${Math.round(RED_WEEK_CEILING * 100)}% of budget, which is what the sources allow even in a dire week.`,
     );
   } else if (posture === "yellow") {
-    weeklyCap = Math.min(paceCap, budget * YELLOW_WEEK_CEILING);
+    weeklyCap = Math.min(paceCap, budget * (weakRoster ? WEAK_YELLOW_CEILING : YELLOW_WEEK_CEILING));
   } else {
     weeklyCap = Math.min(paceCap, budget * GREEN_WEEK_CEILING);
     notes.push(

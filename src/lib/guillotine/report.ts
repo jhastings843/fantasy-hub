@@ -381,6 +381,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     totalTeams: profile.teams,
     posture: posture.posture,
     rivalRemaining,
+    rankFromBottom: risk.teams.find((t) => t.isMine)?.projectionRank,
   });
 
   // --- Market ---
