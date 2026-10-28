@@ -90,11 +90,16 @@ export function projectedScore(margin: number, total: number, sigma: number): Pr
 export class PointsRatings {
   off = new Map<string, number>();
   def = new Map<string, number>();
-  /** Running league average points per team per game. */
-  avg = 28;
+  /** Running league average points per team per game (28 for college; the NFL starts it near 22). */
+  avg: number;
   season = 0;
 
-  constructor(readonly p: PointsParams) {}
+  constructor(
+    readonly p: PointsParams,
+    start = 28,
+  ) {
+    this.avg = start;
+  }
 
   private newSeason(season: number) {
     if (season === this.season) return;

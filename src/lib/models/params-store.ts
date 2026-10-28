@@ -8,7 +8,7 @@ import { redis } from "@/lib/redis/client";
 // Stores read settings through live(): call primeParams() at an entry point,
 // and every read after that sees the stored override (5 minutes fresh).
 
-export const MODEL_KEYS = ["nba-props", "nba-fb", "nba-game", "nba-kotc", "nfl-props", "nfl-ftd", "nfl-attd", "nfl-spread"] as const;
+export const MODEL_KEYS = ["nba-props", "nba-fb", "nba-game", "nba-kotc", "nfl-props", "nfl-ftd", "nfl-attd", "nfl-spread", "nfl-totals"] as const;
 export type ModelKey = (typeof MODEL_KEYS)[number];
 
 export interface StoredParams {

@@ -7,6 +7,7 @@ import type { BoardGame } from "@/lib/picks/engine";
 import { CFB_MODEL_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { CfbModel, type CfbParams, type CfbResult } from "./model";
+import type { OurLine } from "@/lib/models/nfl/spread-live";
 import { CFB_SECTION, cfbCandidates, foldRead, forwardRecord, gameKey, liveSlicesFor, type CfbTracked, type Closing, type ForwardRecord } from "./track";
 import PARAMS from "./params.json";
 
@@ -112,9 +113,11 @@ async function closesFor(season: number, games: CfbTracked[]): Promise<Map<strin
 
 /**
  * One run: rate, project the priced board, save reads, write finals, review
- * once a slate. Returns one line for the picks data receipt.
+ * once a slate. Returns one line for the picks data receipt, and this read's
+ * projections keyed `${home}|${away}` for the forecast archive (so the picks
+ * learner can judge our totals side and straight-up winner as sources).
  */
-export async function runCfbModel(season: number, week: number, board: BoardGame[], feed: SplitGame[], now = new Date()): Promise<string> {
+export async function runCfbModel(season: number, week: number, board: BoardGame[], feed: SplitGame[], now = new Date()): Promise<{ text: string; ours: Map<string, OurLine> }> {
   // This week is read once: its finals feed the ratings, its board gives neutral sites and conference games.
   const [earlier, thisWeek] = await Promise.all([allFinals(season, week - 1), readWeek(season, 2, week).catch(() => null)]);
   const finals = [...earlier, ...(thisWeek?.finals ?? [])];
@@ -122,6 +125,7 @@ export async function runCfbModel(season: number, week: number, board: BoardGame
   const tracked = new Map((await loadTracked(season)).map((g) => [gameKey(g), g]));
   const at = now.toISOString();
   const write: Record<string, CfbTracked> = {};
+  const ours = new Map<string, OurLine>();
 
   for (const g of board) {
     const ref = g.basis === "reference" ? g.ref : undefined;
@@ -130,10 +134,12 @@ export async function runCfbModel(season: number, week: number, board: BoardGame
     const neutral = info?.neutral ?? false;
     const open = matchSplits({ home: g.home, away: g.away, kickoff: ref.kickoff, line: ref.line }, feed)?.open;
     const k = gameKey({ week, home: g.home, away: g.away });
+    const proj = model.project({ season, home: g.home, away: g.away, neutral });
+    ours.set(`${g.home}|${g.away}`, { market: ref.line, model: proj.spread, total: proj.total, homeWin: proj.homeWin });
     const next = foldRead(
       tracked.get(k),
       { week, home: g.home, away: g.away, kickoff: ref.kickoff, neutral, conf: info?.conf ?? null },
-      { at, line: ref.line, ...(ref.total !== undefined ? { total: ref.total } : {}), ...(open !== undefined ? { open } : {}), proj: model.project({ season, home: g.home, away: g.away, neutral }) },
+      { at, line: ref.line, ...(ref.total !== undefined ? { total: ref.total } : {}), ...(open !== undefined ? { open } : {}), proj },
     );
     if (next) {
       write[k] = next;
@@ -158,7 +164,8 @@ export async function runCfbModel(season: number, week: number, board: BoardGame
   const closes = await closesFor(season, all);
   const journal = await reviewIfDue(CFB_SECTION, season, week, CFB_MODEL_GATE, cfbCandidates(all, closes), now);
   const reviewed = journal.filter((j) => j.kind !== "registered").length;
-  return `college model: ${finals.length} finals rated, ${Object.keys(write).length} games saved, ${all.filter((g) => g.final).length}/${all.length} graded${reviewed ? `, review: ${journal.find((j) => j.kind === "review")?.text ?? `${reviewed} changes`}` : ""}`;
+  const text = `college model: ${finals.length} finals rated, ${Object.keys(write).length} games saved, ${all.filter((g) => g.final).length}/${all.length} graded${reviewed ? `, review: ${journal.find((j) => j.kind === "review")?.text ?? `${reviewed} changes`}` : ""}`;
+  return { text, ours };
 }
 
 export interface CfbModelView {

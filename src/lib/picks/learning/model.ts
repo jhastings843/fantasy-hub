@@ -27,7 +27,7 @@
 
 import { MAX_KELLY_SCALE, MAX_STAKE, MIN_PRIOR_GAMES, MIN_STAKE } from "../limits";
 import { BASELINE_POLICY, SU_DEFAULT, envelopeViolations, sourceState, suInForce, type PicksPolicy, type Source, type SourceState, type StakingPolicy } from "../policy";
-import { type TotalsTest, gradeTotal, readTotal, totalsCuts, totalsMatches } from "../totals";
+import { type TotalsTest, gradeTotal, readTotal, sideFor, totalsCuts, totalsMatches } from "../totals";
 import { type CutTest, type Result, STEPPABLE, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
 import type { IssuedRecord } from "../issued";
@@ -521,23 +521,28 @@ export const SU_METHODS = [
   { id: "sam", label: "Sam's winner" },
   { id: "david", label: "David's winner" },
   { id: "vegas", label: "Vegas favorite" },
+  // Our own model's projected winner (NFL spread model, college model); from 2026-10-28.
+  { id: "ours", label: "Our model's winner" },
 ] as const;
 
 /** A totals cut at one snapshot, 1u risked at the quoted over/under price. */
 export function scoreTotal(test: TotalsTest, s: ForecastSnapshot, o: Opportunity): Scored {
   const line = s.ref?.total;
-  if (line === undefined || s.samTotal === undefined || s.davidTotal === undefined || !o.final) return none;
-  const r = readTotal(line, s.samTotal, s.davidTotal);
-  if (!totalsMatches(r, test) || !r.side) return none;
-  const price = r.side === "over" ? s.ref?.overPrice : s.ref?.underPrice;
+  if (line === undefined || !o.final) return none;
+  // Our model's cut needs only our total; every other cut needs both models'.
+  if (test.ours ? s.ours?.total === undefined : s.samTotal === undefined || s.davidTotal === undefined) return none;
+  const r = readTotal(line, s.samTotal, s.davidTotal, s.ours?.total);
+  const side = sideFor(r, test);
+  if (!totalsMatches(r, test) || !side) return none;
+  const price = side === "over" ? s.ref?.overPrice : s.ref?.underPrice;
   if (price === undefined) return none;
-  const result = gradeTotal(o.final.home + o.final.away, line, r.side);
+  const result = gradeTotal(o.final.home + o.final.away, line, side);
   return { bet: true, units: payout(result, 1, price), risked: 1, result };
 }
 
 /** A straight-up method's call at the last pregame snapshot: +1 right, -1 wrong (pool scoring), nothing on a tie. */
 export function scoreSu(method: string, o: Opportunity): Scored {
-  const p = suPick(method, o.last.sam, o.last.david, o.last.ref?.line);
+  const p = suPick(method, o.last.sam, o.last.david, o.last.ref?.line, o.last.ours?.model);
   if (!p || !o.final || o.final.home === o.final.away) return none;
   const right = (p.side === "home") === o.final.home > o.final.away;
   return { bet: true, units: right ? 1 : -1, risked: 1, result: right ? "W" : "L" };
@@ -679,7 +684,7 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       // Accuracy and confidence-pool points (rank by margin within the week), challenger vs incumbent method.
       const pts = (method: string, os: Opportunity[]) => {
         const picks = os.flatMap((o) => {
-          const p = suPick(method, o.last.sam, o.last.david, o.last.ref?.line);
+          const p = suPick(method, o.last.sam, o.last.david, o.last.ref?.line, o.last.ours?.model);
           return p && o.final && o.final.home !== o.final.away ? [{ o, ...p, right: (p.side === "home") === o.final.home > o.final.away }] : [];
         });
         let points = 0;

@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 // live, what is collecting, when it last reviewed. Read-only.
 
 const seasonOf = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
-const SU_LABEL: { [k: string]: string } = { avg: "models' average", sam: "Sam's winner", david: "David's winner", vegas: "Vegas favorite" };
+const SU_LABEL: { [k: string]: string } = { avg: "models' average", sam: "Sam's winner", david: "David's winner", vegas: "Vegas favorite", ours: "our model's winner" };
 
 interface Row {
   name: string;

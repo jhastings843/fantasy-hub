@@ -97,3 +97,30 @@ describe("totalsMiss (tiebreak check)", () => {
     expect(totalsMiss([]).games).toBe(0);
   });
 });
+
+describe("our model's side of the total (t-ours)", () => {
+  const ours = totalsCuts("nfl").find((c) => c.id === "t-ours")!;
+  it("reads our side regardless of Sam and David", () => {
+    const r = readTotal(45, 47, 43, 48);
+    expect(r.agree).toBe(false);
+    expect(r.oursSide).toBe("over");
+    expect(readTotal(45, 47, 48).oursSide).toBeUndefined();
+  });
+  it("grades the t-ours cut on archived rows that carry our total, and skips rows without one", () => {
+    const k = (g: { week: number; home: string; away: string }) => key(g);
+    const seen: TotalsSeen[] = [
+      { week: 9, home: "KC", away: "BUF", sam: 40, david: 41, line: 45, source: "DK", seenAt: "x", ours: 48 },
+      { week: 9, home: "NE", away: "MIA", sam: 50, david: 51, line: 45, source: "DK", seenAt: "x" },
+    ];
+    const finals = new Map([[k(seen[0]), 51], [k(seen[1]), 30]]);
+    const bt = totalsBacktest("nfl", seen, finals, [], new Map(), k);
+    expect(bt.cuts.find((c) => c.id === "t-ours")).toMatchObject({ games: 1, record: expect.objectContaining({ w: 1, l: 0 }) });
+  });
+  it("once promoted, our side is the board's play even when the models split", () => {
+    const ref = { total: 45, source: "DK", fetchedAt: "x", overPrice: -110, underPrice: -110 };
+    const [g] = totalsBoard([{ home: "KC", away: "BUF", sam: 47, david: 43, ours: 41, ref }], ours);
+    expect(g).toMatchObject({ tier: "t1", side: "under", play: "Under 45" });
+    const [h] = totalsBoard([{ home: "KC", away: "BUF", sam: 47, david: 48, ours: 41, ref }], null);
+    expect(h).toMatchObject({ tier: "lean", side: "over" });
+  });
+});

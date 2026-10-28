@@ -6,6 +6,7 @@ import NFL_PROPS from "@/lib/models/nfl/params.json";
 import NFL_FTD from "@/lib/models/nfl/ftd-params.json";
 import NFL_ATTD from "@/lib/models/nfl/attd-params.json";
 import NFL_SPREAD from "@/lib/models/nfl/spread-params.json";
+import NFL_TOTALS from "@/lib/models/nfl/totals-params.json";
 import { MODEL_KEYS, type ModelKey, checkParams, saveParams, storedParams } from "@/lib/models/params-store";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 const DEFAULTS: Record<ModelKey, Record<string, unknown>> = {
   "nba-props": NBA_PROPS, "nba-fb": NBA_FB, "nba-game": NBA_GAME, "nba-kotc": KOTC,
-  "nfl-props": NFL_PROPS, "nfl-ftd": NFL_FTD, "nfl-attd": NFL_ATTD, "nfl-spread": NFL_SPREAD,
+  "nfl-props": NFL_PROPS, "nfl-ftd": NFL_FTD, "nfl-attd": NFL_ATTD, "nfl-spread": NFL_SPREAD, "nfl-totals": NFL_TOTALS,
 };
 
 const authed = (r: Request) => !!process.env.CRON_SECRET && r.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;

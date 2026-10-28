@@ -30,6 +30,7 @@ import { harrisWeeks } from "./harris";
 import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
 import { archiveForecasts, loadForecasts } from "./forecasts";
+import { latestOurs, oursSuRecord } from "./ours";
 import { ourSpreadLines, type OurLine } from "@/lib/models/nfl/spread-live";
 import { runCfbModel } from "@/lib/models/cfb/store";
 import { fetchSplits } from "./splits-feed";
@@ -306,6 +307,12 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // Last week as the board had it, so its games grade from ESPN finals
   // before the sites post their records (Tuesday's rule needs all of it).
   const snaps = await loadForecasts(league, season);
+  // Our own model's latest pregame read per game (forecasts.ts `ours`), for this week's rows and its straight-up record.
+  const oursLast = latestOurs(snaps);
+  if (week) for (const r of rows) {
+    const o = oursLast.get(key({ week, home: r.home, away: r.away }));
+    if (o) r.ours = { spread: o.model, ...(o.total !== undefined ? { total: o.total } : {}), ...(o.homeWin !== undefined ? { homeWin: o.homeWin } : {}) };
+  }
   const lastRows = week ? rowsFromForecasts(snaps, week - 1) : [];
   const lastWeek = week ? lastRows.map((r) => ({ week: week - 1, home: r.home, away: r.away })) : [];
   const { closes, problems: closeProblems } = await closingLines(league, season, [...j.graded, ...issuedGames(issued), ...seen, ...sam, ...lastWeek, ...thisWeek]);
@@ -359,6 +366,8 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // Straight up uses the method in force (policy.suInForce), which only the
   // strategy review changes, on games after registration; not this season's best record.
   const suAll = suRecords(league, j.graded);
+  // Our model's winner, graded on every game with a saved read before kickoff (from 2026-10-21 NFL, 2026-10-28 college).
+  suAll.methods.push(oursSuRecord(oursLast, finals));
   const su = { ...suAll, best: suAll.methods.find((m) => m.id === suInForce(policy, league)) ?? suAll.best };
   const rule = s.rule;
   const points = new Map([...finals].map(([k, f]) => [k, f.home + f.away]));
@@ -576,21 +585,24 @@ export async function runPicksData(league: League): Promise<string> {
     const feed = await fetchSplits(league);
     const priced = r.board.filter((g) => g.basis === "reference" && g.ref);
     splitsMatched = `${priced.filter((g) => matchSplits({ home: g.home, away: g.away, kickoff: g.ref?.kickoff, line: g.ref?.line }, feed)).length}/${priced.length}`;
-    // Our own NFL spread model rides along, tracked only; a failure never stops the archive.
-    const ours =
-      league === "nfl"
-        ? await ourSpreadLines(r.season, priced.map((g) => ({ home: g.home, away: g.away, line: g.ref!.line }))).catch(() => new Map<string, OurLine>())
-        : new Map<string, OurLine>();
+    // Our own models ride along, tracked only; a failure never stops the archive.
+    // NFL: spread model plus projected total. College: its own model (also
+    // tracked and learning on its own), run first so the archive gets its projections.
+    let ours = new Map<string, OurLine>();
+    if (league === "nfl") ours = await ourSpreadLines(r.season, priced.map((g) => ({ home: g.home, away: g.away, line: g.ref!.line }))).catch(() => new Map<string, OurLine>());
+    else {
+      const got = await runCfbModel(r.season, r.week, r.board, feed).catch((e) => ({ text: `college model failed: ${e instanceof Error ? e.message : String(e)}`, ours: new Map<string, OurLine>() }));
+      cfbModel = got.text;
+      ours = got.ours;
+    }
     forecasts = await archiveForecasts(league, r.season, r.week, r.board, core.rows, feed, ours);
     const meet: TotalsSeen[] = r.totals.board.flatMap((g) =>
       g.sam !== undefined && g.david !== undefined && g.ref
-        ? [{ week: r.week as number, home: g.home, away: g.away, sam: g.sam, david: g.david, line: g.ref.total, source: g.ref.source, seenAt: g.ref.fetchedAt }]
+        ? [{ week: r.week as number, home: g.home, away: g.away, sam: g.sam, david: g.david, line: g.ref.total, source: g.ref.source, seenAt: g.ref.fetchedAt, ...(ours.get(`${g.home}|${g.away}`)?.total !== undefined ? { ours: ours.get(`${g.home}|${g.away}`)!.total } : {}) }]
         : [],
     );
     totalsNew = await archiveTotals(league, r.season, r.week, meet).catch(() => 0);
     if (r.board.length) await saveSnapshot(league, r.season, r.week, r.board, r.strategies.rule?.label ?? null);
-    // Our college model rides along the same way: tracked and learning, never staked; a failure never stops the archive.
-    if (league === "cfb") cfbModel = await runCfbModel(r.season, r.week, r.board, feed).catch((e) => `college model failed: ${e instanceof Error ? e.message : String(e)}`);
   }
   return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${splitsMatched} with splits, ${totalsNew} totals archived, ${settled} issued games final${cfbModel ? `; ${cfbModel}` : ""}`;
 }

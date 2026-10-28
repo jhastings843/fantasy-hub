@@ -28,7 +28,7 @@ export interface ForecastSnapshot {
   splits?: Splits;
   /** Set when a field was filled in after the fact (why). College Week 8 2026: David's line, lost to his page redesign. */
   backfilled?: string;
-  /** Our own NFL spread model at this read (lib/models/nfl/spread.ts), tracked only. From 2026-10-21. */
+  /** Our own model at this read, tracked only: NFL spread model (lib/models/nfl/spread.ts) from 2026-10-21; projected total and win chance, and college (lib/models/cfb), from 2026-10-28. */
   ours?: OurLine;
 }
 
@@ -47,6 +47,8 @@ export function fingerprint(s: Omit<ForecastSnapshot, "at">): string {
     // Our NFL line, to a tenth (it moves with the reference line, and when a final changes the ratings).
     // Only present when ours is, so fingerprints saved before it existed still match for other leagues.
     ...(s.ours ? [Math.round(s.ours.model * 10) / 10] : []),
+    // Our projected total, to a tenth, once lines carry one (2026-10-28).
+    ...(s.ours?.total !== undefined ? [Math.round(s.ours.total * 10) / 10] : []),
   ]);
 }
 

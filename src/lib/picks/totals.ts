@@ -21,6 +21,11 @@
 // refinement on games after it registered (learning/model.ts "totals-cut"). Cut thresholds were fixed before
 // any grading: both models at least 3 points off the total in the NFL (a
 // field goal) and 5 in college, where totals run higher and swing wider.
+//
+// "t-ours" (2026-10-28): our own model's side of the total (NFL points
+// ratings, lib/models/nfl/totals.ts; college lib/models/cfb), judged against
+// both models agreeing like any refinement. Its rows need our total, saved
+// with each read from 2026-10-28, so its sample starts then.
 
 import type { League } from "./parse";
 import { BREAK_EVEN, MIN_SAMPLE, type Record, type Result, decided, tally } from "./engine";
@@ -37,12 +42,14 @@ export interface TotalsRead {
   minEdge: number;
   /** |average model total - line|. */
   avgEdge: number;
+  /** Our own model's side, when our total is on file and off the number. */
+  oursSide?: OU;
 }
 
 const sideOf = (model: number | undefined, line: number): OU | undefined =>
   model === undefined || model === line ? undefined : model > line ? "over" : "under";
 
-export function readTotal(line: number, sam?: number, david?: number): TotalsRead {
+export function readTotal(line: number, sam?: number, david?: number, ours?: number): TotalsRead {
   const samSide = sideOf(sam, line);
   const davidSide = sideOf(david, line);
   const agree = !!samSide && samSide === davidSide;
@@ -54,6 +61,7 @@ export function readTotal(line: number, sam?: number, david?: number): TotalsRea
     side: agree ? samSide : undefined,
     minEdge: sam !== undefined && david !== undefined ? Math.min(Math.abs(sam - line), Math.abs(david - line)) : 0,
     avgEdge: ms.length ? Math.abs(ms.reduce((a, b) => a + b, 0) / ms.length - line) : 0,
+    ...(sideOf(ours, line) ? { oursSide: sideOf(ours, line) } : {}),
   };
 }
 
@@ -71,6 +79,8 @@ export function clvTotal(side: OU, line: number, close: number): number {
 export interface TotalsTest {
   side?: OU;
   minBothEdge?: number;
+  /** Our own model's side, regardless of Sam and David. */
+  ours?: boolean;
 }
 
 export interface TotalsCut {
@@ -88,10 +98,15 @@ export function totalsCuts(league: League): TotalsCut[] {
     { id: "t-over", label: "Both agree on the over", test: { side: "over" } },
     { id: "t-under", label: "Both agree on the under", test: { side: "under" } },
     { id: `t-both-${e}`, label: `Both ${e}+ off the total`, test: { minBothEdge: e } },
+    { id: "t-ours", label: "Our model's side of the total", test: { ours: true } },
   ];
 }
 
+/** The side a cut bets: our model's for "t-ours", else the models' agreed side. */
+export const sideFor = (r: TotalsRead, t: TotalsTest): OU | undefined => (t.ours ? r.oursSide : r.side);
+
 export function totalsMatches(r: TotalsRead, t: TotalsTest): boolean {
+  if (t.ours) return !!r.oursSide && (!t.side || r.oursSide === t.side);
   if (!r.agree || !r.side) return false;
   if (t.side && r.side !== t.side) return false;
   if (t.minBothEdge !== undefined && r.minEdge < t.minBothEdge) return false;
@@ -111,6 +126,8 @@ export interface TotalsSeen {
   line: number;
   source: string;
   seenAt: string;
+  /** Our own model's total at that read (from 2026-10-28). */
+  ours?: number;
 }
 
 export interface TotalsCutResult extends TotalsCut {
@@ -161,8 +178,8 @@ export function totalsBacktest(
 ): TotalsBacktest {
   const graded = seen.filter((g) => finals.has(keyOf(g)));
   const cuts = totalsCuts(league).map((cut) => {
-    const hits = graded.filter((g) => totalsMatches(readTotal(g.line, g.sam, g.david), cut.test));
-    const results = hits.map((g) => gradeTotal(finals.get(keyOf(g))!, g.line, readTotal(g.line, g.sam, g.david).side!));
+    const hits = graded.filter((g) => totalsMatches(readTotal(g.line, g.sam, g.david, g.ours), cut.test));
+    const results = hits.map((g) => gradeTotal(finals.get(keyOf(g))!, g.line, sideFor(readTotal(g.line, g.sam, g.david, g.ours), cut.test)!));
     return { ...cut, record: tally(results), games: hits.length, weeks: [...new Set(hits.map((g) => g.week))].sort((a, b) => a - b) };
   });
   const rule =
@@ -214,6 +231,8 @@ export interface TotalsBoardGame {
   away: string;
   sam?: number;
   david?: number;
+  /** Our own model's projected total (tracked; the play only if "t-ours" is the rule). */
+  ours?: number;
   /** The one current total every model is judged at. */
   ref?: TotalsRef;
   read?: TotalsRead;
@@ -249,13 +268,18 @@ export interface TotalsRef {
 }
 
 export function totalsBoard(
-  rows: { home: string; away: string; sam?: number; david?: number; ref?: TotalsRef }[],
+  rows: { home: string; away: string; sam?: number; david?: number; ours?: number; ref?: TotalsRef }[],
   rule: TotalsCut | null,
 ): TotalsBoardGame[] {
   return rows.map((row) => {
     if (!row.ref) return { ...row, tier: "noline" };
+    // Our model as the rule (only once the strategy review promoted "t-ours"): its side is the play, whatever Sam and David say.
+    if (rule?.test.ours) {
+      const r = readTotal(row.ref.total, row.sam, row.david, row.ours);
+      if (totalsMatches(r, rule.test) && r.oursSide) return { ...row, read: r, play: `${r.oursSide === "over" ? "Over" : "Under"} ${row.ref.total}`, side: r.oursSide, line: row.ref.total, tier: "t1" };
+    }
     if (row.sam === undefined || row.david === undefined) return { ...row, tier: "one" };
-    const r = readTotal(row.ref.total, row.sam, row.david);
+    const r = readTotal(row.ref.total, row.sam, row.david, row.ours);
     if (!r.agree || !r.side) return { ...row, read: r, tier: "split" };
     const play = `${r.side === "over" ? "Over" : "Under"} ${row.ref.total}`;
     const base = { ...row, read: r, play, side: r.side, line: row.ref.total };

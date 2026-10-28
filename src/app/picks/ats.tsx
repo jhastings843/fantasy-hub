@@ -7,7 +7,7 @@ import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import Link from "next/link";
 import { bookOf, priceWithBook } from "@/lib/picks/shop";
-import { GameCell, StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
+import { GameCell, StrategyRow, TierChip, drawdown, href, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
@@ -459,10 +459,10 @@ function Finished({ games, r }: { games: BoardGame[]; r: PicksReport }) {
   return (
     <div className={s.finished} aria-labelledby="ats-finished">
       <div className={s.finHead}>
-        <h3 className={s.h3} id="ats-finished">{`Finished (${games.length})`}</h3>
+        <h3 className={s.h3} id="ats-finished">{`This week, game by game (${games.length} final)`}</h3>
         {parts.length > 0 && <span className={`${s.num} ${s.finTally}`}>{parts.join(" · ")}</span>}
       </div>
-      <p className={s.notice}>Graded from the final score the day each game ends, each model at its own line. These count toward the rule at the review next Tuesday, not before. Clears when the week turns over Tuesday morning.</p>
+      <p className={s.notice}>Graded from the final score the day each game ends, each model at its own line. Open a game for how each model did. These count toward the rule at the next review.</p>
       <ul className={s.finList}>
         {games.map((g) => (
           <FinishedRow key={`${g.away}@${g.home}`} g={g} r={r} />
@@ -527,7 +527,7 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
     <section className={s.section} aria-labelledby="ats-week">
       <SecHead id="ats-week" title="Spreads" aside={`${title} · started games first`} />
       {sub && <p className={s.p}>{sub}</p>}
-      {all.length > 0 ? (
+      {open.length > 0 ? (
         <div className={s.section}>
           <ReadLegend />
           <div className={s.gtable}>
@@ -539,19 +539,31 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
               <span>Read</span>
               <span />
             </div>
-            {[...started, ...upcoming, ...justEnded, ...finished].map((g) => (
+            {[...started, ...upcoming, ...justEnded].map((g) => (
               <LedgerRow key={`${g.away}@${g.home}`} g={g} r={r} live={findGame(live, r.league, g.away, g.home)} />
             ))}
           </div>
-          <p className={s.p}>{`Started games first, then by kickoff${finished.length ? `; ${finished.length} final at the bottom` : ""}. Home spread throughout. Open a game for every reason.`}</p>
+          <p className={s.p}>
+            {`Started games first, then by kickoff. Home spread throughout. Open a game for every reason.`}
+            {finished.length > 0 && (
+              <>
+                {` ${finished.length} final this week: `}
+                <Link href={href(r.league, "ats", "results")} className={s.linkA}>see Results</Link>.
+              </>
+            )}
+          </p>
           {near.length + best.length > 0 && <MarketKey pem={r.league === "cfb"} />}
         </div>
+      ) : finished.length > 0 ? (
+        <p className={s.calm}>
+          {`Every game this week is final. `}
+          <Link href={href(r.league, "ats", "results")} className={s.linkA}>See them game by game in Results</Link>.
+        </p>
       ) : (
         <p className={s.calm}>No games on the board yet.</p>
       )}
       <Background>
         <p className={s.p}>{ruleSetLine(r)}</p>
-        {finished.length > 0 && <Finished games={finished} r={r} />}
       </Background>
     </section>
   );
@@ -645,6 +657,8 @@ export function AtsResults({ r }: { r: PicksReport }) {
   const dd = drawdown(weeks.map((w) => w.units));
   const parlays = u.byTier.parlays;
   const clvSent = r.clv.plays.filter((x) => x.id !== "ou");
+  // This week's finals move off the board to here (Jack, 2026-10-27: the board shows what is still to play).
+  const finishedThisWeek = r.board.filter((g) => statusOf(g) === "final").sort((a, b) => (a.ref?.kickoff ?? a.lastRef?.kickoff ?? "").localeCompare(b.ref?.kickoff ?? b.lastRef?.kickoff ?? ""));
   return (
     <section className={s.section} aria-labelledby="ats-results">
       <Hero
@@ -690,6 +704,7 @@ export function AtsResults({ r }: { r: PicksReport }) {
       </div>
       {parlays.bets > 0 && <p className={s.thin}>{`Parlays are their own record: ${rec(parlays)}, ${units(parlays.units)}${parlays.pending ? `, ${parlays.pending} pending` : ""}. Not in the spread numbers above.`}</p>}
       {u.unstaked > 0 && <p className={s.thin}>{`${u.unstaked} earlier plays went out before stakes existed: in the win-loss record below, not in units.`}</p>}
+      {finishedThisWeek.length > 0 && <Finished games={finishedThisWeek} r={r} />}
       <WeekBets r={r} kind="spread" />
       <div className={s.tw}>
         <table className={s.table}>

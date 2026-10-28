@@ -178,7 +178,7 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
   const method = r.su.best?.id ?? "avg";
   const su = r.board
     .flatMap((g) => {
-      const p = suPick(method, g.sam, g.david, g.ref?.line);
+      const p = suPick(method, g.sam, g.david, g.ref?.line, g.ours?.spread);
       return p ? [{ g, ...p, band: marginLabel(r.league, marginBand(r.league, p.margin)) }] : [];
     })
     .sort((x, y) => y.margin - x.margin);

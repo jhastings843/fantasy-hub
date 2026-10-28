@@ -26,6 +26,7 @@ import { type TotalsBacktest, type TotalsBoardGame, totalsBoard } from "./totals
 import {
   type BoardGame,
   type GradedGame,
+  type OursRead,
   type PemLine,
   type RefLine,
   type StrategyBoard,
@@ -48,6 +49,8 @@ export interface CoreRow {
   harris?: number;
   samTotal?: number;
   davidTotal?: number;
+  /** Our own model's latest saved read on this game (tracked only; straight up and totals use it once promoted). */
+  ours?: OursRead;
 }
 
 /** Everything slow, cached for hours. */
@@ -189,6 +192,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
       away: r.away,
       sam: r.samTotal,
       david: r.davidTotal,
+      ours: r.ours?.total,
       ref:
         r.ref?.total !== undefined
           ? { total: r.ref.total, source: r.ref.source, fetchedAt: r.ref.fetchedAt, overPrice: r.ref.overPrice, underPrice: r.ref.underPrice, kickoff: r.ref.kickoff, ...(r.ref.shop ? { shop: { over: r.ref.shop.over, under: r.ref.shop.under } } : {}) }

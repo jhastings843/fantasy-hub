@@ -556,6 +556,15 @@ export interface RefLine {
   };
 }
 
+/** Our own model's projected score for a game, from its latest saved read (forecasts.ts `ours`). */
+export interface OursRead {
+  /** Home spread, negative = home favored. */
+  spread: number;
+  total?: number;
+  /** Home win chance, 0-1. */
+  homeWin?: number;
+}
+
 export interface BoardGame {
   home: string;
   away: string;
@@ -582,6 +591,8 @@ export interface BoardGame {
   homeLine?: number;
   /** Straight-up call, by the selected method. */
   su?: StraightUp;
+  /** Our own model's latest read on the game (tracked only). */
+  ours?: OursRead;
   pem?: PemLine;
   /** The play is PEM's side of a Sam/David split. */
   pemPick?: boolean;
@@ -643,7 +654,7 @@ function withoutPem(t: CutTest): CutTest {
 
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; lastRef?: RefLine; started?: boolean }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; lastRef?: RefLine; started?: boolean; ours?: OursRead }[],
   s: StrategyBoard,
   suMethod = "avg",
   /** Sources the strategy review made vetoes (policy source "veto"): a rule bet one disagrees with is skipped. */
@@ -654,7 +665,7 @@ export function tierBoard(
     const basis: BoardGame["basis"] = row.started ? "started" : row.ref ? "reference" : "source";
     // The line the models are judged at: the live quote, or for a started game its last one.
     const atRef = row.ref ?? row.lastRef;
-    const su = straightUp(row.sam, row.david, league, suMethod, atRef?.line);
+    const su = straightUp(row.sam, row.david, league, suMethod, atRef?.line, row.ours?.spread);
     const team = (side: "home" | "away") => (side === "home" ? row.home : row.away);
     if (!row.sam || !row.david) {
       const only = row.sam ? "Sam" : "David";
@@ -753,8 +764,9 @@ export function straightUp(
   league: "nfl" | "cfb" = "nfl",
   method = "avg",
   ref?: number,
+  ours?: number,
 ): StraightUp | undefined {
-  const p = suPick(method, sam, david, ref);
+  const p = suPick(method, sam, david, ref, ours);
   if (!p) return undefined;
   const ms = [sam, david].filter((m): m is ModelLine => !!m);
   const mkt = ref ?? ms.reduce((t, m) => t + m.market, 0) / ms.length;
@@ -874,7 +886,10 @@ export function suPick(
   sam: ModelLine | undefined,
   david: ModelLine | undefined,
   ref?: number,
+  /** Our own model's home spread (method "ours"); a game without one falls back to the models' average. */
+  ours?: number,
 ): { side: "home" | "away"; margin: number } | null {
+  if (method === "ours" && ours !== undefined && ours !== 0) return { side: ours < 0 ? "home" : "away", margin: Math.abs(ours) };
   const ms = [sam, david].filter((m): m is ModelLine => !!m);
   if (!ms.length) return null;
   const avg = (f: (m: ModelLine) => number) => ms.reduce((t, m) => t + f(m), 0) / ms.length;

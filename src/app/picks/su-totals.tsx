@@ -4,7 +4,8 @@ import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
 import { TeamLogo } from "@/components/TeamLogo";
-import { GameCell, kickoffEt, price, rec, units } from "./ui";
+import Link from "next/link";
+import { GameCell, href, kickoffEt, price, rec, units } from "./ui";
 import { priceWithBook } from "@/lib/picks/shop";
 import { Background, CutRanges, Hero, SecHead } from "./board";
 import { ReadLegend, WeekBets } from "./ats";
@@ -21,12 +22,26 @@ function SuSub({ text }: { text: string }) {
   return <p className={s.p}>{text}</p>;
 }
 
-export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entries: number; shares: Record<string, number> } | null }) {
+/**
+ * The straight-up board. Finished games live on Results (Jack, 2026-10-27:
+ * the board shows only what is still to play); `finishedOnly` renders just
+ * that game-by-game block for the Results view.
+ */
+/** " · ours: KC by 3.1, 61%": our model's projected winner and chance, tracked only. */
+const oursNote = (g: { home: string; away: string; ours?: { spread: number; homeWin?: number } }, name: (k: string) => string) => {
+  const o = g.ours;
+  if (!o || o.spread === 0) return "";
+  const home = o.spread < 0;
+  const chance = o.homeWin !== undefined ? `, ${Math.round((home ? o.homeWin : 1 - o.homeWin) * 100)}%` : "";
+  return ` · ours: ${name(home ? g.home : g.away)} by ${Math.abs(o.spread).toFixed(1)}${chance}`;
+};
+
+export function SuWeek({ r, poolShares, finishedOnly = false }: { r: PicksReport; poolShares?: { entries: number; shares: Record<string, number> } | null; finishedOnly?: boolean }) {
   const name = (k: string) => r.names[k] ?? k;
   const method = r.su.best?.id ?? "avg";
   const list = r.board
     .flatMap((g) => {
-      const p = suPick(method, g.sam, g.david, g.ref?.line);
+      const p = suPick(method, g.sam, g.david, g.ref?.line, g.ours?.spread);
       return p ? [{ g, ...p }] : [];
     })
     .sort((a, b) => b.margin - a.margin);
@@ -39,6 +54,43 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
   const doneW = done.filter((x) => won(x) === "W").length;
   const band = (margin: number) => marginBand(r.league, margin);
   const bandCls = (m: number) => (band(m) === "wide" ? s.readTrack : band(m) === "clear" ? "" : s.readPass);
+  const finishedBlock = done.length > 0 && (
+    <div className={s.finished}>
+      <div className={s.finHead}>
+        <h3 className={s.h3}>{`This week, game by game (${done.length} final)`}</h3>
+        <span className={`${s.num} ${s.finTally}`}>{`Picks ${doneW}-${done.length - doneW}`}</span>
+      </div>
+      <ul className={s.finList}>
+        {done.map((x) => {
+          const f = x.g.final!;
+          const res = won(x);
+          return (
+            <li key={`${x.g.away}@${x.g.home}`} className={s.finRow}>
+              <div className={s.finScore}>
+                <span className={f.away > f.home ? s.finWinner : undefined}>{`${name(x.g.away)} ${f.away}`}</span>
+                <span className={s.muted}> at </span>
+                <span className={f.home > f.away ? s.finWinner : undefined}>{`${name(x.g.home)} ${f.home}`}</span>
+              </div>
+              <div className={s.finCall}>
+                <span className={s.finPick}>{`${name(x.side === "home" ? x.g.home : x.g.away)} to win`}</span>
+                <span className={`${s.resChip} ${res === "W" ? s.resW : res === "L" ? s.resL : s.resP}`}>{res}</span>
+              </div>
+              {(() => {
+                if (!poolShares || f.home === f.away) return null;
+                const winner = f.home > f.away ? x.g.home : x.g.away;
+                const loser = winner === x.g.home ? x.g.away : x.g.home;
+                const shareOf = (t: string) => poolShares.shares[POOL_CANON[t.toUpperCase()] ?? t.toUpperCase()];
+                // A team nobody picked isn't in the counts: its share is what the other side left.
+                const share = shareOf(winner) ?? (shareOf(loser) !== undefined ? 1 - shareOf(loser)! : undefined);
+                return share === undefined ? null : <div className={s.thin}>{`${Math.round(share * 100)}% of the pool had ${name(winner)}`}</div>;
+              })()}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+  if (finishedOnly) return finishedBlock || null;
   return (
     <section className={s.section} aria-labelledby="su-week">
       <SecHead id="su-week" title="Straight up" aside={upcoming.length ? "Who wins, surest first" : done.length ? "Every game played" : "No games on the board yet"} />
@@ -71,7 +123,7 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
                       </span>
                       <span className={s.matchWhen} style={{ whiteSpace: "normal" }}>{`${live ? "In progress" : `${kickoffEt(g.ref?.kickoff)}${g.ref?.tv ? ` · ${g.ref.tv}` : ""}`}${
                         g.sam && g.david && Math.sign(g.sam.model) !== Math.sign(g.david.model) ? ` · split: Sam ${name(g.sam.model < 0 ? g.home : g.away)}, David ${name(g.david.model < 0 ? g.home : g.away)}` : ""
-                      }${share !== undefined ? ` · ${Math.round(share * 100)}% of the pool on ${name(pick)}` : ""}`}</span>
+                      }${share !== undefined ? ` · ${Math.round(share * 100)}% of the pool on ${name(pick)}` : ""}${oursNote(g, name)}`}</span>
                     </span>
                     <span className={`${s.readChip} ${bandCls(margin)}`}>{`${marginLabel(r.league, band(margin))} · ${margin.toFixed(1)}`}</span>
                   </div>
@@ -84,43 +136,12 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
       ) : (
         !done.length && <p className={s.calm}>No games on the board yet.</p>
       )}
+
       {done.length > 0 && (
-        <div className={s.finished}>
-          <div className={s.finHead}>
-            <h3 className={s.h3}>{`Finished (${done.length})`}</h3>
-            <span className={`${s.num} ${s.finTally}`}>{`Picks ${doneW}-${done.length - doneW}`}</span>
-          </div>
-          <ul className={s.finList}>
-            {done.map((x) => {
-              const f = x.g.final!;
-              const res = won(x);
-              return (
-                <li key={`${x.g.away}@${x.g.home}`} className={s.finRow}>
-                  <div className={s.finScore}>
-                    <span className={f.away > f.home ? s.finWinner : undefined}>{`${name(x.g.away)} ${f.away}`}</span>
-                    <span className={s.muted}> at </span>
-                    <span className={f.home > f.away ? s.finWinner : undefined}>{`${name(x.g.home)} ${f.home}`}</span>
-                  </div>
-                  <div className={s.finCall}>
-                    <span className={s.finPick}>{`${name(x.side === "home" ? x.g.home : x.g.away)} to win`}</span>
-                    <span className={`${s.resChip} ${res === "W" ? s.resW : res === "L" ? s.resL : s.resP}`}>{res}</span>
-                  </div>
-                  {(() => {
-                    if (!poolShares || f.home === f.away) return null;
-                    const winner = f.home > f.away ? x.g.home : x.g.away;
-                    const loser = winner === x.g.home ? x.g.away : x.g.home;
-                    const shareOf = (t: string) => poolShares.shares[POOL_CANON[t.toUpperCase()] ?? t.toUpperCase()];
-                    // A team nobody picked isn't in the counts: its share is what the other side left.
-                    const share = shareOf(winner) ?? (shareOf(loser) !== undefined ? 1 - shareOf(loser)! : undefined);
-                    return share === undefined ? null : (
-                      <div className={s.thin}>{`${Math.round(share * 100)}% of the pool had ${name(winner)}`}</div>
-                    );
-                  })()}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <p className={s.thin}>
+          {`${done.length} final this week (picks ${doneW}-${done.length - doneW}): `}
+          <Link href={href(r.league, "su", "results")} className={s.linkA}>see Results</Link>.
+        </p>
       )}
     </section>
   );
@@ -135,6 +156,7 @@ export function SuResults({ r, poolTrack }: { r: PicksReport; poolTrack?: PoolTr
         title={<span id="su-results">{total.w + total.l ? `${total.w}-${total.l} picking winners` : "No winners graded yet"}</span>}
         sub="Winners picked in the emails, as listed. Accuracy only: pick'em has no stake."
       />
+      <SuWeek r={r} finishedOnly />
       <div className={s.tiles}>
         <div className={s.tile}>
           <div className={`${s.tileV} ${s.num}`}>{total.w + total.l ? `${total.w}-${total.l}` : "none yet"}</div>
@@ -239,7 +261,8 @@ export function SuResearch({ r }: { r: PicksReport }) {
 
 // ------------------------------------------------------------------ totals
 
-export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] }) {
+/** The totals board; `finishedOnly` renders this week's finals, game by game, for the Results view. */
+export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksReport; live?: LiveGame[]; finishedOnly?: boolean }) {
   const t = r.totals;
   const name = (k: string) => r.names[k] ?? k;
   const order = { t1: 0, lean: 1, split: 2, one: 3, noline: 4 } as const;
@@ -265,6 +288,8 @@ export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[]
       <dd className={s.num}>{g.sam !== undefined ? g.sam.toFixed(1) : "not posted"}</dd>
       <dt>David total</dt>
       <dd className={s.num}>{g.david !== undefined ? g.david.toFixed(1) : "not posted"}</dd>
+      <dt>Our total</dt>
+      <dd className={s.num}>{g.ours !== undefined ? `${g.ours.toFixed(1)}${g.ref ? ` (${g.ours > g.ref.total ? "over" : g.ours < g.ref.total ? "under" : "on the number"}; tracked, no stake)` : ""}` : "not yet"}</dd>
       {g.p !== undefined && (
         <>
           <dt>Win chance</dt>
@@ -301,6 +326,86 @@ export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[]
     return { chip: ["No line", s.readPass] };
   };
   const title = bets.length ? `${bets.length} totals bet${bets.length === 1 ? "" : "s"} this week` : t.backtest.rule ? "No totals bets this week" : "Totals are tracking only";
+  const boardRows = finishedOnly ? done : [...games.filter((g) => startedOf.has(`${g.away}@${g.home}`) && !endedOf(g)), ...games.filter((g) => !startedOf.has(`${g.away}@${g.home}`)), ...games.filter(endedOf)];
+  const leanRec = (() => {
+    const rs = done.map(ouResult).filter(Boolean);
+    return `${rs.filter((x) => x === "W").length}-${rs.filter((x) => x === "L").length}${rs.some((x) => x === "P") ? `-${rs.filter((x) => x === "P").length}` : ""}`;
+  })();
+  const table = (
+    <div className={s.gtable}>
+      <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
+        <span>Game</span>
+        <span>Total</span>
+        <span>Sam · David · Ours</span>
+        <span>Lean</span>
+        <span>Read</span>
+        <span />
+      </div>
+      {boardRows.map((g) => {
+        const rd = readOf(g);
+        const f = finalOf.get(`${g.away}@${g.home}`);
+        const lg = liveOf(g);
+        const live = startedOf.has(`${g.away}@${g.home}`) && lg?.state !== "post";
+        return (
+          <details key={`${g.away}@${g.home}`} className={`${s.gRow} ${s.ledger}`}>
+            <summary>
+              <GameCell
+                league={r.league}
+                away={g.away}
+                home={g.home}
+                awayName={name(g.away)}
+                homeName={name(g.home)}
+                quote={(() => {
+                  const b = r.board.find((x) => x.away === g.away && x.home === g.home);
+                  return b?.ref ?? b?.lastRef ?? g.ref;
+                })()}
+                status={
+                  live ? (
+                    <>
+                      <span className={s.gLive}>Live</span>
+                      {lg && <span className={s.scoreLine}>{`${lg.away.score + lg.home.score} so far · ${lg.detail}`}</span>}
+                    </>
+                  ) : lg?.state === "post" && !f ? (
+                    `Final · ${lg.away.score + lg.home.score} scored`
+                  ) : f ? (
+                    `Final · ${f.home + f.away} scored`
+                  ) : undefined
+                }
+              />
+              <span className={s.gNum} data-k="Total">{g.ref?.total ?? "·"}</span>
+              <span className={s.gNum} data-k="Sam · David · Ours">
+                <span className={s.cSam}>{`Sam ${g.sam !== undefined ? g.sam.toFixed(1) : "·"}`}</span>
+                <span className={s.cDavid}>{`David ${g.david !== undefined ? g.david.toFixed(1) : "·"}`}</span>
+                {g.ours !== undefined && <span className={s.muted}>{`Ours ${g.ours.toFixed(1)}`}</span>}
+              </span>
+              <span className={s.gNum} data-k="Lean">
+                {g.side && g.ref ? `${ou(g.side)} ${g.ref.total}` : "None"}
+                {g.read && <small>{`${g.read.avgEdge.toFixed(1)} off`}</small>}
+              </span>
+              <span className={s.ledgerRead}>
+                <span className={`${s.readChip} ${rd.chip[1]}`}>{rd.chip[0]}</span>
+                {rd.note && <small>{rd.note}</small>}
+              </span>
+              <span className={s.chev} aria-hidden>
+                ›
+              </span>
+            </summary>
+            <div className={s.gBody}>{why(g)}</div>
+          </details>
+        );
+      })}
+    </div>
+  );
+  if (finishedOnly)
+    return done.length ? (
+      <div className={s.section}>
+        <div className={s.finHead}>
+          <h3 className={s.h3}>{`This week, game by game (${done.length} final)`}</h3>
+          <span className={`${s.num} ${s.finTally}`}>{`Leans ${leanRec}`}</span>
+        </div>
+        {table}
+      </div>
+    ) : null;
   return (
     <section className={s.section} aria-labelledby="ou-week">
       <SecHead id="ou-week" title="Totals" aside={`${title} · started games first`} />
@@ -311,73 +416,25 @@ export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[]
             : `No totals cut has 10+ decided games and a winning rate yet, so nothing here is a bet. ${t.backtest.archived} archived games graded so far.`
         }
       />
-      {all.length > 0 ? (
+      {boardRows.length > 0 ? (
         <div className={s.section}>
           <ReadLegend />
-          <div className={s.gtable}>
-            <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
-              <span>Game</span>
-              <span>Total</span>
-              <span>Sam · David</span>
-              <span>Lean</span>
-              <span>Read</span>
-              <span />
-            </div>
-            {[...games.filter((g) => startedOf.has(`${g.away}@${g.home}`) && !endedOf(g)), ...games.filter((g) => !startedOf.has(`${g.away}@${g.home}`)), ...games.filter(endedOf), ...done].map((g) => {
-              const rd = readOf(g);
-              const f = finalOf.get(`${g.away}@${g.home}`);
-              const lg = liveOf(g);
-              const live = startedOf.has(`${g.away}@${g.home}`) && lg?.state !== "post";
-              return (
-                <details key={`${g.away}@${g.home}`} className={`${s.gRow} ${s.ledger}`}>
-                  <summary>
-                    <GameCell
-                      league={r.league}
-                      away={g.away}
-                      home={g.home}
-                      awayName={name(g.away)}
-                      homeName={name(g.home)}
-                      quote={(() => {
-                        const b = r.board.find((x) => x.away === g.away && x.home === g.home);
-                        return b?.ref ?? b?.lastRef ?? g.ref;
-                      })()}
-                      status={
-                        live ? (
-                          <>
-                            <span className={s.gLive}>Live</span>
-                            {lg && <span className={s.scoreLine}>{`${lg.away.score + lg.home.score} so far · ${lg.detail}`}</span>}
-                          </>
-                        ) : lg?.state === "post" && !f ? (
-                          `Final · ${lg.away.score + lg.home.score} scored`
-                        ) : f ? (
-                          `Final · ${f.home + f.away} scored`
-                        ) : undefined
-                      }
-                    />
-                    <span className={s.gNum} data-k="Total">{g.ref?.total ?? "·"}</span>
-                    <span className={s.gNum} data-k="Sam · David">
-                      <span className={s.cSam}>{`Sam ${g.sam !== undefined ? g.sam.toFixed(1) : "·"}`}</span>
-                      <span className={s.cDavid}>{`David ${g.david !== undefined ? g.david.toFixed(1) : "·"}`}</span>
-                    </span>
-                    <span className={s.gNum} data-k="Lean">
-                      {g.side && g.ref ? `${ou(g.side)} ${g.ref.total}` : "None"}
-                      {g.read && <small>{`${g.read.avgEdge.toFixed(1)} off`}</small>}
-                    </span>
-                    <span className={s.ledgerRead}>
-                      <span className={`${s.readChip} ${rd.chip[1]}`}>{rd.chip[0]}</span>
-                      {rd.note && <small>{rd.note}</small>}
-                    </span>
-                    <span className={s.chev} aria-hidden>
-                      ›
-                    </span>
-                  </summary>
-                  <div className={s.gBody}>{why(g)}</div>
-                </details>
-              );
-            })}
-          </div>
-          <p className={s.p}>{`Started games first, then the strongest reads. ${bets.length ? "" : "Tracked, not bet, until a totals cut earns a rule."}`}</p>
+          {table}
+          <p className={s.p}>
+            {`Started games first, then the strongest reads. ${bets.length ? "" : "Tracked, not bet, until a totals cut earns a rule."}`}
+            {done.length > 0 && (
+              <>
+                {` ${done.length} final this week: `}
+                <Link href={href(r.league, "ou", "results")} className={s.linkA}>see Results</Link>.
+              </>
+            )}
+          </p>
         </div>
+      ) : done.length > 0 ? (
+        <p className={s.calm} data-first-pick>
+          {"Every game this week is final. "}
+          <Link href={href(r.league, "ou", "results")} className={s.linkA}>See them game by game in Results</Link>.
+        </p>
       ) : (
         <p className={s.calm} data-first-pick>No totals on the board yet.</p>
       )}
@@ -421,6 +478,7 @@ export function TotalsResults({ r }: { r: PicksReport }) {
           <div className={s.tileK}>{`vs closing total (${sent?.n ?? 0} with a close)`}</div>
         </div>
       </div>
+      <TotalsWeek r={r} finishedOnly />
       <WeekBets r={r} kind="total" />
     </section>
   );

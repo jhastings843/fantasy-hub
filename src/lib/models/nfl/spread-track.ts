@@ -55,6 +55,7 @@ export function signalsOf(s: ForecastSnapshot): TrackedGame["signals"] {
     out.push({ id: "lean", side, price: price(side) });
     if (Math.abs(res) >= STRONG) out.push({ id: "strong", side, price: price(side) });
   }
+  if (!o.x) return out;
   // move > 0: the line moved toward home beyond the market's own rating, so fade = away.
   if (Math.abs(o.x.move) >= MOVE) {
     const side = opp(o.x.move > 0 ? "home" : "away");

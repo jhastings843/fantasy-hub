@@ -3,15 +3,20 @@ import { parseCsv } from "./data";
 import { Ratings, residual, toSpreadGame, type Features, type SpreadGame, type SpreadParams } from "./spread";
 import type { ModelLine } from "@/lib/picks/parse";
 import PARAMS from "./spread-params.json";
+import TOTALS from "./totals-params.json";
+import { nflPoints, nflProjection, nflTotal, type NflTotalsParams } from "./totals";
 import { live, primeParams } from "@/lib/models/params-store";
 
 // Our NFL spread model, live (tracked only, Jack 2026-10-21: forward-test
 // it at early-week prices). For this week's games at the reference line
 // (DraftKings, home spread), our line = the reference line moved by the
 // predicted residual. Ratings come from nflverse's games file, every final
-// before now; nflverse's codes match the Picks abbreviations.
+// before now; nflverse's codes match the Picks abbreviations. Each line also
+// carries our projected total (points ratings, totals.ts) and the home win
+// chance, so totals and straight up can be judged as sources too.
 
 const P = live("nfl-spread", PARAMS as SpreadParams);
+const T = live("nfl-totals", TOTALS as NflTotalsParams);
 const GAMES = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv";
 
 let cache: { at: number; games: SpreadGame[] } | null = null;
@@ -26,8 +31,13 @@ async function games(): Promise<SpreadGame[]> {
   return out;
 }
 
-/** Our line and the features behind it (nflverse margin terms), so the tracker can test single signals too. */
-export type OurLine = ModelLine & { x: Features };
+/**
+ * Our line, and for NFL the features behind it (nflverse margin terms) so the
+ * tracker can test single signals too. `total` and `homeWin` are the projected
+ * total and home win chance (NFL from 2026-10-28; college from its own model,
+ * lib/models/cfb, which has no features).
+ */
+export type OurLine = ModelLine & { x?: Features; total?: number; homeWin?: number };
 
 /** Our line per game, keyed `${home}|${away}`. `line` is the home spread (negative = home favored). */
 export async function ourSpreadLines(season: number, want: { home: string; away: string; line: number }[]): Promise<Map<string, OurLine>> {
@@ -35,6 +45,7 @@ export async function ourSpreadLines(season: number, want: { home: string; away:
   const all = await games();
   const r = new Ratings(P.rating);
   for (const g of [...all].sort((a, b) => a.gameday.localeCompare(b.gameday) || a.id.localeCompare(b.id))) if (g.homeScore !== null) r.add(g);
+  const pts = nflPoints(all, T);
   const out = new Map<string, OurLine>();
   for (const w of want) {
     const g = all.find((x) => x.season === season && x.home === w.home && x.away === w.away && x.homeScore === null);
@@ -43,7 +54,9 @@ export async function ourSpreadLines(season: number, want: { home: string; away:
     const x = r.features(g, -w.line);
     const res = residual(x, P);
     const r2 = (v: number) => Math.round(v * 100) / 100;
-    out.set(`${w.home}|${w.away}`, { market: w.line, model: r2(w.line - res), x: { gap: r2(x.gap), move: r2(x.move), cover: r2(x.cover), rest: x.rest, qb: x.qb } });
+    const model = r2(w.line - res);
+    const proj = nflProjection(model, nflTotal(pts, g), T);
+    out.set(`${w.home}|${w.away}`, { market: w.line, model, x: { gap: r2(x.gap), move: r2(x.move), cover: r2(x.cover), rest: x.rest, qb: x.qb }, total: proj.total, homeWin: proj.homeWin });
   }
   return out;
 }

@@ -15,6 +15,7 @@ import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
 import { scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { PicksLog } from "./log";
+import { marketOf } from "./learning";
 import { redisStore } from "@/lib/picks/learning/store";
 import s from "./picks.module.css";
 
@@ -50,7 +51,8 @@ export default async function PicksView({ league, market: asked, view }: { leagu
   // Live scores only when a game on the board is under way (ESPN, free); the page then refreshes every 10 minutes.
   const anyLive = r?.board.some((g) => g.basis === "started" && !g.final) ?? false;
   const live = anyLive && view === "week" ? await scoreboard(league).catch(() => []) : [];
-  const testing = (review?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && d.verdict === "retain").length;
+  // Only this market's ideas, the same split the learner log uses (marketOf), so Totals never counts spread ideas.
+  const testing = (review?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && d.verdict === "retain" && marketOf(d.id) === market).length;
 
   if (!r) {
     return (
