@@ -160,7 +160,18 @@ describe("public betting and line moves (report only)", () => {
   // Sam -7, David -5 at KC -6: models split, so use both on KC -9 / -8 to make KC (home) the rule side.
   const ours = snap({ sam: { model: -9, market: -6 }, david: { model: -8, market: -6 } });
   const at = "2026-10-22T12:00:00Z";
-  const withSplits = (splits: ForecastSnapshot["splits"]) => opp({ home: 30, away: 20 }, { ...ours, splits });
+  const withSplits = (splits: ForecastSnapshot["splits"]) => ({ ...opp({ home: 30, away: 20 }, { ...ours, splits }), splitsRead: { ...ours, splits } });
+
+  it("reads splits only in the last 90 minutes before kickoff (2026-10-27)", async () => {
+    const { opportunities } = await import("./model");
+    const kick = "2026-10-25T17:00:00Z";
+    const read = (at: string, homeTickets: number) => ({ ...ours, at, splits: { homeTickets, homeMoney: homeTickets, at } });
+    const [early] = opportunities("nfl", [read("2026-10-25T13:00:00Z", 80)], new Map(), new Map());
+    expect(early.splitsRead).toBeUndefined();
+    const [late] = opportunities("nfl", [read("2026-10-25T13:00:00Z", 80), read("2026-10-25T16:15:00Z", 55), { ...ours, at: "2026-10-25T16:45:00Z" }], new Map(), new Map());
+    expect(late.splitsRead?.splits?.homeTickets).toBe(55);
+    expect(late.last.ref?.kickoff).toBe(kick);
+  });
 
   it("registers three report-only hypotheses per league", async () => {
     const { laterHypotheses: later } = await import("./model");

@@ -220,9 +220,21 @@ export interface Opportunity {
   key: string;
   first: ForecastSnapshot;
   last: ForecastSnapshot;
+  /** The last read with public splits inside SPLITS_WINDOW_MIN of kickoff, when there is one. */
+  splitsRead?: ForecastSnapshot;
   final?: { home: number; away: number };
   close?: number | null;
 }
+
+/**
+ * Splits count only when read in the last stretch before kickoff (Jack,
+ * 2026-10-27: most public money is in an hour to 30 minutes out). The pulse
+ * saves a read every 15 minutes on live windows and hourly otherwise, so 90
+ * minutes always holds at least one.
+ */
+export const SPLITS_WINDOW_MIN = 90;
+/** Flagged games a splits signal needs before it could change anything (Jack: track across 100 games). */
+export const SPLITS_MIN_GAMES = 100;
 
 // A snapshot counts only with a known kickoff it precedes: no kickoff, no
 // proof it was pregame.
@@ -243,7 +255,8 @@ export function opportunities(
   return [...by].map(([k, list]) => {
     const sorted = list.slice().sort((a, b) => a.at.localeCompare(b.at));
     const f = sorted[0];
-    return { league, week: f.week, home: f.home, away: f.away, key: k, first: f, last: sorted[sorted.length - 1], final: finals.get(k), close: closes.get(k) };
+    const splitsRead = sorted.filter((x) => x.splits && Date.parse(x.ref!.kickoff!) - Date.parse(x.at) <= SPLITS_WINDOW_MIN * 60_000).at(-1);
+    return { league, week: f.week, home: f.home, away: f.away, key: k, first: f, last: sorted[sorted.length - 1], ...(splitsRead ? { splitsRead } : {}), final: finals.get(k), close: closes.get(k) };
   });
 }
 
@@ -572,9 +585,9 @@ export const MARKET_FILTERS: { id: MarketFilter; label: string }[] = [
   { id: "sharp-against", label: "Sharp money against our side (money 10+ points over tickets): does skipping those rule bets gain?" },
 ];
 
-/** True when the filter says skip this bet, judged at the last pregame snapshot that carried splits. */
+/** True when the filter says skip this bet, judged at the last read with splits inside the pre-kickoff window. */
 export function marketSkips(filter: MarketFilter, league: League, side: "home" | "away", o: Opportunity): boolean | null {
-  const s = o.last.splits ? o.last : null;
+  const s = o.splitsRead ?? null;
   if (!s?.splits) return null;
   const m = readMarket(league, s.splits, s.ref?.line);
   if (filter === "rlm-against") return !!m.rlm && m.rlm !== side;
@@ -609,8 +622,8 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
     case "market": {
       const t = x.ruleTest[h.league as League];
       if (!t) return { id: h.id, note: "no rule in force" };
-      const withSplits = opps.filter((o) => o.last.splits).length;
-      return { id: h.id, comparison: compare(marketPairs(d.filter, h.league as League, t, opps)), note: `challenger = skip when it fires; ${withSplits} of ${opps.length} games had splits` };
+      const withSplits = opps.filter((o) => o.splitsRead).length;
+      return { id: h.id, comparison: compare(marketPairs(d.filter, h.league as League, t, opps)), note: `challenger = skip when it fires; ${withSplits} of ${opps.length} games had splits read in the last ${SPLITS_WINDOW_MIN} minutes; needs ${SPLITS_MIN_GAMES} games` };
     }
     case "totals-cut":
       return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) }))) };
