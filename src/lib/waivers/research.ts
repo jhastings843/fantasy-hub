@@ -17,8 +17,14 @@ import { redis } from "@/lib/redis/client";
 
 const MODEL = "claude-opus-5";
 
-/** Searches per format. Six covers the columns named in the prompt. */
-const SEARCH_USES = 6;
+/**
+ * Searches per format. The search tool runs searches from code, and a script
+ * looping over the dynasty prompt's sources overran a cap of six in one go:
+ * every later search came back "limit exceeded" and the list came back empty
+ * (Tuesday mornings Oct 6 to 27). Twelve covers each named column once with
+ * room to spare, about 12 cents a run at $10 per 1,000 searches.
+ */
+export const SEARCH_USES = 12;
 
 /** Long enough that a Tuesday morning run still serves Wednesday's page. */
 const RESEARCH_TTL = 5 * 24 * 60 * 60;
@@ -73,9 +79,9 @@ export async function readWaiverResearch(
   }
 }
 
-function researchPrompt(format: ResearchFormat, season: string, week: number): string {
+export function researchPrompt(format: ResearchFormat, season: string, week: number): string {
   const played = week - 1;
-  const common = `It is the ${season} NFL season. Week ${played} has just been played and week ${week} waivers process on Wednesday. Search this week's waiver wire columns and threads, then produce the consensus list of the best 20 waiver claims. For every player give: full name, NFL team, position, the role or usage change behind the recommendation (snaps, routes, targets, carries, a starter's injury, a depth chart promotion), a tier, and the consensus FAAB bid as a percent of the ORIGINAL budget with the range the sources give. Only include players likely to be on waivers in a typical 12-team league (rostered under about 60 percent). Skip anyone whose case is one touchdown on the same snap count. Name your sources with URLs.
+  const common = `You have ${SEARCH_USES} web searches in total; searches past that fail, so spend them one column at a time and stop searching once the columns named below are read. It is the ${season} NFL season. Week ${played} has just been played and week ${week} waivers process on Wednesday. Search this week's waiver wire columns and threads, then produce the consensus list of the best 20 waiver claims. For every player give: full name, NFL team, position, the role or usage change behind the recommendation (snaps, routes, targets, carries, a starter's injury, a depth chart promotion), a tier, and the consensus FAAB bid as a percent of the ORIGINAL budget with the range the sources give. Only include players likely to be on waivers in a typical 12-team league (rostered under about 60 percent). Skip anyone whose case is one touchdown on the same snap count. Name your sources with URLs.
 
 Write every player as its own block with these labelled lines: Name, Team, Position, Tier, FAAB (the bid as a percent of the original budget, with the range the sources give; convert dollar bids against that source's budget, so $12 of $100 is 12% and $150 of $1000 is 15%; if no source gives a bid, write "FAAB: none"), Why (one or two sentences on the role change), Sources. The FAAB line matters most: search the columns that publish bids (FantasyPros gives three bid levels, RotoBaller publishes a FAAB bidding column) and quote them.`;
 
