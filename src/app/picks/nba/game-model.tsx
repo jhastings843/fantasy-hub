@@ -1,5 +1,6 @@
 import { getNbaGameModelView } from "@/lib/models/nba/game-store";
 import { GATE, SIGNALS, signalsOf } from "@/lib/models/nba/game-track";
+import { projectedScore } from "@/lib/models/cfb/model";
 import { kickoffEt } from "../ui";
 import s from "../picks.module.css";
 
@@ -11,6 +12,8 @@ import s from "../picks.module.css";
 const sp = (x: number) => (x === 0 ? "PK" : x > 0 ? `+${x}` : `${x}`);
 const signed = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}`;
 const r1 = (x: number) => Math.round(x * 10) / 10;
+// Spread of real NBA margins around the line (scripts/fit-nba-game.mts: closing line RMSE 13.92), for the win chance.
+const NBA_SIGMA = 13.9;
 
 export async function NbaGameModelCard({ season }: { season: number }) {
   const v = await getNbaGameModelView(season).catch(() => null);
@@ -67,6 +70,7 @@ export async function NbaGameModelCard({ season }: { season: number }) {
                   <th>DK</th>
                   <th>Ours</th>
                   <th>Total</th>
+                  <th>Projected</th>
                   <th>Signals</th>
                 </tr>
               </thead>
@@ -80,6 +84,10 @@ export async function NbaGameModelCard({ season }: { season: number }) {
                     <td className={s.num}>{`${g.home} ${sp(g.first.spread)}`}</td>
                     <td className={s.num}>{`${g.home} ${sp(r1(g.first.ours.spread))}`}</td>
                     <td className={s.num}>{`${g.first.total} · ours ${r1(g.first.ours.total)}`}</td>
+                    <td className={s.num}>{(() => {
+                      const p = projectedScore(-g.first.ours.spread, g.first.ours.total, NBA_SIGMA);
+                      return `${Math.round(p.awayPts)}-${Math.round(p.homePts)} · ${g.home} ${Math.round(p.homeWin * 100)}%`;
+                    })()}</td>
                     <td>
                       {signalsOf(g.first, v.strong)
                         .filter((x) => x.id !== "lean")

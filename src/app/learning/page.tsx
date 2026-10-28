@@ -8,6 +8,7 @@ import { loadSection } from "@/lib/learning/store";
 import { PROPS_SECTION } from "@/lib/props/learn";
 import { OUR_SECTION } from "@/lib/models/learn";
 import { SECTIONS } from "@/lib/models/sections";
+import { CFB_SECTION } from "@/lib/models/cfb/track";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionState } from "@/lib/learning/engine";
 import type { ReviewState } from "@/lib/picks/learning/review";
@@ -82,7 +83,7 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
   const nbaSeason = nbaSeasonOfDate(new Date());
-  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc] = await Promise.all([
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
@@ -94,6 +95,7 @@ export default async function LearningPage() {
     loadSection(SECTIONS.nflAttd, season),
     loadSection(SECTIONS.nbaLotto, nbaSeason),
     loadSection(SECTIONS.nbaKotc, nbaSeason),
+    loadSection(CFB_SECTION, season),
   ]);
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
@@ -127,6 +129,17 @@ export default async function LearningPage() {
         href: "/picks/cfb?v=research",
         ...sourceRow(state, policy, src),
       })),
+    },
+    {
+      title: "Our college model",
+      rows: [
+        {
+          name: "College spreads and totals (our ratings model)",
+          loop: "Shared engine, college model gate: paper bets at -110 on its own slices (edge size, home or road, favorite or dog, conference, line move, totals) and the learner's combinations; 30+ games over 3+ weeks at t 2.33, must beat its parent, rollback. Judged as a source; nothing staked",
+          href: "/picks/cfb?v=research",
+          ...engineRow(cfbModel),
+        },
+      ],
     },
     {
       title: "Public betting and line moves (report only)",

@@ -31,6 +31,7 @@ import { activatedFor } from "./report-scope";
 import { recentKeys } from "./learning/replay";
 import { archiveForecasts, loadForecasts } from "./forecasts";
 import { ourSpreadLines, type OurLine } from "@/lib/models/nfl/spread-live";
+import { runCfbModel } from "@/lib/models/cfb/store";
 import { fetchSplits } from "./splits-feed";
 import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
@@ -570,6 +571,7 @@ export async function runPicksData(league: League): Promise<string> {
   let forecasts = 0;
   let splitsMatched = "0/0";
   let totalsNew = 0;
+  let cfbModel = "";
   if (r.week) {
     const feed = await fetchSplits(league);
     const priced = r.board.filter((g) => g.basis === "reference" && g.ref);
@@ -587,8 +589,10 @@ export async function runPicksData(league: League): Promise<string> {
     );
     totalsNew = await archiveTotals(league, r.season, r.week, meet).catch(() => 0);
     if (r.board.length) await saveSnapshot(league, r.season, r.week, r.board, r.strategies.rule?.label ?? null);
+    // Our college model rides along the same way: tracked and learning, never staked; a failure never stops the archive.
+    if (league === "cfb") cfbModel = await runCfbModel(r.season, r.week, r.board, feed).catch((e) => `college model failed: ${e instanceof Error ? e.message : String(e)}`);
   }
-  return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${splitsMatched} with splits, ${totalsNew} totals archived, ${settled} issued games final`;
+  return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${splitsMatched} with splits, ${totalsNew} totals archived, ${settled} issued games final${cfbModel ? `; ${cfbModel}` : ""}`;
 }
 
 export type { RefLine, BoardGame };

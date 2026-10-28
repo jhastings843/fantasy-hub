@@ -443,6 +443,28 @@ export const ATTD_GATE: Gate = {
   weeklyLossCap: 10,
 };
 
+/**
+ * Our college model's edge hunt (lib/models/cfb/track.ts): one spread or
+ * total bet per game per slice at -110, so bets equal games. Picks' sample
+ * (30 games over 3 weeks) with the props t bar (2.33), since about 14 slices
+ * plus the learner's combinations are checked at once. One activation per review.
+ */
+export const CFB_MODEL_GATE: Gate = {
+  minGames: 30,
+  minWeeks: 3,
+  minBets: 30,
+  minWins: 0,
+  minT: 2.33,
+  minPairedT: 1.645,
+  maxNew: 1,
+  ddSd: 3,
+  ddSlack: 3,
+  moveMin: 20,
+  rollbackGames: 20,
+  rollbackT: 1.645,
+  weeklyLossCap: 10,
+};
+
 // ------------------------------------------------------------------- views
 
 export interface EntryView extends Omit<Entry, "status"> {

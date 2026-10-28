@@ -1,0 +1,18 @@
+{
+  "rating": {
+    "hfa": 2.5,
+    "kPerf": 0.3,
+    "cap": 60,
+    "carryPerf": 1,
+    "hfaMkt": 3,
+    "kMkt": 0.5,
+    "carryMkt": 0.7
+  },
+  "points": {
+    "hfa": 3,
+    "k": 0.15,
+    "cap": 28,
+    "carry": 0.6
+  },
+  "sigma": 17.5
+}
