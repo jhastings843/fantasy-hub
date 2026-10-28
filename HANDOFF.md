@@ -24,9 +24,21 @@ Stage 1 DONE 2026-10-27/28 (all deployed, 1470 tests pass; Jack authorized deplo
 5. Anytime TD: finished games moved from Board to Results ("Game by game"), W-L per game, each edge Won/Lost in the player table.
 
 Answer for Jack's ATTD note: First TD and Anytime TD use separate prices (Kalshi/DK/FD first-TD vs DK anytime) and separate models; they only share TD-share inputs.
-Seen, not fixed (Stage 2 splits work): /learning shows splits 'n=0, 0 of 0 games had splits' for NFL and college since Oct 21, so the Action Network splits feed is not matching games.
+Splits note corrected 2026-10-28: the feed works (Week 8: 13/14 NFL, 51/56 college games with splits). 'n=0' is because the market hypotheses count only games first seen after they registered (Oct 21); Weeks 7-8 were first seen Oct 20. Counting starts Week 9.
 
-NEXT: Stage 2 (learning/autonomy), in this order: (a) Picks one change per part per week; (b) review after each slate; (c) props learners free with guardrails (add slices, auto refits, own bars, weekly loss cap); (d) Venom as a judged source; (e) splits fixed + captured 60-30 min pre-kick, judged as a cut over 100 games; (f) NFL model structural self-changes every 4 weeks; (g) college ratings model + projected scores (spread/total/win chance) from NFL/college/NBA models, tracked first; (h) pick'em per-slate learning.
+Stage 2 progress (2026-10-28, all deployed, 1484 tests):
+(a) DONE review.ts: one activation per part per review (partOf: <league>:rule, <league>:totals, <league>:straight-up, staking, source:<x>); per-activation rollback (revertPart; exact previous version restored when nothing else changed); state.activations + state.changes; legacy single-change state read as one entry. NBA: one per market.
+(b) DONE picks reviews Fri/Sun/Mon/Tue 11:00 UTC (nextReviewAt; run.ts derives the slot from lastReviewAt), lockedParts = one change per part per NFL week (Tue 11:00 UTC turnover), rollbacks count. Rule freeze rebuilt (refreezeRule) when a slate review changes the policy. Shared engine: reviewDue per slate (ET date), maxNew per section week. NBA picks review daily, one per market per 7 days.
+(c) PARTLY: weekly loss cap (gate.weeklyLossCap 10u props/ATTD, 15u FTD-type; entry.pausedWeek; views show "paused"; activeIds excludes). Learner-made slices (engine expand/proposeCombos: bets carry key; up to 2 new combos per review, 6 collecting; parent = the strong slice). NOT DONE: automatic model refits (needs a decision, below). "Own bars" interpreted as edge thresholds via slices; the evidence gate itself does not self-loosen.
+(d) DONE Venom: slices attd:venom / attd:novenom (src/lib/models/nfl/venom.ts, Redis venom:v1:nfl:attd:{season}:w{week}); scripts/venom-upload.mjs (weeks 1-7 uploaded); /venom skill step 4b added.
+(e) PARTLY: splits read only within 90 min of kickoff (Opportunity.splitsRead), 100-game bar noted. Still report-only: bets go out at 9am, splits come 30-60 min pre-kick, so acting needs Jack's choice (skip alert vs later issuance).
+(f) BLOCKED on the refit pipeline decision.
+(g) NOT STARTED: college ratings model + projected scores; research says no ATS edge, ~0.3 pt CLV at the opener. Multi-session; scope with Jack.
+(h) DONE pick'em lean refit after each slate (fitLean, LEAN_OBS hash), prior 2.7 worth 30 games.
+
+OPEN QUESTIONS for Jack: refit pipeline (Vercel token in GitHub vs params in Redis); splits delivery; college model scope.
+
+ORIGINAL Stage 2 order: (a) Picks one change per part per week; (b) review after each slate; (c) props learners free with guardrails (add slices, auto refits, own bars, weekly loss cap); (d) Venom as a judged source; (e) splits fixed + captured 60-30 min pre-kick, judged as a cut over 100 games; (f) NFL model structural self-changes every 4 weeks; (g) college ratings model + projected scores (spread/total/win chance) from NFL/college/NBA models, tracked first; (h) pick'em per-slate learning.
 
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
