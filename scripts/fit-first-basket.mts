@@ -17,7 +17,13 @@
 //      the team loses the tip, shrunk to the league (kDef).
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-first-basket.mts
+//   ... scripts/fit-first-basket.mts --refit [--dry]   weekly refit (scripts/refit/common.mts):
+//   latest season with 300+ games, test = its last 28 days; refits kTip, beta,
+//   kShare on the rest (no candidates) and stores them only if the per-game
+//   scorer log loss beats the live settings by 2+ SE.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import DEFAULTS from "../src/lib/models/nba/fb-params.json";
+import { REFIT, latestSeason, liveParams, paired, submit, windowStart } from "./refit/common.mjs";
 import type { NbaGame } from "../src/lib/models/nba/box";
 import { emptyTables, firstBasketOf, foldFb, forecast, type FbParams, type FbTables } from "../src/lib/models/nba/firstbasket";
 
@@ -25,9 +31,10 @@ const load = (s: number): NbaGame[] =>
   readdirSync(`.cache/nba/${s}`)
     .map((f) => JSON.parse(readFileSync(`.cache/nba/${s}/${f}`, "utf8")) as NbaGame)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-const SPLIT = "2026-01-15";
-const prior = load(2024);
-const season = load(2025).filter((g) => g.jump && firstBasketOf(g));
+const SEASON = REFIT ? latestSeason(Object.fromEntries(readdirSync(".cache/nba").map((d) => [Number(d), readdirSync(`.cache/nba/${d}`).length])), 300) : 2025;
+const prior = load(SEASON - 1);
+const season = load(SEASON).filter((g) => g.jump && firstBasketOf(g));
+const SPLIT = REFIT ? windowStart(season.map((g) => g.date), 28) : "2026-01-15";
 
 const team = (g: NbaGame, t: string) => ({ team: t, starters: g.players.filter((p) => p.team === t && p.starter).map((p) => ({ id: p.id, pos: p.pos })) });
 
@@ -80,6 +87,14 @@ for (const kShare of [0, 1, 2, 5, 10, 20, 50, 100, 1000]) {
 }
 P = best.p;
 say(`shares: kShare ${P.kShare} (train scorer log loss ${best.e.toFixed(4)})`);
+
+if (REFIT) {
+  const live = await liveParams("nba-fb", DEFAULTS as FbParams);
+  const a = score(live, SPLIT, "9");
+  const b = score(P, SPLIT, "9");
+  await submit("nba-fb", DEFAULTS as FbParams, P, paired(a.per, b.per, `scorer log loss per game, ${SEASON} from ${SPLIT}; refit ${JSON.stringify(P)}`));
+  process.exit(0);
+}
 
 const t = score(P, SPLIT, "9");
 const fgOnly = score({ ...P, kShare: 1e9 }, SPLIT, "9");

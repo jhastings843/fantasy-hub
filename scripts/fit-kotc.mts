@@ -15,22 +15,31 @@
 // and calibration of the chances.
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-kotc.mts
+//   ... scripts/fit-kotc.mts --refit [--dry]   weekly refit (scripts/refit/common.mts):
+//   latest season with 300+ games, test = nights in its last 28 days, props
+//   projections from the live nba-props settings; refits the noise and shared
+//   shocks on the rest (crowd fit untouched) and stores them only if the
+//   per-night king log loss beats the live settings by 2+ SE.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import DEFAULTS from "../src/lib/models/nba/kotc-params.json";
+import { REFIT, latestSeason, liveParams, paired, submit, windowStart } from "./refit/common.mjs";
 import type { NbaGame } from "../src/lib/models/nba/box";
 import { summarize, RunningSeason } from "../src/lib/models/nba/history";
 import { projectGame, type NbaParams } from "../src/lib/models/nba/props";
 import { etDate } from "../src/lib/props/parse";
 import { kingLogLoss, kingsOf, simulateSlate, type KotcGame, type KotcParams, type KotcPlayer } from "../src/lib/models/nba/kotc";
 
-const NP = JSON.parse(readFileSync("src/lib/models/nba/params.json", "utf8")) as NbaParams;
+const NP_JSON = JSON.parse(readFileSync("src/lib/models/nba/params.json", "utf8")) as NbaParams;
+const NP = REFIT ? await liveParams("nba-props", NP_JSON) : NP_JSON;
 const load = (s: number): NbaGame[] =>
   readdirSync(`.cache/nba/${s}`)
     .map((f) => JSON.parse(readFileSync(`.cache/nba/${s}/${f}`, "utf8")) as NbaGame)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
-const prior = summarize(load(2024));
-const season = load(2025);
-const SPLIT = "2026-01-15";
+const SEASON = REFIT ? latestSeason(Object.fromEntries(readdirSync(".cache/nba").map((d) => [Number(d), readdirSync(`.cache/nba/${d}`).length])), 300) : 2025;
+const prior = summarize(load(SEASON - 1));
+const season = load(SEASON);
+const SPLIT = REFIT ? windowStart(season.map((g) => etDate(new Date(g.date))), 28) : "2026-01-15";
 const MIN_MIN = 8;
 
 interface Night {
@@ -119,6 +128,19 @@ const score = (ns: Night[], p: KotcParams) => {
         }
   P = best.p;
   say(`shared: sdGame ${P.sdGame}, blowAt ${P.blowAt}, ot ${P.ot}, phi ${P.phi}, sdMin ${P.sdMin}; train king log loss ${best.l.toFixed(3)}`);
+}
+
+if (REFIT) {
+  const live = await liveParams("nba-kotc", DEFAULTS as KotcParams);
+  const perNight = (p: KotcParams) =>
+    test.map((n) => {
+      const b = simulateSlate(n.games, n.players, { ...p, sims: 5000 }, 7);
+      return kingLogLoss(b.rows, kingsOf(n.players.map((x) => ({ id: x.id, pra: n.actual.get(x.id) ?? 0 }))).ids);
+    });
+  const refit: KotcParams = { ...live, ...P, sims: live.sims };
+  delete (refit as Partial<KotcParams>).crowd;
+  await submit("nba-kotc", DEFAULTS as KotcParams, refit, paired(perNight(live), perNight({ ...live, ...refit }), `king log loss per night, ${SEASON} from ${SPLIT}`));
+  process.exit(0);
 }
 
 // Baselines on train: independent players (no shared shocks), and softmax on projected PRA.

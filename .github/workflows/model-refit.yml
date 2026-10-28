@@ -74,8 +74,8 @@ jobs:
           restore-keys: refit-nba-
       - name: Refresh NBA history
         run: |
-          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-history.mts 2024 2025 2026
-          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-lines-history.mts 2024 2025 2026
+          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-history.mts 2023 2024 2025 2026
+          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-lines-history.mts 2025 2026
       - name: Refit
         env:
           APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}

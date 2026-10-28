@@ -12,7 +12,14 @@
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-nba-game.mts
 // Needs .cache/nba/2023-2025 (nba-history.mts) and .cache/nba-lines/2024-2025 (nba-lines-history.mts).
+//   ... scripts/fit-nba-game.mts --refit [--dry]   weekly refit (scripts/refit/common.mts):
+//   S = latest season with 300+ games; S-2 warms, S-1 plus S before its last
+//   28 days trains, those 28 days test; projections from the live nba-props
+//   settings. Stores the refit only if the per-game residual error (spread
+//   over 13.5^2 plus total over 19^2, against the close) beats live by 2+ SE.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import DEFAULTS from "../src/lib/models/nba/game-params.json";
+import { REFIT, latestSeason, liveParams, paired, submit, windowStart } from "./refit/common.mjs";
 import type { NbaGame } from "../src/lib/models/nba/box";
 import { summarize, RunningSeason, type SeasonSummary } from "../src/lib/models/nba/history";
 import { projectGame, type NbaParams, type PlayerInput } from "../src/lib/models/nba/props";
@@ -30,14 +37,15 @@ import {
 } from "../src/lib/models/nba/game";
 import PROPS from "../src/lib/models/nba/params.json";
 
-const PP = PROPS as NbaParams;
+const PP = REFIT ? await liveParams("nba-props", PROPS as NbaParams) : (PROPS as NbaParams);
 const load = (s: number): NbaGame[] =>
   readdirSync(`.cache/nba/${s}`)
     .map((f) => JSON.parse(readFileSync(`.cache/nba/${s}/${f}`, "utf8")) as NbaGame)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 const lines = (s: number, id: string): OpenClose | null => (existsSync(`.cache/nba-lines/${s}/${id}.json`) ? JSON.parse(readFileSync(`.cache/nba-lines/${s}/${id}.json`, "utf8")) : null);
 
-const SEASONS = [2023, 2024, 2025];
+const S = REFIT ? latestSeason(Object.fromEntries(readdirSync(".cache/nba").map((d) => [Number(d), readdirSync(`.cache/nba/${d}`).length])), 300) : 2025;
+const SEASONS = [S - 2, S - 1, S];
 const games = Object.fromEntries(SEASONS.map((s) => [s, load(s)])) as { [s: number]: NbaGame[] };
 const log: string[] = [];
 const say = (s: string) => {
@@ -47,7 +55,7 @@ const say = (s: string) => {
 
 // Availability: each side's projected points with tonight's players minus with its full recent rotation.
 const avail = new Map<string, { home: number; away: number }>();
-for (const s of [2024, 2025]) {
+for (const s of [S - 1, S]) {
   const prior: SeasonSummary = summarize(games[s - 1]);
   const run = new RunningSeason();
   for (const g of games[s]) {
@@ -91,12 +99,12 @@ function build(p: GameRatingParams): { rows: Row[]; err: { m: number; t: number;
       let j = i;
       while (j < gs.length && etDay(gs[j].date) === day) j++;
       const today = gs.slice(i, j);
-      const ls = today.map((g) => (s === 2023 ? null : lines(s, g.id)));
+      const ls = today.map((g) => (s === S - 2 ? null : lines(s, g.id)));
       today.forEach((g, k) => {
         const margin = g.score[g.home] - g.score[g.away];
         const pts = g.score[g.home] + g.score[g.away];
         const e = r.expect(g.home, g.away);
-        if (s === 2024) {
+        if (s === S - 1) {
           em += (e.margin - margin) ** 2;
           et += (e.total - pts) ** 2;
           n++;
@@ -131,13 +139,15 @@ let RP: GameRatingParams = { ppp0: 114, pace0: 99, hfa: 2.5, k: 0.05, kPace: 0.0
         }
   RP = best.p;
   const { err } = build(RP);
-  say(`ratings: hfa ${RP.hfa}/100 poss, k ${RP.k}, kPace ${RP.kPace}, carry ${RP.carry}; 2024-25 results RMSE margin ${Math.sqrt(err.m).toFixed(2)}, total ${Math.sqrt(err.t).toFixed(2)} (${err.n} games)`);
+  say(`ratings: hfa ${RP.hfa}/100 poss, k ${RP.k}, kPace ${RP.kPace}, carry ${RP.carry}; ${S - 1} results RMSE margin ${Math.sqrt(err.m).toFixed(2)}, total ${Math.sqrt(err.t).toFixed(2)} (${err.n} games)`);
 }
 
 const { rows, ratings: END } = build(RP);
-const train = rows.filter((r) => r.season === 2024);
-const test = rows.filter((r) => r.season === 2025);
-say(`rows with lines: train 2024-25 ${train.length}, test 2025-26 ${test.length}`);
+// Refit: the held-out window is the latest season's last 28 days; everything before it trains.
+const SPLIT = REFIT ? windowStart(games[S].map((g) => g.date), 28) : "9";
+const train = rows.filter((r) => r.season === S - 1 || (REFIT && r.season === S && r.date < SPLIT));
+const test = rows.filter((r) => r.season === S && (!REFIT || r.date >= SPLIT));
+say(`rows with lines: train ${train.length}, test ${test.length} (season ${S}${REFIT ? ` from ${SPLIT}` : ""})`);
 
 type Market = "spread" | "total";
 const KEYS = { spread: SPREAD_FEATURES, total: TOTAL_FEATURES } as const;
@@ -173,6 +183,23 @@ for (const m of ["spread", "total"] as Market[]) {
   say(`${m}: lambda ${best.lambda} (split MSE ${best.e.toFixed(2)} vs line ${lineMse.toFixed(2)}); weights ${Object.entries(w.w).map(([k, v]) => `${k} ${v.toFixed(3)}`).join(", ")}, b ${w.b.toFixed(2)}; strong at |res| ${strong[m]}+`);
 }
 const GP = { ...params, strongSpread: strong.spread } as GameParams;
+
+if (REFIT) {
+  const live = await liveParams("nba-game", DEFAULTS as unknown as GameParams);
+  const perGame = (gp: GameParams) => {
+    const rs = build(gp.rating).rows.filter((r) => r.season === S && r.date >= SPLIT);
+    const err = (r: Row, m: Market, scale: number) => {
+      const w = gp[m] as { w: Record<string, number>; b: number };
+      return (actual(r, m) - lineOf(r, m, "close") - pred(w, xOf(r, m, "close"))) ** 2 / scale ** 2;
+    };
+    return new Map(rs.map((r) => [r.id, err(r, "spread", 13.5) + err(r, "total", 19)]));
+  };
+  const a = perGame(live);
+  const b = perGame(GP);
+  const ids = [...a.keys()].filter((id) => b.has(id));
+  await submit("nba-game", DEFAULTS as unknown as GameParams, GP, paired(ids.map((id) => a.get(id)!), ids.map((id) => b.get(id)!), `residual error per game at the close, ${S} from ${SPLIT}`));
+  process.exit(0);
+}
 
 // 3. Test.
 const pct = (w: number, l: number) => (w + l ? `${((100 * w) / (w + l)).toFixed(1)}%` : "·");
