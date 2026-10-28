@@ -3,10 +3,11 @@ import { marginBand, marginLabel, suPick } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
-import { kickoffEt, n, price, rec, units } from "./ui";
+import { TeamLogo } from "@/components/TeamLogo";
+import { GameCell, kickoffEt, price, rec, units } from "./ui";
 import { priceWithBook } from "@/lib/picks/shop";
-import { Background, Hero, SecHead } from "./board";
-import { ReadLegend } from "./ats";
+import { Background, CutRanges, Hero, SecHead } from "./board";
+import { ReadLegend, WeekBets } from "./ats";
 import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
 
@@ -55,10 +56,20 @@ export function SuWeek({ r, poolShares }: { r: PicksReport; poolShares?: { entri
                 <div key={`${g.away}@${g.home}`} className={s.gRow}>
                   <div className={s.suLine}>
                     <span className={`${s.num} ${s.rank}`}>{i + 1}</span>
-                    <span className={s.gGame}>
-                      {name(pick)}
-                      {live && <span className={s.gLive}>Live</span>}
-                      <span>{`over ${name(side === "home" ? g.away : g.home)}${live ? "" : ` · ${kickoffEt(g.ref?.kickoff)}`}${
+                    <span className={s.matchCell}>
+                      <span className={s.matchTeam}>
+                        <TeamLogo league={r.league === "nfl" ? "nfl" : "cfb"} team={pick} espnId={side === "home" ? (g.ref ?? g.lastRef)?.homeId : (g.ref ?? g.lastRef)?.awayId} size={18} />
+                        <span className={s.matchName}>{name(pick)}</span>
+                        {live && <span className={s.gLive}>Live</span>}
+                      </span>
+                      <span className={s.matchTeam}>
+                        <TeamLogo league={r.league === "nfl" ? "nfl" : "cfb"} team={side === "home" ? g.away : g.home} espnId={side === "home" ? (g.ref ?? g.lastRef)?.awayId : (g.ref ?? g.lastRef)?.homeId} size={18} />
+                        <span className={s.matchName}>
+                          <span className={s.matchAt}>over </span>
+                          {name(side === "home" ? g.away : g.home)}
+                        </span>
+                      </span>
+                      <span className={s.matchWhen} style={{ whiteSpace: "normal" }}>{`${live ? "In progress" : `${kickoffEt(g.ref?.kickoff)}${g.ref?.tv ? ` · ${g.ref.tv}` : ""}`}${
                         g.sam && g.david && Math.sign(g.sam.model) !== Math.sign(g.david.model) ? ` · split: Sam ${name(g.sam.model < 0 ? g.home : g.away)}, David ${name(g.david.model < 0 ? g.home : g.away)}` : ""
                       }${share !== undefined ? ` · ${Math.round(share * 100)}% of the pool on ${name(pick)}` : ""}`}</span>
                     </span>
@@ -320,23 +331,33 @@ export function TotalsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[]
               return (
                 <details key={`${g.away}@${g.home}`} className={`${s.gRow} ${s.ledger}`}>
                   <summary>
-                    <span className={s.gGame}>
-                      {`${name(g.away)} at ${name(g.home)}`}
-                      {live ? (
-                        <>
-                          <span className={s.gLive}>Live</span>
-                          {lg && <span className={s.scoreLine}>{`${lg.away.score + lg.home.score} so far · ${lg.detail}`}</span>}
-                        </>
-                      ) : lg?.state === "post" && !f ? (
-                        <span className={s.scoreLine}>{`Final · ${lg.away.score + lg.home.score} scored`}</span>
-                      ) : (
-                        <span>{f ? `Final · ${f.home + f.away} scored` : kickoffEt(g.ref?.kickoff)}</span>
-                      )}
-                    </span>
+                    <GameCell
+                      league={r.league}
+                      away={g.away}
+                      home={g.home}
+                      awayName={name(g.away)}
+                      homeName={name(g.home)}
+                      quote={(() => {
+                        const b = r.board.find((x) => x.away === g.away && x.home === g.home);
+                        return b?.ref ?? b?.lastRef ?? g.ref;
+                      })()}
+                      status={
+                        live ? (
+                          <>
+                            <span className={s.gLive}>Live</span>
+                            {lg && <span className={s.scoreLine}>{`${lg.away.score + lg.home.score} so far · ${lg.detail}`}</span>}
+                          </>
+                        ) : lg?.state === "post" && !f ? (
+                          `Final · ${lg.away.score + lg.home.score} scored`
+                        ) : f ? (
+                          `Final · ${f.home + f.away} scored`
+                        ) : undefined
+                      }
+                    />
                     <span className={s.gNum} data-k="Total">{g.ref?.total ?? "·"}</span>
                     <span className={s.gNum} data-k="Sam · David">
-                      <span className={s.cSam}>{g.sam !== undefined ? g.sam.toFixed(1) : "·"}</span>
-                      <small className={s.cDavid}>{g.david !== undefined ? g.david.toFixed(1) : "·"}</small>
+                      <span className={s.cSam}>{`Sam ${g.sam !== undefined ? g.sam.toFixed(1) : "·"}`}</span>
+                      <span className={s.cDavid}>{`David ${g.david !== undefined ? g.david.toFixed(1) : "·"}`}</span>
                     </span>
                     <span className={s.gNum} data-k="Lean">
                       {g.side && g.ref ? `${ou(g.side)} ${g.ref.total}` : "None"}
@@ -400,6 +421,7 @@ export function TotalsResults({ r }: { r: PicksReport }) {
           <div className={s.tileK}>{`vs closing total (${sent?.n ?? 0} with a close)`}</div>
         </div>
       </div>
+      <WeekBets r={r} kind="total" />
     </section>
   );
 }
@@ -414,34 +436,15 @@ export function TotalsResearch({ r }: { r: PicksReport }) {
           {`Neither site keeps totals history, so two-model agreement is archived going forward: the first time both models' totals and a current line meet, that game is saved and never rewritten. ${r.totals.archived} archived, ${bt.archived} graded. Thresholds were fixed before grading (both ${r.totals.edge}+ off).`}
         </p>
       </div>
-      <div className={s.tw}>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th>Cut</th>
-              <th>Record</th>
-              <th>Weeks</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bt.cuts.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  {c.label}
-                  {bt.rule?.id === c.id && <span className={`${s.tag} ${s.tagRule}`}>rule</span>}
-                </td>
-                <td className={s.num}>{n(c.record) + c.record.p ? rec(c.record) : "none yet"}</td>
-                <td className={s.num}>{c.weeks.join(", ") || "·"}</td>
-              </tr>
-            ))}
-            <tr>
-              <td>Sam alone vs the opening total (history)</td>
-              <td className={s.num}>{n(bt.samAlone.record) ? rec(bt.samAlone.record) : "none"}</td>
-              <td className={s.num}>{bt.samAlone.weeks.join(", ") || "·"}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      {/* The same range view as the learner log (Jack preferred it over the plain table). */}
+      <CutRanges
+        title="Every totals cut"
+        rows={[
+          ...bt.cuts.map((c) => ({ label: `${c.label}${bt.rule?.id === c.id ? " (the rule)" : ""}`, w: c.record.w, l: c.record.l, p: c.record.p, be: 0.524 })),
+          { label: "Sam alone vs the opening total (history)", w: bt.samAlone.record.w, l: bt.samAlone.record.l, p: bt.samAlone.record.p, be: 0.524 },
+        ]}
+        open
+      />
       <p className={s.thin}>
         {bt.samAlone.clv.n
           ? `Sam alone vs the closing total: ${bt.samAlone.clv.avg > 0 ? "+" : ""}${bt.samAlone.clv.avg.toFixed(2)} on ${bt.samAlone.clv.n}; flattered if he posted after the line moved.`

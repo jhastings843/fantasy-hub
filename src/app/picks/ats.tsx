@@ -1,14 +1,13 @@
 // Spreads (ATS): this week's bets, results, research.
-import { needsPem, type BoardGame, type CutResult } from "@/lib/picks/engine";
-import { bettable, cutResult } from "@/lib/picks/engine";
+import type { BoardGame, CutResult, CutTest } from "@/lib/picks/engine";
+import { bettable, cutResult, matches } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import type { BetRow } from "@/lib/picks/units";
 import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import Link from "next/link";
-import TierChecker from "./TierChecker";
 import { bookOf, priceWithBook } from "@/lib/picks/shop";
-import { StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
+import { GameCell, StrategyRow, TierChip, drawdown, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
@@ -177,7 +176,8 @@ function readOf(g: BoardGame, r: PicksReport, live?: LiveGame): { chip: [string,
   if (st === "budget") return { chip: ["Close call", s.readTrack], note: "Over this week's budget" };
   if (st === "wait") return { chip: ["Needs PEM", s.readTrack], note: g.waitFor ? `${g.waitFor === "t1" ? "Tier 1" : "Tier 2"} if PEM agrees` : undefined };
   if (st === "noquote") return { chip: ["No line", s.readPass] };
-  return { chip: [g.tier === "split" ? "Split" : "Pass", s.readPass], note: r.league && g.read && g.tier !== "split" ? `Edge ${g.read.avgEdge.toFixed(1)}` : undefined };
+  // The Side column carries the edge; the read doesn't repeat it.
+  return { chip: [g.tier === "split" ? "Split" : "Pass", s.readPass] };
 }
 
 /** "Kennesaw State +2.5" may wrap, but never between "State" and "+2.5": the last word stays with the line. */
@@ -203,34 +203,45 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
   return (
     <details className={`${s.gRow} ${s.ledger}`} open={st === "started" && !!g.issued}>
       <summary>
-        <span className={s.gGame}>
-          {`${name(g.away)} at ${home}`}
-          {st === "started" && live?.state === "post" ? (
-            // Over on ESPN but not graded yet: say Final, never Live.
-            <span className={s.scoreLine}>{`Final ${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score}`}</span>
-          ) : st === "started" ? (
-            <>
-              <span className={s.gLive}>Live</span>
-              {live && <span className={s.scoreLine}>{`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`}</span>}
-            </>
-          ) : (
-            <span>{g.final ? `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}` : kickoffEt(g.ref?.kickoff)}</span>
-          )}
-        </span>
+        <GameCell
+          league={r.league}
+          away={g.away}
+          home={g.home}
+          awayName={name(g.away)}
+          homeName={home}
+          quote={g.ref ?? g.lastRef}
+          status={
+            st === "started" && live?.state === "post" ? (
+              // Over on ESPN but not graded yet: say Final, never Live.
+              <span className={s.scoreLine}>{`Final ${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score}`}</span>
+            ) : st === "started" ? (
+              <>
+                <span className={s.gLive}>Live</span>
+                {live && <span className={s.scoreLine}>{`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`}</span>}
+              </>
+            ) : g.final ? (
+              `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}`
+            ) : undefined
+          }
+        />
+        {/* The number first, the home team it belongs to under it, so long college names never push the row around. */}
         <span className={s.gNum} data-k="Market">
           {g.ref ? (
-            `${home} ${line(g.ref.line)}`
+            <>
+              {line(g.ref.line)}
+              <small className={s.mktTeam}>{home}</small>
+            </>
           ) : g.lastRef ? (
             <>
-              {`${home} ${line(g.lastRef.line)}`}
-              <small>closed</small>
+              {line(g.lastRef.line)}
+              <small className={s.mktTeam}>{`${home}, closed`}</small>
             </>
           ) : st === "started" || st === "final" ? "Closed" : "·"}
         </span>
         {/* Home-side numbers only: the Market column already names the team, and long college names wrapped and clipped here. */}
         <span className={s.gNum} data-k="Models">
           <span className={s.cSam} style={{ whiteSpace: "nowrap" }}>{`Sam ${num(g.sam?.model)}`}</span>
-          <small className={s.cDavid} style={{ whiteSpace: "nowrap" }}>{`David ${num(g.david?.model)}`}</small>
+          <span className={s.cDavid} style={{ whiteSpace: "nowrap" }}>{`David ${num(g.david?.model)}`}</span>
         </span>
         <span className={s.gNum} data-k="Side">
           {/ [+−-]?(\d|PK)/.test(side) ? keepLine(side) : side}
@@ -245,10 +256,7 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
         </span>
       </summary>
       <div className={s.gBody}>
-        {st === "final" ? <FinishedDetails g={g} r={r} /> : <WhyList g={g} r={r} />}
-        <Link href={gameHref(r, g)} className={s.linkA} style={{ display: "inline-block", marginTop: 8, fontWeight: 600, fontSize: 14 }}>
-          Full breakdown ›
-        </Link>
+        <GameExpand g={g} r={r} />
       </div>
     </details>
   );
@@ -503,12 +511,6 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
   const near = all.filter((g) => ["priced", "budget", "wait"].includes(statusOf(g)));
   const finished = all.filter((g) => statusOf(g) === "final");
   const open = all.filter((g) => statusOf(g) !== "final");
-  const name = (k: string) => r.names[k] ?? k;
-  const firstT1 = all.find((g) => g.tier === "t1" && g.sam && g.david);
-  const example =
-    firstT1?.sam && firstT1.david
-      ? { vegas: firstT1.ref?.line ?? firstT1.david.market, sam: firstT1.sam.model, david: firstT1.david.model, pem: firstT1.pem?.model, label: `${name(firstT1.away)} at ${name(firstT1.home)}` }
-      : null;
   const early = best.filter((g) => statusOf(g) === "early").length;
   const title = best.length ? `${best.length} best bet${best.length === 1 ? "" : "s"} this week` : finished.length && !open.length ? "Week done" : "No spread bets this week";
   const sub = !r.boardUpdated.sam && !r.boardUpdated.david
@@ -549,18 +551,6 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
       )}
       <Background>
         <p className={s.p}>{ruleSetLine(r)}</p>
-        <details className={s.details}>
-          <summary>Check a moved line</summary>
-          <div className={s.detailsBody}>
-            <TierChecker
-              rule={st.rule ? { label: st.rule.label, test: st.rule.test, record: rec(st.rule.record) } : null}
-              second={st.second ? { label: st.second.label, test: st.second.test, record: `${rec(st.second.record)} on games outside Tier 1` } : null}
-              example={example}
-              pem={r.league === "cfb"}
-              pemNeeded={!!(st.rule && needsPem(st.rule.test)) || !!(st.second && needsPem(st.second.test))}
-            />
-          </div>
-        </details>
         {finished.length > 0 && <Finished games={finished} r={r} />}
       </Background>
     </section>
@@ -569,6 +559,72 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
 
 /** Units with up to two decimals: 0.5u, 1u, 1.25u. */
 const amt = (x: number) => `${Number(x.toFixed(2))}u`;
+
+/** One market's settled bets per week: record, net and risked, from the bets themselves so markets never mix. */
+export function weekLedgers(r: PicksReport, kind: BetRow["kind"]) {
+  return r.units.byWeek.map((w) => {
+    const bets = w.bets.filter((b) => b.kind === kind && b.result && !b.unstaked);
+    const count = (x: string) => bets.filter((b) => b.result === x).length;
+    return { week: w.week, bets, w: count("W"), l: count("L"), p: count("P"), units: Math.round(bets.reduce((a, b) => a + (b.net ?? 0), 0) * 100) / 100, risked: bets.reduce((a, b) => a + b.units, 0) };
+  });
+}
+
+/** One market's bets as sent, week by week, newest open. Spreads and totals each show only their own. */
+export function WeekBets({ r, kind }: { r: PicksReport; kind: "spread" | "total" }) {
+  const weeks = weekLedgers(r, kind);
+  const shown = [...r.live].reverse().filter((w) => kind === "spread" || (weeks.find((x) => x.week === w.week)?.bets.length ?? 0) > 0);
+  return (
+    <div className={s.betWeeks}>
+      <h3 className={s.caption}>{kind === "spread" ? "Spread bets as sent, by week (each game once, at the line first sent)" : "Totals bets as sent, by week"}</h3>
+      {shown.length === 0 && <p className={s.dim}>Nothing sent yet.</p>}
+      {shown.map((w, i) => {
+        const lw = weeks.find((x) => x.week === w.week);
+        const staked = lw?.bets ?? [];
+        const all = r.units.byWeek.find((x) => x.week === w.week)?.bets ?? [];
+        const early = all.filter((b) => b.kind === kind && b.result && b.unstaked);
+        const pending = all.filter((b) => b.kind === kind && !b.result).length;
+        const tierRec = (t: "t1" | "t2") => {
+          const rs = staked.filter((b) => b.tier === t).map((b) => b.result);
+          return { w: rs.filter((x) => x === "W").length, l: rs.filter((x) => x === "L").length, p: rs.filter((x) => x === "P").length };
+        };
+        const earlyRec = { w: early.filter((b) => b.result === "W").length, l: early.filter((b) => b.result === "L").length, p: early.filter((b) => b.result === "P").length };
+        return (
+          <details key={w.week} className={s.betWeek} open={i === 0}>
+            <summary>
+              <span className={s.betWeekName}>{`Week ${w.week}`}</span>
+              <span className={`${s.num} ${s.betWeekRec}`}>{kind === "spread" ? `T1 ${rec(tierRec("t1"))} · T2 ${rec(tierRec("t2"))}` : lw ? rec(lw) : "0-0"}</span>
+              <span className={`${s.num} ${s.betWeekNet} ${lw && lw.units < 0 ? s.neg : s.pos}`}>{lw && lw.w + lw.l + lw.p ? units(lw.units) : "·"}</span>
+            </summary>
+            <div className={s.betWeekBody}>
+              <p className={s.thin}>
+                {[
+                  staked.length ? `${staked.length} settled bet${staked.length === 1 ? "" : "s"}, ${amt(lw!.risked)} risked` : "No settled staked bets",
+                  early.length ? `first email, before stakes: ${rec(earlyRec)}, not counted here` : "",
+                  pending ? `${pending} pending, listed once final` : "",
+                  kind === "spread" && w.provenance === "recovered" ? "recovered from the email" : kind === "spread" && w.provenance === "reconstructed" ? "includes a card rebuilt from stored data that was never emailed" : "",
+                ].filter(Boolean).join(" · ")}
+              </p>
+              {staked.length ? (
+                <ul className={s.betList}>
+                  {staked.map((b, j) => (
+                    <li key={j} className={s.betRow}>
+                      <span className={`${s.tier} ${b.tier === "t1" ? s.t1 : b.tier === "t2" ? s.t2 : s.tPass}`}>{b.kind === "spread" ? (b.tier === "t1" ? "Tier 1" : "Tier 2") : "Total"}</span>
+                      <span className={s.betPick}>{betText(b, (k) => r.names[k] ?? k)}</span>
+                      <span className={`${s.num} ${s.betStake}`}>{`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}</span>
+                      <span className={`${s.num} ${s.betNet} ${RES_CLASS[b.result!]}`}>{`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={s.thin}>No staked bets settled yet.</p>
+              )}
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
 
 /** "BYU -11", "Over 47.5 (Iowa State at BYU)", or a parlay's legs joined. */
 function betText(b: BetRow, name: (k: string) => string): string {
@@ -584,7 +640,10 @@ export function AtsResults({ r }: { r: PicksReport }) {
   const t1 = u.byTier.t1;
   const t2 = u.byTier.t2;
   const ats = { bets: t1.bets + t2.bets, w: t1.w + t2.w, l: t1.l + t2.l, p: t1.p + t2.p, units: t1.units + t2.units, risked: t1.risked + t2.risked, pending: t1.pending + t2.pending };
-  const dd = drawdown(u.byWeek.map((w) => w.ledger.units));
+  // Spreads only: totals and parlays keep their own records (Totals view, and the parlay tile below).
+  const weeks = weekLedgers(r, "spread");
+  const dd = drawdown(weeks.map((w) => w.units));
+  const parlays = u.byTier.parlays;
   const clvSent = r.clv.plays.filter((x) => x.id !== "ou");
   return (
     <section className={s.section} aria-labelledby="ats-results">
@@ -605,10 +664,10 @@ export function AtsResults({ r }: { r: PicksReport }) {
         }
         sub="1 unit risked per unit staked, at the line and price each bet was sent with. Recommendation returns, not bets you confirmed placing."
       />
-      {u.byWeek.length > 0 && (
+      {weeks.length > 0 && (
         <div className={s.curveBox}>
-          <h3 className={s.h3} style={{ margin: 0 }}>Units over the season</h3>
-          <Curve points={u.byWeek.map((w) => ({ x: `Week ${w.week}`, v: w.ledger.units }))} label="Running units after each week" />
+          <h3 className={s.h3} style={{ margin: 0 }}>Spread units over the season</h3>
+          <Curve points={weeks.map((w) => ({ x: `Week ${w.week}`, v: w.units }))} label="Running spread units after each week" />
         </div>
       )}
       <div className={s.tiles}>
@@ -629,66 +688,9 @@ export function AtsResults({ r }: { r: PicksReport }) {
           <div className={s.tileK}>{`Issued this week, both sports · ${r.allocation.exposure.outstanding}u open`}</div>
         </div>
       </div>
+      {parlays.bets > 0 && <p className={s.thin}>{`Parlays are their own record: ${rec(parlays)}, ${units(parlays.units)}${parlays.pending ? `, ${parlays.pending} pending` : ""}. Not in the spread numbers above.`}</p>}
       {u.unstaked > 0 && <p className={s.thin}>{`${u.unstaked} earlier plays went out before stakes existed: in the win-loss record below, not in units.`}</p>}
-      <div className={s.betWeeks}>
-        <h3 className={s.caption}>As sent, by week (each game once, at the line first sent)</h3>
-        {r.live.length === 0 && <p className={s.dim}>Nothing sent yet.</p>}
-        {[...r.live].reverse().map((w, i) => {
-          const wk = u.byWeek.find((x) => x.week === w.week);
-          const lw = wk?.ledger;
-          // Only settled bets: a pending one's stake and line can still change.
-          const settled = wk?.bets.filter((b) => b.result) ?? [];
-          const staked = settled.filter((b) => !b.unstaked);
-          const early = settled.filter((b) => b.unstaked);
-          // The heading counts staked bets only, so it matches the list and the units.
-          const tierRec = (t: "t1" | "t2") => {
-            const rs = staked.filter((b) => b.kind === "spread" && b.tier === t).map((b) => b.result);
-            return { w: rs.filter((x) => x === "W").length, l: rs.filter((x) => x === "L").length, p: rs.filter((x) => x === "P").length };
-          };
-          const earlyRec = { w: early.filter((b) => b.result === "W").length, l: early.filter((b) => b.result === "L").length, p: early.filter((b) => b.result === "P").length };
-          return (
-            <details key={w.week} className={s.betWeek} open={i === 0}>
-              <summary>
-                <span className={s.betWeekName}>{`Week ${w.week}`}</span>
-                <span className={`${s.num} ${s.betWeekRec}`}>{`T1 ${rec(tierRec("t1"))} · T2 ${rec(tierRec("t2"))}`}</span>
-                <span className={`${s.num} ${s.betWeekNet} ${lw && lw.units < 0 ? s.neg : s.pos}`}>
-                  {lw && lw.w + lw.l + lw.p ? units(lw.units) : "·"}
-                </span>
-              </summary>
-              <div className={s.betWeekBody}>
-                <p className={s.thin}>
-                  {[
-                    staked.length ? `${staked.length} settled bet${staked.length === 1 ? "" : "s"}, ${amt(lw!.risked)} risked` : "No settled staked bets",
-                    early.length ? `first email, before stakes: ${rec(earlyRec)}, not counted here` : "",
-                    w.pending ? `${w.pending} pending, listed once final` : "",
-                    w.provenance === "recovered" ? "recovered from the email" : w.provenance === "reconstructed" ? "includes a card rebuilt from stored data that was never emailed" : "",
-                  ].filter(Boolean).join(" · ")}
-                </p>
-                {staked.length ? (
-                  <ul className={s.betList}>
-                    {staked.map((b, j) => (
-                      <li key={j} className={s.betRow}>
-                        <span className={`${s.tier} ${b.tier === "t1" ? s.t1 : b.tier === "t2" ? s.t2 : s.tPass}`}>
-                          {b.kind === "spread" ? (b.tier === "t1" ? "Tier 1" : "Tier 2") : b.kind === "total" ? "Total" : "Parlay"}
-                        </span>
-                        <span className={s.betPick}>{betText(b, (k) => r.names[k] ?? k)}</span>
-                        <span className={`${s.num} ${s.betStake}`}>
-                          {`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}
-                        </span>
-                        <span className={`${s.num} ${s.betNet} ${RES_CLASS[b.result!]}`}>
-                          {`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className={s.thin}>No staked bets settled yet.</p>
-                )}
-              </div>
-            </details>
-          );
-        })}
-      </div>
+      <WeekBets r={r} kind="spread" />
       <div className={s.tw}>
         <table className={s.table}>
           <caption className={s.caption}>Beating the closing line</caption>
@@ -754,7 +756,6 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
       ) : (
         <p className={s.calm}>No cut qualifies as the rule yet.</p>
       )}
-      {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} />}
       <details className={s.details} open>
         <summary>Every cut tested</summary>
         <div className={s.board}>
@@ -868,6 +869,7 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
         </details>
       )}
       {panel}
+      {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} />}
       <details className={s.details}>
         <summary>{`Game log: all ${r.graded.length} graded games`}</summary>
         <div className={s.tw}>
@@ -928,20 +930,136 @@ export function suWhy(g: BoardGame, name: (k: string) => string): string {
 }
 
 /** One game on its own page: the pick, the market against every model, why it is or isn't a bet, and everything else known about the game. */
+/** The market against both models on one number line, and the sentence that reads it. */
+function MarketBlock({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const name = (k: string) => r.names[k] ?? k;
+  const home = name(g.home);
+  const away = name(g.away);
+  const market = g.ref?.line ?? g.lastRef?.line ?? g.david?.market ?? g.sam?.market;
+  const proj = (x: number) => (Math.abs(x) < 0.05 ? "a pick'em" : `${x < 0 ? home : away} by ${Math.abs(Math.round(x * 10) / 10)}`);
+  const models = [g.sam?.model, g.david?.model].filter((x): x is number => x !== undefined);
+  const avg = models.length ? models.reduce((a, x) => a + x, 0) / models.length : null;
+  if (market === undefined) return <p className={s.thin}>No line on file for this game yet.</p>;
+  return (
+    <>
+      <MarketLine market={market} sam={g.sam ? Math.round(g.sam.model * 10) / 10 : undefined} david={g.david ? Math.round(g.david.model * 10) / 10 : undefined} pem={r.league === "cfb" && g.pem ? g.pem.model : undefined} fmt={(x) => `${home} ${line(x)}`} pk={{ below: home, above: away }} />
+      {avg !== null && (
+        <p className={s.p}>
+          {`The models have ${proj(avg)}${models.length > 1 ? " on average" : ""}. The market has ${proj(market)}.${g.read?.agree && g.side ? ` So ${name(g.side === "home" ? g.home : g.away)} gets ${g.read.avgEdge.toFixed(1)} more points than the models think it needs.` : g.read && !g.read.agree ? " Sam and David are on different sides, so no spread bet." : ""}`}
+        </p>
+      )}
+      <MarketKey pem={r.league === "cfb"} />
+    </>
+  );
+}
+
+/** Why it is (or isn't) a bet, the price, the win chance: three cards. */
+function EdgeCards({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const st = statusOf(g);
+  const st1 = r.strategies;
+  const cut = g.tier === "t1" ? st1.rule : g.tier === "t2" ? st1.second : null;
+  const worst = g.p !== undefined ? worstPrice(g.p) : null;
+  const sentPrice = st === "sent" ? g.issued?.price : undefined;
+  return (
+    <div className={s.edgeGrid} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))" }}>
+      <div className={s.edgeCard}>
+        <span className={s.eyebrow}>{["bet", "sent", "early"].includes(st) ? "Why it is a bet" : "Why it is not a bet"}</span>
+        <b className={s.closePick} style={{ textTransform: "none" }}>{cut ? cut.label : g.read?.agree ? "Agree, but outside the rule" : g.read ? "Models split" : "One model or no line"}</b>
+        <span className={s.p}>{cut ? `${g.tier === "t1" ? "The rule" : "Tier 2"} in force since the last review: ${rec(cut.record)} on the games it picked.` : "Only games in the rule or Tier 2 become bets."}</span>
+      </div>
+      <div className={s.edgeCard}>
+        <span className={s.eyebrow}>Price</span>
+        <b className={s.closePick} style={{ textTransform: "none" }}>
+          {sentPrice !== undefined ? `Sent at ${price(sentPrice)}` : g.price !== undefined ? `${price(g.price)} at ${bookOf(g.ref, g.side) ?? "DraftKings"}` : "No price yet"}
+        </b>
+        <span className={s.p}>
+          {sentPrice !== undefined && g.p !== undefined
+            ? `Estimated edge ${((g.p * decimal(sentPrice) - 1) * 100).toFixed(1)}% per unit at the sent price.${g.price !== undefined && g.price !== sentPrice ? ` The price has since moved to ${price(g.price)} at ${bookOf(g.ref, g.side) ?? "DraftKings"}; your bet keeps ${price(sentPrice)}.` : ""}`
+            : g.p !== undefined && g.price !== undefined
+            ? `Estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit. ${
+                worst === null
+                  ? "It needs plus money to be a bet."
+                  : g.price >= worst
+                    ? `Still a bet down to ${price(worst)}; anything more expensive than that (${price(worst - 3)}, say) is a pass.`
+                    : `Too expensive at ${price(g.price)}: it needs ${price(worst)} or cheaper (${price(Math.min(-100, worst + 2))}, say) to be a bet.`
+              }`
+            : "Priced when a line is quoted and the game is in the rule or Tier 2."}
+        </span>
+      </div>
+      <div className={s.edgeCard}>
+        <span className={s.eyebrow}>Win chance</span>
+        <b className={s.closePick} style={{ textTransform: "none" }}>{g.p !== undefined ? `${(g.p * 100).toFixed(1)}%` : "·"}</b>
+        <span className={s.p}>{g.p !== undefined ? "An estimate from the tier's record so far, not a calibrated probability." : "Only rule and Tier 2 games carry one."}</span>
+      </div>
+    </div>
+  );
+}
+
+/** What opens under a board row: the chart, the three cards and every number, across the full width. */
+function GameExpand({ g, r }: { g: BoardGame; r: PicksReport }) {
+  const st = statusOf(g);
+  return (
+    <div className={s.expand}>
+      <div className={s.expandMain}>
+        <div className={s.expandChart}>
+          <MarketBlock g={g} r={r} />
+        </div>
+        <div className={s.expandNums}>{st === "final" ? <FinishedDetails g={g} r={r} /> : <WhyList g={g} r={r} />}</div>
+      </div>
+      <EdgeCards g={g} r={r} />
+      <Link href={gameHref(r, g)} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
+        Full breakdown: every step of the call ›
+      </Link>
+    </div>
+  );
+}
+
+/** A cut's test as checks against this game's read, in plain words. */
+function ruleChecks(rd: NonNullable<BoardGame["read"]>, t: CutTest, name: (side: "home" | "away") => string): { label: string; pass: boolean }[] {
+  const out: { label: string; pass: boolean }[] = [];
+  const f1 = (x: number) => x.toFixed(1);
+  if (t.pemSplit) {
+    out.push({ label: "Sam and David split", pass: !rd.agree });
+    out.push({ label: `PEM takes a side${rd.pemSide ? ` (${name(rd.pemSide)})` : ""}`, pass: !!rd.pemSide });
+    return out;
+  }
+  out.push({ label: rd.agree && rd.side ? `Sam and David on the same side (${name(rd.side)})` : "Sam and David on the same side", pass: rd.agree });
+  if (!rd.agree || rd.line === undefined) return out;
+  if (t.pem) out.push({ label: `PEM ${t.pem === "agree" ? "agrees" : "disagrees"}`, pass: !!rd.pemSide && (t.pem === "agree" ? rd.pemSide === rd.side : rd.pemSide !== rd.side) });
+  if (t.side) out.push({ label: `Pick is the ${t.side === "dog" ? "underdog" : "favorite"} (it is the ${rd.dog ? "underdog" : "favorite"})`, pass: t.side === "dog" ? !!rd.dog : !rd.dog });
+  if (t.venue) out.push({ label: `Pick is the ${t.venue} team (it is ${rd.side === "home" ? "home" : "on the road"})`, pass: t.venue === "home" ? rd.side === "home" : rd.side === "away" });
+  if (t.minAvgEdge !== undefined) out.push({ label: `Average edge at least ${t.minAvgEdge} (${f1(rd.avgEdge)})`, pass: rd.avgEdge >= t.minAvgEdge });
+  if (t.maxAvgEdge !== undefined) out.push({ label: `Average edge under ${t.maxAvgEdge} (${f1(rd.avgEdge)})`, pass: rd.avgEdge < t.maxAvgEdge });
+  if (t.minBothEdge !== undefined) out.push({ label: `Both models at least ${t.minBothEdge} off the line (smaller ${f1(rd.minEdge)})`, pass: rd.minEdge >= t.minBothEdge });
+  if (t.maxEachEdge !== undefined) out.push({ label: `Each model within ${t.maxEachEdge} of its line (larger ${f1(rd.maxEdge)})`, pass: rd.maxEdge <= t.maxEachEdge });
+  if (t.maxModelGap !== undefined) out.push({ label: `Models within ${t.maxModelGap} of each other (${f1(rd.modelGap)} apart)`, pass: rd.modelGap <= t.maxModelGap });
+  if (t.minModelGap !== undefined) out.push({ label: `Models more than ${t.minModelGap} apart (${f1(rd.modelGap)})`, pass: rd.modelGap > t.minModelGap });
+  if (t.minLine !== undefined) out.push({ label: `Pick's line ${line(t.minLine)} or more (${line(rd.line)})`, pass: rd.line >= t.minLine });
+  if (t.maxLine !== undefined) out.push({ label: `Pick's line under ${line(t.maxLine)} (${line(rd.line)})`, pass: rd.line < t.maxLine });
+  if (t.minAbsLine !== undefined) out.push({ label: `Line at least ${t.minAbsLine} either way (${Math.abs(rd.line)})`, pass: Math.abs(rd.line) >= t.minAbsLine });
+  if (t.maxAbsLine !== undefined) out.push({ label: `Line under ${t.maxAbsLine} either way (${Math.abs(rd.line)})`, pass: Math.abs(rd.line) < t.maxAbsLine });
+  if (t.flip !== undefined) out.push({ label: t.flip ? "Both models make the underdog the winner" : "Models keep the favorite winning", pass: rd.flip === t.flip });
+  return out;
+}
+
 export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
   const name = (k: string) => r.names[k] ?? k;
   const st = statusOf(g);
   const home = name(g.home);
   const away = name(g.away);
-  const market = g.ref?.line ?? g.david?.market ?? g.sam?.market;
   const st1 = r.strategies;
-  const cut = g.tier === "t1" ? st1.rule : g.tier === "t2" ? st1.second : null;
-  const proj = (x: number) => (Math.abs(x) < 0.05 ? "a pick'em" : `${x < 0 ? home : away} by ${Math.abs(Math.round(x * 10) / 10)}`);
-  const models = [g.sam?.model, g.david?.model].filter((x): x is number => x !== undefined);
-  const avg = models.length ? models.reduce((a, x) => a + x, 0) / models.length : null;
   const tot = r.totals.board.find((t) => t.home === g.home && t.away === g.away);
-  const worst = g.p !== undefined ? worstPrice(g.p) : null;
-  const sentPrice = st === "sent" ? g.issued?.price : undefined;
+  const sideName = (x: "home" | "away") => (x === "home" ? home : away);
+  const inCuts = g.read ? st1.cuts.filter((c) => matches(g.read!, c.test)).sort((a, b) => b.record.lo - a.record.lo) : [];
+  const steps: { k: string; v: string }[] = [
+    { k: "1. Read both models", v: g.sam && g.david ? `Sam ${home} ${line(Math.round(g.sam.model * 10) / 10)}, David ${home} ${line(Math.round(g.david.model * 10) / 10)}, each against the line on its own site.` : "Needs both Sam and David; one is missing, so there is no read." },
+    { k: "2. Same side?", v: g.read ? (g.read.agree && g.read.side ? `Yes: both like ${sideName(g.read.side)}, average edge ${g.read.avgEdge.toFixed(1)} pts.` : "No: they split, so no spread bet.") : "No read." },
+    { k: "3. Rule and Tier 2", v: g.tier === "t1" ? `In the rule: ${st1.rule?.label}.` : g.tier === "t2" ? `In Tier 2: ${st1.second?.label}.` : g.tier === "wait" ? "Waiting on PEM's line to decide." : "Outside both, so tracked only." },
+    { k: "4. Win chance", v: g.p !== undefined ? `${(g.p * 100).toFixed(1)}%, the tier's record pulled toward 50% (an estimate).` : "Only rule and Tier 2 games get one." },
+    { k: "5. Price check", v: g.p === undefined ? "Not needed." : g.price === undefined ? "No quoted price yet." : g.eligible ? `Passes at ${priceWithBook(price(g.price), g.ref, g.side)}.` : pricedWhy(g) },
+    { k: "6. Stake and limits", v: st === "bet" || st === "early" || st === "sent" ? (st === "sent" ? `Sent: ${g.issued!.units}u at ${price(g.issued!.price)}.` : stakeWhy(g, r)) : st === "budget" ? `Worth ${g.want}u, but ${g.limited ?? "the limits leave no room"}.` : "No stake." },
+    { k: "7. Timing", v: g.held && g.stake ? `Held as an early look until ${kickoffEt(g.held)} on game day.` : st === "sent" ? "Issued on game day." : "Every game locks at 9am ET on its own game day." },
+  ];
   const eyebrow = `${["bet", "sent", "early"].includes(st) ? "Best bet" : STATUS_TEXT[st]} · ${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` Week ${r.week}` : ""}`;
   return (
     <section className={s.section} aria-labelledby="game">
@@ -950,67 +1068,68 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
         <h1 className={s.heroH} id="game" style={{ fontSize: "clamp(44px, 8vw, 72px)" }}>
           {g.side ? pickText(g, name) : `${away} at ${home}`}
         </h1>
-        <p className={s.heroSub}>{`${away} at ${home} · ${kickoffEt(g.ref?.kickoff)}`}</p>
-        <div className={s.chips} style={{ marginTop: 6 }}>
+        <p className={s.heroSub}>{`${away} at ${home} · ${kickoffEt((g.ref ?? g.lastRef)?.kickoff)}${(g.ref ?? g.lastRef)?.tv ? ` · ${(g.ref ?? g.lastRef)!.tv}` : ""}`}</p>
+        <div className={s.chips} style={{ marginTop: 6, display: st === "early" || st === "bet" || st === "sent" || g.final ? undefined : "none" }}>
           {st === "early" && <span className={`${s.chip} ${s.chipLock}`}>{`Locks ${kickoffEt(g.held)}`}</span>}
           {(st === "bet" || st === "sent" || st === "early") && <span className={s.chip}>{`${st === "sent" ? g.issued!.units : g.stake}u at ${price(st === "sent" ? g.issued!.price : g.price)}`}</span>}
           {g.final && <span className={s.chip}>{`Final: ${away} ${g.final.away}, ${home} ${g.final.home}`}</span>}
         </div>
       </div>
 
-      {market !== undefined && (
+      <div className={s.curveBox}>
+        <h2 className={s.h2}>Market vs models</h2>
+        <MarketBlock g={g} r={r} />
+      </div>
+
+      <EdgeCards g={g} r={r} />
+
+      <div className={s.curveBox}>
+        <h2 className={s.h2}>How the call was made</h2>
+        <dl className={s.kv}>
+          {steps.map((x) => (
+            <Fragment key={x.k}>
+              <dt>{x.k}</dt>
+              <dd>{x.v}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      </div>
+
+      {g.read && (st1.rule || st1.second) && (
         <div className={s.curveBox}>
-          <h2 className={s.h2}>Market vs models</h2>
-          <MarketLine market={market} sam={g.sam ? Math.round(g.sam.model * 10) / 10 : undefined} david={g.david ? Math.round(g.david.model * 10) / 10 : undefined} pem={r.league === "cfb" && g.pem ? g.pem.model : undefined} fmt={(x) => `${home} ${line(x)}`}
-          pk={{ below: home, above: name(g.away) }} />
-          {avg !== null && (
-            <p className={s.p}>
-              {`The models have ${proj(avg)}${models.length > 1 ? " on average" : ""}. The market has ${proj(market)}.${g.read?.agree && g.side ? ` So ${name(g.side === "home" ? g.home : g.away)} gets ${g.read.avgEdge.toFixed(1)} more points than the models think it needs.` : g.read && !g.read.agree ? " Sam and David are on different sides, so no spread bet." : ""}`}
-            </p>
-          )}
-          <MarketKey pem={r.league === "cfb"} />
+          <h2 className={s.h2}>The rule&apos;s tests, one by one</h2>
+          {[st1.rule, st1.second].filter((c): c is CutResult => !!c).map((c) => (
+            <div key={c.id}>
+              <div className={s.eyebrow}>{`${c.id === st1.rule?.id ? "The rule" : "Tier 2"}: ${c.label} (${rec(c.record)})`}</div>
+              <ul className={s.checks}>
+                {ruleChecks(g.read!, c.test, sideName).map((x) => (
+                  <li key={x.label} className={x.pass ? s.checkPass : s.checkFail}>
+                    <span aria-hidden>{x.pass ? "Yes" : "No"}</span>
+                    {x.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
 
-      <div className={s.edgeGrid} style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))" }}>
-        <div className={s.edgeCard}>
-          <span className={s.eyebrow}>{["bet", "sent", "early"].includes(st) ? "Why it is a bet" : "Why it is not a bet"}</span>
-          <b className={s.closePick} style={{ textTransform: "none" }}>{cut ? cut.label : g.read?.agree ? "Agree, but outside the rule" : g.read ? "Models split" : "One model or no line"}</b>
-          <span className={s.p}>{cut ? `${g.tier === "t1" ? "The rule" : "Tier 2"} in force since the last review: ${rec(cut.record)} on the games it picked.` : "Only games in the rule or Tier 2 become bets."}</span>
-          <Link href={`/picks${r.league === "cfb" ? "/cfb" : ""}?v=research`} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
-            See the rule&apos;s record ›
-          </Link>
+      {inCuts.length > 0 && (
+        <div className={s.curveBox}>
+          <h2 className={s.h2}>{`Every tested cut this game falls in (${inCuts.length})`}</h2>
+          <p className={s.thin}>How games like this one have done at -110, best low end first. Only the rule and Tier 2 stake.</p>
+          <div className={s.board}>
+            {inCuts.map((c) => (
+              <StrategyRow key={c.id} label={c.label} r={c.record} mark={st1.rule?.id === c.id ? "rule" : st1.second?.id === c.id ? "second" : undefined} />
+            ))}
+          </div>
         </div>
-        <div className={s.edgeCard}>
-          <span className={s.eyebrow}>Price</span>
-          <b className={s.closePick} style={{ textTransform: "none" }}>
-            {sentPrice !== undefined ? `Sent at ${price(sentPrice)}` : g.price !== undefined ? `${price(g.price)} at ${bookOf(g.ref, g.side) ?? "DraftKings"}` : "No price yet"}
-          </b>
-          <span className={s.p}>
-            {sentPrice !== undefined && g.p !== undefined
-              ? `Estimated edge ${((g.p * decimal(sentPrice) - 1) * 100).toFixed(1)}% per unit at the sent price.${g.price !== undefined && g.price !== sentPrice ? ` The price has since moved to ${price(g.price)} at ${bookOf(g.ref, g.side) ?? "DraftKings"}; your bet keeps ${price(sentPrice)}.` : ""}`
-              : g.p !== undefined && g.price !== undefined
-              ? `Estimated edge ${((g.p * decimal(g.price) - 1) * 100).toFixed(1)}% per unit. ${
-                  worst === null
-                    ? "It needs plus money to be a bet."
-                    : g.price >= worst
-                      ? `Still a bet down to ${price(worst)}; anything more expensive than that (${price(worst - 3)}, say) is a pass.`
-                      : `Too expensive at ${price(g.price)}: it needs ${price(worst)} or cheaper (${price(Math.min(-100, worst + 2))}, say) to be a bet.`
-                }`
-              : "Priced when a line is quoted."}
-          </span>
-        </div>
-        <div className={s.edgeCard}>
-          <span className={s.eyebrow}>Win chance</span>
-          <b className={s.closePick} style={{ textTransform: "none" }}>{g.p !== undefined ? `${(g.p * 100).toFixed(1)}%` : "·"}</b>
-          <span className={s.p}>{g.p !== undefined ? "An estimate from the tier's record so far, not a calibrated probability." : "Only rule and Tier 2 games carry one."}</span>
-        </div>
-      </div>
+      )}
 
       {g.close && (g.close.open !== null || g.close.close !== null) && (
         <div className={s.curveBox}>
           <h2 className={s.h2}>Line since open</h2>
-          <p className={s.p}>{`${home} ${g.close.open !== null ? line(g.close.open) : "?"} at open → ${g.close.close !== null ? line(g.close.close) : "?"} at close.`}</p>
+          <p className={s.p}>{`${home} ${g.close.open !== null ? line(g.close.open) : "?"} at open, ${g.close.close !== null ? line(g.close.close) : "?"} at close.`}</p>
         </div>
       )}
 
@@ -1030,6 +1149,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
     </section>
   );
 }
+
 
 /** Tracked only: every tier pick at -115 or better, 1u flat, bet or not (price-shadow.ts). */
 function PriceShadowPanel({ x, name }: { x: NonNullable<PicksReport["priceShadow"]>; name: (k: string) => string }) {

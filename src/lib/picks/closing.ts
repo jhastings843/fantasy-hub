@@ -45,6 +45,7 @@ export interface EspnEventRef {
 const ESPN_NFL: { [abbr: string]: string } = { WSH: "WAS", LAR: "LA" };
 
 interface EspnTeam {
+  id?: string;
   abbreviation?: string;
   location?: string;
 }
@@ -60,6 +61,7 @@ interface EspnScoreboard {
     status?: { type?: { completed?: boolean; state?: string } };
     competitions?: Array<{
       competitors?: EspnCompetitor[];
+      broadcasts?: { names?: string[] }[];
       odds?: Array<{
         spread?: number;
         overUnder?: number;
@@ -104,11 +106,19 @@ export function parseCurrentOdds(
       ...(typeof o.overUnder === "number" ? { total: o.overUnder } : {}),
       ...Object.fromEntries(Object.entries(prices).filter(([, v]) => v !== undefined)),
       ...(e.date ? { kickoff: e.date } : {}),
+      ...teamsOf(e.competitions?.[0]),
       source: `${o.provider?.name ?? "Sportsbook"} via ESPN`,
       fetchedAt,
     });
   });
   return out;
+}
+
+/** ESPN's team ids (college logos) and the first listed channel, when the scoreboard carries them. */
+function teamsOf(c?: { competitors?: EspnCompetitor[]; broadcasts?: { names?: string[] }[] }): Pick<RefLine, "homeId" | "awayId" | "tv"> {
+  const id = (side: string) => c?.competitors?.find((x) => x.homeAway === side)?.team?.id;
+  const tv = c?.broadcasts?.flatMap((b) => b.names ?? [])[0];
+  return { ...(id("home") ? { homeId: id("home") } : {}), ...(id("away") ? { awayId: id("away") } : {}), ...(tv ? { tv } : {}) };
 }
 
 /** Scoreboard events as team keys the picks engine can join on. */

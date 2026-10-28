@@ -111,4 +111,22 @@ describe("current reference lines", () => {
     expect(later.has("6:SEA@DEN")).toBe(false);
     expect(later.has("6:HOU@JAX")).toBe(false);
   });
+
+  it("carries ESPN team ids and the channel for the board's logos and kickoff line", () => {
+    const data = {
+      events: [{
+        id: "1", date: "2026-10-31T16:00Z", status: { type: { state: "pre" } },
+        competitions: [{
+          competitors: [
+            { homeAway: "home", team: { id: "2", abbreviation: "AUB", location: "Auburn" } },
+            { homeAway: "away", team: { id: "333", abbreviation: "ALA", location: "Alabama" } },
+          ],
+          broadcasts: [{ names: ["CBS"] }],
+          odds: [{ spread: 3.5, provider: { name: "DraftKings" } }],
+        }],
+      }],
+    };
+    const [ref] = [...parseCurrentOdds("cfb", 10, data, "t").values()];
+    expect(ref).toMatchObject({ homeId: "2", awayId: "333", tv: "CBS", line: 3.5 });
+  });
 });

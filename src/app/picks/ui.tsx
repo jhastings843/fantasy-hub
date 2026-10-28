@@ -1,6 +1,9 @@
 // Shared bits for the Picks views: formatting, small components.
 import { BREAK_EVEN, MIN_SAMPLE, type Record as Rec, type Tier } from "@/lib/picks/engine";
 import type { League } from "@/lib/picks/parse";
+import type { RefLine } from "@/lib/picks/engine";
+import { TeamLogo } from "@/components/TeamLogo";
+import type { ReactNode } from "react";
 import s from "./picks.module.css";
 
 export const LEAGUE_NAME: { [k in League]: string } = { nfl: "NFL", cfb: "College" };
@@ -109,4 +112,32 @@ export function drawdown(steps: number[]): number {
     worst = Math.max(worst, peak - run);
   }
   return Math.round(worst * 100) / 100;
+}
+
+/**
+ * A board row's game: away over home, each with its logo, and the kickoff
+ * (with the channel when ESPN lists one) underneath, so every row lines up
+ * the same whatever the team names. `status` replaces the kickoff line
+ * (live score, final) and `extra` adds a chip after the home team.
+ */
+export function GameCell({ league, away, home, awayName, homeName, quote, status, extra }: { league: League; away: string; home: string; awayName: string; homeName: string; quote?: Pick<RefLine, "kickoff" | "tv" | "homeId" | "awayId">; status?: ReactNode; extra?: ReactNode }) {
+  const lg = league === "nfl" ? "nfl" : "cfb";
+  const when = quote?.kickoff ? `${kickoffEt(quote.kickoff)}${quote.tv ? ` · ${quote.tv}` : ""}` : undefined;
+  return (
+    <span className={s.matchCell}>
+      <span className={s.matchTeam}>
+        <TeamLogo league={lg} team={away} espnId={quote?.awayId} size={18} />
+        <span className={s.matchName}>{awayName}</span>
+      </span>
+      <span className={s.matchTeam}>
+        <TeamLogo league={lg} team={home} espnId={quote?.homeId} size={18} />
+        <span className={s.matchName}>
+          <span className={s.matchAt}>at </span>
+          {homeName}
+        </span>
+        {extra}
+      </span>
+      <span className={s.matchWhen}>{status ?? when ?? "time TBD"}</span>
+    </span>
+  );
 }

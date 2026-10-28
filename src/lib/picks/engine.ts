@@ -533,6 +533,10 @@ export interface RefLine {
   underPrice?: number;
   /** Scheduled kickoff (ISO). */
   kickoff?: string;
+  /** ESPN team ids (college logos) and the TV channel, from the same scoreboard read. */
+  homeId?: string;
+  awayId?: string;
+  tv?: string;
   /** Where it came from, e.g. "DraftKings via ESPN". */
   source: string;
   /** When we read it (the feed carries no quote time of its own). */

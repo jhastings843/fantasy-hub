@@ -4,11 +4,12 @@
 import type { League } from "@/lib/picks/parse";
 import { redisStore } from "@/lib/picks/learning/store";
 import type { JournalEntry } from "@/lib/picks/learning/review";
-import { Background, CutRanges, Hero, LearnerLog, TrackingProgress, type CutRow, type LogEntry } from "./board";
+import { CutRanges, Hero, LearnerLog, TrackingProgress, type CutRow, type LogEntry } from "./board";
 import { getPicksReport } from "@/lib/picks/report";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { LearningPanel, OTHER, leagueOf, marketOf } from "./learning";
-import { LEAGUE_NAME, whenEt, type Market } from "./ui";
+import Link from "next/link";
+import { LEAGUE_NAME, href, whenEt, type Market } from "./ui";
 import s from "./picks.module.css";
 
 const KIND: { [k in JournalEntry["kind"]]?: LogEntry["kind"] } = {
@@ -88,14 +89,20 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
         <h3 className={s.h2}>Latest</h3>
         <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the next review." />
       </div>
-      <div className={s.section}>
-        <h3 className={s.h2}>Cut comparisons</h3>
-        <p className={s.p}>{AGAINST[market]}</p>
-        <CutRanges title={`${LEAGUE_NAME[league]} ${MARKET_NAME[market].toLowerCase()}`} rows={cuts} open />
-      </div>
-      <Background title="Review details: stake sizing, every idea being tested, scheduler health">
-        <LearningPanel league={league} market={market} />
-      </Background>
+      {market === "ats" ? (
+        // Spreads' every-cut table already lives on Research; repeating it here read as a second, different list.
+        <p className={s.p}>
+          {`${AGAINST[market]} Every cut's record and range is on `}
+          <Link href={href(league, "ats", "research")}>Research</Link>.
+        </p>
+      ) : (
+        <div className={s.section}>
+          <h3 className={s.h2}>Cut comparisons</h3>
+          <p className={s.p}>{AGAINST[market]}</p>
+          <CutRanges title={`${LEAGUE_NAME[league]} ${MARKET_NAME[market].toLowerCase()}`} rows={cuts} open />
+        </div>
+      )}
+      <LearningPanel league={league} market={market} />
     </section>
   );
 }

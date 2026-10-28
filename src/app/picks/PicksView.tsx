@@ -3,7 +3,7 @@ import { getPicksReport, SOURCES, type PicksReport } from "@/lib/picks/report";
 import type { League } from "@/lib/picks/parse";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "@/lib/picks/limits";
 import { getPoolShares, getPoolTrack } from "@/lib/picks/pool-store";
-import { AtsResearch, AtsResults, AtsWeek } from "./ats";
+import { AtsResearch, AtsResults, AtsWeek, weekLedgers } from "./ats";
 import { SuResearch, SuResults, SuWeek, TotalsResearch, TotalsResults, TotalsWeek } from "./su-totals";
 import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
@@ -91,6 +91,9 @@ export default async function PicksView({ league, market: asked, view }: { leagu
                 </Link>
               ))}
             </nav>
+            <Link className={s.chip} href={`/picks/model?l=${league}`}>
+              How it works
+            </Link>
             {anyLive && view === "week" && (
               <span className={s.liveRefresh}>
                 <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />
@@ -98,7 +101,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
             )}
           </div>
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
-          {view !== "week" && <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />}
+          {view !== "week" && <TopStats r={r} market={market} testing={testing} logHref={href(league, market, "log")} />}
         </header>
         {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
 
@@ -113,7 +116,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
         {view === "log" && <PicksLog league={league} market={market} />}
-        {view === "week" && <TopStats r={r} testing={testing} logHref={href(league, market, "log")} />}
+        {view === "week" && <TopStats r={r} market={market} testing={testing} logHref={href(league, market, "log")} />}
 
         <Background title="Budget and exposure">
           <RiskStrip r={r} coreStale={fresh?.stale ?? false} coreAt={fresh?.at ?? r.generatedAt} />
@@ -184,19 +187,42 @@ function lineupAside(r: PicksReport, market: Market): string {
   return "No stakes in straight up.";
 }
 
-/** The four numbers that matter, on every view: season, this week, the rule in force, the learner. */
-function TopStats({ r, testing, logHref }: { r: PicksReport; testing: number; logHref: string }) {
-  const u = r.units.total;
-  const wk = r.units.byWeek.find((w) => w.week === r.week)?.ledger;
-  const rule = r.strategies.rule;
+/** The four numbers that matter, on every view: this market's season, its week, its rule, and the learner. Markets never combine. */
+function TopStats({ r, market, testing, logHref }: { r: PicksReport; market: Market; testing: number; logHref: string }) {
+  const L = LEAGUE_NAME[r.league];
+  const label = MARKETS.find((m) => m.id === market)!.label;
+  const finals = `${r.board.filter((g) => g.final).length} of ${r.board.length} games final`;
+  const learner = { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={logHref}>Open the log</Link>, small: true };
+  if (market === "su") {
+    const season = r.live.reduce((t, w) => ({ w: t.w + w.su.w, l: t.l + w.su.l }), { w: 0, l: 0 });
+    const wk = r.live.find((w) => w.week === r.week)?.su;
+    return (
+      <Stats
+        label={`${L} straight up: season, this week, method and learner`}
+        items={[
+          { k: `${L} straight up`, v: season.w + season.l ? `${season.w}-${season.l}` : "0-0", sub: "winners picked, no stakes" },
+          { k: "This week", v: wk && wk.w + wk.l ? `${wk.w}-${wk.l}` : "0-0", sub: finals },
+          { k: "Method in force", v: r.su.best?.label ?? "Models' average", sub: r.su.best ? `${r.su.best.w}-${r.su.best.l} this season` : "default", small: true },
+          learner,
+        ]}
+      />
+    );
+  }
+  const kind = market === "ou" ? "total" : "spread";
+  const led = market === "ou" ? r.units.byTier.totals : (() => {
+    const { t1, t2 } = r.units.byTier;
+    return { w: t1.w + t2.w, l: t1.l + t2.l, p: t1.p + t2.p, units: t1.units + t2.units };
+  })();
+  const wk = weekLedgers(r, kind).find((w) => w.week === r.week);
+  const rule = market === "ou" ? r.totals.backtest.rule : r.strategies.rule;
   return (
     <Stats
-      label="Season, this week, rule and learner"
+      label={`${L} ${label.toLowerCase()}: season, this week, rule and learner`}
       items={[
-        { k: `Season (${LEAGUE_NAME[r.league]})`, v: u.w + u.l + u.p ? units(u.units) : "0-0", sub: u.w + u.l + u.p ? `${rec(u)} at the price taken` : "no bets settled", tone: u.w + u.l ? (u.units >= 0 ? "up" : "down") : undefined },
-        { k: "This week", v: wk && wk.w + wk.l + wk.p ? rec(wk) : "0-0", sub: `${r.board.filter((g) => g.final).length} of ${r.board.length} games final` },
+        { k: `${L} ${label.toLowerCase()}`, v: led.w + led.l + led.p ? units(led.units) : "0-0", sub: led.w + led.l + led.p ? `${rec(led)} at the price taken` : "no bets settled", tone: led.w + led.l ? (led.units >= 0 ? "up" : "down") : undefined },
+        { k: "This week", v: wk && wk.w + wk.l + wk.p ? rec(wk) : "0-0", sub: finals },
         { k: "Rule in force", v: rule ? rule.label : "None yet", sub: rule ? `${rec(rule.record)} since tracking` : "nothing clears the bar", small: true },
-        { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={logHref}>Open the log</Link>, small: true },
+        learner,
       ]}
     />
   );

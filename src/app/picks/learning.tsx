@@ -4,7 +4,7 @@ import type { SizingState } from "@/lib/picks/learning/review";
 import type { Summary } from "@/lib/picks/learning/model";
 import { loadOps } from "@/lib/picks/ops";
 import Link from "next/link";
-import { type Market, href, whenEt } from "./ui";
+import { type Market, whenEt } from "./ui";
 import s from "./picks.module.css";
 
 // Strategy review status: last reviewed, what changed and why, next review,
@@ -45,22 +45,24 @@ export async function LearningPanel({ league, market }: { league: League; market
     redisStore.active(),
   ]);
   const mine = (state?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && marketOf(d.id) === market);
-  // The review status, journal and scheduler health are shared by every
-  // market, so they show once, under Spreads; the others list their own hypotheses.
-  const full = market === "ats";
   const health = Object.entries(ops);
+  const failing = health.filter(([, h]) => h.lastFailure && (!h.lastSuccess || h.lastFailure > h.lastSuccess));
+  const sizing = state?.sizing ?? [];
+  const closestSizing = sizing.slice().sort((a, b) => b.n - a.n)[0];
+  const count = (v: string) => mine.filter((d) => d.verdict === v).length;
+  const next = state ? whenEt(state.nextReviewAt) : "the next pulse";
+  const latest = journal[0];
   return (
     <section className={s.section} aria-labelledby="learning">
       <div className={s.sectionHead}>
         <h2 className={s.h2} id="learning">Strategy review</h2>
         <p className={s.p}>
-          Runs once a week, Tuesday at 7am ET, compares the active
-          policy with registered challengers on the same games, and only changes something when the evidence clears a
-          fixed bar. The rule and Tier 2 are set right after it and hold all week; games that finish mid-week count from the next review. It can never raise a limit, change grading, or rewrite what was sent.
+          Runs the morning after each slate (Friday, Sunday, Monday and Tuesday, 7am ET), compares the active policy with
+          registered challengers on the same games, and changes something only when the evidence clears a fixed bar. Each
+          part (the rule, totals, straight up, staking, each source) can change at most once per NFL week, and a rollback
+          counts as that week&apos;s change. It can never raise a limit, change grading, or rewrite what was sent.
         </p>
       </div>
-      {full && (
-        <>
       <dl className={s.strip} aria-label="Review status">
         <div>
           <dt>Last reviewed</dt>
@@ -76,30 +78,42 @@ export async function LearningPanel({ league, market }: { league: League; market
         </div>
         <div>
           <dt>Next review</dt>
-          <dd className={s.num}>{state ? whenEt(state.nextReviewAt) : "next pulse"}</dd>
+          <dd className={s.num}>{next}</dd>
         </div>
       </dl>
-      {state && (
-        <p className={s.p}>
-          <b>Why: </b>
-          {journal.find((j) => j.kind === "review")?.why ?? state.lastOutcome}
-        </p>
-      )}
       <p className={s.thin}>{active.summary}</p>
-      {state?.calibration && (
-        <p className={s.thin}>
-          {state.calibration.n
-            ? `Probability check: ${state.calibration.n} settled issued bets, mean estimate ${(state.calibration.meanP * 100).toFixed(1)}%, actual ${(state.calibration.winRate * 100).toFixed(1)}%. Stakes may only size up once 50+ bets agree within 5 points.`
-            : "Probability check: no settled issued bets with a stored estimate yet, so the estimates are unproven and stakes can't size up."}
-        </p>
-      )}
-      <SizingBlock rows={state?.sizing} live={active.summary.split(";")[0]} next={state ? whenEt(state.nextReviewAt) : "the next pulse"} />
-        </>
-      )}
-      {mine.length > 0 && (
-        <details className={s.details}>
-          <summary>{`Hypotheses being tested (${mine.length})`}</summary>
+      {/* The four parts of the review at a glance; each opens across the full width for the detail. */}
+      <div className={s.srGrid}>
+        <details className={s.srCard}>
+          <summary>
+            <span className={s.eyebrow}>Stake sizing</span>
+            <b>{active.summary.split(";")[0]}</b>
+            <small>
+              {closestSizing
+                ? `${sizing.length} challenger${sizing.length === 1 ? "" : "s"}; closest ${closestSizing.label}: ${closestSizing.n} bets over ${closestSizing.weeks} wk, ${closestSizing.verdict === "promote" ? "clears the bar" : "collecting"}`
+                : `Comparison starts at the review on ${next}`}
+            </small>
+            {state?.calibration?.n ? <small>{`Probability check: ${state.calibration.n} bets, estimate ${(state.calibration.meanP * 100).toFixed(1)}% vs actual ${(state.calibration.winRate * 100).toFixed(1)}%`}</small> : null}
+          </summary>
+          <div className={s.cardsInset}>
+            {state?.calibration && (
+              <p className={s.thin}>
+                {state.calibration.n
+                  ? `Probability check: ${state.calibration.n} settled issued bets, mean estimate ${(state.calibration.meanP * 100).toFixed(1)}%, actual ${(state.calibration.winRate * 100).toFixed(1)}%. Stakes may only size up once 50+ bets agree within 5 points.`
+                  : "Probability check: no settled issued bets with a stored estimate yet, so the estimates are unproven and stakes can't size up."}
+              </p>
+            )}
+            <SizingBlock rows={state?.sizing} live={active.summary.split(";")[0]} next={next} />
+          </div>
+        </details>
+        <details className={s.srCard}>
+          <summary>
+            <span className={s.eyebrow}>Ideas being tested</span>
+            <b>{mine.length ? `${mine.length} idea${mine.length === 1 ? "" : "s"}` : "None yet"}</b>
+            <small>{mine.length ? [count("promote") && `${count("promote")} promoted`, count("retain") && `${count("retain")} collecting`, count("report") && `${count("report")} report only`, count("reject") && `${count("reject")} rejected`].filter(Boolean).join(" · ") : EMPTY[market] || "They register at the next review."}</small>
+          </summary>
           <ul className={`${s.journal} ${s.cardsInset}`}>
+            {mine.length === 0 && <li>{EMPTY[market] || "Nothing registered yet."}</li>}
             {mine.map((d) => (
               <li key={d.id}>
                 <b>{d.label}</b> <span className={s.statusChip}>{VERDICT[d.verdict] ?? d.verdict}</span>
@@ -108,44 +122,42 @@ export async function LearningPanel({ league, market }: { league: League; market
             ))}
           </ul>
         </details>
-      )}
-      {full ? (
-        <>
-      <details className={s.details}>
-        <summary>{`Learning journal (latest ${journal.length})`}</summary>
-        <ul className={`${s.journal} ${s.cardsInset}`}>
-          {journal.length === 0 && <li>Nothing recorded yet.</li>}
-          {journal.map((j, i) => (
-            <li key={`${j.at}-${i}`}>
-              <div className={s.thin}>{`${whenEt(j.at)} · ${j.kind}`}</div>
-              <b>{j.title}</b>
-              <div>{j.why}</div>
-              {j.rollbackTarget && <div className={s.thin}>{`Rollback target: ${j.rollbackTarget}`}</div>}
-            </li>
-          ))}
-        </ul>
-      </details>
-      <details className={s.details}>
-        <summary>Scheduler health</summary>
-        <ul className={`${s.journal} ${s.cardsInset}`}>
-          {health.length === 0 && <li>No scheduled runs recorded yet.</li>}
-          {health.map(([name, h]) => (
-            <li key={name}>
-              <b>{name}</b>
-              <div className={s.thin}>{`last success ${whenEt(h.lastSuccess)} · next expected ${whenEt(h.nextExpected)}${h.lastFailure ? ` · last failure ${whenEt(h.lastFailure)}: ${h.lastError}` : ""}`}</div>
-              {h.detail && <div className={s.thin}>{h.detail}</div>}
-            </li>
-          ))}
-        </ul>
-      </details>
-        </>
-      ) : (
-        <p className={s.thin}>
-          {mine.length === 0 ? `${EMPTY[market]} ` : ""}
-          The review status, learning journal and scheduler health are under{" "}
-          <Link href={href(league, "ats", "log")}>the Spreads learner log</Link>.
-        </p>
-      )}
+        <details className={s.srCard}>
+          <summary>
+            <span className={s.eyebrow}>Learning journal</span>
+            <b>{latest ? latest.title : "Nothing recorded yet"}</b>
+            <small>{latest ? `${whenEt(latest.at)} · ${journal.length} recent entries` : "The first entry comes from the next review."}</small>
+          </summary>
+          <ul className={`${s.journal} ${s.cardsInset}`}>
+            {journal.length === 0 && <li>Nothing recorded yet.</li>}
+            {journal.map((j, i) => (
+              <li key={`${j.at}-${i}`}>
+                <div className={s.thin}>{`${whenEt(j.at)} · ${j.kind}`}</div>
+                <b>{j.title}</b>
+                <div>{j.why}</div>
+                {j.rollbackTarget && <div className={s.thin}>{`Rollback target: ${j.rollbackTarget}`}</div>}
+              </li>
+            ))}
+          </ul>
+        </details>
+        <details className={s.srCard}>
+          <summary>
+            <span className={s.eyebrow}>Scheduler health</span>
+            <b className={failing.length ? s.neg : undefined}>{health.length ? (failing.length ? `${failing.length} of ${health.length} jobs failing` : `All ${health.length} jobs running`) : "No runs recorded"}</b>
+            <small>{failing.length ? failing.map(([n]) => n).join(", ") : health.length ? "Last success and next run for each inside" : "Shows once the first scheduled run reports."}</small>
+          </summary>
+          <ul className={`${s.journal} ${s.cardsInset}`}>
+            {health.length === 0 && <li>No scheduled runs recorded yet.</li>}
+            {health.map(([name, h]) => (
+              <li key={name}>
+                <b>{name}</b>
+                <div className={s.thin}>{`last success ${whenEt(h.lastSuccess)} · next expected ${whenEt(h.nextExpected)}${h.lastFailure ? ` · last failure ${whenEt(h.lastFailure)}: ${h.lastError}` : ""}`}</div>
+                {h.detail && <div className={s.thin}>{h.detail}</div>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
       <p className={s.thin}>
         <Link href="/learning">Every section&apos;s learning on one page</Link>, Picks and Props.
       </p>
@@ -164,9 +176,8 @@ const tone = (x: number) => (x > 0 ? s.pos : x < 0 ? s.neg : undefined);
  */
 function SizingBlock({ rows, live, next }: { rows?: SizingState[]; live: string; next: string }) {
   return (
-    <details className={s.details} open>
-      <summary>Stake sizing</summary>
-      <div className={s.cardsInset}>
+    <div>
+      <div>
         <p className={s.thin}>
           {`Live: ${live}. Challengers are replayed send by send through the same limits (weekly budget, open bets, per game, the other sport's held plays), using only what was known at each 9am decision. Bets a policy couldn't afford count as zero.`}
         </p>
@@ -175,7 +186,7 @@ function SizingBlock({ rows, live, next }: { rows?: SizingState[]; live: string;
           <SizingCard key={r.id} r={r} next={next} />
         ))}
       </div>
-    </details>
+    </div>
   );
 }
 
