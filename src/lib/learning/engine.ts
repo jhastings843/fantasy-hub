@@ -30,6 +30,8 @@ export interface Bet {
   net: number;
   /** Did the line move toward (1) or against (-1) the bet before kickoff (0 or absent: no move or unknown)? */
   toward?: number;
+  /** Unique id of the bet (game, player, market, side). Slices whose bets carry one can be combined by the learner. */
+  key?: string;
 }
 
 export interface Candidate {
@@ -94,6 +96,71 @@ export interface SectionState {
   lastReviewWeek?: number;
   /** The slate (ET date) the last review ran on. */
   lastReviewSlate?: string;
+  /** Slices the learner proposed itself: the bets two base slices share. */
+  generated?: Generated[];
+}
+
+/** A combined slice: the bets base slice `a` shares with base slice `b`, judged against `a`. */
+export interface Generated {
+  id: string;
+  a: string;
+  b: string;
+  label: string;
+  at: string;
+}
+
+/** At most this many learner-made slices collecting per section, and this many new per review. */
+export const MAX_GENERATED = 6;
+const NEW_GENERATED = 2;
+
+/** The code's slices plus the learner's own combinations, rebuilt from the same bets each run. */
+export function expand(s: SectionState, cands: Candidate[]): Candidate[] {
+  const byId = new Map(cands.map((c) => [c.id, c]));
+  const out = [...cands];
+  for (const g of s.generated ?? []) {
+    const a = byId.get(g.a);
+    const b = byId.get(g.b);
+    if (!a || !b || byId.has(g.id)) continue;
+    const keys = new Set(b.bets.map((x) => x.key).filter((k): k is string => !!k));
+    out.push({ id: g.id, label: g.label, parent: g.a, bets: a.bets.filter((x) => x.key && keys.has(x.key)) });
+  }
+  return out;
+}
+
+/**
+ * New combinations from the evidence (Jack, 2026-10-27: let the learners add
+ * slices). The strongest base slices so far, each with every other base
+ * slice; a combination must share enough past bets to be worth testing and
+ * be narrower than both. It then starts from zero like any slice: only games
+ * after it registers count, and it must beat the slice it narrows.
+ */
+function proposeCombos(gate: Gate, s: SectionState, base: Candidate[], ev: Map<string, Evidence>, now: string): Generated[] {
+  const have = new Set((s.generated ?? []).map((g) => g.id));
+  const collecting = (s.generated ?? []).filter((g) => s.entries[g.id]?.status === "collecting").length;
+  const room = Math.min(NEW_GENERATED, MAX_GENERATED - collecting);
+  if (room <= 0) return [];
+  const keyed = base.filter((c) => c.bets.length > 0 && c.bets.every((b) => b.key));
+  const strong = keyed
+    .filter((c) => {
+      const e = ev.get(c.id);
+      return !!e && e.games >= Math.ceil(gate.minGames / 2) && e.units > 0 && e.t > 0;
+    })
+    .sort((x, y) => ev.get(y.id)!.t - ev.get(x.id)!.t)
+    .slice(0, 3);
+  const out: Generated[] = [];
+  for (const a of strong) {
+    for (const b of keyed) {
+      if (out.length >= room) return out;
+      if (a.id === b.id) continue;
+      const id = `gen:${[a.id, b.id].sort().join("&")}`;
+      if (have.has(id) || out.some((g) => g.id === id)) continue;
+      const keys = new Set(b.bets.map((x) => x.key));
+      const shared = a.bets.filter((x) => keys.has(x.key)).length;
+      if (shared < Math.ceil(gate.minBets / 2) || shared >= a.bets.length || shared >= b.bets.length) continue;
+      out.push({ id, a: a.id, b: b.id, label: `${a.label} + ${b.label}`, at: now });
+    }
+  }
+  return out;
 }
 
 export interface JournalLine {
@@ -212,7 +279,9 @@ export const reviewDue = (s: SectionState, week: number, slate?: string) => s.la
  * the weekly review; a slice added mid-week would otherwise sit unseen until
  * then (First TD, Oct 26). Leaves the review stamps alone.
  */
-export function register(prev: SectionState, cands: Candidate[], now: string, week: number): { state: SectionState; journal: JournalLine[] } {
+export function register(prev: SectionState, base: Candidate[], now: string, week: number): { state: SectionState; journal: JournalLine[] } {
+  // The learner's own slices count as defined while the slices they combine are.
+  const cands = expand(prev, base);
   const entries: { [id: string]: Entry } = Object.fromEntries(Object.entries(prev.entries).map(([k, v]) => [k, { ...v }]));
   const fresh: string[] = [];
   for (const c of cands) {
@@ -231,7 +300,8 @@ export function register(prev: SectionState, cands: Candidate[], now: string, we
   return { state: { ...prev, entries }, journal };
 }
 
-export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: string, week: number, slate?: string): { state: SectionState; journal: JournalLine[]; evidence: Map<string, Evidence> } {
+export function review(gate: Gate, prev: SectionState, base: Candidate[], now: string, week: number, slate?: string): { state: SectionState; journal: JournalLine[]; evidence: Map<string, Evidence> } {
+  const cands = expand(prev, base);
   const reg = register(prev, cands, now, week);
   const entries = reg.state.entries;
   const journal: JournalLine[] = [...reg.journal];
@@ -291,7 +361,15 @@ export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: 
       best ? ` Closest: ${entries[best.id].label} (${best.checks.filter((c) => !c.pass).map((c) => c.note).join("; ") || "ready"}).` : " No games since registration yet."
     }`,
   });
-  return { state: { ...prev, entries, lastReviewAt: now, lastReviewWeek: week, ...(slate ? { lastReviewSlate: slate } : {}) }, journal, evidence: ev };
+  // The learner's own slices, proposed from the evidence and registered now (their sample starts now).
+  let state: SectionState = { ...prev, entries, lastReviewAt: now, lastReviewWeek: week, ...(slate ? { lastReviewSlate: slate } : {}) };
+  const combos = proposeCombos(gate, state, base, ev, now);
+  if (combos.length) {
+    state = { ...state, generated: [...(state.generated ?? []), ...combos] };
+    state = register(state, expand(state, base), now, week).state;
+    journal.push({ at: now, week, kind: "registered", text: `Proposed ${combos.length} combined slice${combos.length > 1 ? "s" : ""}: ${combos.map((c) => c.label).join("; ")}. Each counts games from today and must beat the slice it narrows.` });
+  }
+  return { state, journal, evidence: ev };
 }
 
 /** Active ids, for marking this week's bets. A paused slice marks none. */
@@ -385,7 +463,8 @@ export interface SectionView {
 }
 
 /** What a page shows for a section, computed fresh from the saved state and today's data. */
-export function sectionView(gate: Gate, s: SectionState, cands: Candidate[], journal: JournalLine[]): SectionView {
+export function sectionView(gate: Gate, s: SectionState, base: Candidate[], journal: JournalLine[]): SectionView {
+  const cands = expand(s, base);
   const byId = new Map(cands.map((c) => [c.id, c]));
   // A slice whose definition was retired never gathers evidence again; only a live one (its record) stays in view.
   const entries = Object.values(s.entries).filter((e) => byId.has(e.id) || e.activatedAt).map((e): EntryView => {
@@ -403,8 +482,8 @@ export function sectionView(gate: Gate, s: SectionState, cands: Candidate[], jou
 }
 
 /** Bets that counted while a slice was live, for money charts. */
-export function liveBets(s: SectionState, cands: Candidate[]): Bet[] {
-  const byId = new Map(cands.map((c) => [c.id, c]));
+export function liveBets(s: SectionState, base: Candidate[]): Bet[] {
+  const byId = new Map(expand(s, base).map((c) => [c.id, c]));
   return Object.values(s.entries).flatMap((e) =>
     e.activatedAt ? (byId.get(e.id)?.bets ?? []).filter((b) => b.at >= e.activatedAt! && (!e.endedAt || b.at < e.endedAt)) : [],
   );

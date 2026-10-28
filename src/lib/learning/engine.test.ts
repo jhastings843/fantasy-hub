@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FTD_GATE, PROPS_GATE, activeIds, emptyState, evidence, register, review, reviewDue, sectionView, liveBets, tOf, type Bet, type Candidate, type Gate } from "./engine";
+import { FTD_GATE, PROPS_GATE, activeIds, emptyState, evidence, expand, register, review, reviewDue, sectionView, liveBets, tOf, type Bet, type Candidate, type Gate } from "./engine";
 import { parentOf } from "../props/learn";
 
 // Small gate so the tests can reach it.
@@ -196,5 +196,41 @@ describe("weekly loss cap", () => {
   it("every gate has a cap", () => {
     expect(PROPS_GATE.weeklyLossCap).toBe(10);
     expect(FTD_GATE.weeklyLossCap).toBe(15);
+  });
+});
+
+describe("the learner adds its own slices (2026-10-27)", () => {
+  // Two base slices over the same keyed bets: "overs" and "rec yards"; overs win, and the rec-yard overs win most.
+  const keyed = (n: number, start: number, win: (i: number) => boolean, tag: string): Bet[] =>
+    Array.from({ length: n }, (_, i) => ({ game: `g${start + i}`, key: `g${start + i}|${tag}`, week: 7 + (i % 3), at: at(1 + (i % 9)), net: win(i) ? 0.9 : -1 }));
+  const recOvers = keyed(40, 0, (i) => i % 5 !== 0, "rec-over");
+  const otherOvers = keyed(40, 100, (i) => i % 2 === 0, "rush-over");
+  const recUnders = keyed(40, 200, (i) => i % 2 === 1, "rec-under");
+  const overs: Candidate = { id: "p:over", label: "Overs", bets: [...recOvers, ...otherOvers] };
+  const rec: Candidate = { id: "p:rec", label: "Receiving yards", bets: [...recOvers, ...recUnders] };
+  const g: Gate = { ...G, minGames: 20, minBets: 20 };
+  const early = "2026-10-01T00:00:00.000Z";
+
+  it("proposes a combination of a winning slice with another, and the combination holds only shared bets", () => {
+    const r = review(g, emptyState("t"), [overs, rec], early, 8, "2026-10-01");
+    const r2 = review(g, r.state, [overs, rec], "2026-11-01T00:00:00.000Z", 9, "2026-11-01");
+    const gen = r2.state.generated ?? [];
+    expect(gen.map((x) => x.label)).toContain("Overs + Receiving yards");
+    const combo = expand(r2.state, [overs, rec]).find((c) => c.label === "Overs + Receiving yards")!;
+    expect(combo.bets).toHaveLength(40);
+    expect(combo.parent).toBe("p:over");
+    const made = gen.find((x) => x.id === combo.id)!;
+    expect(r2.state.entries[combo.id]).toMatchObject({ status: "collecting", registeredAt: made.at });
+    // Registration doesn't retire it on the next pull, though it isn't in the code's list.
+    expect(register(r2.state, [overs, rec], "2026-11-02T00:00:00.000Z", 9).state.entries[combo.id]).toBeDefined();
+    // Never proposed twice.
+    const r3 = review(g, r2.state, [overs, rec], "2026-11-03T00:00:00.000Z", 9, "2026-11-03");
+    expect((r3.state.generated ?? []).filter((x) => x.label === "Overs + Receiving yards")).toHaveLength(1);
+  });
+
+  it("bets without ids never combine", () => {
+    const strip = (c: Candidate): Candidate => ({ ...c, bets: c.bets.map(({ key: _k, ...b }) => b) });
+    const r = review(g, emptyState("t"), [strip(overs), strip(rec)], early, 8, "2026-10-01");
+    expect(review(g, r.state, [strip(overs), strip(rec)], "2026-11-01T00:00:00.000Z", 9, "2026-11-01").state.generated ?? []).toEqual([]);
   });
 });

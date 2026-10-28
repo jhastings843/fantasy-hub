@@ -54,7 +54,7 @@ export function attdCandidates(games: (AttdGraded & { at: string })[]): Candidat
       g.rows.flatMap((r): Bet[] => {
         const t = g.result[r.key];
         if (r.dk === undefined || t === null || t === undefined || !keep(r.anytime, r.dk)) return [];
-        return [{ game: g.slug, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1) }];
+        return [{ game: g.slug, key: `${g.slug}|${r.key}`, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1) }];
       }),
     ),
   }));
@@ -83,7 +83,7 @@ export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number
     id,
     label,
     ...(id === "lotto:value" ? {} : { parent: "lotto:value" }),
-    bets: graded.filter(keep).map((r) => ({ game: r.game, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1) })),
+    bets: graded.filter(keep).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1) })),
   }));
   // The ticket at its real stake: one per night, so it needs the long gate's patience.
   const ticket: Candidate = {

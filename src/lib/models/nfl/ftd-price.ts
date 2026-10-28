@@ -59,14 +59,14 @@ type Keep = (p: FtdPlayer & { p: number }, cost: number, g: FtdGame) => boolean;
 export function bestBets(
   list: (GradedGame & Books)[],
   keep: Keep,
-): { game: FtdGame; kickoff?: string; cost: number; book: Book; win: boolean; net: number }[] {
-  const out: { game: FtdGame; kickoff?: string; cost: number; book: Book; win: boolean; net: number }[] = [];
+): { game: FtdGame; player: string; kickoff?: string; cost: number; book: Book; win: boolean; net: number }[] {
+  const out: { game: FtdGame; player: string; kickoff?: string; cost: number; book: Book; win: boolean; net: number }[] = [];
   for (const x of list) {
     for (const p of pricedPlayers(x.game)) {
       const b = bestCost(x, p.name);
       if (!b || b.cost >= 1 || !keep(p, b.cost, x.game)) continue;
       const win = x.result.key === p.key;
-      out.push({ game: x.game, kickoff: x.kickoff ?? x.capturedAt, cost: b.cost, book: b.book, win, net: win ? (1 - b.cost) / b.cost : -1 });
+      out.push({ game: x.game, player: p.key, kickoff: x.kickoff ?? x.capturedAt, cost: b.cost, book: b.book, win, net: win ? (1 - b.cost) / b.cost : -1 });
     }
   }
   return out;

@@ -70,7 +70,7 @@ export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[]): Can
     label,
     ...(id.endsWith(":all") ? {} : { parent: `${id.split(":")[0]}:all` }),
     bets: ourSliceBets(graded, id).map(
-      ({ x, bet, marketId, line }): Bet => ({ game: x.slug, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line) }),
+      ({ x, bet, marketId, line }): Bet => ({ game: x.slug, key: `${x.week}|${x.slug}|${marketId}|${bet.side}`, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line) }),
     ),
   }));
 }
@@ -115,7 +115,7 @@ export function fbCandidates(boards: FbGradedBoard[]): Candidate[] {
     id,
     label,
     ...(id === "fb:all" ? {} : { parent: "fb:all" }),
-    bets: boards.flatMap((b) => b.bets.filter((x) => keep(b, x)).map((x): Bet => ({ game: b.event, week: b.week, at: b.at, net: x.net }))),
+    bets: boards.flatMap((b) => b.bets.filter((x) => keep(b, x)).map((x): Bet => ({ game: b.event, key: `${b.event}|${x.id}`, week: b.week, at: b.at, net: x.net }))),
   }));
 }
 
@@ -137,6 +137,6 @@ export function ourFtdCandidates(list: (FtdGradedGame & Books)[]): Candidate[] {
     id,
     label,
     ...(id === "ftdb:value" ? {} : { parent: "ftdb:value" }),
-    bets: bestBets(list, keep).map((b): Bet => ({ game: b.game.slug, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000 })),
+    bets: bestBets(list, keep).map((b): Bet => ({ game: b.game.slug, key: `${b.game.week}|${b.game.slug}|${b.player}`, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000 })),
   }));
 }
