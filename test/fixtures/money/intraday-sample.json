@@ -1,0 +1,873 @@
+{
+ "book": "intraday-orb",
+ "start": 100000.0,
+ "equity": 99680.97,
+ "spyEquity": 100119.3,
+ "asOf": "2026-10-28",
+ "curve": [
+  {
+   "day": "2026-10-28",
+   "equity": 99680.97,
+   "spy": 100119.3,
+   "ret": -0.00319,
+   "spyRet": 0.001193,
+   "taken": 2,
+   "rejected": 19
+  }
+ ],
+ "record": {
+  "taken": {
+   "n": 2,
+   "meanR": -1.034,
+   "hit": 0.0,
+   "t": -121.71
+  },
+  "shadow": {
+   "n": 19,
+   "meanR": 0.529,
+   "hit": 0.737,
+   "t": 2.0
+  },
+  "days": 1,
+  "excessMean": -0.00438,
+  "tags": {}
+ },
+ "open": [
+  {
+   "day": "2026-10-28",
+   "symbol": "PH",
+   "trigger_time": "12:35",
+   "decision": "taken",
+   "reason": "forced for the test",
+   "entry": 915.083,
+   "stop": 910.84,
+   "target": 923.02,
+   "p_target": 0.1324,
+   "p_stop": 0.5555,
+   "mc_r": -0.137,
+   "hist_n": 28,
+   "hist_r": -0.23,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 19 % (target first 13.2 % vs stop first 55.5 %).",
+   "outcome": null,
+   "exit_time": null,
+   "exit": null,
+   "r": null,
+   "pnl": null,
+   "shares": 27,
+   "ctx": {
+    "headlines": 5
+   }
+  }
+ ],
+ "today": [
+  {
+   "day": "2026-10-28",
+   "symbol": "PH",
+   "trigger_time": "12:35",
+   "decision": "taken",
+   "reason": "forced for the test",
+   "entry": 915.083,
+   "stop": 910.84,
+   "target": 923.02,
+   "p_target": 0.1324,
+   "p_stop": 0.5555,
+   "mc_r": -0.137,
+   "hist_n": 28,
+   "hist_r": -0.23,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 19 % (target first 13.2 % vs stop first 55.5 %).",
+   "outcome": "stop",
+   "exit_time": "14:10",
+   "exit": 910.6578,
+   "r": -1.043,
+   "pnl": -119.48,
+   "shares": 27,
+   "ctx": {
+    "headlines": 5
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "T",
+   "trigger_time": "12:30",
+   "decision": "taken",
+   "reason": "forced for the test",
+   "entry": 21.0942,
+   "stop": 20.93,
+   "target": 21.41,
+   "p_target": 0.0189,
+   "p_stop": 0.3159,
+   "mc_r": -0.147,
+   "hist_n": 43,
+   "hist_r": -0.151,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 6 % (target first 1.9 % vs stop first 31.6 %).",
+   "outcome": "stop",
+   "exit_time": "13:10",
+   "exit": 20.9258,
+   "r": -1.026,
+   "pnl": -199.55,
+   "shares": 1185,
+   "ctx": {
+    "headlines": 7
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "NUE",
+   "trigger_time": "11:25",
+   "decision": "rejected",
+   "reason": "target first 11% of decided replays, needs 38%",
+   "entry": 270.41,
+   "stop": 267.43,
+   "target": 276.37,
+   "p_target": 0.0381,
+   "p_stop": 0.3177,
+   "mc_r": -0.058,
+   "hist_n": 34,
+   "hist_r": -0.322,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 11 % (target first 3.8 % vs stop first 31.8 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 270.75,
+   "r": 0.114,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 5
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "GE",
+   "trigger_time": "11:25",
+   "decision": "rejected",
+   "reason": "target first 23% of decided replays, needs 38%",
+   "entry": 299.67,
+   "stop": 297.81,
+   "target": 303.39,
+   "p_target": 0.1408,
+   "p_stop": 0.4795,
+   "mc_r": -0.051,
+   "hist_n": 28,
+   "hist_r": -0.025,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 23 % (target first 14.1 % vs stop first 47.9 %).",
+   "outcome": "target",
+   "exit_time": "12:00",
+   "exit": 303.39,
+   "r": 2.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 17
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "FLEX",
+   "trigger_time": "11:25",
+   "decision": "rejected",
+   "reason": "target first 0% of decided replays, needs 38%",
+   "entry": 90.59,
+   "stop": 87.15,
+   "target": 97.47,
+   "p_target": 0.0001,
+   "p_stop": 0.0282,
+   "mc_r": -0.048,
+   "hist_n": 33,
+   "hist_r": -0.23,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 0 % (target first 0.0 % vs stop first 2.8 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 93.30500030517578,
+   "r": 0.789,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 10
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "HOOD",
+   "trigger_time": "11:20",
+   "decision": "rejected",
+   "reason": "target first 4% of decided replays, needs 38%",
+   "entry": 92.35,
+   "stop": 90.7,
+   "target": 95.65,
+   "p_target": 0.0163,
+   "p_stop": 0.3866,
+   "mc_r": -0.254,
+   "hist_n": 30,
+   "hist_r": -0.165,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 4 % (target first 1.6 % vs stop first 38.7 %).",
+   "outcome": "stop",
+   "exit_time": "12:00",
+   "exit": 90.7,
+   "r": -1.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 15
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "GS",
+   "trigger_time": "11:20",
+   "decision": "rejected",
+   "reason": "target first 32% of decided replays, needs 38%",
+   "entry": 922.41,
+   "stop": 918.35,
+   "target": 930.53,
+   "p_target": 0.2794,
+   "p_stop": 0.5946,
+   "mc_r": 0.027,
+   "hist_n": 26,
+   "hist_r": -0.223,
+   "verdict": "Close to break-even: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 32 % (target first 27.9 % vs stop first 59.5 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 928.0349731445312,
+   "r": 1.385,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 9
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "WDC",
+   "trigger_time": "10:30",
+   "decision": "rejected",
+   "reason": "target first 21% of decided replays, needs 38%",
+   "entry": 389.21,
+   "stop": 381.64,
+   "target": 404.35,
+   "p_target": 0.0979,
+   "p_stop": 0.3713,
+   "mc_r": 0.042,
+   "hist_n": 34,
+   "hist_r": -0.119,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 21 % (target first 9.8 % vs stop first 37.1 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 395.95001220703125,
+   "r": 0.89,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 18
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "OXY",
+   "trigger_time": "10:30",
+   "decision": "rejected",
+   "reason": "target first 31% of decided replays, needs 38%",
+   "entry": 63.42,
+   "stop": 63.06,
+   "target": 64.14,
+   "p_target": 0.2554,
+   "p_stop": 0.5707,
+   "mc_r": 0.02,
+   "hist_n": 35,
+   "hist_r": -0.242,
+   "verdict": "Close to break-even: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 31 % (target first 25.5 % vs stop first 57.1 %).",
+   "outcome": "stop",
+   "exit_time": "15:45",
+   "exit": 63.06,
+   "r": -1.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 1
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "COP",
+   "trigger_time": "10:30",
+   "decision": "rejected",
+   "reason": "target first 37% of decided replays, needs 38%",
+   "entry": 149.61,
+   "stop": 148.91,
+   "target": 151.01,
+   "p_target": 0.33,
+   "p_stop": 0.5641,
+   "mc_r": 0.141,
+   "hist_n": 38,
+   "hist_r": 0.001,
+   "verdict": "Close to break-even: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 37 % (target first 33.0 % vs stop first 56.4 %).",
+   "outcome": "stop",
+   "exit_time": "15:55",
+   "exit": 148.91,
+   "r": -1.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 4
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "AON",
+   "trigger_time": "10:30",
+   "decision": "rejected",
+   "reason": "target first 3% of decided replays, needs 38%",
+   "entry": 315.48,
+   "stop": 311.27,
+   "target": 323.9,
+   "p_target": 0.0066,
+   "p_stop": 0.188,
+   "mc_r": -0.044,
+   "hist_n": 29,
+   "hist_r": -0.119,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 3 % (target first 0.7 % vs stop first 18.8 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 317.42999267578125,
+   "r": 0.463,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 10
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "ROP",
+   "trigger_time": "10:25",
+   "decision": "rejected",
+   "reason": "target first 26% of decided replays, needs 38%",
+   "entry": 436.81,
+   "stop": 433.37,
+   "target": 443.69,
+   "p_target": 0.1463,
+   "p_stop": 0.4185,
+   "mc_r": 0.103,
+   "hist_n": 35,
+   "hist_r": -0.34,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 26 % (target first 14.6 % vs stop first 41.9 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 439.114990234375,
+   "r": 0.67,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 0
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "JPM",
+   "trigger_time": "10:25",
+   "decision": "rejected",
+   "reason": "target first 25% of decided replays, needs 38%",
+   "entry": 337.56,
+   "stop": 336.37,
+   "target": 339.94,
+   "p_target": 0.2293,
+   "p_stop": 0.6978,
+   "mc_r": -0.201,
+   "hist_n": 29,
+   "hist_r": -0.489,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 25 % (target first 22.9 % vs stop first 69.8 %).",
+   "outcome": "target",
+   "exit_time": "12:25",
+   "exit": 339.94,
+   "r": 2.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 17
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "BP",
+   "trigger_time": "10:25",
+   "decision": "rejected",
+   "reason": "target first 30% of decided replays, needs 38%",
+   "entry": 49.5,
+   "stop": 49.27,
+   "target": 49.96,
+   "p_target": 0.2555,
+   "p_stop": 0.5956,
+   "mc_r": -0.019,
+   "hist_n": 41,
+   "hist_r": -0.166,
+   "verdict": "Close to break-even: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 30 % (target first 25.6 % vs stop first 59.6 %).",
+   "outcome": "target",
+   "exit_time": "14:05",
+   "exit": 49.96,
+   "r": 2.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "setups": [
+     "bull_flag"
+    ],
+    "headlines": 6
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "TXN",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 37% of decided replays, needs 38%",
+   "entry": 309.48,
+   "stop": 307.03,
+   "target": 314.38,
+   "p_target": 0.284,
+   "p_stop": 0.4783,
+   "mc_r": 0.208,
+   "hist_n": 36,
+   "hist_r": -0.068,
+   "verdict": "Close to break-even: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 37 % (target first 28.4 % vs stop first 47.8 %).",
+   "outcome": "stop",
+   "exit_time": "11:00",
+   "exit": 307.03,
+   "r": -1.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 7
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "TGT",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 8% of decided replays, needs 38%",
+   "entry": 148.26,
+   "stop": 146.53,
+   "target": 151.72,
+   "p_target": 0.0255,
+   "p_stop": 0.2926,
+   "mc_r": -0.082,
+   "hist_n": 33,
+   "hist_r": -0.075,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 8 % (target first 2.5 % vs stop first 29.3 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 148.60499572753906,
+   "r": 0.199,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 9
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "STX",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 26% of decided replays, needs 38%",
+   "entry": 653.81,
+   "stop": 641.0,
+   "target": 679.43,
+   "p_target": 0.1237,
+   "p_stop": 0.3524,
+   "mc_r": 0.123,
+   "hist_n": 34,
+   "hist_r": -0.145,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 26 % (target first 12.4 % vs stop first 35.2 %).",
+   "outcome": "target",
+   "exit_time": "12:05",
+   "exit": 679.43,
+   "r": 2.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 19
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "LMT",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 21% of decided replays, needs 38%",
+   "entry": 621.88,
+   "stop": 617.77,
+   "target": 630.1,
+   "p_target": 0.1466,
+   "p_stop": 0.5485,
+   "mc_r": -0.106,
+   "hist_n": 27,
+   "hist_r": 0.143,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 21 % (target first 14.7 % vs stop first 54.9 %).",
+   "outcome": "target",
+   "exit_time": "12:50",
+   "exit": 630.1,
+   "r": 2.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 10
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "HLT",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 5% of decided replays, needs 38%",
+   "entry": 348.22,
+   "stop": 344.3,
+   "target": 356.06,
+   "p_target": 0.0107,
+   "p_stop": 0.2206,
+   "mc_r": -0.063,
+   "hist_n": 28,
+   "hist_r": 0.216,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 5 % (target first 1.1 % vs stop first 22.1 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 349.94000244140625,
+   "r": 0.439,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 7
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "GNRC",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 0% of decided replays, needs 38%",
+   "entry": 200.05,
+   "stop": 189.02,
+   "target": 222.11,
+   "p_target": 0.0,
+   "p_stop": 0.0062,
+   "mc_r": -0.02,
+   "hist_n": 26,
+   "hist_r": 0.219,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 0 % (target first 0.0 % vs stop first 0.6 %).",
+   "outcome": "stop",
+   "exit_time": "10:55",
+   "exit": 189.02,
+   "r": -1.0,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 11
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "AZO",
+   "trigger_time": "10:20",
+   "decision": "rejected",
+   "reason": "target first 28% of decided replays, needs 38%",
+   "entry": 3157.2,
+   "stop": 3139.63,
+   "target": 3192.34,
+   "p_target": 0.2574,
+   "p_stop": 0.671,
+   "mc_r": -0.12,
+   "hist_n": 31,
+   "hist_r": -0.139,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 28 % (target first 25.7 % vs stop first 67.1 %).",
+   "outcome": "flat",
+   "exit_time": "15:55",
+   "exit": 3159.034912109375,
+   "r": 0.104,
+   "pnl": null,
+   "shares": null,
+   "ctx": {
+    "headlines": 0
+   }
+  }
+ ],
+ "staleToday": 133,
+ "recent": [
+  {
+   "day": "2026-10-28",
+   "symbol": "PH",
+   "trigger_time": "12:35",
+   "decision": "taken",
+   "reason": "forced for the test",
+   "entry": 915.083,
+   "stop": 910.84,
+   "target": 923.02,
+   "p_target": 0.1324,
+   "p_stop": 0.5555,
+   "mc_r": -0.137,
+   "hist_n": 28,
+   "hist_r": -0.23,
+   "verdict": "Leans toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 19 % (target first 13.2 % vs stop first 55.5 %).",
+   "outcome": "stop",
+   "exit_time": "14:10",
+   "exit": 910.6578,
+   "r": -1.043,
+   "pnl": -119.48,
+   "shares": 27,
+   "ctx": {
+    "headlines": 5
+   }
+  },
+  {
+   "day": "2026-10-28",
+   "symbol": "T",
+   "trigger_time": "12:30",
+   "decision": "taken",
+   "reason": "forced for the test",
+   "entry": 21.0942,
+   "stop": 20.93,
+   "target": 21.41,
+   "p_target": 0.0189,
+   "p_stop": 0.3159,
+   "mc_r": -0.147,
+   "hist_n": 43,
+   "hist_r": -0.151,
+   "verdict": "Strongly toward the stop: at 2R the target has to come first in 33 % of the replays that hit one side; it did in 6 % (target first 1.9 % vs stop first 31.6 %).",
+   "outcome": "stop",
+   "exit_time": "13:10",
+   "exit": 20.9258,
+   "r": -1.026,
+   "pnl": -199.55,
+   "shares": 1185,
+   "ctx": {
+    "headlines": 7
+   }
+  }
+ ],
+ "tax": {
+  "short": -308.94,
+  "long": 0.0,
+  "disallowed": 119.34,
+  "count": 2
+ },
+ "log": [
+  {
+   "at": "2026-10-28 16:10",
+   "kind": "close",
+   "text": "2026-10-28: 2 taken -319.03, 19 shadows graded"
+  },
+  {
+   "at": "2026-10-28 15:52",
+   "kind": "exit",
+   "text": "T stop 13:10 at 20.93: -199.55 (-1.03R)"
+  },
+  {
+   "at": "2026-10-28 15:52",
+   "kind": "exit",
+   "text": "PH stop 14:10 at 910.66: -119.48 (-1.04R)"
+  },
+  {
+   "at": "2026-10-28 12:40",
+   "kind": "taken",
+   "text": "PH 12:35 forced for the test"
+  },
+  {
+   "at": "2026-10-28 12:40",
+   "kind": "taken",
+   "text": "T 12:30 forced for the test"
+  },
+  {
+   "at": "2026-10-28 11:25",
+   "kind": "rejected",
+   "text": "NUE 11:25 target first 11% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 11:25",
+   "kind": "rejected",
+   "text": "GE 11:25 target first 23% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 11:25",
+   "kind": "rejected",
+   "text": "FLEX 11:25 target first 0% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 11:25",
+   "kind": "rejected",
+   "text": "HOOD 11:20 target first 4% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 11:25",
+   "kind": "rejected",
+   "text": "GS 11:20 target first 32% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "WDC 10:30 target first 21% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "OXY 10:30 target first 31% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "COP 10:30 target first 37% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "AON 10:30 target first 3% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "ROP 10:25 target first 26% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "JPM 10:25 target first 25% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "BP 10:25 target first 30% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "TXN 10:20 target first 37% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "TGT 10:20 target first 8% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "STX 10:20 target first 26% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "LMT 10:20 target first 21% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "HLT 10:20 target first 5% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "GNRC 10:20 target first 0% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "rejected",
+   "text": "AZO 10:20 target first 28% of decided replays, needs 38%"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "stale",
+   "text": "XOM 10:15 trigger at 10:15 was 15 minutes old"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "stale",
+   "text": "UNH 10:15 trigger at 10:15 was 15 minutes old"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "stale",
+   "text": "PPG 10:15 trigger at 10:15 was 15 minutes old"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "stale",
+   "text": "LIN 10:15 trigger at 10:15 was 15 minutes old"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "stale",
+   "text": "EXR 10:15 trigger at 10:15 was 15 minutes old"
+  },
+  {
+   "at": "2026-10-28 10:30",
+   "kind": "stale",
+   "text": "CVX 10:15 trigger at 10:15 was 15 minutes old"
+  }
+ ],
+ "skills": [
+  {
+   "skill": "trader-alerts",
+   "role": "market clock (session gate) and fresh quotes for sizing"
+  },
+  {
+   "skill": "trader-scanner",
+   "role": "universe weekly, daily setups before the open, opening-range breakouts every 5 minutes"
+  },
+  {
+   "skill": "trader-entry",
+   "role": "the trigger bar"
+  },
+  {
+   "skill": "trader-news",
+   "role": "skips a name with an 8-K today"
+  },
+  {
+   "skill": "trader-exit",
+   "role": "stop at the range midpoint, 2R target, flat by 15:55"
+  },
+  {
+   "skill": "trader-timemachine",
+   "role": "the filter: 10,000 replays plus 60 days of history"
+  },
+  {
+   "skill": "trader-budget",
+   "role": "share count from the max loss and position cap"
+  },
+  {
+   "skill": "trader-risk",
+   "role": "every config rule must pass"
+  },
+  {
+   "skill": "trader-broker",
+   "role": "the ticket and the paper fill (no broker connected)"
+  },
+  {
+   "skill": "trader-tax",
+   "role": "FIFO lots and wash sales on every exit, as if real money"
+  },
+  {
+   "skill": "trader-rebalance",
+   "role": "15:50 go-flat list, checked against open trades"
+  },
+  {
+   "skill": "trader-pelosi",
+   "role": "new House trade filings, a context tag"
+  },
+  {
+   "skill": "trader-copycat",
+   "role": "Berkshire's latest 13F, a context tag"
+  },
+  {
+   "skill": "trader-analyst",
+   "role": "SEC fundamentals for the watch list"
+  },
+  {
+   "skill": "trader-screener",
+   "role": "quality pass/fail on those fundamentals, a context tag"
+  }
+ ],
+ "filter": "Take a breakout only when the Time Machine's replays reach the target first at least 5% points above break-even (33% at 2R), average above +0.05R, and the same rule fired 8+ times in the last 60 days with a positive average.",
+ "rules": {
+  "max_loss_per_trade_usd": 500,
+  "max_daily_loss_usd": 1500,
+  "max_trades_per_day": 5,
+  "no_entries_after": "15:30",
+  "flat_by": "15:55"
+ }
+}

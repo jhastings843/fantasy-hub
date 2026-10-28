@@ -205,6 +205,9 @@ export interface MoneySnapshot {
   weather?: Weather | null;
   /** The trend book, tracked apart from the stock books (trade-bot tradebot/trends.py). Missing before 2026-10-21. */
   trends?: Trends | null;
+  /** The intraday desk (trade-bot tradebot/intraday.py export()): opening-range breakouts on 5-minute bars,
+   *  filtered by the Time Machine. Its own $100,000 paper book. Missing before 2026-10-28; `{ error }` if the desk failed. */
+  intraday?: Intraday | null;
 }
 
 /** n graded picks, average return vs SPY, share that beat SPY, t-stat. */
@@ -457,10 +460,93 @@ export interface Weather {
   weatherModel?: { halfLifeDays: number; fitted: string | null; sameDay: WeatherModelTest; dayAhead: WeatherModelTest };
 }
 
+/** Graded breakouts: count, average result in R (1R = the planned loss), share that made money, t-stat. */
+export interface IntradayStats {
+  n: number;
+  meanR: number | null;
+  hit: number | null;
+  t: number | null;
+}
+
+/** One opening-range breakout the desk saw. "taken" is paper-traded; "rejected" is replayed on the real bars
+ *  at the close (the shadow); "stale" was seen too late to act on. */
+export interface IntradayRow {
+  day: string;
+  symbol: string;
+  trigger_time: string | null;
+  decision: "taken" | "rejected" | "stale";
+  reason: string | null;
+  entry: number | null;
+  stop: number | null;
+  target: number | null;
+  /** Time Machine: share of the 10,000 replays that hit the target first, and the stop first. */
+  p_target: number | null;
+  p_stop: number | null;
+  /** Average replay result in R. */
+  mc_r: number | null;
+  /** The same rule on the last 60 days of real sessions: how often it fired and its average R. */
+  hist_n: number | null;
+  hist_r: number | null;
+  verdict: string | null;
+  /** Null until graded (taken: on exit; rejected: at the close). */
+  outcome: "target" | "stop" | "flat" | null;
+  exit_time: string | null;
+  exit: number | null;
+  r: number | null;
+  /** Dollars, taken trades only. */
+  pnl: number | null;
+  shares: number | null;
+  ctx?: { setups?: string[]; quality?: boolean; berkshire?: boolean; headlines?: number; [k: string]: unknown };
+}
+
+export interface IntradayDay {
+  day: string;
+  equity: number;
+  spy: number | null;
+  ret: number | null;
+  spyRet: number | null;
+  taken: number;
+  rejected: number;
+}
+
+/** trade-bot tradebot/intraday.py export(). Before the first session only book, start, equity, curve (empty),
+ *  today (empty), record (null), skills, status and filter are present. */
+export interface Intraday {
+  error?: string;
+  book?: string;
+  start?: number;
+  equity?: number;
+  spyEquity?: number | null;
+  asOf?: string | null;
+  /** Set before the first session, like "waiting for the first session". */
+  status?: string;
+  curve?: IntradayDay[];
+  record?: {
+    taken: IntradayStats;
+    shadow: IntradayStats;
+    /** Sessions graded against SPY, and the average daily return over SPY's open-to-close (a fraction). */
+    days: number;
+    excessMean: number | null;
+    /** Context tags split out, like "quality:yes". */
+    tags?: Record<string, IntradayStats>;
+  } | null;
+  open?: IntradayRow[];
+  today?: IntradayRow[];
+  staleToday?: number;
+  recent?: IntradayRow[];
+  /** As if it were real money: short- and long-term realized gains, wash-sale losses disallowed, closed lots. */
+  tax?: { short: number; long: number; disallowed: number; count: number } | null;
+  log?: { at: string; kind: string; text: string }[];
+  skills?: { skill: string; role: string }[];
+  filter?: string;
+  rules?: { max_loss_per_trade_usd: number; max_daily_loss_usd: number; max_trades_per_day: number; no_entries_after: string; flat_by: string };
+}
+
 /** Enough of a check that a malformed post can't break the page. */
 export function isSnapshot(x: unknown): x is MoneySnapshot {
   const s = x as MoneySnapshot;
   return !!s && s.version === 1 && typeof s.generatedAt === "string" && Array.isArray(s.books)
     && s.books.every((b) => typeof b.id === "string" && Array.isArray(b.curve) && Array.isArray(b.positions))
-    && (s.phil === null || typeof s.phil === "object");
+    && (s.phil === null || typeof s.phil === "object")
+    && (s.intraday === undefined || s.intraday === null || typeof s.intraday === "object");
 }

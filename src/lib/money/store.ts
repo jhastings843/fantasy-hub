@@ -1,4 +1,5 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
 import { redis } from "@/lib/redis/client";
 import { boxStats, type EspnBoxTeam } from "@/lib/props/grade";
 import { gradeBet, netUnits, summarize, type BetSummary, type FinalGame, type MoneyBet } from "./bets";
@@ -117,6 +118,13 @@ export interface MoneyView {
 }
 
 export async function getMoneyView(): Promise<MoneyView> {
+  // Local checks only: MONEY_SNAPSHOT_FILE points at a snapshot JSON and the page
+  // renders from it with no Redis reads or writes. Ignored in production.
+  const file = process.env.NODE_ENV !== "production" ? process.env.MONEY_SNAPSHOT_FILE : undefined;
+  if (file) {
+    const snapshot = JSON.parse(await readFile(file, "utf8")) as MoneySnapshot;
+    return { snapshot, bets: [], summary: summarize([]), problems: [], sports: null };
+  }
   const [snapshot, raw, sports] = await Promise.all([getSnapshot(), getBets(), getSportsView().catch(() => null)]);
   const { bets, problems } = await gradePending(raw);
   return { snapshot, bets, summary: summarize(bets), problems, sports };

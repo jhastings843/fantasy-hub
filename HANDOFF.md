@@ -55,7 +55,12 @@ DONE 2026-10-28 later (money projects + leftovers, all deployed / pushed):
 
 Open questions for Jack (recommended first): Kalshi Phil small learning bets (no, keep); weather seed both eras (yes); retest day-ahead weather terms ~Nov 27 (yes); trade-bot lab-fail rule daily (no); buy trend extras small (no).
 
+DONE 2026-10-28 late (committed locally on main, NOT pushed, NOT deployed; Jack decides):
+- Money > Intraday tab (/money?v=intraday), after Trends. Draws `snapshot.intraday` from trade-bot tradebot/intraday.py export(): opening-range breakouts on 5-minute bars, Time Machine filter, its own $100k paper book vs SPY open-to-close. Types `Intraday`, `IntradayRow`, `IntradayStats` in src/lib/money/types.ts (optional on the snapshot; isSnapshot accepts it missing, null, `{error}` or the empty "waiting for the first session" shape). Pure reads in src/lib/money/intraday.ts (filterRead: too early under 30 graded on either side, helping/hurting at a 0.05R gap; openTrades drops opens the day already shows closed; todayRows; decidedOdds) + intraday.test.ts on test/fixtures/money/intraday-sample.json. View in src/app/money/IntradayTab.tsx: hero, stats, chart at 2+ sessions, "Is the filter helping?" taken vs turned down, the day's breakouts (6 turned down shown, rest folded, stale count), recent taken (folded), the rule, skills (folded), taxes and log (folded). Overview gains an Intraday desk row and chart panel.
+- Local check without Redis: `MONEY_SNAPSHOT_FILE=/path/snapshot.json npx next dev` renders /money from that file (dev only, no bets/sports, no reads or writes to the store).
+
 NEXT SESSION:
+0. Push and `vercel --prod` the Intraday tab once Jack says so; it shows real data after trade-bot posts a snapshot with `intraday`.
 1. Check Tue 11/3 12:00 UTC model-refit run summary (first real run; nflverse week 8 should be in by then).
 2. Check the college model's first live runs: pulse receipt line "college model ...", /picks?l=cfb research panel populated, slices registered on /learning.
 3. Verify dynasty waiver research run (search budget fix) passed.

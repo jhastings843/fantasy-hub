@@ -9,6 +9,7 @@ import { Background, PageHead, SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 import { Term } from "./Term";
+import { IntradayHero, IntradayTab } from "./IntradayTab";
 
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
 // paper stock books, all paper or unit-based. Bets live in this app;
@@ -17,7 +18,7 @@ import { Term } from "./Term";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books" | "trends" | "weather";
+export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "weather";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -28,6 +29,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "kalshi", label: "Kalshi" },
   { id: "books", label: "Stock books" },
   { id: "trends", label: "Trends" },
+  { id: "intraday", label: "Intraday" },
   { id: "weather", label: "Weather" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
@@ -1546,6 +1548,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
   const kp = v.snapshot?.kalshiPhil;
   const wx = v.snapshot?.weather;
   const tb = v.snapshot?.trends && !v.snapshot.trends.error ? v.snapshot.trends.book : null;
+  const ix = v.snapshot?.intraday && !v.snapshot.intraday.error ? v.snapshot.intraday : null;
   const books = v.snapshot?.books ?? [];
   const bookStart = books.reduce((a, b) => a + b.start, 0);
   // All the books on one line: summed by day.
@@ -1620,6 +1623,26 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
               />
             ) : (
               <span className={m.sub}>Opened, first marks pending. The chart starts after a couple of trading days.</span>
+            )}
+          </div>
+        )}
+        {ix && (
+          <div className={m.panel}>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Intraday</h2><Link className={m.panelLink} href={href("intraday")}>Breakouts and filter</Link></div>
+            {(ix.curve ?? []).length > 1 ? (
+              <LineChart
+                series={[
+                  { label: "Intraday book", points: ix.curve!.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
+                  { label: "SPY, open to close", points: ix.curve!.filter((c) => c.spy !== null).map((c) => ({ x: t(c.day), y: c.spy! })) },
+                ]}
+                baseline={ix.start ?? 100_000}
+                format={(y) => `$${(y / 1000).toFixed(1)}k`}
+                height={230}
+                width={360}
+                ariaLabel="The intraday book against SPY"
+              />
+            ) : (
+              <span className={m.sub}>{(ix.curve ?? []).length ? "One session so far. The chart starts after the second." : "Waiting for the first session."}</span>
             )}
           </div>
         )}
@@ -1764,10 +1787,14 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "trends" && snap && (snap.trends
           ? (snap.trends.error ? <p className={s.error}>{snap.trends.error}</p> : <TrendsTab tr={snap.trends} />)
           : <p className={s.calm}>The trend book hasn&apos;t posted yet. It reports after the next 6:30am run.</p>)}
+        {v && tab === "intraday" && snap?.intraday && !snap.intraday.error && <IntradayHero d={snap.intraday} />}
+        {v && tab === "intraday" && snap && (snap.intraday
+          ? (snap.intraday.error ? <p className={s.error}>{`The intraday desk failed: ${snap.intraday.error}`}</p> : <IntradayTab d={snap.intraday} />)
+          : <p className={s.calm}>The intraday desk hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
 
         <footer className={s.footer}>
           <span>
-            Phil, Kalshi Phil and the stock books run on the Mac and post a snapshot here after each run. Bets grade from ESPN. Everything here is paper
+            Phil, Kalshi Phil, the stock books and the intraday desk run on the Mac and post a snapshot here after each run. Bets grade from ESPN. Everything here is paper
             money or betting units, a record and not advice.
           </span>
         </footer>

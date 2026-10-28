@@ -152,6 +152,28 @@ export function desks(v: View): Desk[] {
       href: "/money?v=trends",
     });
   }
+  const ix = snap?.intraday && !snap.intraday.error ? snap.intraday : null;
+  if (ix) {
+    const start = ix.start ?? 100_000;
+    const ret = (ix.equity ?? start) / start - 1;
+    const spy = ix.spyEquity != null ? ix.spyEquity / start - 1 : null;
+    const days = ix.record?.days ?? (ix.curve ?? []).length;
+    const early = days < 20;
+    out.push({
+      id: "intraday",
+      money: "usd",
+      name: "Intraday",
+      what: "Opening-range breakouts, Time Machine filter",
+      result: pct(ret),
+      rec: days ? `${days} ${days === 1 ? "session" : "sessions"}, ${ix.record?.taken.n ?? 0} trades` : "Waiting for the first session",
+      tone: toneOf(ret),
+      ours: `Book ${pct(ret)}`,
+      yard: spy !== null ? `SPY ${pct(spy)} open to close` : "SPY, open to close",
+      read: early ? "Too early" : spy !== null && ret > spy ? "Ahead of SPY" : "Behind SPY",
+      readTone: early ? "neutral" : spy !== null && ret > spy ? "good" : "bad",
+      href: "/money?v=intraday",
+    });
+  }
   if (snap?.kalshiPhil && !snap.kalshiPhil.error) out.push(philDesk(snap.kalshiPhil, "kalshi", "Kalshi Phil", "Claude agent, Kalshi", "/money?v=kalshi"));
   if (sp) {
     const e = sp.props.reduce((a, x) => ({ u: a.u + x.edges, n: a.n + x.edgeBets }), { u: 0, n: 0 });

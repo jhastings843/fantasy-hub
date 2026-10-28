@@ -224,3 +224,36 @@
 .gateBar > span { display: block; height: 100%; border-radius: 3px; }
 .sky { display: inline-block; margin-left: 8px; padding: 0 6px; border-radius: 4px; font-family: var(--font-plex-mono), monospace; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; background: color-mix(in srgb, var(--pos) 12%, var(--surface)); color: var(--pos); }
 .skyRough { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); color: var(--gold); }
+
+/* Intraday tab (2026-10-28) */
+@media (max-width: 520px) { .hideSm { display: none; } }
+.ixSides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ixSide { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 10px; background: var(--surface2); border: 1px solid transparent; min-width: 0; }
+.ixTaken { border-color: color-mix(in srgb, var(--pos) 35%, transparent); }
+.ixSideHead { min-height: 24px; display: flex; align-items: center; }
+.ixSideHead .tag { margin-right: 0; }
+.ixBig { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; }
+.ixSideSub { font-size: 12px; color: var(--mute); }
+.ixSideNums { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--ink2); margin-top: 4px; }
+.ixSideNums b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+.ixRead { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.45; }
+.ixList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ixRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.ixRow:last-child { border-bottom: 0; }
+.ixRow .why { grid-column: 1 / -1; max-width: none; }
+.ixWho { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ixWho b { font-weight: 700; }
+.ixWho .tag { margin-right: 0; }
+.ixResult { display: inline-flex; align-items: baseline; gap: 8px; justify-self: end; white-space: nowrap; font-size: 12.5px; }
+.ixSkill { display: grid; grid-template-columns: 110px 1fr; gap: 2px 12px; padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.ixSkill:last-child { border-bottom: 0; }
+.ixSkillName { font-size: 12px; color: var(--accent); padding-top: 1px; }
+.ixSkillRole { color: var(--ink2); }
+@media (max-width: 480px) {
+  .ixSides { gap: 8px; }
+  .ixSide { padding: 10px 11px; }
+  .ixBig { font-size: 28px; }
+  .ixSkill { grid-template-columns: 1fr; }
+  .ixRow { grid-template-columns: 1fr; }
+  .ixResult { justify-self: start; }
+}
