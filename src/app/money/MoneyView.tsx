@@ -2,12 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, TrendGraded, TrendPick, Trends, TrendStats, Weather, WeatherBet, WeatherCity, WeatherDay } from "@/lib/money/types";
+import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, TrendGraded, TrendPick, Trends, TrendSlice, TrendStats, Weather, WeatherBet, WeatherCity, WeatherDay, WeatherSlice, WeatherSliceGate } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { BrierGauge, DeskHero, DeskTable, LearnerLog, MoneyLogSection, Stats, WeatherBrake, booksLog, booksTotals, desks, moneyLog, retroLog } from "./desks";
 import { Background, PageHead, SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
+import { Term } from "./Term";
 
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
 // paper stock books, all paper or unit-based. Bets live in this app;
@@ -356,60 +357,54 @@ function BookCard({ b }: { b: Book }) {
   );
 }
 
-function BookHoldings({ b }: { b: Book }) {
+// Holdings, neat (Jack, 2026-10-27: "not as wordy and not as many
+// expandables"): one line per book with its tickers as chips, then one short
+// list of recent trades. Each line opens the book's page, which keeps every
+// reason in full.
+
+function HoldingsLine({ b, idleSpy = false }: { b: Book; idleSpy?: boolean }) {
   const held = [...b.positions]
     .map((p) => ({ p, g: p.last !== null ? p.last / p.entryPrice - 1 : null }))
     .sort((x, y) => (y.g ?? -9) - (x.g ?? -9));
   return (
-    <details className={m.row}>
-      <summary className={m.rowHead}>
-        <span className={m.rowTitle}>{b.label}</span>
-        <span className={m.rowMeta}>
-          {b.retired ? `retired ${b.retired}` : `${held.length} ${held.length === 1 ? "holding" : "holdings"}, ${usd(b.cash)} cash`}
-        </span>
-      </summary>
-      <div className={m.rowBody}>
-        {b.strategy ? (
-          <div className={m.strat}>
-            <span className={m.stratWhat}>{b.strategy.what}</span>
-            <span className={m.stratHow}>{b.strategy.how}</span>
-            {b.strategy.record && <span className={m.stratRec}>{b.strategy.record}</span>}
-          </div>
+    <Link href={`/money/book/${encodeURIComponent(b.id)}`} className={m.hline} aria-label={`${b.label}: every holding and trade with its reason`}>
+      <span className={m.hname}>{b.label}</span>
+      <span className={m.chips}>
+        {held.length ? (
+          held.map(({ p, g }) => (
+            <span key={p.symbol} className={m.chip} title={`${p.shares} sh at ${p.entryPrice.toFixed(2)}${p.last !== null ? `, now ${p.last.toFixed(2)}` : ""}`}>
+              <b>{idleSpy && p.symbol === "SPY" ? "SPY (idle cash)" : p.symbol}</b>
+              <span className={`${s.num} ${g !== null ? tone(g) : s.muted}`}>{g !== null ? pct(g) : "n/a"}</span>
+            </span>
+          ))
         ) : (
-          <p className={m.sub}>{b.about}</p>
+          <span className={s.muted}>All cash</span>
         )}
-        {held.length > 0 && (
-          <ul className={m.holdList}>
-            {held.map(({ p, g }) => (
-              <li key={p.symbol} className={m.hold}>
-                <span className={s.play}>{p.symbol}</span>
-                <span className={`${s.num} ${g !== null ? tone(g) : s.muted}`}>{g !== null ? pct(g) : "n/a"}</span>
-                <span className={m.why}>{`${p.shares} sh at ${p.entryPrice.toFixed(2)}${p.last !== null ? `, now ${p.last.toFixed(2)}` : ""}. ${p.reason.replace(/^\[[^\]]+\] /, "")}`}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {b.fills.length > 0 && (
-          <details className={m.inner}>
-            <summary>{`Last ${Math.min(b.fills.length, 10)} trades`}</summary>
-            <ul className={m.holdList}>
-              {b.fills.slice(0, 10).map((f, i) => (
-                <li key={i} className={m.hold}>
-                  <span className={s.play}>{`${f.side === "buy" ? "Bought" : "Sold"} ${f.symbol}`}</span>
-                  <span className={`${s.num} ${s.muted}`}>{f.day}</span>
-                  <span className={m.why}>{`${f.shares} sh at ${f.price.toFixed(2)}. ${f.reason.replace(/^\[[^\]]+\] /, "")}`}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-        <p className={m.why}>
-          {b.liveAt
-            ? `Valued at ${clockEt(b.liveAt)} ET prices; the official close is marked at 6:30am. Started ${b.started}.`
-            : `Marked through ${b.asOf ?? "n/a"}. Started ${b.started}.`}
-        </p>
-      </div>
-    </details>
+      </span>
+      <span className={m.hcash}>{`${usd(b.cash)} cash \u203A`}</span>
+    </Link>
+  );
+}
+
+function RecentTrades({ books, n = 12 }: { books: Book[]; n?: number }) {
+  const rows = books
+    .flatMap((b) => b.fills.map((f, i) => ({ f, b, i })))
+    .sort((x, y) => y.f.day.localeCompare(x.f.day) || x.i - y.i)
+    .slice(0, n);
+  if (!rows.length) return <p className={s.muted}>No trades yet.</p>;
+  return (
+    <table className={m.trades}>
+      <tbody>
+        {rows.map(({ f, b }, k) => (
+          <tr key={`${b.id}${k}`}>
+            <td className={m.tday}>{shortDay(f.day)}</td>
+            <td className={m.tbook}>{b.label}</td>
+            <td><span className={f.side === "buy" ? s.pos : s.neg}>{f.side === "buy" ? "Bought" : "Sold"}</span>{` ${f.symbol}`}</td>
+            <td className={m.tnum}>{`${f.shares} at ${f.price.toFixed(2)}`}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -527,18 +522,28 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
       <p className={m.sub}>{`$100,000 each, traded at 6:30am on the previous close; the dashed line is the same money left in SPY.${live ? ` Charts are live at ${clockEt(live)} ET.` : ""}`}</p>
       <div className={m.cards}>
         {[...active, ...books.filter((b) => b.retired)].map((b) => (
-          <Link key={b.id} href={`/money/book/${encodeURIComponent(b.id)}`} target="_blank" rel="noopener" className={m.cardLink} aria-label={`${b.label}: open the full chart and strategy in a new window`}>
+          <Link key={b.id} href={`/money/book/${encodeURIComponent(b.id)}`} className={m.cardLink} aria-label={`${b.label}: open the full chart and strategy`}>
             <BookCard b={b} />
           </Link>
         ))}
       </div>
-      <details className={`${m.panel} ${m.fold}`}>
-        <summary className={m.foldHead}>
-          <h2 className={m.panelTitle}>Holdings and trades</h2>
-          <span className={m.foldMeta}>{`${books.reduce((a, b) => a + (b.retired ? 0 : b.positions.length), 0)} positions`}</span>
-        </summary>
-        <div className={m.rows}>{books.map((b) => <BookHoldings key={b.id} b={b} />)}</div>
-      </details>
+      <div className={m.panel}>
+        <div className={m.panelHead}>
+          <h2 className={m.panelTitle}>Holdings</h2>
+          <span className={m.foldMeta}>{`${active.reduce((a, b) => a + b.positions.length, 0)} positions · open a book for the reasons`}</span>
+        </div>
+        <div className={m.hgrid}>{active.map((b) => <HoldingsLine key={b.id} b={b} />)}</div>
+        {books.some((b) => b.retired) && (
+          <span className={m.why}>{`Retired: ${books.filter((b) => b.retired).map((b) => b.label).join(", ")}. Their pages keep the full record.`}</span>
+        )}
+      </div>
+      <div className={m.panel}>
+        <div className={m.panelHead}>
+          <h2 className={m.panelTitle}>Recent trades</h2>
+          <span className={m.foldMeta}>latest 12, every book</span>
+        </div>
+        <RecentTrades books={books} />
+      </div>
       {log.length > 0 && (
         <div className={s.section}>
           <h3 className={s.h2}>Learner log</h3>
@@ -568,22 +573,52 @@ const BUCKET_TITLE: Record<string, string> = {
 const statLine = (r?: TrendStats) =>
   !r || !r.n ? "No picks graded yet" : `${r.n} graded, ${pct(r.mean ?? 0)} vs SPY on average, ${Math.round((r.hit ?? 0) * 100)}% beat SPY`;
 
+// Plain definitions behind each tag, from trade-bot's own rules
+// (trends/PICKER.md and tradebot/trends.py), so a tap explains the label.
+const TERM = {
+  direct: "Direct: the company is the story, like the game's publisher or the company in the deal talks.",
+  "second-order": "Second-order: the company gains from how people behave around the story, like food delivery on a big game's launch weekend. The picker has to spell out a plain, believable chain.",
+  conviction: {
+    1: "Conviction 1 of 3: a reasonable bet. Most picks are 1 or 2, and the book buys the highest conviction first.",
+    2: "Conviction 2 of 3: a clear link to the trend and a catalyst ahead. The book buys the highest conviction first.",
+    3: "Conviction 3 of 3: a clear link, a catalyst ahead, not yet priced in, and the playbook backs this kind of bet. Bought first.",
+  } as Record<number, string>,
+  horizon: (n: number) => `${n} sessions: how long the pick is held and how long it is graded over, in trading days. It matches the catalyst: an event inside a week is 5, inside two weeks 10, otherwise 21.`,
+  bought: "Bought: the book bought it at the next open, $10,000 a slot. It is graded against SPY either way.",
+  gradedOnly: "Graded only: scored against SPY over its horizon, but not bought. That happens when the book is full, the kind of bet is benched, or in the shadow week before the book starts buying.",
+};
+
 function PickRow({ p }: { p: TrendPick }) {
   return (
-    <li className={m.hold}>
-      <span className={s.play}>
-        {p.ticker}
-        <span className={m.why} style={{ marginLeft: 8 }}>{p.topic}</span>
-      </span>
-      <span className={`${s.num} ${p.bought ? s.pos : s.muted}`}>{p.bought ? "bought" : "graded only"}</span>
-      <span className={m.why}>
-        <span className={`${m.tag} ${p.link === "direct" ? m.tagOpen : m.tagIdea}`}>{p.link}</span>
-        <span className={m.tag}>{`conviction ${p.conviction}`}</span>
-        <span className={m.tag}>{`${p.horizon} sessions`}</span>
-        {p.why}
-        {p.catalyst ? ` Catalyst: ${p.catalyst}.` : ""}
-        {p.pricedIn ? ` Priced in? ${p.pricedIn}` : ""}
-      </span>
+    <li className={m.pick}>
+      <div className={m.pickHead}>
+        <span className={m.pickTicker}>{p.ticker}</span>
+        <span className={m.pickTopic}>{p.topic}</span>
+        <span className={m.pickStatus}>
+          <Term label={p.bought ? "bought" : "graded only"} def={p.bought ? TERM.bought : TERM.gradedOnly} tone={p.bought ? m.tagOpen : undefined} />
+        </span>
+      </div>
+      <div className={m.pickTags}>
+        <Term label={p.link} def={TERM[p.link as "direct" | "second-order"] ?? p.link} tone={p.link === "direct" ? m.tagOpen : m.tagIdea} />
+        <Term label={`conviction ${p.conviction}`} def={TERM.conviction[p.conviction] ?? `Conviction ${p.conviction}.`} />
+        <Term label={`${p.horizon} sessions`} def={TERM.horizon(p.horizon)} />
+      </div>
+      <dl className={m.facts}>
+        <dt>Why</dt>
+        <dd>{p.why}</dd>
+        {p.catalyst && (
+          <>
+            <dt>Catalyst</dt>
+            <dd>{p.catalyst}</dd>
+          </>
+        )}
+        {p.pricedIn && (
+          <>
+            <dt>Priced in?</dt>
+            <dd>{p.pricedIn}</dd>
+          </>
+        )}
+      </dl>
     </li>
   );
 }
@@ -646,6 +681,132 @@ function TrendsHero({ tr }: { tr: Trends }) {
   );
 }
 
+type Extra = NonNullable<NonNullable<Trends["latest"]>["extras"]>[number];
+
+function ExtraRow({ p }: { p: Extra }) {
+  return (
+    <li className={m.hold}>
+      <span className={s.play}>
+        {p.ticker}
+        {p.topic ? <span className={m.why} style={{ marginLeft: 8 }}>{p.topic}</span> : null}
+      </span>
+      <span className={m.pickTags}>
+        <Term label={p.link} def={TERM[p.link as "direct" | "second-order"] ?? p.link} tone={p.link === "direct" ? m.tagOpen : m.tagIdea} />
+        <Term label={`c${p.conviction}`} def={TERM.conviction[p.conviction] ?? `Conviction ${p.conviction}.`} />
+        <Term label={`${p.horizon}d`} def={TERM.horizon(p.horizon)} />
+      </span>
+      {p.why && <span className={m.why}>{p.why}</span>}
+    </li>
+  );
+}
+
+const STATUS_TAG: Record<TrendSlice["status"], { label: string; cls?: string }> = {
+  edge: { label: "edge", cls: m.tagOpen }, losing: { label: "losing", cls: m.tagRetire }, "no edge": { label: "no edge" }, collecting: { label: "collecting", cls: m.tagWatch },
+};
+/** trend_learner slice keys read "link=direct", "rank=rank 1", "set=extra"; say them plainly. */
+const sliceName = (k: string) => {
+  if (k === "set=extra") return "Picks past the cap";
+  if (k === "set=in cap") return "Picks inside the cap";
+  const [d, v] = k.split("=");
+  const dim: Record<string, string> = { link: "Link", conviction: "Conviction", horizon: "Hold", rank: "Rank", source: "Source", run_up: "Run-up" };
+  return `${dim[d] ?? d}: ${v ?? ""}`;
+};
+
+function TrendLearner({ tr }: { tr: Trends }) {
+  const L = tr.learner;
+  if (!L) return null;
+  const rows = [...L.slices].filter((x) => x.n > 0).sort((a, b) => (a.status === "edge" ? -1 : 0) - (b.status === "edge" ? -1 : 0) || b.n - a.n);
+  const r = L.rules;
+  return (
+    <div className={m.panel}>
+      <div className={m.panelHead}>
+        <h2 className={m.panelTitle}>Learner</h2>
+        <span className={m.foldMeta}>{L.reviewed ? `reviewed ${when(L.reviewed)}` : "not reviewed yet"}</span>
+      </div>
+      <div className={m.trackStrip}>
+        <span><b className={s.num}>{L.cap}</b> picks a day (the cap)</span>
+        <span>{L.capChanged ? `last moved ${shortDay(L.capChanged)}` : "never moved"}</span>
+        {r && <span>{`can run 1 to ${r.maxCap}`}</span>}
+      </div>
+      <p className={m.sub}>
+        {r
+          ? `The picker still names picks past the cap; those are graded only. If picks past the cap beat SPY (${r.minN}+ picks over ${r.minWeeks}+ weeks, t ${r.edgeT} or better, and still ahead on the newer half), the cap goes up one. If the last pick inside the cap loses to SPY, it goes down one. At most one move every ${r.capCooldownDays} days. Each kind of bet is judged the same way.`
+          : "The cap moves only when graded picks show the extra picks beat SPY, or the last one inside the cap loses to it."}
+      </p>
+      {rows.length ? (
+        <div className={m.scroll}>
+          <table className={s.table}>
+            <thead><tr><th>Kind of pick</th><th className={s.num}>Picks</th><th className={s.num}>Weeks</th><th className={s.num}>vs SPY</th><th className={s.num}>t</th><th className={s.num}>Newer half</th></tr></thead>
+            <tbody>
+              {rows.map((x) => (
+                <tr key={x.slice}>
+                  <td><span className={`${m.tag} ${STATUS_TAG[x.status]?.cls ?? ""}`}>{STATUS_TAG[x.status]?.label ?? x.status}</span>{sliceName(x.slice)}</td>
+                  <td className={s.num}>{x.n}</td>
+                  <td className={`${s.num} ${s.muted}`}>{x.weeks}</td>
+                  <td className={`${s.num} ${x.mean !== null ? tone(x.mean) : s.muted}`}>{x.mean !== null ? pct(x.mean) : "·"}</td>
+                  <td className={`${s.num} ${s.muted}`}>{x.t !== null ? x.t.toFixed(2) : "·"}</td>
+                  <td className={`${s.num} ${x.heldOutMean !== null ? tone(x.heldOutMean) : s.muted}`}>{x.heldOutMean !== null ? pct(x.heldOutMean) : "·"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className={m.sub}>No pick is graded yet, so every kind of pick is still collecting. The table fills in as picks reach their horizon.</p>
+      )}
+      <div>
+        <h3 className={m.subHead}>Changes</h3>
+        {L.journal.length ? (
+          <ul className={m.grades}>
+            {[...L.journal].reverse().slice(0, 8).map((j, i) => (
+              <li key={`${j.at}-${i}`} className={m.grade}>
+                <span className={s.play}>
+                  {j.kind === "cap" ? `Cap ${j.before} to ${j.after}` : `${sliceName(j.slice ?? "")}: ${j.before ?? "new"} to ${j.after}`}
+                </span>
+                <span className={`${s.num} ${s.muted}`}>{shortDay(j.at.slice(0, 10))}</span>
+                <span className={m.why}>
+                  {j.why ?? (j.n !== undefined ? `${j.n} picks${j.mean != null ? `, ${pct(j.mean)} vs SPY` : ""}${j.t != null ? `, t ${j.t.toFixed(2)}` : ""}` : "")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={m.sub}>No changes yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TrendPending({ tr }: { tr: Trends }) {
+  const rows = [...(tr.pending ?? [])].sort((a, b) => a.sessionsLeft - b.sessionsLeft || a.day.localeCompare(b.day));
+  if (!rows.length) return null;
+  return (
+    <details className={`${m.panel} ${m.fold}`} open>
+      <summary className={m.foldHead}>
+        <h2 className={m.panelTitle}>Waiting to be graded</h2>
+        <span className={m.foldMeta}>{`${rows.length}, next in ${rows[0].sessionsLeft} ${rows[0].sessionsLeft === 1 ? "session" : "sessions"}`}</span>
+      </summary>
+      <p className={m.sub}>A pick is graded against SPY once its hold ends, counted in trading sessions.</p>
+      <ul className={m.grades}>
+        {rows.map((p) => (
+          <li key={p.id} className={m.grade}>
+            <span className={s.play}>
+              {p.ticker}
+              {p.extra && <span className={m.tag} style={{ marginLeft: 8 }}>past the cap</span>}
+            </span>
+            <span className={m.gateCell}>
+              <span className={m.gateBar}><span style={{ width: `${Math.min(1, (p.horizon - p.sessionsLeft) / p.horizon) * 100}%`, background: "var(--accent)" }} /></span>
+              <span className={`${s.num} ${s.muted}`}>{p.sessionsLeft ? `${p.sessionsLeft} left` : "grading"}</span>
+            </span>
+            <span className={m.why}>{`Picked ${shortDay(p.day)}, ${p.horizon}-session hold.`}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function TrendsTab({ tr }: { tr: Trends }) {
   const b = tr.book ?? null;
   const latest = tr.latest ?? null;
@@ -653,6 +814,10 @@ function TrendsTab({ tr }: { tr: Trends }) {
   const spy = b && b.spyEquity !== null ? b.spyEquity / b.start - 1 : null;
   const benched = tr.benched ?? [];
   const dims = ["link", "conviction", "horizon", "run_up"].filter((d) => (tr.buckets?.[d] ?? []).length > 0);
+  // Picks made but not yet graded: every pick in the history minus the graded ones.
+  const open = Math.max(0, (tr.history ?? []).reduce((a, h) => a + h.tickers.length, 0) - (tr.record?.n ?? 0));
+  const heldPicks = b ? b.positions.filter((p) => p.symbol !== "SPY").length : 0;
+  const everBought = (tr.graded ?? []).some((o) => o.bought) || (latest?.picks ?? []).some((p) => p.bought) || heldPicks > 0;
   return (
     <section className={s.section}>
       <Stats
@@ -660,18 +825,19 @@ function TrendsTab({ tr }: { tr: Trends }) {
         items={[
           { k: "Book", v: ret !== null ? pct(ret) : "·", sub: b ? `${usd(b.equity)} of ${usd(b.start)}` : "opens on its first run", tone: ret === null ? undefined : ret >= 0 ? "up" : "down" },
           { k: "SPY, same days", v: spy !== null ? pct(spy) : "·", sub: "the same money left in SPY" },
-          { k: "Picks graded", v: `${tr.record?.n ?? 0}`, sub: tr.record?.n ? `${Math.round((tr.record.hit ?? 0) * 100)}% beat SPY` : "each one, bought or not" },
-          { k: "Benched", v: `${benched.length}`, sub: benched.length ? benched.join(", ") : "kinds of bet it stopped buying", small: benched.length > 0 },
+          { k: "Picks graded", v: `${tr.record?.n ?? 0}`, sub: tr.record?.n ? `${Math.round((tr.record.hit ?? 0) * 100)}% beat SPY` : tr.pending?.length ? `${tr.pending.length} waiting, first in ${Math.min(...tr.pending.map((p) => p.sessionsLeft))} sessions` : `${open} waiting for their horizon` },
+          { k: "Benched", v: `${benched.length}`, sub: benched.length ? benched.join(", ") : `needs ${tr.bench?.n ?? 20} graded of a kind` },
         ]}
       />
       <p className={m.sub}>
-        Every trading morning Claude reads Google&apos;s trending searches and Wikipedia&apos;s most-read pages, searches for what is coming up, and picks up to 5 listed
+        Every trading morning Claude reads Google&apos;s trending searches and Wikipedia&apos;s most-read pages, searches for what is coming up, and names its best {tr.learner?.cap ?? latest?.cap ?? 3}{" "}listed
         companies riding a trend. The book buys them at the open, $10,000 a slot, and sells at the pick&apos;s horizon, on a 15% drop, or when the story is over. Every pick
         is graded against SPY, and each Saturday a review rewrites the playbook the picker follows.
+        {tr.liveFrom ? ` Until ${shortDay(tr.liveFrom)} it is a shadow run: every pick is graded, none is bought.` : ""}
       </p>
       <div className={m.panels}>
         {b && (
-          <Link href={`/money/book/${encodeURIComponent(b.id)}`} target="_blank" rel="noopener" className={m.cardLink} aria-label="Trend themes: open the full chart in a new window">
+          <Link href={`/money/book/${encodeURIComponent(b.id)}`} className={m.cardLink} aria-label="Trend themes: open the full chart">
             <BookCard b={b} />
           </Link>
         )}
@@ -685,6 +851,12 @@ function TrendsTab({ tr }: { tr: Trends }) {
             <span className={m.sub}>No picks: nothing trending had a listed company with a clear, unpriced link. That is a normal day.</span>
           )}
           {latest && latest.picks.length > 0 && <ul className={m.holdList}>{latest.picks.map((p) => <PickRow key={p.id} p={p} />)}</ul>}
+          {latest && (latest.extras ?? []).length > 0 && (
+            <details className={m.inner}>
+              <summary>{`Past the cap of ${latest.cap ?? tr.learner?.cap ?? 3}: graded only, not bought (${latest.extras!.length})`}</summary>
+              <ul className={m.holdList}>{latest.extras!.map((p) => <ExtraRow key={p.id} p={p} />)}</ul>
+            </details>
+          )}
           {latest && latest.exits.length > 0 && <span className={m.why}>{`Selling: ${latest.exits.map((e) => `${e.ticker} (${e.why})`).join("; ")}`}</span>}
           {latest && latest.rejected.length > 0 && (
             <span className={m.why}>{`Thrown out by the checks: ${latest.rejected.map((r) => `${r.ticker ?? "?"} (${r.why})`).join("; ")}`}</span>
@@ -705,6 +877,8 @@ function TrendsTab({ tr }: { tr: Trends }) {
         </div>
       </div>
 
+      <TrendPending tr={tr} />
+
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>What it has learned</h3>
@@ -712,6 +886,7 @@ function TrendsTab({ tr }: { tr: Trends }) {
             {`Every graded pick, split by the kind of bet. A kind of bet with ${tr.bench?.n ?? 20}+ picks averaging worse than ${pct(tr.bench?.excess ?? -0.01)} vs SPY is benched: still picked and graded, no longer bought, until it recovers.`}
           </p>
         </div>
+        <TrendLearner tr={tr} />
         {dims.length === 0 ? (
           <p className={s.calm}>The first picks are graded 1 to 4 weeks after they are made. The split by kind of bet starts then.</p>
         ) : (
@@ -754,13 +929,21 @@ function TrendsTab({ tr }: { tr: Trends }) {
         </details>
       )}
       {b && (
-        <details className={`${m.panel} ${m.fold}`}>
-          <summary className={m.foldHead}>
-            <h2 className={m.panelTitle}>Holdings and trades</h2>
-            <span className={m.foldMeta}>{`${b.positions.filter((p) => p.symbol !== "SPY").length} picks held`}</span>
-          </summary>
-          <div className={m.rows}><BookHoldings b={b} /></div>
-        </details>
+        <div className={m.panel}>
+          <div className={m.panelHead}>
+            <h2 className={m.panelTitle}>Holdings</h2>
+            <span className={m.foldMeta}>{`${heldPicks} ${heldPicks === 1 ? "pick" : "picks"} held`}</span>
+          </div>
+          {heldPicks === 0 && (
+            <span className={m.note}>
+              {everBought
+                ? "No pick is held right now: each one sold at its horizon, on a 15% drop or when its story ended. Idle cash sits in SPY until the next buy."
+                : `Not day trades: nothing has been bought yet. Every pick so far is graded only (the shadow week${tr.liveFrom ? `, buying starts ${shortDay(tr.liveFrom)}` : ""}), so the book holds its idle cash in SPY.`}
+            </span>
+          )}
+          <div className={m.hgrid}><HoldingsLine b={b} idleSpy /></div>
+          <RecentTrades books={[b]} n={8} />
+        </div>
       )}
       {tr.playbook && (
         <details className={`${m.panel} ${m.fold}`}>
@@ -1022,6 +1205,7 @@ function WeatherBetRow({ b }: { b: WeatherBet }) {
       <span className={m.why}>
         {`${shortDay(b.day)} high. ${b.contracts} at ${wc(b.price)}. Forecast ${deg(b.mu)} ±${b.sigma.toFixed(1)}°; desk ${Math.round(own * 100)}%, blended with the market ${Math.round(b.p * 100)}%, edge ${wc(b.edge)}.`}
         {b.status !== "open" ? ` ${b.status === "won" ? "Won" : "Lost"}.` : ""}
+        {b.slices?.length ? ` Staked because it falls in ${b.slices.length === 1 ? "a live slice" : "live slices"}: ${b.slices.map(sliceLabel).join(", ")}.` : ""}
       </span>
     </li>
   );
@@ -1030,11 +1214,15 @@ function WeatherBetRow({ b }: { b: WeatherBet }) {
 function WeatherDayRow({ d, benched }: { d: WeatherDay; benched: boolean }) {
   return (
     <li className={m.grade}>
-      <span className={s.play}>{d.name}</span>
+      <span className={s.play}>
+        {d.name}
+        {d.unsettled !== undefined && <span className={`${m.sky} ${d.unsettled ? m.skyRough : ""}`}>{d.unsettled ? "Unsettled" : "Calm"}</span>}
+      </span>
       <span className={`${s.num} ${s.muted}`}>{`${deg(d.mu)} ±${d.sigma.toFixed(1)}°`}</span>
       <span className={m.why}>
         {`Most likely ${d.favorite}: desk ${Math.round(d.favoriteP * 100)}%, market ${d.favoriteMid !== null ? wc(d.favoriteMid) : "n/a"}. `}
         {benched ? "Benched: the market has out-forecast the desk here." : d.pick ? `Edge: ${d.pick} (${wc(d.edge ?? 0)}).` : "No edge."}
+        {skyLine(d)}
       </span>
     </li>
   );
@@ -1053,6 +1241,140 @@ function WeatherCityRow({ c }: { c: WeatherCity }) {
         {c.scored ? ` Scored ${c.scored} days: desk ${c.desk!.toFixed(3)}, market ${c.market!.toFixed(3)} (lower is better).` : ""}
       </span>
     </li>
+  );
+}
+
+/* Slices: every edge is tracked at zero stake; only a slice that clears the gate earns a stake. */
+
+const SLICE_PART: Record<string, string> = {
+  "side:yes": "Yes", "side:no": "No", "kind:middle": "2-degree bracket", "kind:tail": "Tail bracket",
+  "lead:day1": "Day before", "lead:day0": "Morning of", "edge:5-10c": "Edge 5-10c", "edge:10c+": "Edge 10c+",
+  "price:<30c": "Price under 30c", "price:30-60c": "Price 30-60c", "price:60c+": "Price 60c+",
+  "sky:calm": "Calm sky", "sky:unsettled": "Unsettled sky", all: "Every edge",
+};
+/** Same wording as weather-desk slices.label(), for keys that arrive without a label (bet rows). */
+const sliceLabel = (k: string) => (k.startsWith("city:") ? k.slice(5).toUpperCase() : k.split("|").map((p) => SLICE_PART[p] ?? p).join(" + "));
+
+const WX_TERM: Record<string, string> = { spread: "how far apart the models are", cloud: "cloud cover", precip: "rain", dt: "the swing from yesterday's high", wind: "wind", dew: "dew point", dp: "pressure change" };
+
+function skyLine(d: WeatherDay): string {
+  if (d.unsettled === undefined) return "";
+  const bits = [
+    d.spread != null ? `models ${d.spread.toFixed(1)}° apart` : null,
+    d.cloud != null ? `${Math.round(d.cloud)}% cloud` : null,
+    d.precip ? `${d.precip.toFixed(2)} in rain` : null,
+  ].filter(Boolean);
+  return ` Sky ${d.unsettled ? "unsettled" : "calm"}${bits.length ? ` (${bits.join(", ")})` : ""}.`;
+}
+
+function GateBar({ have, need }: { have: number; need: number }) {
+  const done = have >= need;
+  return (
+    <span className={m.gateCell}>
+      <span className={m.gateBar}><span style={{ width: `${Math.min(1, need ? have / need : 0) * 100}%`, background: done ? "var(--pos)" : "var(--accent)" }} /></span>
+      <span className={`${s.num} ${done ? s.pos : s.muted}`}>{`${have}/${need}`}</span>
+    </span>
+  );
+}
+
+function SliceTable({ rows, gate }: { rows: WeatherSlice[]; gate: WeatherSliceGate }) {
+  return (
+    <div className={m.scroll}>
+      <table className={`${s.table} ${m.sliceTable}`}>
+        <thead>
+          <tr><th>Slice</th><th>Record</th><th>Per $1</th><th>t</th><th>Bets</th><th>Days</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>
+                <span className={`${m.tag} ${r.status === "live" ? m.tagOpen : ""}`}>{r.status === "live" ? "Live" : "Tracking"}</span>
+                {r.label}
+              </td>
+              <td className={s.num}>{r.n ? `${r.won}-${r.n - r.won}` : "·"}</td>
+              <td className={`${s.num} ${r.n ? tone(r.roi) : s.muted}`}>{r.n ? `${r.roi >= 0 ? "+" : "-"}${Math.abs(Math.round(r.roi * 100))}¢` : "·"}</td>
+              <td className={`${s.num} ${r.t >= gate.min_t ? s.pos : s.muted}`}>{r.n > 1 ? r.t.toFixed(2) : "·"}</td>
+              <td><GateBar have={r.n} need={gate.min_bets} /></td>
+              <td><GateBar have={r.days} need={gate.min_days} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function WeatherSlices({ w }: { w: Weather }) {
+  const gate = w.sliceGate;
+  const rows = w.slices ?? [];
+  if (!gate || !rows.length) return null;
+  const live = rows.filter((r) => r.status === "live");
+  const top = rows.slice(0, 10);
+  const rest = rows.slice(10);
+  const tr = w.tracked;
+  const journal = w.sliceJournal ?? [];
+  return (
+    <div className={m.panel}>
+      <div className={m.panelHead}>
+        <h2 className={m.panelTitle}>Slices</h2>
+        <span className={m.foldMeta}>{live.length ? `${live.length} live, staking` : "none live, nothing staked"}</span>
+      </div>
+      <p className={m.sub}>
+        {`Every edge of ${wc(w.rules.min_edge)} or more is tracked at zero stake and sorted into slices (yes or no, bracket type, day before or morning of, edge size, price, calm or unsettled sky, city, and pairs of those). A slice earns real paper stakes only after ${gate.min_bets}+ bets over ${gate.min_days}+ days that make money per contract at t ${gate.min_t} or better and beat the broader slice it narrows, at most ${gate.max_new} new a day. It goes back to tracking if it loses at t ${gate.rollback_t} over ${gate.rollback_bets}+ bets after going live.`}
+      </p>
+      {tr && (
+        <div className={m.trackStrip}>
+          <span><b className={s.num}>{tr.n ? `${tr.won}-${tr.n - tr.won}` : "0-0"}</b> tracked edges</span>
+          <span><b className={`${s.num} ${tr.n ? tone(tr.roi) : ""}`}>{tr.n ? `${tr.roi >= 0 ? "+" : "-"}${Math.abs(Math.round(tr.roi * 100))}¢` : "·"}</b> per $1</span>
+          <span><b className={s.num}>{tr.n > 1 ? tr.t.toFixed(2) : "·"}</b> t</span>
+          <span><b className={s.num}>{tr.days}</b> days</span>
+          <span><b className={s.num}>{tr.open}</b> open</span>
+        </div>
+      )}
+      <SliceTable rows={top} gate={gate} />
+      {rest.length > 0 && (
+        <details className={m.fold}>
+          <summary className={m.foldHead}><span className={m.foldMeta}>{`${rest.length} more slices`}</span></summary>
+          <SliceTable rows={rest} gate={gate} />
+        </details>
+      )}
+      <div>
+        <h3 className={m.subHead}>Slice changes</h3>
+        {journal.length ? (
+          <ul className={m.grades}>
+            {journal.slice(0, 8).map((j, i) => (
+              <li key={`${j.day}-${j.slice}-${i}`} className={m.grade}>
+                <span className={s.play}><span className={`${m.tag} ${j.kind === "live" ? m.tagOpen : m.tagRetire}`}>{j.kind === "live" ? "Live" : "Back to tracking"}</span>{j.label}</span>
+                <span className={`${s.num} ${s.muted}`}>{shortDay(j.day)}</span>
+                <span className={m.why}>{j.why}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={m.sub}>No slice has gone live or been pulled yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WeatherModelNote({ w }: { w: Weather }) {
+  const wm = w.weatherModel;
+  if (!wm) return null;
+  const same = wm.sameDay;
+  const ahead = wm.dayAhead;
+  const terms = (x: string[]) => x.map((k) => WX_TERM[k] ?? k).join(", ");
+  return (
+    <p className={m.sub}>
+      {`How sure it is: each city's usual miss weights recent days more (a miss ${wm.halfLifeDays} days old counts half), since weather runs in spells. `}
+      {same.terms.length
+        ? `On the morning of, the spread widens on rough days, using ${terms(same.terms)}${same.test ? `; on ${same.test.n} held-out days that cut the bracket log loss from ${same.test.base.toFixed(3)} to ${same.test.weather.toFixed(3)} (t ${same.test.t.toFixed(1)})` : ""}. `
+        : "On the morning of, it uses the city's usual miss. "}
+      {ahead.terms.length
+        ? `The day before, it also uses ${terms(ahead.terms)}.`
+        : `The day before, it keeps the city's usual miss: the weather terms did not test better${ahead.test ? ` (t ${ahead.test.t.toFixed(1)} on ${ahead.test.n} days)` : ""}.`}
+      {wm.fitted ? ` Fit ${shortDay(wm.fitted)}.` : ""}
+    </p>
   );
 }
 
@@ -1077,12 +1399,14 @@ function WeatherTab({ w }: { w: Weather }) {
         <h2 className={m.panelTitle}>Bankroll</h2>
         {weatherChart(w, 220, 640)}
       </div>
+      <WeatherSlices w={w} />
       <Background title="How the desk forecasts and bets">
         <p className={m.sub}>
           {`Bets on tomorrow's high in ${w.cities.length} cities on Kalshi. Each forecast averages five weather models with the National Weather Service forecast, correcting each by what it has learned about the station and weighting whichever has missed by less. The desk's odds are blended with the market's: ${Math.round(w.trust.w * 100)}% desk, ${100 - Math.round(w.trust.w * 100)}% market${
             w.trust.days ? `, re-fit from ${w.trust.days} settled days` : ", until 20 days have settled"
-          }. It bets only when the blend beats the price by ${wc(w.rules.min_edge)} after fees, no more than ${usd(w.rules.max_stake)} a bet, and never after ${w.rules.cutoff_hour}am on the day.`}
+          }. It ${w.sliceGate ? "tracks every edge" : "bets only"} when the blend beats the price by ${wc(w.rules.min_edge)} after fees${w.sliceGate ? ", stakes only edges in a live slice (below)" : ""}, no more than ${usd(w.rules.max_stake)} a bet, and never after ${w.rules.cutoff_hour}am on the day.`}
         </p>
+        <WeatherModelNote w={w} />
         {w.brake && w.brake.level !== "off" && w.brake.desk !== null && w.brake.market !== null ? (
           <p className={`${m.sub} ${s.neg}`}>
             {`Brake ${w.brake.level === "stop" ? "on: no new bets" : "on: quarter stakes"}. Over the last week the market scored ${w.brake.market.toFixed(3)} to the desk's ${w.brake.desk.toFixed(3)} across ${w.brake.n} city-days (lower is better). It keeps forecasting and scoring, and bets again once its week beats the market's.`}

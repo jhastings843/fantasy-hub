@@ -261,11 +261,51 @@ export interface Trends {
     rejected: { ticker: string | null; why: string }[];
     passed: { topic: string | null; why: string | null }[];
     exits: { ticker: string; why: string }[];
+    /** The pick cap that day, and the picks past it, graded but not bought (added 2026-10-28). */
+    cap?: number | null;
+    extras?: { id: string; ticker: string; topic: string | null; link: string; conviction: number; horizon: number; why: string | null }[];
   } | null;
   history?: { day: string; tickers: string[] }[];
   graded?: TrendGraded[];
   playbook?: string | null;
   review?: { day: string; text: string } | null;
+  /** The trend learner (trade-bot tradebot/trend_learner.py, added 2026-10-28). Means are fractions of a pick's return over SPY. */
+  learner?: {
+    cap: number;
+    capChanged: string | null;
+    reviewed: string | null;
+    rules: { minN: number; minWeeks: number; edgeT: number; capCooldownDays: number; maxCap: number } | null;
+    slices: TrendSlice[];
+    journal: TrendJournal[];
+  };
+  /** First day the book buys picks; before it every pick is graded only. */
+  liveFrom?: string;
+  /** Picks waiting for their horizon, counted in trading sessions. */
+  pending?: { id: string; ticker: string; day: string; horizon: number; sessionsLeft: number; extra: boolean }[];
+}
+
+export interface TrendSlice {
+  slice: string;
+  n: number;
+  weeks: number;
+  mean: number | null;
+  t: number | null;
+  heldOutMean: number | null;
+  hit: number | null;
+  status: "collecting" | "edge" | "losing" | "no edge";
+}
+
+export interface TrendJournal {
+  at: string;
+  kind: "status" | "cap" | string;
+  slice?: string;
+  before?: string | number | null;
+  after?: string | number | null;
+  n?: number;
+  mean?: number | null;
+  t?: number | null;
+  heldOutMean?: number | null;
+  why?: string;
 }
 
 /** One paper bet on a Kalshi daily-high bracket. */
@@ -292,6 +332,8 @@ export interface WeatherBet {
   status: "open" | "won" | "lost";
   settled?: string;
   pnl?: number;
+  /** The live slices that earned this bet its stake (added 2026-10-28). */
+  slices?: string[];
 }
 
 export interface WeatherCity {
@@ -322,6 +364,67 @@ export interface WeatherDay {
   nwsWeight?: number;
   edge: number | null;
   pick: string | null;
+  /** Weather inputs (added 2026-10-28): the city's usual miss, how far apart the models are (°F), cloud cover (%), rain (in), and whether that makes the sky "unsettled". */
+  citySigma?: number;
+  spread?: number | null;
+  cloud?: number | null;
+  precip?: number | null;
+  unsettled?: boolean;
+}
+
+/** One slice of the weather desk's edges (weather-desk desk/slices.py table()). roi = profit per $1 contract after fees. */
+export interface WeatherSlice {
+  key: string;
+  label: string;
+  status: "tracking" | "live";
+  since: string;
+  liveSince: string | null;
+  n: number;
+  days: number;
+  won: number;
+  roi: number;
+  t: number;
+}
+
+export interface WeatherSliceGate {
+  min_bets: number;
+  min_days: number;
+  min_t: number;
+  max_new: number;
+  rollback_bets: number;
+  rollback_t: number;
+  floor_t: number;
+}
+
+export interface WeatherSliceNote {
+  day: string;
+  kind: "live" | "rollback" | string;
+  slice: string;
+  label: string;
+  why: string;
+}
+
+/** An edge the desk tracked at zero stake unless a live slice covered it. */
+export interface WeatherTrackedBet {
+  id: string;
+  placed: string;
+  city: string;
+  day: string;
+  label: string;
+  side: "yes" | "no";
+  kind: string;
+  lead: "day1" | "day0";
+  price: number;
+  edge: number;
+  p: number;
+  unsettled: boolean;
+  live: string[];
+  won: boolean | null;
+}
+
+export interface WeatherModelTest {
+  terms: string[];
+  test: { base: number; weather: number; n: number; t: number } | null;
 }
 
 /** Weather desk status (weather-desk desk/desk.py report()). */
@@ -346,6 +449,12 @@ export interface Weather {
   /** Desk-wide brake over the last week (added 2026-10-21): off, slow (quarter stakes) or stop. */
   brake?: { level: "off" | "slow" | "stop"; mult: number; n: number; desk: number | null; market: number | null; ratio: number | null };
   rules: { min_edge: number; kelly: number; max_stake: number; cutoff_hour: number; bench_min: number };
+  /** Slice gate (added 2026-10-28): every edge is tracked; only edges in a live slice get a stake. */
+  slices?: WeatherSlice[];
+  sliceGate?: WeatherSliceGate;
+  sliceJournal?: WeatherSliceNote[];
+  tracked?: { n: number; days: number; won: number; roi: number; t: number; open: number; recent: WeatherTrackedBet[] };
+  weatherModel?: { halfLifeDays: number; fitted: string | null; sameDay: WeatherModelTest; dayAhead: WeatherModelTest };
 }
 
 /** Enough of a check that a malformed post can't break the page. */

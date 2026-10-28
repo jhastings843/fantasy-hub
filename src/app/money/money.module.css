@@ -172,3 +172,55 @@
 .md { display: flex; flex-direction: column; gap: 8px; max-width: 72ch; }
 .mdHead { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--ink); }
 .mdList { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.45; color: var(--ink2); }
+
+/* ---- 2026-10-28: trend picks laid out as label / text, tags explain themselves ---- */
+.term { position: relative; display: inline-block; }
+.termBtn { border: 0; cursor: pointer; font: inherit; font-family: var(--font-plex-mono), monospace; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; text-decoration: underline dotted; text-underline-offset: 3px; min-height: 24px; }
+.termBtn:hover { filter: brightness(1.15); }
+.termBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.termPop { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: min(300px, 78vw); padding: 10px 12px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--rule); color: var(--ink); font-size: 13px; line-height: 1.45; text-transform: none; letter-spacing: 0; font-weight: 400; font-family: inherit; box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
+.pick { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.pick:last-child { border-bottom: 0; }
+.pickHead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pickTicker { font-weight: 700; font-size: 15px; }
+.pickTopic { color: var(--ink2); font-size: 13px; }
+.pickStatus { margin-left: auto; }
+.pickTags { display: flex; flex-wrap: wrap; gap: 6px 0; }
+.facts { display: grid; grid-template-columns: 82px 1fr; gap: 6px 12px; margin: 0; font-size: 13px; line-height: 1.45; }
+.facts dt { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); padding-top: 2px; }
+.facts dd { margin: 0; color: var(--ink2); }
+@media (max-width: 480px) { .facts { grid-template-columns: 1fr; gap: 2px; } .facts dd { margin-bottom: 6px; } }
+.note { font-size: 13px; color: var(--ink2); padding: 10px 12px; border-radius: 8px; background: var(--surface2); line-height: 1.45; }
+
+/* Holdings: one line per book, tickers as chips; the book page has every reason */
+.hgrid { display: flex; flex-direction: column; }
+.hline { display: grid; grid-template-columns: minmax(130px, 200px) 1fr auto; gap: 6px 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule); color: inherit; text-decoration: none; }
+.hline:last-child { border-bottom: 0; }
+.hline:hover .hname, .hline:focus-visible .hname { color: var(--accent); }
+.hline:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.hname { font-weight: 600; font-size: 14px; transition: color .15s; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 2px 8px; border-radius: 999px; background: var(--surface2); font-size: 12.5px; }
+.chip b { font-weight: 600; }
+.hcash { font-family: var(--font-plex-mono), monospace; font-size: 11.5px; color: var(--mute); white-space: nowrap; }
+@media (max-width: 600px) { .hline { grid-template-columns: 1fr auto; } .hline .chips { grid-column: 1 / -1; order: 3; } }
+.trades { width: 100%; border-collapse: collapse; font-size: 13px; }
+.trades td { padding: 7px 8px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+.trades tr:last-child td { border-bottom: 0; }
+.trades .tday { font-family: var(--font-plex-mono), monospace; font-size: 11.5px; color: var(--mute); white-space: nowrap; }
+.trades .tbook { color: var(--ink2); }
+.trades .tnum { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-plex-mono), monospace; font-size: 12px; white-space: nowrap; }
+@media (max-width: 520px) { .trades .tbook { display: none; } }
+.cards > .cardLink, .cards > .card { min-width: 0; }
+
+/* Weather slices (2026-10-28) */
+.subHead { font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); font-weight: 600; margin: 4px 0 2px; }
+.trackStrip { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 10px 12px; border-radius: 8px; background: var(--surface2); font-size: 13px; color: var(--ink2); }
+.trackStrip b { color: var(--ink); font-size: 15px; font-weight: 600; margin-right: 4px; }
+.sliceTable td { vertical-align: middle; }
+.sliceTable td:first-child { white-space: nowrap; }
+.gateCell { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.gateBar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.gateBar > span { display: block; height: 100%; border-radius: 3px; }
+.sky { display: inline-block; margin-left: 8px; padding: 0 6px; border-radius: 4px; font-family: var(--font-plex-mono), monospace; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; vertical-align: 1px; background: color-mix(in srgb, var(--pos) 12%, var(--surface)); color: var(--pos); }
+.skyRough { background: color-mix(in srgb, var(--gold) 18%, var(--surface)); color: var(--gold); }
