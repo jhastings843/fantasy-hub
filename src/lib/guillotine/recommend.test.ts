@@ -244,6 +244,25 @@ describe("buildBidCard", () => {
     expect(["bench1", "bench2"]).toContain(card.chains[0].drop?.playerId);
   });
 
+  it("does not count a player in the IR slot in Sunday's lineup, since Sleeper won't start him there", () => {
+    // Cleared and projected, but still in the IR slot: the claim's gain is
+    // measured against the lineup that can actually take the field.
+    const ir = player("ir", "WR", 14, { rosPoints: 14 });
+    const card = buildBidCard(input({ myPlayers: [...myPlayers, ir], reserveIds: ["ir"], candidates: [player("wrA", "WR", 10)] }));
+    const target = card.chains.flatMap((c) => c.targets).find((t) => t.player.playerId === "wrA");
+    // Over the weak flex (4), not over a 9 the IR player would push to the flex.
+    expect(target?.weekGain).toBeCloseTo(6, 5);
+    expect(target?.displaces?.name).toBe("Player wr3");
+  });
+
+  it("names how long an injured target is out", () => {
+    const hurt = player("hurtWR", "WR", 20, { injuryStatus: "IR", plays: 0, weeksOut: 3, rosPoints: 29 });
+    const card = buildBidCard(input({ candidates: [hurt] }));
+    const target = card.chains.flatMap((c) => c.targets).find((t) => t.player.playerId === "hurtWR");
+    expect(target?.reason).toMatch(/out about 3 weeks/i);
+    expect(target?.reason).not.toMatch(/after this week/);
+  });
+
   it("at a two-QB cap, a QB claim drops the backup QB and other chains leave him alone", () => {
     const withBackup = [...myPlayers, player("qb2", "QB", 12, { rosPoints: 12 })];
     const card = buildBidCard(

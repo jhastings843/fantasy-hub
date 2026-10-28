@@ -20,6 +20,7 @@ import { blendRates } from "./season-value";
 import { buildBidCard, finalFourBars } from "./recommend";
 import { bestLineup, slotAccepts } from "./lineup";
 import { availability, injuryFor } from "./availability";
+import { byeAlerts as byeAlertsFor, irMoves, restOfSeasonShare, sundayPoints, weeksOut } from "./injury-timeline";
 import { getInjuryReport } from "@/lib/survivor/intel";
 import { snapshotFrom } from "./roster-diff";
 import { projectRoomClaims, withClaims, type RoomCandidate, type RoomTeam } from "./room-claims";
@@ -239,6 +240,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
   const injuryReport = await getInjuryReport().catch(() => []);
 
   const choppedIds = new Set(state.choppedPlayerIds);
+  const now = new Date().toISOString();
 
   const toPool = (playerId: string): PoolPlayer | null => {
     const weekly = weekProjections[playerId];
@@ -248,11 +250,21 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     const team = base.team;
     // Sleeper's tag, ESPN's report and Sleeper's own projection, crossed. See
     // availability.ts: any one of the three on its own gets week 3 wrong.
-    const status = availability(
-      base.injuryStatus,
-      injuryFor(base.name, injuryReport),
-      weekly ? weekly.points : null,
-    );
+    const espn = injuryFor(base.name, injuryReport);
+    const status = availability(base.injuryStatus, espn, weekly ? weekly.points : null);
+    // The status the card prints is the one the price used: ESPN's Active
+    // clears a stale Sleeper tag, ESPN's Questionable replaces a blunt Out.
+    const shown =
+      !status.status || (status.plays >= 1 && /^(active|healthy)/i.test(status.status))
+        ? null
+        : /^injured ?reserve/i.test(status.status)
+          ? "IR"
+          : status.status;
+    // A player out for weeks is worth only the weeks he plays: the rest-of-
+    // season rate is spread over the season left, so tiers, final-four bars
+    // and season starters all see the timeline (injury-timeline.ts).
+    const out = weeksOut(espn, base.injuryStatus, now);
+    const share = restOfSeasonShare(out, week);
     return {
       plays: status.plays,
       statusDisputed: status.disputed,
@@ -262,8 +274,10 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
       position: base.position,
       team,
       weekPoints: weekly?.points ?? 0,
-      rosPoints: rate?.points ?? weekly?.points ?? 0,
-      injuryStatus: base.injuryStatus,
+      rosPoints: (rate?.points ?? weekly?.points ?? 0) * share,
+      injuryStatus: shown,
+      sleeperStatus: base.injuryStatus,
+      weeksOut: out,
       byeWeek: team ? (byes[team] ?? null) : null,
       fromChoppedRoster: choppedIds.has(playerId),
     };
@@ -285,12 +299,22 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
   // expensive mistake this report could make. Sleeper uses several strings for
   // "will not play", and NA is the one that caught this out: Josh Jacobs
   // carried it with no week-1 stat line at all.
+  //
+  // Points are the projection times the crossed chance he plays, the same
+  // number the bid card prices with. This used to zero anyone whose raw
+  // Sleeper tag read Out, so on week 8 Breece Hall (Sleeper Out, ESPN
+  // Questionable, back Sunday) scored 0 in every simulated lineup. Players in
+  // the IR slot are left out: Sleeper will not start a player there.
+  const activeIds = (roster: { players?: string[] | null; reserve?: string[] | null } | undefined) => {
+    const reserve = new Set(roster?.reserve ?? []);
+    return (roster?.players ?? []).filter((id) => !reserve.has(id));
+  };
   const lineupPlayersFor = (rosterId: number) => {
     const roster = rosters.find((r) => r.roster_id === rosterId);
-    return poolFor(roster?.players ?? []).map((p) => ({
+    return poolFor(activeIds(roster)).map((p) => ({
       playerId: p.playerId,
       position: p.position,
-      points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints,
+      points: sundayPoints(p),
     }));
   };
 
@@ -319,7 +343,7 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
       playerId: p.playerId,
       name: p.name,
       position: p.position,
-      points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints * (p.plays ?? 1),
+      points: sundayPoints(p),
     }));
   const roomTeams: RoomTeam[] = state.aliveRosterIds
     .filter((id) => id !== myRoster.roster_id)
@@ -356,10 +380,10 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
   // Forward-looking: what one absence does to my roster, and whether the
   // lineup as set on Sleeper has a hole in it. Uses the same zeroing rule as
   // the simulation, so a ruled-out starter counts for nothing in both.
-  const myPlayersForFragility = poolFor(myRoster.players ?? []).map((p) => ({
+  const myPlayersForFragility = poolFor(activeIds(myRoster)).map((p) => ({
     playerId: p.playerId,
     position: p.position,
-    points: UNAVAILABLE.has(p.injuryStatus ?? "") ? 0 : p.weekPoints,
+    points: sundayPoints(p),
     name: p.name,
     // A bye reads as "bye" in the lineup warning, not as a mystery 0.0.
     injuryStatus: p.injuryStatus ?? (p.byeWeek === week ? "bye" : null),
@@ -486,9 +510,9 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     .filter((id) => id !== myRoster.roster_id)
     .map((id) => {
       const roster = rosters.find((r) => r.roster_id === id);
-      const theirs = poolFor(roster?.players ?? []);
+      const theirs = poolFor(activeIds(roster));
       const lineup = bestLineup(
-        theirs.map((p) => ({ playerId: p.playerId, position: p.position, points: p.weekPoints })),
+        theirs.map((p) => ({ playerId: p.playerId, position: p.position, points: sundayPoints(p) })),
         profile.rosterPositions,
       );
       const byPosition: Record<string, number> = {};
@@ -541,11 +565,28 @@ export async function buildWeeklyReport(leagueId: string): Promise<WeeklyFaabRep
     };
   });
 
-  const byeAlerts = myPlayers
-    .filter((p) => p.byeWeek != null && p.byeWeek > week)
-    .map((p) => `${p.name} is on bye in week ${p.byeWeek}`);
+  const seasonStarters = new Set(
+    bestLineup(
+      myPlayers.map((p) => ({ playerId: p.playerId, position: p.position, points: p.rosPoints })),
+      profile.rosterPositions,
+    )
+      .slots.map((slot) => slot.player?.playerId)
+      .filter((id): id is string => !!id),
+  );
+  const byeAlerts = byeAlertsFor(myPlayers, week, seasonStarters);
 
   const caveats = [...state.caveats];
+  // IR slot housekeeping, by Sleeper's own tags (what Sleeper enforces).
+  caveats.push(
+    ...irMoves(
+      myPlayers.map((p) => ({ ...p, injuryStatus: p.sleeperStatus ?? null })),
+      myRoster.reserve ?? [],
+      {
+        slots: Number(league.settings?.reserve_slots ?? 0),
+        allowOut: Number(league.settings?.reserve_allow_out ?? 0) === 1,
+      },
+    ),
+  );
   const lineupNote = submittedLineupNote(fragility);
   if (lineupNote) caveats.unshift(lineupNote);
   for (const name of card.sharedDisplacement) {

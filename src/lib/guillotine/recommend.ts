@@ -403,9 +403,14 @@ function reasonFor(
 
   if (player.injuryStatus) {
     parts.push(
-      cannotPlay(player)
+      cannotPlay(player) && !((player.weeksOut ?? 0) >= 2)
         ? `listed ${player.injuryStatus}, so he is priced for what he is worth after this week, not for Sunday`
         : `listed ${player.injuryStatus}`,
+    );
+  }
+  if (player.weeksOut && player.weeksOut >= 1) {
+    parts.push(
+      `out about ${player.weeksOut} week${player.weeksOut === 1 ? "" : "s"} by ESPN's return date, so his rest-of-season worth only counts the weeks he plays`,
     );
   }
   if (player.byeWeek != null) parts.push(`bye week ${player.byeWeek}`);
@@ -567,7 +572,10 @@ export function buildBidCard(input: RecommendInput): BidCard {
   } = input;
 
   const bars = finalFourBars(leaguePlayers, rosterPositions);
-  const rosterLineup = myPlayers.map((p) => asLineup(p));
+  // Sunday's lineup leaves out the IR slot: Sleeper will not start a player
+  // there, so a cleared player still sitting in it fills nothing this week.
+  const reserve = new Set(input.reserveIds ?? []);
+  const rosterLineup = myPlayers.filter((p) => !reserve.has(p.playerId)).map((p) => asLineup(p));
 
   // Score every candidate on what he would actually add.
   const rivals = input.rivals ?? [];
@@ -707,7 +715,6 @@ export function buildBidCard(input: RecommendInput): BidCard {
     lineup.slots.filter((s) => s.player === null).map((s) => s.slot),
   );
   // An IR player can't be the drop: it frees the IR slot, not a roster spot.
-  const reserve = new Set(input.reserveIds ?? []);
   const droppable = myPlayers
     .filter((p) => !seasonStarterIds.has(p.playerId) && !reserve.has(p.playerId))
     .sort((a, b) => a.rosPoints - b.rosPoints);

@@ -29,7 +29,7 @@ export async function getInjuries(): Promise<InjuryNote[]> {
 
 async function rawInjuries(): Promise<InjuryNote[]> {
   const res = await cachedWithFallback<InjuryNote[]>({
-    key: "survivor:injuries:v3",
+    key: "survivor:injuries:v4",
     ttlSeconds: 60 * 30,
     empty: [],
     // The league always has injuries. An empty list means a broken fetch.

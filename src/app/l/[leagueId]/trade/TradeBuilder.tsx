@@ -23,6 +23,8 @@ import type { RAPick } from "@/lib/rosteraudit/types";
 import type { LeagueType } from "@/lib/league/types";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
+import { tradeOffers } from "@/lib/dynasty/trade-offers";
+import Offers from "./Offers";
 
 const POSITION_TINT: Record<string, string> = {
   QB: "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
@@ -504,6 +506,11 @@ export default function TradeBuilder({
     return findBestTrades(myTeam, teams, teams.length, 6, { youth: tradesPicks });
   }, [myTeam, teams, tradesPicks]);
 
+  const offers = useMemo(() => {
+    if (!myTeam) return [];
+    return tradeOffers(myTeam, teams, teams.length, { youth: tradesPicks });
+  }, [myTeam, teams, tradesPicks]);
+
   const assessment = useMemo(() => {
     if (!myTeam) return null;
     const proposal = {
@@ -813,6 +820,7 @@ export default function TradeBuilder({
           </span>
         </p>
       )}
+      <Offers offers={offers} onApply={applyBestTrade} />
       {bestTrades.length === 0 && myTeam && (
         <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
           No trade ideas across the league right now. Your rooms rank{" "}
@@ -822,18 +830,19 @@ export default function TradeBuilder({
         </p>
       )}
       {bestTrades.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold tracking-tight">
-              Best trades across the league
+        <details className="group">
+          <summary className="flex cursor-pointer list-none flex-col gap-1">
+            <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight">
+              <ChevronDown className="h-4 w-4 -rotate-90 transition-transform group-open:rotate-0" />
+              More trade ideas ({bestTrades.length})
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Player-for-player swaps that fill your weakest positions from
               each opponent&apos;s surplus, scored by positional gain and
               value parity. Tap Apply to load into the builder.
             </p>
-          </div>
-          <ul className="grid gap-3 md:grid-cols-2">
+          </summary>
+          <ul className="mt-3 grid gap-3 md:grid-cols-2">
             {bestTrades.map((idea) => (
               <li
                 key={`${idea.partnerRosterId}-${packageKey(idea.send)}-${packageKey(idea.receive)}`}
@@ -921,7 +930,7 @@ export default function TradeBuilder({
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
 
       <div className="flex flex-col gap-2">

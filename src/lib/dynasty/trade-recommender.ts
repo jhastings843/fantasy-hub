@@ -886,6 +886,8 @@ function verdictFor(score: number): TradeVerdict {
 }
 
 interface BilateralScore {
+  /** What the deal does to my rooms (scoreBoth always fills it). */
+  positionalImpact: PositionalImpact[];
   partner: { score: number; verdict: TradeVerdict; positionalImpact: PositionalImpact[] };
   mutual: boolean;
   mutualScore: number;

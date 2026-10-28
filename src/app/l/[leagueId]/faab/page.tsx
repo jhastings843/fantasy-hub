@@ -696,11 +696,18 @@ export default async function FaabPage({
             {report.me.byeAlerts.length > 0 ? (
               <div className="mt-4 border-t border-zinc-200/70 pt-4 dark:border-zinc-800">
                 <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                  Byes ahead
+                  Byes
                 </div>
                 <ul className="mt-1.5 flex flex-col gap-1">
                   {report.me.byeAlerts.map((alert) => (
-                    <li key={alert} className="text-xs text-zinc-600 dark:text-zinc-400">
+                    <li
+                      key={alert}
+                      className={
+                        alert.includes("plan that week")
+                          ? "text-xs font-medium text-amber-700 dark:text-amber-400"
+                          : "text-xs text-zinc-600 dark:text-zinc-400"
+                      }
+                    >
                       {alert}
                     </li>
                   ))}

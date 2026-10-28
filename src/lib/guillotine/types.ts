@@ -31,8 +31,16 @@ export interface PoolPlayer {
   weekPoints: number;
   /** Average projected points per remaining week, same scoring. */
   rosPoints: number;
-  /** Sleeper's status string when it is anything other than active. */
+  /**
+   * His status when it is anything other than active: the one availability.ts
+   * landed on after crossing Sleeper with ESPN, so the card prints what the
+   * price used.
+   */
   injuryStatus: string | null;
+  /** Sleeper's own tag, which is what decides IR slot eligibility. */
+  sleeperStatus?: string | null;
+  /** NFL weeks he misses from this one on, from ESPN's return date (injury-timeline.ts). */
+  weeksOut?: number;
   /**
    * The chance he is in the lineup on Sunday, 0 to 1, crossed from Sleeper's
    * tag, ESPN's report and whether Sleeper still projects him. Absent means

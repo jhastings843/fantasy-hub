@@ -56,6 +56,8 @@ export interface InjuryNote {
   comment: string;
   /** True for the positions that actually move a win probability. */
   premium: boolean;
+  /** ESPN's expected return (YYYY-MM-DD), filed on every non-active entry. */
+  returnDate?: string | null;
 }
 
 /** A single candidate pick, fully scored. */

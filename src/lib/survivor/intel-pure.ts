@@ -53,6 +53,7 @@ export interface EspnInjuryFeed {
     injuries?: Array<{
       status?: string;
       shortComment?: string;
+      details?: { returnDate?: string };
       athlete?: {
         displayName?: string;
         position?: { abbreviation?: string };
@@ -88,6 +89,7 @@ export function parseInjuries(data: EspnInjuryFeed, includeActive = false): Inju
         status,
         comment: inj.shortComment ?? "",
         premium: isPremium(position, status),
+        returnDate: inj.details?.returnDate ?? null,
       });
     }
   }
