@@ -44,8 +44,39 @@ export const ATTD_SLICES: [string, string, AttdKeep][] = [
   ["attd:long", "Priced +150 or longer, ours above it", (o, p) => p >= 150 && o > implied(p)],
 ];
 
+/**
+ * Venom as a source, judged like PEM: our value bets he also picks, and the
+ * ones he doesn't, each against every value bet. If agreeing wins, it goes
+ * live the way PEM's cuts do; if skipping his disagreements wins, so does that.
+ * Only weeks with his board uploaded count.
+ */
+export const VENOM_SLICES: [string, string, boolean][] = [
+  ["attd:venom", "Our value bets Venom also picks (his top 5)", true],
+  ["attd:novenom", "Our value bets Venom doesn't pick", false],
+];
+
 /** Graded Anytime TD boards (with kickoff) into the engine's candidates. Players who didn't play are void and left out. */
-export function attdCandidates(games: (AttdGraded & { at: string })[]): Candidate[] {
+export function attdCandidates(games: (AttdGraded & { at: string })[], venom?: Map<number, Set<string>>): Candidate[] {
+  const venomSlices: Candidate[] = venom
+    ? VENOM_SLICES.map(([id, label, agrees]) => ({
+        id,
+        label,
+        parent: "attd:value",
+        bets: games.flatMap((g) => {
+          const picks = venom.get(g.week);
+          if (!picks) return [];
+          return g.rows.flatMap((r): Bet[] => {
+            const t = g.result[r.key];
+            if (r.dk === undefined || t === null || t === undefined || !(r.anytime > implied(r.dk)) || picks.has(r.key) !== agrees) return [];
+            return [{ game: g.slug, key: `${g.slug}|${r.key}`, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1) }];
+          });
+        }),
+      }))
+    : [];
+  return [...baseAttd(games), ...venomSlices];
+}
+
+function baseAttd(games: (AttdGraded & { at: string })[]): Candidate[] {
   return ATTD_SLICES.map(([id, label, keep]) => ({
     id,
     label,

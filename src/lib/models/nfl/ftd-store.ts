@@ -8,6 +8,7 @@ import { nameKey } from "@/lib/props/grade";
 import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
+import { loadVenomPicks } from "./venom";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
 import { addTotals, ftdGame, impliedPoints, tdTotals, type FtdParams, type TdLine } from "./firsttd";
 import { nflverseRows } from "./store";
@@ -226,7 +227,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
   try {
     const cands = ourFtdCandidates(await ftdGraded(season));
     for (const j of await reviewIfDue(OUR_SECTION.nflFirstTd, season, report.week ?? weeks.at(-1) ?? 0, FTD_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
-    const attd = attdCandidates(await attdGraded(season));
+    const attd = attdCandidates(await attdGraded(season), await loadVenomPicks(season));
     for (const j of await reviewIfDue(SECTIONS.nflAttd, season, report.week ?? weeks.at(-1) ?? 0, ATTD_GATE, attd, now)) if (j.kind !== "registered") report.learning.push(`Anytime TD: ${j.text}`);
   } catch (err) {
     report.problems.push(`learning: ${err instanceof Error ? err.message : String(err)}`);
@@ -270,6 +271,6 @@ export async function getOurFtdView(season: number): Promise<OurFtdView> {
 
 /** Anytime TD's learner: its section, judged on ATTD_GATE. */
 export async function getAttdLearning(season: number): Promise<SectionView> {
-  const [state, journal, graded] = await Promise.all([loadSection(SECTIONS.nflAttd, season), loadJournal(SECTIONS.nflAttd, season), attdGraded(season)]);
-  return sectionView(ATTD_GATE, state, attdCandidates(graded), journal);
+  const [state, journal, graded, venom] = await Promise.all([loadSection(SECTIONS.nflAttd, season), loadJournal(SECTIONS.nflAttd, season), attdGraded(season), loadVenomPicks(season)]);
+  return sectionView(ATTD_GATE, state, attdCandidates(graded, venom), journal);
 }

@@ -12,6 +12,20 @@ describe("Anytime TD slices", () => {
     expect(c["attd:short"].bets).toHaveLength(0);
     expect(c["attd:long"].parent).toBe("attd:value");
   });
+
+  it("judges Venom like PEM: our value bets he picks and the ones he doesn't, on weeks his board is in", () => {
+    const row = (key: string, anytime: number, dk?: number) => ({ id: key, name: key, team: "KC", key, m: 0, anytime, two: 0, ...(dk !== undefined ? { dk } : {}) });
+    const games = [
+      { slug: "g1", week: 9, at: "2026-11-02T00:00:00Z", rows: [row("a", 0.5, 150), row("b", 0.3, 300)], result: { a: 1, b: 0 } },
+      { slug: "g2", week: 10, at: "2026-11-09T00:00:00Z", rows: [row("e", 0.5, 150)], result: { e: 1 } },
+    ];
+    const c = Object.fromEntries(attdCandidates(games, new Map([[9, new Set(["a"])]])).map((x) => [x.id, x]));
+    expect(c["attd:venom"].bets.map((b) => b.key)).toEqual(["g1|a"]);
+    expect(c["attd:novenom"].bets.map((b) => b.key)).toEqual(["g1|b"]);
+    expect(c["attd:venom"].parent).toBe("attd:value");
+    // Without his boards there are no Venom slices at all.
+    expect(attdCandidates(games).some((x) => x.id === "attd:venom")).toBe(false);
+  });
 });
 
 describe("Lotto slices", () => {
