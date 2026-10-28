@@ -28,11 +28,14 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: actions/cache@v4
         with:
           path: |
@@ -41,7 +44,7 @@ jobs:
           key: refit-nfl-${{ github.run_id }}
           restore-keys: refit-nfl-
       - name: Refresh NFL history
-        run: npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/refit/nfl-data.mts
+        run: pnpm dlx tsx@4 --tsconfig scripts/tsconfig.json scripts/refit/nfl-data.mts
       - name: Refit
         env:
           APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
@@ -51,7 +54,7 @@ jobs:
           echo "### NFL refits" >> "$GITHUB_STEP_SUMMARY"
           fail=0
           for s in fit-first-td fit-anytime-td fit-nfl-props fit-nfl-spread; do
-            npx -y tsx@4 --tsconfig scripts/tsconfig.json "scripts/$s.mts" --refit $DRY || { echo "- $s failed" >> "$GITHUB_STEP_SUMMARY"; fail=1; }
+            pnpm dlx tsx@4 --tsconfig scripts/tsconfig.json "scripts/$s.mts" --refit $DRY || { echo "- $s failed" >> "$GITHUB_STEP_SUMMARY"; fail=1; }
           done
           exit $fail
 
@@ -60,11 +63,14 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: actions/cache@v4
         with:
           path: |
@@ -74,8 +80,8 @@ jobs:
           restore-keys: refit-nba-
       - name: Refresh NBA history
         run: |
-          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-history.mts 2023 2024 2025 2026
-          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-lines-history.mts 2025 2026
+          pnpm dlx tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-history.mts 2023 2024 2025 2026
+          pnpm dlx tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-lines-history.mts 2025 2026
       - name: Refit
         env:
           APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
@@ -85,6 +91,6 @@ jobs:
           echo "### NBA refits" >> "$GITHUB_STEP_SUMMARY"
           fail=0
           for s in fit-nba-props fit-first-basket fit-kotc fit-nba-game; do
-            npx -y tsx@4 --tsconfig scripts/tsconfig.json "scripts/$s.mts" --refit $DRY || { echo "- $s failed" >> "$GITHUB_STEP_SUMMARY"; fail=1; }
+            pnpm dlx tsx@4 --tsconfig scripts/tsconfig.json "scripts/$s.mts" --refit $DRY || { echo "- $s failed" >> "$GITHUB_STEP_SUMMARY"; fail=1; }
           done
           exit $fail
