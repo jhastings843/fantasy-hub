@@ -37,6 +37,12 @@ export interface PicksPolicy {
   sources?: { pem?: SourceState; harris?: SourceState };
   /** When the review last switched each source: its value test restarts then. */
   sourcesChangedAt?: { pem?: string; harris?: string };
+  /**
+   * Splits signals the review made live, per league (learning/model.ts
+   * MarketFilter ids). A sent bet one of them flags gets a "skip" alert about
+   * 45 minutes before kickoff (splits-alert.ts); the 9am email is unchanged.
+   */
+  marketSkips?: { nfl?: string[]; cfb?: string[] };
 }
 
 /**

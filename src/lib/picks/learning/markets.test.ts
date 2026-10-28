@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyPromotion, decide, evaluate, laterHypotheses, scoreSu, scoreTotal, sourcePairs, type Hypothesis, type Opportunity } from "./model";
 import { tierBoard } from "../engine";
 import { BASELINE_POLICY, SOURCE_DEFAULT, SU_DEFAULT, sourceState, suInForce, totalsAllowed } from "../policy";
@@ -173,11 +173,27 @@ describe("public betting and line moves (report only)", () => {
     expect(late.last.ref?.kickoff).toBe(kick);
   });
 
-  it("registers three report-only hypotheses per league", async () => {
+  it("registers three splits hypotheses per league, actionable as skip alerts (2026-10-27)", async () => {
     const { laterHypotheses: later } = await import("./model");
     const hs = later("2026-10-21T11:00:00Z").filter((h) => h.kind === "market");
     expect(hs.map((h) => h.id).sort()).toEqual(["cfb:mkt:public-ours", "cfb:mkt:rlm-against", "cfb:mkt:sharp-against", "nfl:mkt:public-ours", "nfl:mkt:rlm-against", "nfl:mkt:sharp-against"]);
-    expect(hs.every((h) => !h.actionable)).toBe(true);
+    expect(hs.every((h) => h.actionable)).toBe(true);
+  });
+
+  it("a splits signal needs 100 settled rule bets, and going live or back touches only its alert list", async () => {
+    const { laterHypotheses: later, decide, applyPromotion, SPLITS_MIN_GAMES } = await import("./model");
+    const { revertPart } = await import("./review");
+    const { FLAT_POLICY } = await import("../policy");
+    const h = later("2026-10-21T11:00:00Z").find((x) => x.id === "nfl:mkt:sharp-against")!;
+    const cmp = (n: number) => ({ n, weeks: [1, 2, 3, 4], meanDiff: 0.2, t: 3, challenger: { units: 5, risked: 10, clv: null, drawdown: 1 }, incumbent: { units: 1, risked: 12, clv: null, drawdown: 1 } });
+    const cal = { n: 0, meanP: 0, winRate: 0, brier: 0, calibrated: false };
+    expect(decide(h, { id: h.id, comparison: cmp(60) } as never, { calibration: cal, active: FLAT_POLICY } as never).verdict).toBe("retain");
+    expect(decide(h, { id: h.id, comparison: cmp(SPLITS_MIN_GAMES) } as never, { calibration: cal, active: FLAT_POLICY } as never).verdict).toBe("promote");
+    const live = applyPromotion(FLAT_POLICY, h, "p2", "2026-12-01T11:00:00Z");
+    expect(live.marketSkips).toEqual({ nfl: ["sharp-against"] });
+    expect(live.staking).toEqual(FLAT_POLICY.staking);
+    const back = revertPart(live, h, { part: "nfl:splits", hypothesis: h.id, at: "", from: "", to: "" }, "p3", "");
+    expect(back.marketSkips).toEqual({ nfl: [] });
   });
 
   it("skips a rule bet when the line moved toward the side the tickets are against, and it is not ours", async () => {
@@ -198,5 +214,16 @@ describe("public betting and line moves (report only)", () => {
     expect(marketPairs("sharp-against", "nfl", {}, [withSplits({ homeTickets: 45, homeMoney: 60, at })])[0].ch.bet).toBe(true);
     const [none] = marketPairs("public-ours", "nfl", {}, [opp({ home: 30, away: 20 }, ours)]);
     expect(none.ch).toEqual(none.inc);
+  });
+});
+
+describe("the live skip alert window", () => {
+  it("checks sent stakes kicking off 20 to 75 minutes out", async () => {
+    vi.mock("server-only", () => ({}));
+    const { playsDue } = await import("../splits-alert");
+    const play = (kickoff: string, units = 1) => ({ home: "KC", away: "LV", tier: "t1" as const, side: "home" as const, homeLine: -6, play: "KC -6", basis: "reference" as const, shownInEmail: true, units, kickoff });
+    const rec = { league: "nfl", season: 2026, week: 9, status: "sent", plays: [play("2026-11-01T18:00:00Z"), play("2026-11-01T20:25:00Z"), play("2026-11-01T18:00:00Z", 0)] } as never;
+    const due = playsDue([rec], new Date("2026-11-01T17:15:00Z"));
+    expect(due.map((d) => d.p.kickoff)).toEqual(["2026-11-01T18:00:00Z"]);
   });
 });

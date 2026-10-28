@@ -178,10 +178,10 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
         kind: "market",
         league,
         definition: { kind: "market", filter: f.id, label: f.label },
-        actionable: false,
+        actionable: true,
         registeredAt,
         status: "collecting",
-        origin: "Jack, 2026-10-21: test public betting splits and reverse line movement before they touch a bet",
+        origin: "Jack, 2026-10-27: splits read in the last 90 minutes, judged on 100+ rule bets; if one wins it goes live as a pre-kickoff skip alert",
       }),
     );
     return [...totals, ...su, ...sources, ...market];
@@ -589,10 +589,15 @@ export const MARKET_FILTERS: { id: MarketFilter; label: string }[] = [
 export function marketSkips(filter: MarketFilter, league: League, side: "home" | "away", o: Opportunity): boolean | null {
   const s = o.splitsRead ?? null;
   if (!s?.splits) return null;
-  const m = readMarket(league, s.splits, s.ref?.line);
+  return filterFires(filter, readMarket(league, s.splits, s.ref?.line), side);
+}
+
+/** One splits read against our side: the learner's test and the live skip alert use this same check. */
+export function filterFires(filter: MarketFilter | string, m: ReturnType<typeof readMarket>, side: "home" | "away"): boolean {
   if (filter === "rlm-against") return !!m.rlm && m.rlm !== side;
   if (filter === "public-ours") return m.publicSide === side;
-  return !!m.sharpSide && m.sharpSide !== side;
+  if (filter === "sharp-against") return !!m.sharpSide && m.sharpSide !== side;
+  return false;
 }
 
 /** Rule bet vs the same bet skipped when the market filter fires. Games without splits score the same on both sides. */
@@ -742,6 +747,7 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
   const gaps: string[] = [];
   if (c.n < CRITERIA.MIN_OPPORTUNITIES) gaps.push(`${c.n} of ${CRITERIA.MIN_OPPORTUNITIES} settled matched games`);
   if (c.weeks.length < CRITERIA.MIN_WEEKS) gaps.push(`${c.weeks.length} of ${CRITERIA.MIN_WEEKS} weeks`);
+  if (h.definition.kind === "market" && c.n < SPLITS_MIN_GAMES) gaps.push(`${c.n} of ${SPLITS_MIN_GAMES} settled rule bets (splits need more)`);
   if (gaps.length) return { id: h.id, verdict: "retain", why: `insufficient evidence: ${gaps.join(", ")}` };
   const need = Math.max(CRITERIA.MIN_T, c.tNeeded ?? 0);
   if (c.t < need) {
@@ -812,6 +818,10 @@ export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, a
   if (d.kind === "su-method" && d.vs === "in-force") {
     const league = h.league as "nfl" | "cfb";
     return { ...active, id, createdAt: at, suMethod: { ...SU_DEFAULT, ...active.suMethod, [league]: d.method }, summary: `${active.summary}; ${league.toUpperCase()} straight up by ${d.method}` };
+  }
+  if (d.kind === "market") {
+    const league = h.league as "nfl" | "cfb";
+    return { ...active, id, createdAt: at, marketSkips: { ...active.marketSkips, [league]: [...new Set([...(active.marketSkips?.[league] ?? []), d.filter])] }, summary: `${active.summary}; ${league.toUpperCase()} skip alert: ${d.filter}` };
   }
   if (d.kind === "stake-policy") {
     return { ...active, id, createdAt: at, staking: { ...d.staking }, summary: `${d.label}; ${active.atsCandidates.length ? `candidates: ${active.atsCandidates.join(", ")}` : "built-in cuts only"}; parlays off` };

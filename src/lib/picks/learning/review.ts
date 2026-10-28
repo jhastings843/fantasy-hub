@@ -22,6 +22,7 @@ import {
   isIncumbentStaking,
   issuedBets,
   laterHypotheses,
+  marketPairs,
   opportunities,
   propose,
   scoreCut,
@@ -63,6 +64,7 @@ export function partOf(h: Hypothesis): string | null {
   if (d.kind === "su-method") return `${h.league}:straight-up`;
   if (d.kind === "stake-policy") return "staking";
   if (d.kind === "source") return `source:${d.source}`;
+  if (d.kind === "market") return `${h.league}:splits`;
   return null;
 }
 
@@ -100,6 +102,10 @@ export function revertPart(active: PicksPolicy, h: Hypothesis, a: Activation, id
   if (d.kind === "totals-cut") return { ...base, totalsCandidates: (active.totalsCandidates ?? []).filter((c) => c !== `${h.league}:${d.cutId}`), summary: `${active.summary}; ${h.league.toUpperCase()} totals ${d.label} rolled back` };
   if (d.kind === "su-method" && a.prev?.su) return { ...base, suMethod: { ...active.suMethod, [h.league]: a.prev.su }, summary: `${active.summary}; ${h.league.toUpperCase()} straight up back to ${a.prev.su}` };
   if (d.kind === "stake-policy" && a.prev?.staking) return { ...base, staking: { ...a.prev.staking }, summary: `${active.summary}; staking rolled back` };
+  if (d.kind === "market") {
+    const l = h.league as "nfl" | "cfb";
+    return { ...base, marketSkips: { ...active.marketSkips, [l]: (active.marketSkips?.[l] ?? []).filter((f) => f !== d.filter) }, summary: `${active.summary}; ${l.toUpperCase()} skip alert ${d.filter} rolled back` };
+  }
   return active;
 }
 
@@ -259,6 +265,14 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     await write({ at, kind: "register", title: `Registered ${h.id}`, why: h.origin });
   }
 
+  // Splits signals were report-only until 2026-10-27 (Jack: act through a pre-kickoff skip alert once one wins on 100+ rule bets).
+  for (const h of hs.filter((y) => y.kind === "market" && !y.actionable && y.status === "collecting")) {
+    const next = { ...h, actionable: true, origin: `${h.origin}; actionable from 2026-10-27 as a skip alert` };
+    if (!opts.dryRun) await store.putHypothesis(next);
+    hs = hs.map((y) => (y.id === h.id ? next : y));
+    await write({ at, kind: "register", title: `${h.id} can now go live as a skip alert`, why: "Same test as any change, on 100+ settled rule bets; live means a phone alert about 45 minutes before kickoff when it flags a bet you were sent." });
+  }
+
   // Generated cuts were report-only until 2026-10-20 (Jack: let it act on its own when it's best).
   // Ones already collecting become actionable; their sample and definition are unchanged.
   for (const h of hs.filter((y) => y.kind === "ats-cut" && !y.actionable && y.status === "collecting" && y.origin.startsWith("generated from"))) {
@@ -307,6 +321,9 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
       const r = sizingComparison(sizing, active.staking, a.prev.staking, a.at);
       c = r.comparison ?? null;
       if (!c) rollbackNote += ` Sizing rollback check: no complete recorded sends since ${a.at.slice(0, 10)}${r.view.restartedAfter ? ` (restarting after ${r.view.restartedAfter})` : ""}.`;
+    } else if (d.kind === "market") {
+      const t = x.ruleTest[h.league as "nfl" | "cfb"];
+      if (t) c = compare(marketPairs(d.filter, h.league as League, t, since.filter((o) => o.league === h.league)));
     } else if (d.kind === "source") {
       // A source question never closes; its own test moves it back.
       kept.push(a);
