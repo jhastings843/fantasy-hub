@@ -36,7 +36,13 @@ Stage 2 progress (2026-10-28, all deployed, 1484 tests):
 (g) NOT STARTED: college ratings model + projected scores; research says no ATS edge, ~0.3 pt CLV at the opener. Multi-session; scope with Jack.
 (h) DONE pick'em lean refit after each slate (fitLean, LEAN_OBS hash), prior 2.7 worth 30 games.
 
-OPEN QUESTIONS for Jack: refit pipeline (Vercel token in GitHub vs params in Redis); splits delivery; college model scope.
+DECIDED 2026-10-28 (Jack): refits store settings in the database; splits act as a pre-kick skip alert; college model gets built AND must learn to find an edge (Jack: "have the college model learn to find an edge"), not just track.
+Done since: (e) splits hypotheses actionable on 100+ settled rule bets (decide gap), part <league>:splits, policy.marketSkips, per-part rollback; src/lib/picks/splits-alert.ts pulse job "splits-skip" pushes one Pushover per sent bet a live signal flags, 20-75 min before kickoff. Settings layer: src/lib/models/params-store.ts (live() Proxy over JSON defaults, primeParams at 14 store entry points, checkParams), POST/GET /api/model-params (cron secret; requires after<before and se>=2).
+
+NEXT SESSION, in order:
+1. Refit jobs, one model at a time (start NBA props, then First TD, First Basket, Anytime TD, NFL props, KOTC, NBA game; NFL spread every 4 weeks = item f): make each scripts/fit-*.mts roll its train/test split forward (test = most recent weeks not used in the fit), score the LIVE settings (GET /api/model-params, else JSON) and the refit on the same held-out games, POST only when better by 2+ SE. New workflow .github/workflows/model-refit.yml weekly with actions/cache for .cache history (nba-history.mts, nflverse downloads).
+2. College model with its own edge-finding loop: ratings from ESPN results (seed from cfbfastR history like fit-cfb-spread.mts: results rating, market rating, Elo-like), projected scores (spread, total, win chance) for NFL/college/NBA, forward-tested at the opener and the close, as a source the picks review judges; slices on its signals (edge size, line move, home/road, conference) registered so the review can promote what wins.
+3. Stage 3 UI pass (list above).
 
 ORIGINAL Stage 2 order: (a) Picks one change per part per week; (b) review after each slate; (c) props learners free with guardrails (add slices, auto refits, own bars, weekly loss cap); (d) Venom as a judged source; (e) splits fixed + captured 60-30 min pre-kick, judged as a cut over 100 games; (f) NFL model structural self-changes every 4 weeks; (g) college ratings model + projected scores (spread/total/win chance) from NFL/college/NBA models, tracked first; (h) pick'em per-slate learning.
 
