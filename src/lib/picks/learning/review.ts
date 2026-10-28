@@ -1,6 +1,7 @@
 // One strategy review, against a store: memory in tests and the rehearsal,
-// Redis in production (store.ts). Bounded: at most one activation per
-// review, no edits to definitions, nothing it writes can loosen a limit.
+// Redis in production (store.ts). Bounded: at most one activation per part
+// per review (Jack, 2026-10-27: a rule change shouldn't wait on a staking or
+// totals change), no edits to definitions, nothing it writes can loosen a limit.
 
 import type { League } from "../parse";
 import type { CutTest } from "../engine";
@@ -36,6 +37,7 @@ import {
   type ValidationInput,
 } from "./model";
 import type { DecisionRecord } from "./replay";
+import type { StakingPolicy } from "../policy";
 
 export interface JournalEntry {
   at: string;
@@ -48,6 +50,59 @@ export interface JournalEntry {
   evidence?: unknown;
 }
 
+/**
+ * The part of the process a hypothesis changes. One activation per part per
+ * review, each with its own rollback: NFL's rule cuts, college's rule cuts,
+ * each league's totals and straight-up method, the shared staking, and each
+ * outside source.
+ */
+export function partOf(h: Hypothesis): string | null {
+  const d = h.definition;
+  if (d.kind === "ats-cut") return `${h.league}:rule`;
+  if (d.kind === "totals-cut") return `${h.league}:totals`;
+  if (d.kind === "su-method") return `${h.league}:straight-up`;
+  if (d.kind === "stake-policy") return "staking";
+  if (d.kind === "source") return `source:${d.source}`;
+  return null;
+}
+
+/** The strongest promotion in each part (highest t first), in that order. */
+export function bestPerPart<P extends { h: Hypothesis; t: number }>(promos: P[]): P[] {
+  const seen = new Set<string>();
+  return promos
+    .slice()
+    .sort((a, b) => b.t - a.t)
+    .filter((p) => {
+      const part = partOf(p.h);
+      if (!part || seen.has(part)) return false;
+      seen.add(part);
+      return true;
+    });
+}
+
+/** One live change, and what it replaced: enough to undo just that part. */
+export interface Activation {
+  part: string;
+  hypothesis: string;
+  at: string;
+  /** Policy ids around it, for the journal. */
+  from: string;
+  to: string;
+  /** What the part was before (straight-up method, staking); cuts need nothing, they are removed. */
+  prev?: { su?: string; staking?: StakingPolicy };
+}
+
+/** The active policy with one activation undone; every other part untouched. */
+export function revertPart(active: PicksPolicy, h: Hypothesis, a: Activation, id: string, at: string): PicksPolicy {
+  const d = h.definition;
+  const base = { ...active, id, createdAt: at };
+  if (d.kind === "ats-cut") return { ...base, atsCandidates: active.atsCandidates.filter((c) => c !== `${h.league}:${d.cutId}`), summary: `${active.summary}; ${h.league.toUpperCase()} cut ${d.label} rolled back` };
+  if (d.kind === "totals-cut") return { ...base, totalsCandidates: (active.totalsCandidates ?? []).filter((c) => c !== `${h.league}:${d.cutId}`), summary: `${active.summary}; ${h.league.toUpperCase()} totals ${d.label} rolled back` };
+  if (d.kind === "su-method" && a.prev?.su) return { ...base, suMethod: { ...active.suMethod, [h.league]: a.prev.su }, summary: `${active.summary}; ${h.league.toUpperCase()} straight up back to ${a.prev.su}` };
+  if (d.kind === "stake-policy" && a.prev?.staking) return { ...base, staking: { ...a.prev.staking }, summary: `${active.summary}; staking rolled back` };
+  return active;
+}
+
 export interface ReviewState {
   lastReviewAt: string;
   lastOutcome: string;
@@ -58,6 +113,8 @@ export interface ReviewState {
   previousPolicyId?: string;
   activatedAt?: string;
   activatedFrom?: string;
+  /** Every change still live, one per part at most; each is checked for rollback on its own. */
+  activations?: Activation[];
   /** Every hypothesis's verdict at the last review, for the page. */
   decisions?: { id: string; label: string; verdict: string; why: string; n?: number; weeks?: number; t?: number }[];
   calibration?: { n: number; meanP: number; winRate: number; brier: number };
@@ -117,8 +174,13 @@ export interface ReviewInputs {
 export interface ReviewResult {
   decisions: Decision[];
   evaluations: Evaluation[];
+  /** The first activation this review (kept for callers that show one). */
   activated?: { from: string; to: string; hypothesis: string };
+  /** Every activation this review, one per part. */
+  activatedAll: { from: string; to: string; hypothesis: string; part: string }[];
+  /** The first rollback this review. */
   rolledBack?: { from: string; to: string; why: string };
+  rolledBackAll: { from: string; to: string; why: string; part: string }[];
   registered: string[];
   journal: JournalEntry[];
   state: ReviewState;
@@ -131,6 +193,21 @@ export function nextReviewAt(now: Date): string {
   // The next Tuesday 11:00 UTC strictly after now (today's, if it is still ahead).
   while (d.getUTCDay() !== 2 || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString();
+}
+
+/**
+ * State written before per-part activations kept one change in three fields.
+ * Read it as a one-entry list, with the previous version supplying what the
+ * part was before (the default if that version is gone: never larger stakes).
+ */
+async function legacyActivations(store: LearningStore, prev: ReviewState | null, active: PicksPolicy, hs: Hypothesis[]): Promise<Activation[]> {
+  if (!prev?.previousPolicyId || !prev.activatedAt || !prev.activatedFrom || active.id === prev.previousPolicyId) return [];
+  const h = hs.find((y) => y.id === prev.activatedFrom);
+  const part = h ? partOf(h) : null;
+  if (!h || !part) return [];
+  const before = (await store.version(prev.previousPolicyId)) ?? DEFAULT_POLICY;
+  const p = h.definition.kind === "su-method" ? { su: suInForce(before, h.league as "nfl" | "cfb") } : h.definition.kind === "stake-policy" ? { staking: before.staking } : undefined;
+  return [{ part, hypothesis: h.id, at: prev.activatedAt, from: prev.previousPolicyId, to: active.id, ...(p ? { prev: p } : {}) }];
 }
 
 export async function runReview(store: LearningStore, x: ReviewInputs, opts: { dryRun?: boolean; reason?: string } = {}): Promise<ReviewResult> {
@@ -181,51 +258,54 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   const sizing: SizingInputs = { decisions: x.decisions ?? [], days: x.decisionDays, issued: x.issued, finals: x.finals };
   let rollbackNote = "";
 
-  // Rollback check on the policy in force, before anything new.
-  let rolledBack: ReviewResult["rolledBack"];
-  if (prev?.previousPolicyId && prev.activatedAt && active.id !== prev.previousPolicyId) {
-    const stored = await store.version(prev.previousPolicyId);
-    // A missing version falls back to the default (flat 1u), never to p1's
-    // larger stakes: those come back only through the calibration gate.
-    const before = stored ?? DEFAULT_POLICY;
-    const missingNote = stored ? "" : ` (previous version ${prev.previousPolicyId} not on file; would return to the default ${DEFAULT_POLICY.id})`;
-    const since = opps.filter((o) => o.first.at >= prev.activatedAt!);
+  // Rollback check on each live change, before anything new. A rollback
+  // undoes only its own part; the others stay as they are.
+  const live: Activation[] = prev?.activations ?? (await legacyActivations(store, prev, active, hs));
+  const kept: Activation[] = [];
+  const rolledBackAll: ReviewResult["rolledBackAll"] = [];
+  const fails = live.length ? validate({ policy: active, replay: await x.replay(active), historyBefore, historyAfter: historyBefore }) : [];
+  for (const a of live) {
+    const h = hs.find((y) => y.id === a.hypothesis);
+    if (!h) continue;
+    const since = opps.filter((o) => o.first.at >= a.at);
+    const d = h.definition;
     let c: Comparison | null = null;
-    const newCut = active.atsCandidates.find((id) => !before.atsCandidates.includes(id));
-    if (newCut && prev.activatedFrom) {
-      const h = hs.find((y) => y.id === prev.activatedFrom);
-      if (h?.definition.kind === "ats-cut") {
-        const d = h.definition;
-        const own = since.filter((o) => o.league === h.league);
-        c = compare(own.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) })));
-      }
-    } else if ((active.totalsCandidates ?? []).some((id) => !(before.totalsCandidates ?? []).includes(id)) && prev.activatedFrom) {
-      const h = hs.find((y) => y.id === prev.activatedFrom);
-      if (h?.definition.kind === "totals-cut") {
-        const d = h.definition;
-        c = compare(since.filter((o) => o.league === h.league).map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) })));
-      }
-    } else if ((["nfl", "cfb"] as const).some((l) => suInForce(active, l) !== suInForce(before, l))) {
-      const l = (["nfl", "cfb"] as const).find((y) => suInForce(active, y) !== suInForce(before, y))!;
-      c = compare(since.filter((o) => o.league === l).map((o) => ({ o, ch: scoreSu(suInForce(active, l), o), inc: scoreSu(suInForce(before, l), o) })));
-    } else if (JSON.stringify(active.staking) !== JSON.stringify(before.staking)) {
+    if (d.kind === "ats-cut") {
+      c = compare(since.filter((o) => o.league === h.league).map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) })));
+    } else if (d.kind === "totals-cut") {
+      c = compare(since.filter((o) => o.league === h.league).map((o) => ({ o, ch: scoreTotal(d.test, o.first, o), inc: scoreTotal(d.parentTest, o.first, o) })));
+    } else if (d.kind === "su-method" && a.prev?.su) {
+      const l = h.league as "nfl" | "cfb";
+      c = compare(since.filter((o) => o.league === l).map((o) => ({ o, ch: scoreSu(suInForce(active, l), o), inc: scoreSu(a.prev!.su!, o) })));
+    } else if (d.kind === "stake-policy" && a.prev?.staking) {
       // The same replay as promotion: what each sizing would actually have
       // bet through the limits since activation. Rollback keeps the plain
       // MIN_T bar on the weekly t (easier to size back down than up).
-      const r = sizingComparison(sizing, active.staking, before.staking, prev.activatedAt);
+      const r = sizingComparison(sizing, active.staking, a.prev.staking, a.at);
       c = r.comparison ?? null;
-      if (!c) rollbackNote = ` Sizing rollback check: no complete recorded sends since ${prev.activatedAt.slice(0, 10)}${r.view.restartedAfter ? ` (restarting after ${r.view.restartedAfter})` : ""}.`;
+      if (!c) rollbackNote += ` Sizing rollback check: no complete recorded sends since ${a.at.slice(0, 10)}${r.view.restartedAfter ? ` (restarting after ${r.view.restartedAfter})` : ""}.`;
+    } else if (d.kind === "source") {
+      // A source question never closes; its own test moves it back.
+      kept.push(a);
+      continue;
     }
-    const fails = validate({ policy: active, replay: await x.replay(active), historyBefore, historyAfter: historyBefore });
-    const reason = shouldRollBack(c, fails);
-    const why = reason ? `${reason}${missingNote}` : null;
-    if (why) {
-      rolledBack = { from: active.id, to: before.id, why };
-      await write({ at, kind: "rollback", title: `Rolled back ${active.id} to ${before.id}`, why, policyBefore: active.id, policyAfter: before.id, evidence: c });
-      if (!opts.dryRun) await store.setActive(before);
-      active = before;
+    const why = shouldRollBack(c, fails);
+    if (!why) {
+      kept.push(a);
+      continue;
     }
+    // Nothing else changed since: the version it replaced comes back as it was.
+    const exact = active.id === a.to ? await store.version(a.from) : null;
+    const next = exact ?? revertPart(active, h, a, `p${at.replace(/[-:]/g, "").slice(0, 13)}r${rolledBackAll.length}`, at);
+    rolledBackAll.push({ from: active.id, to: next.id, why, part: a.part });
+    await write({ at, kind: "rollback", title: `Rolled back ${a.part}: ${h.id}`, why, policyBefore: active.id, policyAfter: next.id, evidence: c });
+    if (!opts.dryRun) {
+      if (!exact) await store.putVersion(next);
+      await store.setActive(next);
+    }
+    active = next;
   }
+  const rolledBack = rolledBackAll[0];
 
   // A staking challenger that matches the live sizing is the incumbent now
   // (flat 1u became live on 2026-10-10): retire it rather than compare it
@@ -246,32 +326,40 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     await write({ at, kind: "reject", title: `Rejected ${h.id}`, why: d.why, evidence: evaluations.find((e) => e.id === d.id)?.comparison });
   }
 
-  // At most one activation per review: the strongest promotion that validates.
-  let activated: ReviewResult["activated"];
-  const promos = decisions
-    .filter((y) => y.verdict === "promote")
-    .map((y) => ({ y, t: evaluations.find((e) => e.id === y.id)?.comparison?.t ?? 0 }))
-    .sort((a, b) => b.t - a.t);
-  if (promos.length && !rolledBack) {
-    const h = hs.find((y) => y.id === promos[0].y.id)!;
-    // Ids are unique by time, so a rollback can never lead to a reused id.
-    const next = applyPromotion(active, h, `p${at.replace(/[-:]/g, "").slice(0, 13)}`, at, promos[0].y.to);
+  // One activation per part: the strongest promotion in each part that
+  // validates, applied in turn. A part rolled back this review waits a week.
+  const activatedAll: ReviewResult["activatedAll"] = [];
+  const backParts = new Set(rolledBackAll.map((r) => r.part));
+  const promos = bestPerPart(
+    decisions
+      .filter((y) => y.verdict === "promote")
+      .map((y) => ({ y, h: hs.find((z) => z.id === y.id)!, t: evaluations.find((e) => e.id === y.id)?.comparison?.t ?? 0 })),
+  ).filter((p) => !backParts.has(partOf(p.h)!));
+  for (const { y, h } of promos) {
+    const part = partOf(h)!;
+    // Ids are unique by time (and part order), so a rollback can never lead to a reused id.
+    const next = applyPromotion(active, h, `p${at.replace(/[-:]/g, "").slice(0, 13)}${activatedAll.length ? `-${activatedAll.length}` : ""}`, at, y.to);
     const historyAfter = await x.history();
-    const fails = validate({ policy: next, replay: await x.replay(next), historyBefore, historyAfter });
-    if (fails.length) {
-      await write({ at, kind: "retain", title: `Kept ${active.id}: ${h.id} failed validation`, why: fails.join("; "), evidence: evaluations.find((e) => e.id === h.id)?.comparison });
-    } else {
-      activated = { from: active.id, to: next.id, hypothesis: h.id };
-      if (!opts.dryRun) {
-        await store.putVersion(next);
-        await store.setActive(next);
-        // A source question never closes: it keeps testing from the switch, so the source can come back or go.
-        if (h.kind !== "source") await store.putHypothesis({ ...h, status: "promoted" });
-      }
-      await write({ at, kind: "activate", title: `Activated ${next.id} (${h.id})`, why: promos[0].y.why, policyBefore: active.id, policyAfter: next.id, rollbackTarget: active.id, evidence: evaluations.find((e) => e.id === h.id)?.comparison });
-      active = next;
+    const vfails = validate({ policy: next, replay: await x.replay(next), historyBefore, historyAfter });
+    if (vfails.length) {
+      await write({ at, kind: "retain", title: `Kept ${active.id}: ${h.id} failed validation`, why: vfails.join("; "), evidence: evaluations.find((e) => e.id === h.id)?.comparison });
+      continue;
     }
+    activatedAll.push({ from: active.id, to: next.id, hypothesis: h.id, part });
+    // A part holds one live change: a newer one replaces the older one's rollback record.
+    const prevPart = h.definition.kind === "su-method" ? { su: suInForce(active, h.league as "nfl" | "cfb") } : h.definition.kind === "stake-policy" ? { staking: active.staking } : undefined;
+    for (let i = kept.length - 1; i >= 0; i--) if (kept[i].part === part) kept.splice(i, 1);
+    kept.push({ part, hypothesis: h.id, at, from: active.id, to: next.id, ...(prevPart ? { prev: prevPart } : {}) });
+    if (!opts.dryRun) {
+      await store.putVersion(next);
+      await store.setActive(next);
+      // A source question never closes: it keeps testing from the switch, so the source can come back or go.
+      if (h.kind !== "source") await store.putHypothesis({ ...h, status: "promoted" });
+    }
+    await write({ at, kind: "activate", title: `Activated ${next.id} (${h.id})`, why: y.why, policyBefore: active.id, policyAfter: next.id, rollbackTarget: active.id, evidence: evaluations.find((e) => e.id === h.id)?.comparison });
+    active = next;
   }
+  const activated = activatedAll[0] ? { from: activatedAll[0].from, to: activatedAll[0].to, hypothesis: activatedAll[0].hypothesis } : undefined;
 
   // Bounded new proposals from the evidence, registered before their sample.
   const fresh = propose(hs, evaluations, at);
@@ -290,15 +378,10 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     return Math.min(c.n / CRITERIA.MIN_OPPORTUNITIES, 1) + Math.min(c.weeks.length / CRITERIA.MIN_WEEKS, 1) + (c.t ?? 0) / 100;
   };
   const closest = retained.slice().sort((a, b) => progress(b.id) - progress(a.id))[0];
-  const outcome = activated
-    ? `activated ${activated.to}`
-    : rolledBack
-      ? `rolled back to ${rolledBack.to}`
-      : `no change: kept ${active.id}`;
-  const why = activated
-    ? promos[0].y.why
-    : rolledBack
-      ? rolledBack.why
+  const changes = [...rolledBackAll.map((r) => `rolled back ${r.part}`), ...activatedAll.map((a) => `activated ${a.hypothesis}`)];
+  const outcome = changes.length ? `${changes.join("; ")}: now ${active.id}` : `no change: kept ${active.id}`;
+  const why = changes.length
+    ? [...rolledBackAll.map((r) => r.why), ...promos.filter((p) => activatedAll.some((a) => a.hypothesis === p.h.id)).map((p) => p.y.why)].join(" · ")
       : retained.length
         ? `${retained.length} hypotheses still collecting (closest: ${closest.id}, ${closest.why}). Settled matched games so far: ${settled}. Calibration: ${cal.n} settled issued bets, mean estimate ${cal.meanP}, win rate ${cal.winRate}.${rollbackNote}`
         : `nothing collecting met the criteria${rollbackNote}`;
@@ -308,9 +391,11 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     nextReviewAt: nextReviewAt(x.now),
     settledOpportunities: settled,
     activePolicyId: active.id,
-    previousPolicyId: activated ? activated.from : rolledBack ? undefined : prev?.previousPolicyId,
-    activatedAt: activated ? at : rolledBack ? undefined : prev?.activatedAt,
-    activatedFrom: activated ? activated.hypothesis : rolledBack ? undefined : prev?.activatedFrom,
+    // The single-change fields mirror the newest live change, for older readers.
+    previousPolicyId: kept.at(-1)?.from,
+    activatedAt: kept.at(-1)?.at,
+    activatedFrom: kept.at(-1)?.hypothesis,
+    activations: kept,
     decisions: decisions.map((d) => {
       const h = hs.find((y) => y.id === d.id)!;
       const c = evaluations.find((e) => e.id === d.id)?.comparison;
@@ -338,7 +423,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   };
   await write({ at, kind: "review", title: `Review (${opts.reason ?? "scheduled"}): ${outcome}`, why, policyAfter: active.id });
   if (!opts.dryRun) await store.setState(state);
-  return { decisions, evaluations, activated, rolledBack, registered, journal, state };
+  return { decisions, evaluations, activated, activatedAll, rolledBack, rolledBackAll, registered, journal, state };
 }
 
 export { CRITERIA };

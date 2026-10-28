@@ -430,9 +430,10 @@ export function registerNew(hyps: NbaHypothesis[], now: string): NbaHypothesis[]
 }
 
 /**
- * One review: at most one activation (the strongest t that clears the
- * criteria), and a rollback for any active cut trailing its parent since
- * activation. Returns the new hypothesis states and journal entries.
+ * One review: at most one activation per market (spreads, totals: the
+ * strongest t that clears the criteria in each, as football does per part
+ * since 2026-10-27), and a rollback for any active cut trailing its parent
+ * since activation. Returns the new hypothesis states and journal entries.
  */
 export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): { hyps: NbaHypothesis[]; journal: NbaJournalEntry[] } {
   const journal: NbaJournalEntry[] = [];
@@ -450,18 +451,24 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
     .map((h) => ({ h, c: compareCut(rows, h.id, h.registeredAt) }))
     .filter(({ c }) => c.n >= CRITERIA.MIN_OPPORTUNITIES && c.weeks >= CRITERIA.MIN_WEEKS && c.t !== null && c.t >= CRITERIA.MIN_T)
     .sort((a, b) => (b.c.t ?? 0) - (a.c.t ?? 0));
-  if (ready[0]) {
-    const { h, c } = ready[0];
+  const markets = new Set<string>();
+  const picked = ready.filter(({ h }) => {
+    const m = NBA_CUT.get(h.id)!.market;
+    if (markets.has(m)) return false;
+    markets.add(m);
+    return true;
+  });
+  for (const { h, c } of picked) {
     h.status = "active";
     h.activatedAt = now;
-    journal.push({ at: now, kind: "activate", text: `${NBA_CUT.get(h.id)!.label} beat ${NBA_CUT.get(h.parent)!.label} on ${c.n} games over ${c.weeks} weeks (t ${c.t}); it is now a candidate for the NBA rule.` });
+    journal.push({ at: now, kind: "activate", text: `${NBA_CUT.get(h.id)!.label} beat ${NBA_CUT.get(h.parent)!.label} on ${c.n} games over ${c.weeks} weeks (t ${c.t}); it is now a candidate for the NBA ${NBA_CUT.get(h.id)!.market === "ats" ? "spread" : "totals"} rule.` });
   }
   const collecting = next.filter((h) => h.status === "collecting").length;
   journal.push({
     at: now,
-    kind: ready[0] ? "review" : "retain",
-    text: ready[0]
-      ? `Review: one research cut activated; ${collecting} still collecting.`
+    kind: picked.length ? "review" : "retain",
+    text: picked.length
+      ? `Review: ${picked.length} research cut${picked.length > 1 ? "s" : ""} activated (one per market at most); ${collecting} still collecting.`
       : `Review: no change. ${collecting} research cut${collecting === 1 ? "" : "s"} collecting; none has ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with t ${CRITERIA.MIN_T}+ yet.`,
   });
   return { hyps: next, journal };

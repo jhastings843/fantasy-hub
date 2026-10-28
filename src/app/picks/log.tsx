@@ -72,7 +72,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
               id: d.id,
               label: d.id.startsWith("both:") ? `${d.label} (shared with ${OTHER[league]})` : d.label,
               // "promote" means it passed; only the idea the review actually switched in is live (one per review, and validation can still refuse it).
-              status: d.id === state?.activatedFrom ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
+              status: (state?.activations ? state.activations.some((x) => x.hypothesis === d.id) : d.id === state?.activatedFrom) ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
               games: n,
               needGames: CRITERIA.MIN_OPPORTUNITIES,
               weeks: wk,

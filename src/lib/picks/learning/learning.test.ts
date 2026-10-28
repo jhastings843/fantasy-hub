@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CRITERIA, seedHypotheses, validate } from "./model";
-import { runReview, type ReviewInputs } from "./review";
+import { bestPerPart, partOf, revertPart, runReview, type ReviewInputs } from "./review";
 import { memoryStore } from "./memory-store";
 import type { ForecastSnapshot } from "../forecasts";
 import { BASELINE_POLICY, DEFAULT_POLICY, FLAT_POLICY, envelopeViolations } from "../policy";
@@ -200,5 +200,52 @@ describe("generated cuts can go live on their own (2026-10-20)", () => {
     const out = propose(hs, [{ id: h.id, comparison: { n: 18, meanDiff: 0.175 } } as never], "2026-10-20T11:00:00Z");
     expect(out.length).toBeGreaterThan(0);
     expect(out.every((y) => y.actionable)).toBe(true);
+  });
+});
+
+describe("one change per part per review (2026-10-27)", () => {
+  const hs = seedHypotheses("2026-10-09T00:00:00Z");
+  const h = (id: string) => hs.find((x) => x.id === id)!;
+
+  it("each part keeps only its strongest promotion", () => {
+    const nflCuts = hs.filter((x) => x.kind === "ats-cut" && x.league === "nfl").slice(0, 2);
+    const cfbCut = hs.find((x) => x.kind === "ats-cut" && x.league === "cfb")!;
+    const picked = bestPerPart([
+      { h: nflCuts[0], t: 2.0 },
+      { h: nflCuts[1], t: 3.1 },
+      { h: cfbCut, t: 1.9 },
+      { h: h("both:stake:kelly0125"), t: 2.5 },
+    ]);
+    expect(picked.map((p) => [partOf(p.h), p.h.id])).toEqual([
+      ["nfl:rule", nflCuts[1].id],
+      ["staking", "both:stake:kelly0125"],
+      ["cfb:rule", cfbCut.id],
+    ]);
+  });
+
+  it("a rollback undoes its own part and leaves the others", () => {
+    const cut = h("nfl:ats:dog-band-a");
+    const both = { ...FLAT_POLICY, id: "p9", atsCandidates: ["nfl:dog-band-a", "cfb:other"], suMethod: { nfl: "sam" } };
+    const back = revertPart(both, cut, { part: "nfl:rule", hypothesis: cut.id, at: "2026-11-01T00:00:00Z", from: "p8", to: "p9" }, "p10", "2026-11-20T00:00:00Z");
+    expect(back.atsCandidates).toEqual(["cfb:other"]);
+    expect(back.suMethod).toEqual({ nfl: "sam" });
+    expect(back.staking).toEqual(FLAT_POLICY.staking);
+    const su = { ...hs[0], id: "nfl:su:x", kind: "su-method" as const, league: "nfl" as const, definition: { kind: "su-method" as const, method: "sam", vs: "in-force", label: "Sam" } };
+    expect(revertPart(both, su, { part: "nfl:straight-up", hypothesis: su.id, at: "", from: "", to: "", prev: { su: "avg" } }, "p11", "").suMethod).toEqual({ nfl: "avg" });
+  });
+
+  it("the review records the live change per part and reads older single-change state", async () => {
+    const store = memoryStore();
+    await runReview(store, inputs([], "2026-10-09T10:00:00Z"));
+    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, new Date(Date.parse("2026-10-13T21:00:00Z") + k * 7 * 86400000).toISOString(), (i) => i !== 3, (i) => i === 9));
+    const r = await runReview(store, inputs(good, "2026-11-11T10:00:00Z"));
+    expect(r.activatedAll.map((a) => a.part)).toEqual(["nfl:rule"]);
+    expect(r.state.activations).toEqual([expect.objectContaining({ part: "nfl:rule", hypothesis: "nfl:ats:dog-band-a", from: "p1" })]);
+    // Older state (no list) still rolls back: strip the list and let the cut fall apart.
+    await store.setState({ ...r.state, activations: undefined });
+    const bad = [10, 11].map((w, k) => weekOf(w, `2026-11-${17 + 7 * k}T21:00:00Z`, () => false, () => true));
+    const r2 = await runReview(store, inputs([...good, ...bad], "2026-12-01T10:00:00Z"));
+    expect(r2.rolledBackAll).toEqual([expect.objectContaining({ part: "nfl:rule", to: "p1" })]);
+    expect(r2.state.activations).toEqual([]);
   });
 });
