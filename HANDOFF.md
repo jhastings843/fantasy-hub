@@ -16,6 +16,18 @@ Stage 3 UI (applies everywhere): team logos, even row spacing, game time under t
 
 Done 2026-10-27: price shadow deployed (tests 1462 pass).
 
+Stage 1 DONE 2026-10-27/28 (all deployed, 1470 tests pass; Jack authorized deploying as we go):
+1. 106cd53 Started games kept no quote, so the read fell back to Sam/David's own (stale) site lines: WKU's edge jumped 2.4 -> 4.4 at kickoff. compose.ts now passes `lastRef` (last pre-kick DK line) for the read only; never staked (audit.test.ts). Row shows "WKU -2.5 closed".
+2. Learning engine (engine.ts `register`, store.ts reviewIfDue): new slices register on any pull, not only at the weekly review; collecting slices no longer defined are retired (never on an empty candidate list); sectionView hides orphans. Cause: First TD slices renamed Oct 26 (ftdb:*) sat unregistered; log showed retired Kalshi slices at 0 games. The /learning page count fixes itself at First TD's next capture (Thursday).
+3. Sam NBA: 8 games (2 a night Oct 23-26) never got a saved Sam read (he posted after the last scheduled save). `recheckSam` (nba-track-store.ts) runs every pulse as job "nba-sam": one ESPN call; full save only when an untipped game today has no saved read.
+4. Waiver research: web_search_20260209 runs searches from code; dynasty's source loop overran max_uses 6, every later search failed, list empty. SEARCH_USES 12 and the prompt states the budget. VERIFY: Wednesday 00:00 UTC workflow run (GitHub often runs it hours late) should pass dynasty.
+5. Anytime TD: finished games moved from Board to Results ("Game by game"), W-L per game, each edge Won/Lost in the player table.
+
+Answer for Jack's ATTD note: First TD and Anytime TD use separate prices (Kalshi/DK/FD first-TD vs DK anytime) and separate models; they only share TD-share inputs.
+Seen, not fixed (Stage 2 splits work): /learning shows splits 'n=0, 0 of 0 games had splits' for NFL and college since Oct 21, so the Action Network splits feed is not matching games.
+
+NEXT: Stage 2 (learning/autonomy), in this order: (a) Picks one change per part per week; (b) review after each slate; (c) props learners free with guardrails (add slices, auto refits, own bars, weekly loss cap); (d) Venom as a judged source; (e) splits fixed + captured 60-30 min pre-kick, judged as a cut over 100 games; (f) NFL model structural self-changes every 4 weeks; (g) college ratings model + projected scores (spread/total/win chance) from NFL/college/NBA models, tracked first; (h) pick'em per-slate learning.
+
 # Handoff (2026-10-12 sizing replay; 2026-10-08, Picks: same-day grading, Tuesday 4am week turnover, Finished section; earlier: game-day stakes, daily 9am email, audit, learning loop)
 
 

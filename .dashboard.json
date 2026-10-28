@@ -5,7 +5,7 @@
   "status": "active",
   "status_detail": "Multi-league fantasy football tools. Every tool lives under /l/[leagueId] with leagues auto-discovered from Sleeper and format detected from settings.type (including type 3, which is Sleeper's undocumented guillotine code). Four live leagues: Dah Dynasty League (dynasty, in season), 2026 Half PPR (redraft, drafts Sep 7), Sunday Scaries #2 (redraft, full PPR, in season), and Dah Chopped League (guillotine, 16 teams, $1000 FAAB, still pre-draft). Guillotine leagues get a weekly FAAB advisor at /l/[id]/faab, /api/faab and a Tuesday email. Written playbooks with sources at /strategy. His rankings moved off Substack to the FantasyPros platform on 2026-09-17 and are read from there by week rather than by post, per scoring, so each league finally reads a list in its own scoring. SURVIVOR is a live recommendation engine at /survivor and /api/survivor: no-vig moneylines from ESPN, real public pick percentages from Yahoo, first-place equity scoring and a season-long Hungarian assignment for future value. TWO POOLS now, 500 entries and 30, tracked apart: separate burned teams, separate logged distributions, separate chalk factors, one shared data pull. Switcher on the page, ?pool=<id>|all on the API, one labelled card per pool in the Thursday email. Each pool carries a POSTURE, computed from expected entries alive at week 18, which breaks ties toward safety in a pool that will thin to one entry and toward leverage in one that will split. Week 1 live: 500 pool takes JAX, 30 pool takes LAC. A PULSE now keeps it current: /api/pulse called every fifteen minutes by GitHub Actions, tiered by the Eastern clock (live gameday, hourly, overnight), plus five scheduled emails through one shell and a Sunday 11:45 exception alarm that stays silent when nothing is wrong.",
   "next_steps": [
-    "SYSTEMS REVIEW (2026-10-27): decisions + plan at top of HANDOFF.md. Next: Stage 1 bugs (CFB moved line, First TD learner log, Sam NBA missing lines, dynasty waiver research failing weekly, Anytime TD graded W/L), then learning/autonomy, then UI pass.",
+    "SYSTEMS REVIEW: Stage 1 bugs DONE + deployed (started-game line, learner registration, Sam NBA recheck, waiver search cap, ATTD W-L). Verify Wed waiver run passes dynasty. Next: Stage 2 learning/autonomy, order in HANDOFF.md.",
     "WEEK 9 REPORT: first week the learner can grade a saved card (week 8). Check learning.shadows and learning.chops are non-empty on /api/faab.",
     "Still open from the audit: survivor POST, survivor entries and refresh routes have no login.",
     "POOL TIEBREAK (2026-10-26): next mid-week Sunday, check the pool card shows 'Tiebreaker to enter' with a number and win chance. Rule assumed closest guess, over or under; confirm in Sleeper's pool settings.",
@@ -337,7 +337,8 @@
       "date": "2026-10-27",
       "note": "DROP POOL IS SEASON-BASED. Drops came from players not starting THIS week, so byes (SF, NYG week 8) put Kittle/Likely/Nabers in the drop pool while Fannin and Boston were protected. Now the pool is players outside the best season lineup (rosPoints), plus the starter a chain replaces. Week 8: drops Corum and Boston, Kittle kept."
     },
-    "2026-10-27: Systems review read (24/24 sections), direction set with Jack; price shadow deployed to prod."
+    "2026-10-27: Systems review read (24/24 sections), direction set with Jack; price shadow deployed to prod.",
+    "2026-10-28: Stage 1 bug pass shipped (5 fixes, 1470 tests). Splits feed matches 0 games since Oct 21, queued for Stage 2."
   ],
   "tags": [
     "personal",
