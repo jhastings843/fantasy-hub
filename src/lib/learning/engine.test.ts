@@ -133,7 +133,13 @@ describe("slices change between reviews", () => {
     expect(r.state.entries["b:value"]).toMatchObject({ status: "collecting", registeredAt: at(1), registeredWeek: 8 });
     expect(r.state.lastReviewWeek).toBe(8);
     expect(r.state.lastReviewAt).toBe(T0);
-    expect(r.journal.map((j) => j.kind)).toEqual(["registered"]);
+    expect(r.state.entries["k:value"]).toBeUndefined();
+    expect(r.journal.map((j) => j.text)).toEqual([
+      "Registered 1 slice; only games after today count toward them.",
+      "Retired 1 slice no longer defined: Our chance above Kalshi's cost.",
+    ]);
+    // A failed read (no candidates) retires nothing.
+    expect(register(reviewed, [], at(1), 8).state.entries["k:value"]).toBeDefined();
     expect(register(r.state, [fresh], at(2), 8).journal).toEqual([]);
   });
 

@@ -209,6 +209,13 @@ export function register(prev: SectionState, cands: Candidate[], now: string, we
     fresh.push(c.label);
   }
   const journal: JournalLine[] = fresh.length ? [{ at: now, week, kind: "registered", text: `Registered ${fresh.length} slice${fresh.length > 1 ? "s" : ""}; only games after today count toward them.` }] : [];
+  // A collecting slice whose definition is gone can never gather evidence; drop it.
+  // Live and rolled-back ones keep their record. An empty list is a failed
+  // read, not a retirement, so nothing goes then.
+  const ids = new Set(cands.map((c) => c.id));
+  const gone = cands.length ? Object.values(entries).filter((e) => e.status === "collecting" && !ids.has(e.id)) : [];
+  for (const e of gone) delete entries[e.id];
+  if (gone.length) journal.push({ at: now, week, kind: "registered", text: `Retired ${gone.length} slice${gone.length > 1 ? "s" : ""} no longer defined: ${gone.map((e) => e.label).join(", ")}.` });
   return { state: { ...prev, entries }, journal };
 }
 
