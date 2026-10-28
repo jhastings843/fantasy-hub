@@ -1,5 +1,6 @@
 import "server-only";
 import { runNbaNews } from "@/lib/models/nba/news-store";
+import { recheckSam } from "@/lib/picks/nba-track-store";
 import { redis } from "@/lib/redis/client";
 import { buildReports, SEASON } from "@/lib/survivor/report";
 import { revalidateGames } from "@/lib/survivor/odds";
@@ -522,7 +523,8 @@ export async function runPulse(
   // NBA injury news runs on every pulse, whatever the tier: its value is in
   // minutes. It needs no claim; the day's status hash makes a second run in
   // the same window see no changes. Kept out of the tier's done check.
-  const [jobs, news] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now))]);
+  // Sam's NBA reads ride along the same way: a cheap check most runs, a save only when one of today's games lacks his line.
+  const [jobs, news, sam] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now))]);
 
   for (const id of tempo.dueJobs) {
     let left = DEADLINE_MS - (Date.now() - started);
@@ -562,7 +564,7 @@ export async function runPulse(
   // the difference between advice that is stale for fifteen minutes and
   // advice that is stale until lunch.
   if (claimed && jobs.every((j) => j.ok)) await recordTierRun(tier);
-  jobs.push(news);
+  jobs.push(news, sam);
 
   const receipt: PulseReceipt = {
     at: new Date().toISOString(),

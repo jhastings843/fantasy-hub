@@ -471,3 +471,13 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
 export function reviewDue(lastAt: string | undefined, now: Date): boolean {
   return !lastAt || now.getTime() - Date.parse(lastAt) >= 6.5 * 86_400_000;
 }
+
+/**
+ * Today's games still to tip that have no saved copy of Sam's read. Sam posts
+ * only the day's games and sometimes late, after the last scheduled save
+ * before tip (two games a night went unsaved Oct 23 to 26), so the pulse
+ * rechecks his page while this is non-empty.
+ */
+export function samGaps<G extends { id: string; tip: string; state: string }>(today: G[], saved: Set<string>, now: Date): G[] {
+  return today.filter((g) => g.state === "pre" && new Date(g.tip) > now && !saved.has(g.id));
+}

@@ -19,6 +19,7 @@ import {
   registerNew,
   reviewDue,
   reviewNba,
+  samGaps,
   settledRows,
   type NbaCutRecord,
   type NbaGate,
@@ -227,4 +228,22 @@ export async function getNbaPicksView(season = nbaSeasonOfDate(new Date())): Pro
     lastReviewAt: state?.lastReviewAt ?? null,
     room: { ...nbaRoom(games, etDay(new Date())), day: etDay(new Date()) },
   };
+}
+
+/**
+ * Pulse check: one ESPN read of today's slate against the saved games. Only
+ * when an untipped game has no saved Sam read does it run the full save,
+ * which re-reads his page (Jack, 2026-10-27: recheck Sam only then).
+ */
+export async function recheckSam(now = new Date()): Promise<string> {
+  const day = etDay(now);
+  const res = await fetch(`${NBA_SOURCES.espn}?dates=${day}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`ESPN ${day} answered ${res.status}`);
+  const today = parseNbaScoreboard(await res.json(), day);
+  const saved = new Set((await loadGames(nbaSeasonOfDate(now))).map((g) => g.id));
+  const gaps = samGaps(today, saved, now);
+  if (!gaps.length) return today.length ? "every game today has Sam's read" : "no games today";
+  const r = await runNbaPicks(now);
+  const still = gaps.filter((g) => !r.saved.includes(`${g.away.abbr}@${g.home.abbr}`));
+  return `${gaps.length} without Sam's read, saved ${gaps.length - still.length}${still.length ? `; still missing ${still.map((g) => `${g.away.abbr}@${g.home.abbr}`).join(", ")}` : ""}`;
 }

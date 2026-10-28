@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocateNbaDay, compareCut, cutRecord, nbaRoom, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
+import { allocateNbaDay, compareCut, cutRecord, nbaRoom, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, samGaps, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
 
 const snap = (x: Partial<NbaSnap> = {}): NbaSnap => ({ at: "2026-10-20T12:00:00Z", line: -4.5, homePrice: -110, awayPrice: -110, total: 230.5, overPrice: -110, underPrice: -110, mlHome: -190, mlAway: 160, model: -7, modelTotal: 226, ...x });
 const game = (i: number, x: Partial<NbaTracked> = {}, s: Partial<NbaSnap> = {}): NbaTracked => ({
@@ -180,5 +180,21 @@ describe("NBA's running week", () => {
       3.5,
     );
     expect(Object.fromEntries(got)).toEqual({ b: 2, c: 1.5 });
+  });
+});
+
+describe("rechecking Sam when today's game has no saved line", () => {
+  // Oct 23 to 26: two games a night (NY@BOS, MEM@GS, ...) never got a saved copy of Sam's read.
+  const NOW = new Date("2026-10-23T22:00:00Z");
+  const g = (id: string, tip: string, state: "pre" | "in" | "post" = "pre") =>
+    ({ id, tip, day: "20261023", state, detail: "", home: { abbr: "BOS", name: "Boston" }, away: { abbr: "NY", name: "New York" } }) as Parameters<typeof samGaps>[0][number];
+
+  it("lists only untipped games without a saved read", () => {
+    const today = [g("1", "2026-10-23T23:00:00Z"), g("2", "2026-10-24T02:00:00Z"), g("3", "2026-10-23T20:00:00Z", "in")];
+    expect(samGaps(today, new Set(["1"]), NOW).map((x) => x.id)).toEqual(["2"]);
+  });
+
+  it("nothing to do once every game is saved or has tipped", () => {
+    expect(samGaps([g("1", "2026-10-23T23:00:00Z"), g("3", "2026-10-23T21:00:00Z")], new Set(["1"]), NOW)).toEqual([]);
   });
 });
