@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { nbaNameIndex, parseNbaScoreboard, parseSamNba, readNba } from "./nba";
+import { nbaNameIndex, nbaTv, parseNbaScoreboard, parseSamNba, readNba } from "./nba";
 
 const fixture = (f: string) => readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks", f), "utf8");
 const slate = parseNbaScoreboard(JSON.parse(fixture("espn-scoreboard-nba-20261020.json")), "20261020");
@@ -100,5 +100,13 @@ describe("Sam's read at the DraftKings line", () => {
   it("is null without a model row or a line", () => {
     expect(readNba(slate[0], undefined)).toBeNull();
     expect(readNba({ ...slate[0], line: undefined }, { home: "DET", away: "BOS", model: -3, vegas: 1.5 })).toBeNull();
+  });
+});
+
+describe("nbaTv", () => {
+  it("prefers a national broadcast, else the first listed", () => {
+    expect(nbaTv({ geoBroadcasts: [{ media: { shortName: "NBCS-BOS" }, market: { type: "Home" } }, { media: { shortName: "ESPN" }, market: { type: "National" } }] })).toBe("ESPN");
+    expect(nbaTv({ broadcasts: [{ market: "home", names: ["FDSN Ohio"] }] })).toBe("FDSN Ohio");
+    expect(nbaTv({})).toBeUndefined();
   });
 });

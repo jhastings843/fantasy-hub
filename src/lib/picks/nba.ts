@@ -28,6 +28,8 @@ export type NbaGame = {
   total?: { points: number; overPrice?: number; underPrice?: number };
   ml?: { home?: number; away?: number };
   score?: { home: number; away: number };
+  /** TV channel ESPN lists, national first (e.g. "ESPN", "NBA TV"), when it lists one. */
+  tv?: string;
 };
 
 export type SamNbaRow = { home: string; away: string; model: number; vegas: number; total?: number };
@@ -79,6 +81,14 @@ export function parseNbaSummaryOdds(json: any): Pick<NbaGame, "line" | "total" |
 }
 
 /** One day of ESPN's NBA scoreboard. */
+/** The channel to watch: a national broadcast if ESPN lists one, else the first listed (usually the home team's local feed). */
+export function nbaTv(c: any): string | undefined {
+  const geo: { name?: string; national: boolean }[] = (c?.geoBroadcasts ?? []).map((b: any) => ({ name: b?.media?.shortName, national: /national/i.test(b?.market?.type ?? "") }));
+  const plain: { name?: string; national: boolean }[] = (c?.broadcasts ?? []).flatMap((b: any) => (b?.names ?? []).map((n: string) => ({ name: n, national: /national/i.test(b?.market ?? "") })));
+  const all = [...geo, ...plain].filter((b) => b.name);
+  return (all.find((b) => b.national) ?? all[0])?.name;
+}
+
 export function parseNbaScoreboard(json: any, day: string): NbaGame[] {
   const out: NbaGame[] = [];
   for (const e of json?.events ?? []) {
@@ -100,6 +110,8 @@ export function parseNbaScoreboard(json: any, day: string): NbaGame[] {
       away: t(a),
     };
     if (o) Object.assign(g, nbaOdds(o));
+    const tv = nbaTv(c);
+    if (tv) g.tv = tv;
     if (state !== "pre") g.score = { home: Number(h.score) || 0, away: Number(a.score) || 0 };
     out.push(g);
   }
