@@ -251,7 +251,8 @@
     "2026-10-28: Stage 2 shipped: per-part picks changes, slate reviews, props loss cap + self-made slices, Venom as source, splits 90-min window, pick'em lean refit.",
     "2026-10-28: splits skip alert, DB-backed model settings (params-store + /api/model-params) shipped.",
     "2026-10-28: refit pipeline, college model, Stage 3 UI pass, trade finder, guillotine injuries deployed.",
-    "2026-10-28: money UI, NFL totals/projected scores, boards upcoming-only deployed; Phil/trade-bot/weather reworked in their repos."
+    "2026-10-28: money UI, NFL totals/projected scores, boards upcoming-only deployed; Phil/trade-bot/weather reworked in their repos.",
+    "2026-10-28: PEM Week 9 card was skipped (Jay reworded the post); matcher loosened, card ingested 56/56 verified."
   ],
   "tags": [
     "personal",
