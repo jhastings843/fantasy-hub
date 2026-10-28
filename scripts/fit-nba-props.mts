@@ -12,19 +12,31 @@
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-nba-props.mts
 // Needs .cache/nba/2024 and 2025 (scripts/nba-history.mts).
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+//
+//   ... scripts/fit-nba-props.mts --refit [--dry]
+// Weekly refit (scripts/refit/common.mts): the latest season with 300+ games,
+// the one before as the prior, the last 28 days held out. The search starts
+// from the live settings, and the refit is stored only if its over/under log
+// loss at the naive line beats live's by 2+ standard errors on those games.
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { NbaGame } from "../src/lib/models/nba/box";
 import { summarize, RunningSeason, type SeasonSummary } from "../src/lib/models/nba/history";
 import { NBA_STATS, overUnder, pmf, projectGame, type NbaParams, type NbaStat, type PlayerInput, type TeamInput } from "../src/lib/models/nba/props";
+import DEFAULTS from "../src/lib/models/nba/params.json";
+import { REFIT, latestSeason, liveParams, paired, submit, windowStart } from "./refit/common.mjs";
 
 const load = (s: number): NbaGame[] =>
   readdirSync(`.cache/nba/${s}`)
     .map((f) => JSON.parse(readFileSync(`.cache/nba/${s}/${f}`, "utf8")) as NbaGame)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
-const prior: SeasonSummary = summarize(load(2024));
-const season = load(2025);
-const SPLIT = "2026-01-15";
+const count = (s: number) => (existsSync(`.cache/nba/${s}`) ? readdirSync(`.cache/nba/${s}`).length : 0);
+const SEASON = REFIT ? latestSeason(Object.fromEntries([2023, 2024, 2025, 2026, 2027].map((s) => [s, count(s)])), 300) : 2025;
+const prior: SeasonSummary = summarize(load(SEASON - 1));
+const season = load(SEASON);
+const SPLIT = REFIT ? windowStart(season.map((g) => g.date), 28) : "2026-01-15";
+const LIVE = REFIT ? await liveParams("nba-props", DEFAULTS as unknown as NbaParams) : null;
+if (REFIT) console.log(`refit: season ${SEASON}, prior ${SEASON - 1}, held out from ${SPLIT}`);
 
 interface Case {
   date: string;
@@ -61,7 +73,8 @@ const train = cases.filter((c) => c.date < SPLIT);
 const test = cases.filter((c) => c.date >= SPLIT);
 console.log(`games: train ${train.length}, test ${test.length}; judged rows train ${train.reduce((a, c) => a + c.judged.length, 0)}, test ${test.reduce((a, c) => a + c.judged.length, 0)}`);
 
-let P: NbaParams = {
+// A refit searches outward from the live settings (inputs this script doesn't fit, like kOpp, ride along).
+let P: NbaParams = LIVE ? { ...LIVE } : {
   halfLife: 5,
   kMin: 4,
   minScale: 1,
@@ -199,6 +212,28 @@ const trainRows = project(train, P);
   }
   P = { ...P, calib: b.a };
   say(`calibration slope: ${P.calib}`);
+}
+
+if (REFIT && LIVE) {
+  // Per player-game loss: over/under log loss at the naive line, summed over the four stats.
+  const loss = (p: NbaParams) => {
+    const m = new Map<string, number>();
+    for (const r of project(test, p)) {
+      let l = 0;
+      for (const s of NBA_STATS) {
+        const line = Math.floor(r.naive[s]) + 0.5;
+        const po = Math.min(Math.max(overUnder(s, Math.max(r.mean[s], 0.01), line, p).over, 1e-6), 1 - 1e-6);
+        l -= r.c.actual.get(r.id)![s] > line ? Math.log(po) : Math.log(1 - po);
+      }
+      m.set(`${r.c.game}|${r.id}`, l);
+    }
+    return m;
+  };
+  const a = loss(LIVE);
+  const b = loss(P);
+  const keys = [...a.keys()].filter((k) => b.has(k));
+  await submit("nba-props", DEFAULTS as unknown as NbaParams, P, paired(keys.map((k) => a.get(k)!), keys.map((k) => b.get(k)!), `${test.length} games from ${SPLIT}`));
+  process.exit(0);
 }
 
 // Test: accuracy against naive averages, and calibration at a naive line

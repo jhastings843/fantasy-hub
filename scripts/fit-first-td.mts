@@ -8,7 +8,14 @@
 // Fit on 2024 and 2025 weeks 1-9; tested on 2025 weeks 10-18 and 2026 weeks 1-6.
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-first-td.mts
+// --refit (weekly job, scripts/refit/common.mts): test = the last 4 weeks with
+// data, train = every game before; fits team and scorer constants on train
+// (no sharp / wPrev candidates: the stored settings can't carry them) and
+// stores the refit only if its per-game log loss beats the live settings by
+// 2+ SE. Writes no JSON. Add --dry to score without storing.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import FTD_DEFAULTS from "../src/lib/models/nfl/ftd-params.json";
+import { REFIT, liveParams, paired, submit } from "./refit/common.mjs";
 import { readGames, readStats, type NflRow } from "../src/lib/models/nfl/data";
 import { addTotals, impliedPoints, scorerShares, tdTotals, teamFirst, type FtdParams, type TdLine } from "../src/lib/models/nfl/firsttd";
 import { nameKey } from "../src/lib/props/grade";
@@ -63,10 +70,13 @@ for (const season of [2024, 2025, 2026]) {
     cases.push({ season, week: g.week, game: g.game, home: g.home, away: g.away, pts: impliedPoints(g.total, g.homeMargin), lists, parts, first: ftd.first, drives: Object.values(ftd.drives) });
   }
 }
-const train = cases.filter((c) => c.season === 2024 || (c.season === 2025 && c.week <= 9));
-const testA = cases.filter((c) => c.season === 2025 && c.week >= 10);
-const testB = cases.filter((c) => c.season === 2026);
-console.log(`games: train ${train.length}, test 2025 wks 10-18 ${testA.length}, test 2026 ${testB.length}`);
+const wk = (c: Case) => c.season * 100 + c.week;
+const lastWeeks = [...new Set(cases.map(wk))].sort((a, b) => a - b).slice(-4);
+const train = REFIT ? cases.filter((c) => wk(c) < lastWeeks[0]) : cases.filter((c) => c.season === 2024 || (c.season === 2025 && c.week <= 9));
+const testA = REFIT ? cases.filter((c) => lastWeeks.includes(wk(c))) : cases.filter((c) => c.season === 2025 && c.week >= 10);
+const testB = REFIT ? [] : cases.filter((c) => c.season === 2026);
+if (REFIT) console.log(`refit: test weeks ${lastWeeks.join(", ")} (season*100+week)`);
+console.log(REFIT ? `games: train ${train.length}, test ${testA.length}` : `games: train ${train.length}, test 2025 wks 10-18 ${testA.length}, test 2026 ${testB.length}`);
 
 const log: string[] = [];
 const say = (s: string) => {
@@ -126,7 +136,7 @@ const scorerLoss = (cs: Case[], p: FtdParams) => {
 // sharpen the shares (sharp > 1), and count last season's TD history less (wPrev < 1). Fit on train, kept only if both tests improve.
 const withPrev = (cs: Case[], w: number): Case[] =>
   w === 1 ? cs : cs.map((c) => ({ ...c, lists: Object.fromEntries(Object.entries(c.parts).map(([t, ps]) => [t, ps.map((x) => ({ ...addTotals(x.a, x.b, w)!, id: x.id, name: x.name, team: t }))])) }));
-{
+if (!REFIT) {
   const base = { train: scorerLoss(train, P), A: scorerLoss(testA, P), B: scorerLoss(testB, P) };
   let b = { e: base.train, sharp: 1, wPrev: 1, kTd: P.kTd };
   const trainBy = new Map<number, Case[]>();
@@ -190,7 +200,23 @@ function report(name: string, cs: Case[]) {
     if (b.length) say(`  ${lo.toFixed(2)}-${Math.min(hi, 1).toFixed(2)}: ${(b.reduce((a, x) => a + x.p, 0) / b.length).toFixed(3)} vs ${(b.reduce((a, x) => a + x.y, 0) / b.length).toFixed(3)}, n ${b.length}`);
   }
 }
-report("TEST 2025 weeks 10-18", testA);
-report("TEST 2026 weeks 1-6", testB);
-writeFileSync("src/lib/models/nfl/ftd-params.json", JSON.stringify(P, null, 2) + "\n");
-writeFileSync(".cache/fit-first-td.txt", log.join("\n") + "\n");
+if (REFIT) {
+  // Per game: log loss of what happened first (no TD, the scorer, or the team's off-list share).
+  const gameLoss = (c: Case, p: FtdParams) => {
+    const cs = withPrev([c], p.wPrev ?? 1)[0];
+    const t = teamFirst(c.pts.home, c.pts.away, p);
+    if (c.first.kind === "none") return -Math.log(Math.max(t.none, 1e-6));
+    const tp = c.first.team === c.home ? t.home : t.away;
+    if (c.first.kind !== "offense") return -Math.log(Math.max(tp, 1e-6));
+    const i = scorerIdx(cs);
+    return -Math.log(Math.max(tp * (i >= 0 ? scorerShares(cs.lists[c.first.team] ?? [], p)[i] : p.other), 1e-6));
+  };
+  const L = await liveParams("nfl-ftd", FTD_DEFAULTS as FtdParams);
+  const ev = paired(testA.map((c) => gameLoss(c, L)), testA.map((c) => gameLoss(c, P)), `per-game log loss, weeks ${lastWeeks.join(",")}`);
+  await submit("nfl-ftd", FTD_DEFAULTS as FtdParams, P, ev);
+} else {
+  report("TEST 2025 weeks 10-18", testA);
+  report("TEST 2026 weeks 1-6", testB);
+  writeFileSync("src/lib/models/nfl/ftd-params.json", JSON.stringify(P, null, 2) + "\n");
+  writeFileSync(".cache/fit-first-td.txt", log.join("\n") + "\n");
+}

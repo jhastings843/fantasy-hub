@@ -7,7 +7,13 @@
 // Fit on 2024 and 2025 weeks 1-9; tested on 2025 weeks 10-18 and 2026.
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-anytime-td.mts
+// --refit (weekly job, scripts/refit/common.mts): test = the last 4 weeks with
+// data, train = every game before; stores the refit only if its log loss per
+// team-game (summed over the team's listed players) beats the live settings
+// by 2+ SE. Writes no files. Add --dry to score without storing.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import ATTD_DEFAULTS from "../src/lib/models/nfl/attd-params.json";
+import { REFIT, liveParams, paired, submit } from "./refit/common.mjs";
 import { readGames, readStats, type NflRow } from "../src/lib/models/nfl/data";
 import { impliedPoints, tdTotals, type TdLine } from "../src/lib/models/nfl/firsttd";
 import { attdTeam, type AttdLine, type AttdParams, type ZoneTotals } from "../src/lib/models/nfl/anytime";
@@ -101,9 +107,12 @@ for (const season of [2024, 2025, 2026]) {
     }
   }
 }
-const train = cases.filter((c) => c.season === 2024 || (c.season === 2025 && c.week <= 9));
-const testA = cases.filter((c) => c.season === 2025 && c.week >= 10);
-const testB = cases.filter((c) => c.season === 2026);
+const wk = (c: Case) => c.season * 100 + c.week;
+const lastWeeks = [...new Set(cases.map(wk))].sort((a, b) => a - b).slice(-4);
+const train = REFIT ? cases.filter((c) => wk(c) < lastWeeks[0]) : cases.filter((c) => c.season === 2024 || (c.season === 2025 && c.week <= 9));
+const testA = REFIT ? cases.filter((c) => lastWeeks.includes(wk(c))) : cases.filter((c) => c.season === 2025 && c.week >= 10);
+const testB = REFIT ? testA : cases.filter((c) => c.season === 2026);
+if (REFIT) console.log(`refit: test weeks ${lastWeeks.join(", ")} (season*100+week); "test 2025" and "test 2026" lines below both mean these weeks`);
 
 const log: string[] = [];
 const say = (s: string) => {
@@ -174,6 +183,13 @@ function report(name: string, cs: Case[]) {
     if (!b.length) continue;
     say(`  ${Math.round(lo * 100)}-${Math.round(hi * 100)}%: n ${b.length}, said ${((b.reduce((s, x) => s + x.p, 0) / b.length) * 100).toFixed(1)}%, scored ${((b.filter((x) => x.y).length / b.length) * 100).toFixed(1)}%`);
   }
+}
+if (REFIT) {
+  const L = await liveParams("nfl-attd", ATTD_DEFAULTS as AttdParams);
+  const per = (p: AttdParams) => testA.map((c) => loss([c], p) * c.list.length).map((x) => (Number.isFinite(x) ? x : 0));
+  const ev = paired(per(L), per(P), `log loss per team-game, weeks ${lastWeeks.join(",")}`);
+  await submit("nfl-attd", ATTD_DEFAULTS as AttdParams, P, ev);
+  process.exit(0);
 }
 report("train", train);
 report("test 2025 wks 10-18", testA);

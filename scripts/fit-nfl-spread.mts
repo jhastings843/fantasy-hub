@@ -11,8 +11,17 @@
 //    feature alone, so a weak model can't hide behind a strong one.
 //
 //   npx tsx --tsconfig scripts/tsconfig.json scripts/fit-nfl-spread.mts
+// --refit (weekly job, scripts/refit/common.mts): the structural refit, due
+// every 4th NFL week (the latest week with scores a multiple of 4; --force runs
+// it anyway). Test = the last 4 weeks with a line and a score; rating
+// constants are refit on every game before them, lambda on the 5 seasons
+// before the test season, weights on everything before the test. Stored only
+// if the margin-vs-line squared error per test game beats the live settings by
+// 2+ SE. Writes no JSON. Add --dry to score without storing.
 // Needs .cache/nfl/games.csv (nflverse nfldata games.csv).
 import { readFileSync, writeFileSync } from "node:fs";
+import SPREAD_DEFAULTS from "../src/lib/models/nfl/spread-params.json";
+import { REFIT, liveParams, paired, submit } from "./refit/common.mjs";
 import { parseCsv } from "../src/lib/models/nfl/data";
 import { FEATURES, Ratings, fitRidge, rateAll, residual, toSpreadGame, type Feature, type RatingParams, type Rated, type SpreadGame } from "../src/lib/models/nfl/spread";
 
@@ -24,6 +33,86 @@ const say = (s: string) => {
   log.push(s);
 };
 say(`games ${games.length}, with a line and a score ${games.filter((g) => g.line !== null && g.homeScore !== null).length}`);
+
+if (REFIT) {
+  const done = games.filter((g) => g.line !== null && g.homeScore !== null);
+  const wk = (g: SpreadGame) => g.season * 100 + (g.type === "POST" ? 30 : 0) + g.week;
+  const weeks = [...new Set(done.map(wk))].sort((a, b) => a - b);
+  const latest = weeks[weeks.length - 1];
+  if (latest % 100 % 4 !== 0 && !process.argv.includes("--force")) {
+    console.log(`nfl-spread: not due (latest week with scores ${latest % 100} of ${Math.floor(latest / 100)}; structural refits run every 4th week, --force to run anyway)`);
+    process.exit(0);
+  }
+  const testWeeks = weeks.slice(-4);
+  const isTest = (g: SpreadGame) => testWeeks.includes(wk(g)) && g.line !== null && g.homeScore !== null;
+  const before = games.filter((g) => wk(g) < testWeeks[0]);
+  const yg = (g: SpreadGame) => g.homeScore! - g.awayScore! - g.line!;
+  // Rating constants on every game before the test, by the same two errors as the full fit.
+  const errsOn = (p: RatingParams) => {
+    const r = new Ratings(p);
+    let perf = 0, mkt = 0, n = 0;
+    for (const g of [...before].sort((a, b) => a.gameday.localeCompare(b.gameday))) {
+      if (g.line !== null && g.homeScore !== null && g.season > 1999) {
+        const x = r.features(g, g.line);
+        perf += (x.gap + g.line - (g.homeScore - g.awayScore!)) ** 2;
+        mkt += x.move ** 2;
+        n++;
+      }
+      r.add(g);
+    }
+    return { perf: perf / n, mkt: mkt / n };
+  };
+  let rp: RatingParams = { ...(SPREAD_DEFAULTS.rating as RatingParams) };
+  {
+    let b = { e: Infinity, p: rp };
+    for (const hfa of [1.5, 2, 2.5, 3]) for (const kPerf of [0.04, 0.06, 0.08, 0.1, 0.14]) for (const cap of [14, 21, 28]) for (const carryPerf of [0.5, 0.67, 0.8]) {
+      const p = { ...rp, hfa, kPerf, cap, carryPerf };
+      const e = errsOn(p).perf;
+      if (e < b.e) b = { e, p };
+    }
+    rp = b.p;
+    let m = { e: Infinity, p: rp };
+    for (const hfaMkt of [1.5, 2, 2.5, 3]) for (const kMkt of [0.1, 0.2, 0.3, 0.4, 0.6]) for (const carryMkt of [0.5, 0.67, 0.8, 0.9]) {
+      const p = { ...rp, hfaMkt, kMkt, carryMkt };
+      const e = errsOn(p).mkt;
+      if (e < m.e) m = { e, p };
+    }
+    rp = m.p;
+  }
+  say(`refit ratings: ${JSON.stringify(rp)}`);
+  const ratedR = rateAll(games, rp).filter((r) => r.game.season >= 2002 && r.game.line !== null && r.game.homeScore !== null);
+  const pre = ratedR.filter((r) => wk(r.game) < testWeeks[0]);
+  const testSeason = Math.floor(testWeeks[0] / 100);
+  let lam = SPREAD_DEFAULTS.lambda;
+  {
+    let b = Infinity;
+    for (const l of [1, 10, 100, 1000, 10000, 100000]) {
+      let e = 0, n = 0;
+      for (let s = testSeason - 5; s < testSeason; s++) {
+        const f = fitRidge(pre.filter((r) => r.game.season < s).map((r) => ({ x: r.x, y: yg(r.game) })), l);
+        for (const r of pre.filter((x) => x.game.season === s)) {
+          e += (yg(r.game) - residual(r.x, f)) ** 2;
+          n++;
+        }
+      }
+      if (e / n < b) {
+        b = e / n;
+        lam = l;
+      }
+    }
+  }
+  const f = fitRidge(pre.map((r) => ({ x: r.x, y: yg(r.game) })), lam);
+  const refit = { rating: rp, w: f.w, b: f.b, lambda: lam };
+  say(`refit lambda ${lam}, weights ${FEATURES.map((k) => `${k} ${f.w[k].toFixed(3)}`).join(", ")}, intercept ${f.b.toFixed(3)}`);
+  const L = await liveParams("nfl-spread", SPREAD_DEFAULTS as typeof refit);
+  const testOf = (p: typeof refit) => {
+    const byId = new Map(rateAll(games, p.rating).map((r) => [r.game.id, r]));
+    return games.filter(isTest).map((g) => (yg(g) - residual(byId.get(g.id)!.x, { w: p.w, b: p.b })) ** 2);
+  };
+  const ev = paired(testOf(L), testOf(refit), `margin vs line squared error per game, weeks ${testWeeks.join(",")}`);
+  await submit("nfl-spread", SPREAD_DEFAULTS as typeof refit, refit, ev);
+  process.exit(0);
+}
 
 // 1. Rating constants, 1999-2009.
 let RP: RatingParams = { hfa: 2.5, kPerf: 0.1, cap: 21, carryPerf: 0.67, hfaMkt: 2.5, kMkt: 0.3, carryMkt: 0.67 };

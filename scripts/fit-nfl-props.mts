@@ -20,7 +20,16 @@
 // candidate get their own dispersion and calibration and are compared on both
 // test sets. KEEP lists the ones that earned a place (judged by hand on that
 // comparison: better on both tests for the stats they touch).
+//
+// --refit (weekly job, scripts/refit/common.mts): test = the last 4 weeks with
+// data across 2025 and 2026, train = every game before; refits the same steps
+// with the kept inputs (implied total, opponent factor on passing yards and
+// receptions), no candidate comparison, and stores the refit only if its
+// over/under log loss at the naive line, summed per game, beats the live
+// settings by 2+ SE. Writes no JSON. Add --dry to score without storing.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import PROPS_DEFAULTS from "../src/lib/models/nfl/params.json";
+import { REFIT, liveParams, paired, submit } from "./refit/common.mjs";
 import { readGames, readStats, type NflRow } from "../src/lib/models/nfl/data";
 import { NflRunning, nflPos, summarizeNfl, type NflSummary } from "../src/lib/models/nfl/history";
 import { NFL_STATS, impliedPoints, nflMedian, teamVolume, nflOverUnder, projectNflGame, type NflParams, type NflPlayerInput, type NflStat, type NflTeamInput } from "../src/lib/models/nfl/props";
@@ -41,6 +50,8 @@ interface Case {
   absent: NflPlayerInput[];
   actual: Map<string, NflRow>;
   judged: { id: string; stat: NflStat; naive: number }[];
+  /** League base of the prior season this case was built on. */
+  base: NflSummary["base"];
 }
 
 type Air = { [k: string]: [number, number] };
@@ -94,7 +105,7 @@ function build(season: number, prior: NflSummary): Case[] {
         if (car >= 8) judged.push({ id: pl.id, stat: "rush_yds", naive: avg((g) => g.rushYds, pl.prior?.rushYds) });
         if (pl.pos === "QB" && att >= 20) judged.push({ id: pl.id, stat: "pass_yds", naive: avg((g) => g.passYds, pl.prior?.passYds) });
       }
-      out.push({ season, week, game, home: meta.home, margin: meta.homeMargin, total: meta.total, players, teams, absent, actual: new Map(gr.map((r) => [r.id, r])), judged });
+      out.push({ season, week, game, home: meta.home, margin: meta.homeMargin, total: meta.total, players, teams, absent, actual: new Map(gr.map((r) => [r.id, r])), judged, base: prior.base });
     }
     run.addWeek(wk);
     for (const game of new Set(wk.map((r) => r.game))) {
@@ -119,9 +130,11 @@ const s2025 = build(2025, summarizeNfl(rows(2024)));
 const s2026 = build(2026, summarizeNfl(rows(2025)));
 const base2025 = summarizeNfl(rows(2024)).base;
 const base2026 = summarizeNfl(rows(2025)).base;
-const train = s2025.filter((c) => c.week <= 9);
-const test = s2025.filter((c) => c.week >= 10);
-console.log(`games: train ${train.length}, test ${test.length}, 2026 ${s2026.length}`);
+const wkOf = (c: Case) => c.season * 100 + c.week;
+const lastWeeks = [...new Set([...s2025, ...s2026].map(wkOf))].sort((a, b) => a - b).slice(-4);
+const train = REFIT ? [...s2025, ...s2026].filter((c) => wkOf(c) < lastWeeks[0]) : s2025.filter((c) => c.week <= 9);
+const test = REFIT ? [...s2025, ...s2026].filter((c) => lastWeeks.includes(wkOf(c))) : s2025.filter((c) => c.week >= 10);
+console.log(REFIT ? `refit: test weeks ${lastWeeks.join(", ")} (season*100+week); games: train ${train.length}, test ${test.length}` : `games: train ${train.length}, test ${test.length}, 2026 ${s2026.length}`);
 
 let P: NflParams = {
   kTeam: 4,
@@ -139,10 +152,11 @@ let P: NflParams = {
   calib: 1,
 };
 
-function project(cs: Case[], p: NflParams, base = base2025) {
+// Each case carries its prior season's base; callers may pass the same one explicitly.
+function project(cs: Case[], p: NflParams, base?: typeof base2025) {
   const out: { c: Case; id: string; stat: NflStat; naive: number; mean: number; y: number }[] = [];
   for (const c of cs) {
-    const pr = new Map(projectNflGame(c.players, c.teams, c.home, c.margin, base, p, c.absent, c.total).map((x) => [x.id, x]));
+    const pr = new Map(projectNflGame(c.players, c.teams, c.home, c.margin, base ?? c.base, p, c.absent, c.total).map((x) => [x.id, x]));
     for (const j of c.judged) out.push({ c, id: j.id, stat: j.stat, naive: j.naive, mean: pr.get(j.id)!.mean[j.stat], y: ACTUAL[j.stat](c.actual.get(j.id)!) });
   }
   return out;
@@ -182,8 +196,8 @@ const grid = (key: keyof NflParams, vals: number[] | boolean[], stats: NflStat[]
         const att = rowsT.reduce((q, r) => q + r.att, 0);
         const car = rowsT.reduce((q, r) => q + r.car, 0);
         const ta = c.teams[t];
-        const pa = ta.prior?.att ?? base2025.att;
-        const pc = ta.prior?.car ?? base2025.car;
+        const pa = ta.prior?.att ?? c.base.att;
+        const pc = ta.prior?.car ?? c.base.car;
         const ea = (ta.games.reduce((q, g) => q + g.att, 0) + p.kTeam * pa) / (ta.games.length + p.kTeam) + p.margin.att * margin;
         const ec = (ta.games.reduce((q, g) => q + g.car, 0) + p.kTeam * pc) / (ta.games.length + p.kTeam) + p.margin.car * margin;
         a += (ea - att) ** 2 + (ec - car) ** 2;
@@ -305,7 +319,7 @@ const implied = (() => {
       for (const t of Object.keys(c.teams)) {
         const margin = (c.margin ?? 0) * (t === c.home ? 1 : -1);
         const rowsT = [...c.actual.values()].filter((r) => r.team === t);
-        const v = teamVolume(c.teams[t], margin, base2025, { ...BASE, implied: { e, mean } }, c.total !== null && c.margin !== null ? impliedPoints(c.total, margin) : null);
+        const v = teamVolume(c.teams[t], margin, c.base, { ...BASE, implied: { e, mean } }, c.total !== null && c.margin !== null ? impliedPoints(c.total, margin) : null);
         a += (v.att - rowsT.reduce((q, r) => q + r.att, 0)) ** 2 + (v.car - rowsT.reduce((q, r) => q + r.car, 0)) ** 2;
         n++;
       }
@@ -354,6 +368,25 @@ const adot = (() => {
   return b.q;
 })();
 say(`candidate opponent defense: pseudo-games ${NFL_STATS.map((s) => `${s} ${kOpp[s] ?? "off"}`).join(", ")}`);
+
+if (REFIT) {
+  // The kept structure (see KEEP_OPP below), refit on train, against the live settings on the test weeks.
+  const refit = tail({ ...BASE, implied, kOpp: Object.fromEntries((["pass_yds", "rec"] as NflStat[]).filter((s) => kOpp[s] !== undefined).map((s) => [s, kOpp[s]])) });
+  const L = await liveParams("nfl-props", PROPS_DEFAULTS as unknown as NflParams);
+  const perGame = (p: NflParams) => {
+    const byGame = new Map<string, number>();
+    for (const r of project(test, p)) {
+      const line = Math.floor(r.naive) + 0.5;
+      if (!Number.isFinite(line)) continue;
+      const po = Math.min(Math.max(nflOverUnder(r.stat, Math.max(r.mean, 0.1), line, p).over, 1e-6), 1 - 1e-6);
+      byGame.set(r.c.game, (byGame.get(r.c.game) ?? 0) - (r.y > line ? Math.log(po) : Math.log(1 - po)));
+    }
+    return test.map((c) => byGame.get(c.game) ?? 0);
+  };
+  const ev = paired(perGame(L), perGame(refit), `over/under log loss at the naive line, summed per game, weeks ${lastWeeks.join(",")}`);
+  await submit("nfl-props", PROPS_DEFAULTS as unknown as NflParams, refit, ev);
+  process.exit(0);
+}
 
 const VARIANTS: { name: string; p: NflParams }[] = [
   { name: "base", p: BASE },

@@ -1,0 +1,90 @@
+name: Model refit
+
+# Weekly refit of every model's settings (Jack, 2026-10-27: props learners may
+# refit their own models). Each fit script runs with --refit: it rolls its
+# train/test split forward to the newest games, refits on train, scores the
+# live settings and the refit on the same held-out games, and stores the refit
+# through /api/model-params only when it wins by 2+ standard errors. Otherwise
+# the live settings stay. The step summary lists each model's evidence line.
+# History lives in an actions/cache of .cache, refreshed here each run (free
+# ESPN and nflverse reads). The NFL spread model only changes every 4th week;
+# its script says "not due" the other weeks.
+# Tuesday 12:00 UTC = 8am EDT / 7am EST, after the 11:00 UTC picks review and
+# the NFL week turnover.
+
+on:
+  schedule:
+    - cron: "0 12 * * 2"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "Score and print only, store nothing"
+        type: boolean
+        default: false
+
+jobs:
+  nfl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache/nfl
+            !.cache/nfl/pbp/play_by_play_201*
+          key: refit-nfl-${{ github.run_id }}
+          restore-keys: refit-nfl-
+      - name: Refresh NFL history
+        run: npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/refit/nfl-data.mts
+      - name: Refit
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DRY: ${{ inputs.dry && '--dry' || '' }}
+        run: |
+          echo "### NFL refits" >> "$GITHUB_STEP_SUMMARY"
+          fail=0
+          for s in fit-first-td fit-anytime-td fit-nfl-props fit-nfl-spread; do
+            npx -y tsx@4 --tsconfig scripts/tsconfig.json "scripts/$s.mts" --refit $DRY || { echo "- $s failed" >> "$GITHUB_STEP_SUMMARY"; fail=1; }
+          done
+          exit $fail
+
+  nba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache/nba
+            .cache/nba-lines
+          key: refit-nba-${{ github.run_id }}
+          restore-keys: refit-nba-
+      - name: Refresh NBA history
+        run: |
+          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-history.mts 2024 2025 2026
+          npx -y tsx@4 --tsconfig scripts/tsconfig.json scripts/nba-lines-history.mts 2024 2025 2026
+      - name: Refit
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DRY: ${{ inputs.dry && '--dry' || '' }}
+        run: |
+          echo "### NBA refits" >> "$GITHUB_STEP_SUMMARY"
+          fail=0
+          for s in fit-nba-props fit-first-basket fit-kotc fit-nba-game; do
+            npx -y tsx@4 --tsconfig scripts/tsconfig.json "scripts/$s.mts" --refit $DRY || { echo "- $s failed" >> "$GITHUB_STEP_SUMMARY"; fail=1; }
+          done
+          exit $fail
