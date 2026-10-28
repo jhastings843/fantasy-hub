@@ -45,6 +45,16 @@ DONE 2026-10-28 overnight (all deployed from a clean checkout at HEAD, tests 152
 - UI pass: shared src/components/TeamLogo.tsx. NFL/college picks: GameCell rows (logos, time, channel; ESPN ids/tv via closing.ts), one edge column, moved-line check removed, Ignore the odds lower, full-width expand + deeper breakdown, results split by market, compact strategy review tiles, /picks/model?l=nfl|cfb "How it works". NBA picks: spreads/SU/totals markets, upcoming-only board, NFL-style results/research. Props: matchup.tsx rows, upcoming-only boards, game-by-game results everywhere, NBA prop line prominent, David's board folded per view, KOTC prop to tag for all top 30 (kotc-tag.ts, also used by the learner), Lottos singles + parlay-of-the-day records.
 - Leagues: trade finder "Offers to send" (src/lib/dynasty/trade-offers.ts). Guillotine: one injury answer (Sleeper x ESPN), return timelines (injury-timeline.ts), IR slot handling, bye crunch weeks. Kittle over Fannin checked: correct (13.1 vs 9.9 ROS rate).
 
+DONE 2026-10-28 later (money projects + leftovers, all deployed / pushed):
+- Kalshi Phil (kalshi-phil 34796e2): no bug. Paper, loop runs hourly; its forecasts trail the market (Brier 0.0064 worse). Every gate-blocked bet would have gone 8-25, -19.36u; gates kept. scripts/why_no_bets.py recomputes it.
+- Trade-bot (d1432ec): automation verified (paper only, data/paper.db). learner --daily acts Tue-Fri (retire/open), ideas 12 x 5 values. Trends learner tradebot/trend_learner.py daily; pick cap is a learner setting (starts 3, 1-5, once a week), extras graded only. Trends buying starts 2026-11-02; first grades ~Nov 3.
+- Weather desk (a3378c0): recency-weighted bias (14-day half-life) and weather-dependent same-day spread (disagreement, cloud, rain, temp change), both beat held-out; slice gate (desk/slices.py: 30 bets, 10 days, t 2.33, beats parent, 1 new/day, rollback t -1.645). Data backup at scratchpad wd-data-backup.
+- Hub Money UI: holdings panel + recent trades table, trend pick labels with tap-to-define (Term.tsx), charts open in place, Weather slices/tracked/model, Trends learner/pending/extras. New fields appear after the next trade-bot export.
+- NFL totals model (src/lib/models/nfl/totals.ts, nfl-totals in MODEL_KEYS + refit loop): test RMSE 13.24 vs line 12.92, no edge at close. Projected scores on every NFL/college forecast snapshot. Sources nfl:ou:t-ours, cfb:ou:t-ours, nfl:su:ours, cfb:su:ours register at the next review.
+- Picks boards (spreads, SU, totals) upcoming only; this week's finals at top of Results. TierChecker deleted. Learner tile per market.
+
+Open questions for Jack (recommended first): Kalshi Phil small learning bets (no, keep); weather seed both eras (yes); retest day-ahead weather terms ~Nov 27 (yes); trade-bot lab-fail rule daily (no); buy trend extras small (no).
+
 NEXT SESSION:
 1. Check Tue 11/3 12:00 UTC model-refit run summary (first real run; nflverse week 8 should be in by then).
 2. Check the college model's first live runs: pulse receipt line "college model ...", /picks?l=cfb research panel populated, slices registered on /learning.
