@@ -17,7 +17,7 @@
 //
 //   attdCandidates([{ slug, week, at, rows, result }]) -> [{ id: "attd:value", bets: [...] }, ...]
 
-import type { Bet, Candidate, Entry } from "@/lib/learning/engine";
+import type { Bet, Candidate, Entry, ViewStatus } from "@/lib/learning/engine";
 import { implied, nbaWeek, payout } from "@/lib/props/parse";
 import type { AttdGraded } from "./nfl/anytime";
 import { STAKE, type Rung, type Ticket } from "./nba/lotto";
@@ -158,7 +158,7 @@ export function kotcCandidates(nights: KotcNight[], boards: OurStoredProps[], se
 // slice went live was never bet, whatever the slice says now. A rolled-back
 // slice stops marking. Pure.
 
-type LiveEntry = Pick<Entry, "id" | "status" | "activatedAt">;
+type LiveEntry = Pick<Entry, "id" | "activatedAt"> & { status: ViewStatus };
 
 /** Ids of slices live for a play starting at `at`. */
 const liveFor = (entries: LiveEntry[], at: string | undefined) =>

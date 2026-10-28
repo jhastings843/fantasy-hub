@@ -60,9 +60,13 @@ export interface Gate {
   moveMin: number;
   rollbackGames: number;
   rollbackT: number;
+  /** Units a live slice may lose in one section week before it pauses for the rest of that week. */
+  weeklyLossCap: number;
 }
 
 export type Status = "collecting" | "active" | "rolled-back";
+/** What views show: a live slice past its weekly loss cap reads "paused" (stored status stays "active"). */
+export type ViewStatus = Status | "paused";
 
 export interface Entry {
   id: string;
@@ -78,6 +82,8 @@ export interface Entry {
   endedAt?: string;
   endedWeek?: number;
   reason?: string;
+  /** Lost its weekly cap in this section week: no bets until the next week's first review. */
+  pausedWeek?: number;
 }
 
 export interface SectionState {
@@ -237,6 +243,19 @@ export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: 
     if (c) ev.set(e.id, evidence(gate, c, e.registeredAt, e.parent ? byId.get(e.parent) : undefined));
   }
 
+  // Weekly loss cap: a new week lifts last week's pauses; a live slice down
+  // its cap on this week's bets since going live pauses for the rest of it.
+  for (const e of Object.values(entries)) {
+    if (e.pausedWeek !== undefined && e.pausedWeek !== week) delete e.pausedWeek;
+    if (e.status !== "active" || e.pausedWeek !== undefined) continue;
+    const c = byId.get(e.id);
+    const lost = (c?.bets ?? []).filter((b) => b.week === week && b.at >= e.activatedAt!).reduce((a, b) => a + b.net, 0);
+    if (lost <= -gate.weeklyLossCap) {
+      e.pausedWeek = week;
+      journal.push({ at: now, week, kind: "rolled back", id: e.id, text: `Paused ${e.label} for the rest of week ${week}: down ${r2(-lost)}u this week, past its ${gate.weeklyLossCap}u cap. It bets again next week unless the rollback test drops it first.` });
+    }
+  }
+
   let rolled = 0;
   for (const e of Object.values(entries)) {
     if (e.status !== "active") continue;
@@ -275,8 +294,8 @@ export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: 
   return { state: { ...prev, entries, lastReviewAt: now, lastReviewWeek: week, ...(slate ? { lastReviewSlate: slate } : {}) }, journal, evidence: ev };
 }
 
-/** Active ids, for marking this week's bets. */
-export const activeIds = (s: SectionState) => Object.values(s.entries).filter((e) => e.status === "active").map((e) => e.id);
+/** Active ids, for marking this week's bets. A paused slice marks none. */
+export const activeIds = (s: SectionState) => Object.values(s.entries).filter((e) => e.status === "active" && e.pausedWeek === undefined).map((e) => e.id);
 
 // ------------------------------------------------------------------ gates
 
@@ -299,6 +318,7 @@ export const PROPS_GATE: Gate = {
   moveMin: 20,
   rollbackGames: 20,
   rollbackT: 1.645,
+  weeklyLossCap: 10,
 };
 
 /**
@@ -320,6 +340,8 @@ export const FTD_GATE: Gate = {
   moveMin: 20,
   rollbackGames: 30,
   rollbackT: 1.645,
+  // Long prices lose 1u at a time for weeks between hits; a tighter cap would pause on ordinary variance.
+  weeklyLossCap: 15,
 };
 
 /**
@@ -340,11 +362,13 @@ export const ATTD_GATE: Gate = {
   moveMin: 20,
   rollbackGames: 20,
   rollbackT: 1.645,
+  weeklyLossCap: 10,
 };
 
 // ------------------------------------------------------------------- views
 
-export interface EntryView extends Entry {
+export interface EntryView extends Omit<Entry, "status"> {
+  status: ViewStatus;
   /** Evidence since it registered, judged against the gate. */
   ev?: Evidence;
   /** Record since it went live (active or rolled back). */
@@ -366,13 +390,14 @@ export function sectionView(gate: Gate, s: SectionState, cands: Candidate[], jou
   // A slice whose definition was retired never gathers evidence again; only a live one (its record) stays in view.
   const entries = Object.values(s.entries).filter((e) => byId.has(e.id) || e.activatedAt).map((e): EntryView => {
     const c = byId.get(e.id);
-    if (!c) return e;
+    const status: ViewStatus = e.status === "active" && e.pausedWeek !== undefined ? "paused" : e.status;
+    if (!c) return { ...e, status };
     const ev = evidence(gate, c, e.registeredAt, e.parent ? byId.get(e.parent) : undefined);
-    if (!e.activatedAt) return { ...e, ev };
+    if (!e.activatedAt) return { ...e, status, ev };
     const bets = c.bets.filter((b) => b.at >= e.activatedAt! && (!e.endedAt || b.at < e.endedAt));
     const w = bets.filter((b) => b.net > 0).length;
     const l = bets.filter((b) => b.net < 0).length;
-    return { ...e, ev, live: { bets: bets.length, w, l, p: bets.length - w - l, units: r2(bets.reduce((a, b) => a + b.net, 0)), games: new Set(bets.map((b) => b.game)).size } };
+    return { ...e, status, ev, live: { bets: bets.length, w, l, p: bets.length - w - l, units: r2(bets.reduce((a, b) => a + b.net, 0)), games: new Set(bets.map((b) => b.game)).size } };
   });
   return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal };
 }

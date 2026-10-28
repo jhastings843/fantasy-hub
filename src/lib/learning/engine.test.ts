@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FTD_GATE, PROPS_GATE, emptyState, evidence, register, review, reviewDue, sectionView, liveBets, tOf, type Bet, type Candidate, type Gate } from "./engine";
+import { FTD_GATE, PROPS_GATE, activeIds, emptyState, evidence, register, review, reviewDue, sectionView, liveBets, tOf, type Bet, type Candidate, type Gate } from "./engine";
 import { parentOf } from "../props/learn";
 
 // Small gate so the tests can reach it.
@@ -170,5 +170,31 @@ describe("reviews every slate, activations capped per week", () => {
     expect(active(r2.state)).toBe(1);
     // Next week the cap resets.
     expect(active(review(one, r2.state, ready, at(13), 9, "2026-11-02").state)).toBe(active(r1.state) + 1);
+  });
+});
+
+describe("weekly loss cap", () => {
+  const cap: Gate = { ...G, maxNew: 1, weeklyLossCap: 5 };
+  const winner: Candidate = { id: "w", label: "W", bets: bets(8, () => 1) };
+
+  it("a live slice that loses the cap in a week pauses until the next week's first review", () => {
+    const live = review(cap, emptyState("t"), [winner], T0, 8, "2026-10-20").state;
+    expect(live.entries.w.status).toBe("active");
+    // Week 9: six straight 1u losses after it went live.
+    const losing: Candidate = { ...winner, bets: [...winner.bets, ...Array.from({ length: 6 }, (_, i) => ({ game: `L${i}`, week: 9, at: at(9), net: -1 }))] };
+    const hit = review(cap, live, [losing], at(10), 9, "2026-10-30");
+    expect(hit.state.entries.w).toMatchObject({ status: "active", pausedWeek: 9 });
+    expect(hit.journal.map((j) => j.text).join(" ")).toMatch(/Paused W/);
+    expect(sectionView(cap, hit.state, [losing], []).entries.find((e) => e.id === "w")!.status).toBe("paused");
+    expect(activeIds(hit.state)).toEqual([]);
+    // Week 10's first review lifts it.
+    const next = review(cap, hit.state, [losing], at(17), 10, "2026-11-06").state;
+    expect(next.entries.w.pausedWeek).toBeUndefined();
+    expect(activeIds(next)).toEqual(["w"]);
+  });
+
+  it("every gate has a cap", () => {
+    expect(PROPS_GATE.weeklyLossCap).toBe(10);
+    expect(FTD_GATE.weeklyLossCap).toBe(15);
   });
 });

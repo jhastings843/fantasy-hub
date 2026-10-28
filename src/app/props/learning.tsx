@@ -16,7 +16,8 @@ export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
   const g = v.gate;
   return v.entries.map((e): TrackRow => {
     const ev = e.ev;
-    const live = e.status === "active";
+    const paused = e.status === "paused";
+    const live = e.status === "active" || paused;
     const rec = e.live ? `${e.live.w}-${e.live.l}${e.live.p ? `-${e.live.p}` : ""}, ${u(e.live.units)} since it went live` : undefined;
     // Games and weeks have their own bars; the note lists what else is short.
     const short = ev?.checks.filter((c) => !c.pass && c.name !== "games" && c.name !== "weeks").map((c) => c.note) ?? [];
@@ -30,7 +31,7 @@ export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
       weeks: ev?.weeks ?? 0,
       needWeeks: g.minWeeks,
       result: live || e.status === "rolled-back" ? rec : ev && ev.bets ? `${u(ev.units)} over ${ev.bets} bet${ev.bets === 1 ? "" : "s"}` : undefined,
-      note: live ? undefined : e.status === "rolled-back" ? e.reason : still,
+      note: paused ? `Paused for the rest of week ${e.pausedWeek}: past its ${g.weeklyLossCap}u weekly loss cap` : live ? undefined : e.status === "rolled-back" ? e.reason : still,
     };
   });
 }
@@ -74,7 +75,7 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
                   <td className={s.num}>{`Wk ${e.activeWeek}`}</td>
                   <td className={s.num}>{e.live ? `${e.live.w}-${e.live.l}${e.live.p ? `-${e.live.p}` : ""}` : "–"}</td>
                   <td className={`${s.num} ${(e.live?.units ?? 0) > 0 ? s.pos : (e.live?.units ?? 0) < 0 ? s.neg : ""}`}>{u(e.live?.units ?? 0)}</td>
-                  <td className={e.status === "rolled-back" ? s.neg : s.pos}>{e.status === "rolled-back" ? `rolled back Wk ${e.endedWeek}` : "live"}</td>
+                  <td className={e.status === "rolled-back" || e.status === "paused" ? s.neg : s.pos}>{e.status === "rolled-back" ? `rolled back Wk ${e.endedWeek}` : e.status === "paused" ? `paused Wk ${e.pausedWeek}` : "live"}</td>
                 </tr>
               ))
             ) : (
