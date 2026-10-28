@@ -60,7 +60,7 @@ DONE 2026-10-28 late (committed locally on main, NOT pushed, NOT deployed; Jack 
 - Local check without Redis: `MONEY_SNAPSHOT_FILE=/path/snapshot.json npx next dev` renders /money from that file (dev only, no bets/sports, no reads or writes to the store).
 
 NEXT SESSION:
-0. Push and `vercel --prod` the Intraday tab once Jack says so; it shows real data after trade-bot posts a snapshot with `intraday`.
+0. Done 2026-10-28: Intraday tab pushed and deployed; real data after the first intraday session.
 1. Check Tue 11/3 12:00 UTC model-refit run summary (first real run; nflverse week 8 should be in by then).
 2. Check the college model's first live runs: pulse receipt line "college model ...", /picks?l=cfb research panel populated, slices registered on /learning.
 3. Verify dynasty waiver research run (search budget fix) passed.
