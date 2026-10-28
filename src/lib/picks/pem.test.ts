@@ -62,6 +62,10 @@ describe("PEM card", () => {
     expect(cardKind(wk7)).toEqual({ week: 7, kind: "picks" });
     expect(cardKind("Week 8 starts tonight.\n\nPEM has Tennessee winning at South Carolina.\n\nAll 56 games: PEM spreads, ATS picks and EDGE.")).toEqual({ week: 8, kind: "picks" });
     expect(cardKind("Troy -14.5 is the line. That leads Week 8.\n\nAll 56 games, largest to smallest EDGE.")).toBeNull();
+    const wk9 = "Week 9 starts with PEM taking both Tuesday underdogs outright: Delaware and Sam Houston.\n\nThe published Week 9 card: all 56 games, with lines, ATS picks and EDGE.";
+    expect(cardKind(wk9)).toEqual({ week: 9, kind: "picks" });
+    expect(statedCount(wk9)).toBe(56);
+    expect(cardKind("The full Week 8 PEM card: all 56 results.\n\n32-24 SU (57.1%)")).toBeNull();
     expect(statedCount(wk7)).toBe(59);
   });
 

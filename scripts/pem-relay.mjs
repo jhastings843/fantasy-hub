@@ -34,7 +34,10 @@ function log(msg) {
   console.log(`${new Date().toISOString()} ${msg}`);
 }
 
-const isPicksCard = (text) => /week \d+ PEM picks|PEM week \d+ picks|full week \d+ card(?!, with every final)|all \d+ games: PEM spreads/i.test(text);
+// Keep in step with cardKind in src/lib/picks/pem-card.ts; Jay rewords the post most weeks.
+const isPicksCard = (text) =>
+  /week \d+ PEM picks|PEM week \d+ picks|full week \d+ card(?!, with every final)|all \d+ games: PEM spreads/i.test(text) ||
+  (/week \d+ (?:PEM )?card/i.test(text) && /all \d+ games/i.test(text) && !/results?\b|final/i.test(text));
 
 function latestPosts(user = "FansOfCFB") {
   const out = execFileSync(

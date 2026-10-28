@@ -130,5 +130,9 @@ export function cardKind(text: string): { week: number; kind: "picks" | "final" 
   // Week 8 on (2026-10-20): "Week 8 starts tonight. ... All 56 games: PEM spreads, ATS picks and EDGE."
   const all = /all \d+ games: PEM spreads/i.test(text) ? text.match(/week (\d+)/i) : null;
   if (all) return { week: Number(all[1]), kind: "picks" };
+  // Week 9 on (2026-10-27): "The published Week 9 card: all 56 games, with lines, ATS picks and EDGE."
+  // Any "Week N card" post that counts every game and isn't a results card.
+  const card = text.match(/week (\d+) (?:PEM )?card/i);
+  if (card && /all \d+ games/i.test(text) && !/results?\b|final/i.test(text)) return { week: Number(card[1]), kind: "picks" };
   return null;
 }
