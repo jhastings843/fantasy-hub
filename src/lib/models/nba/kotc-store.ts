@@ -5,6 +5,7 @@ import { compactGame, type EspnNbaSummary } from "./box";
 import { kingLogLoss, kingsOf, simulateSlate, type KotcBoard, type KotcParams, type KotcPlayer } from "./kotc";
 import type { OurStoredProps, SbGame } from "./store";
 import KOTC_PARAMS from "./kotc-params.json";
+import { live, primeParams } from "@/lib/models/params-store";
 
 // King of the Court, live. Inside every run of our NBA props model
 // (runOurNbaProps), after the boards are saved:
@@ -17,7 +18,7 @@ import KOTC_PARAMS from "./kotc-params.json";
 //
 // Redis: kotc:v1:nba:{season}:nights  hash date (YYYY-MM-DD, Eastern) -> KotcNight
 
-const P = KOTC_PARAMS as KotcParams;
+const P = live("nba-kotc", KOTC_PARAMS as KotcParams);
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
 const KEY = (s: number) => `kotc:v1:nba:${s}:nights`;
 
@@ -71,6 +72,7 @@ async function summary(id: string): Promise<EspnNbaSummary> {
 
 /** Save tonight's boards and grade finished nights. Returns one line per thing done. */
 export async function runKotc(season: number, now: Date, games: SbGame[], boards: OurStoredProps[]): Promise<string[]> {
+  await primeParams();
   const out: string[] = [];
   const nights = (await redis.hgetall<{ [date: string]: KotcNight }>(KEY(season))) ?? {};
   const byDate = new Map<string, SbGame[]>();
@@ -127,6 +129,7 @@ export async function runKotc(season: number, now: Date, games: SbGame[], boards
 }
 
 export async function getKotcNights(season: number): Promise<KotcNight[]> {
+  await primeParams();
   const h = (await redis.hgetall<{ [date: string]: KotcNight }>(KEY(season))) ?? {};
   return Object.values(h).sort((a, b) => b.date.localeCompare(a.date));
 }

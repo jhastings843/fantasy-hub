@@ -21,6 +21,7 @@ import { gradeGameModel, ratingsNow, saveGameModel } from "./game-store";
 import type { GameRatings } from "./game";
 import PARAMS from "./params.json";
 import FB_PARAMS from "./fb-params.json";
+import { live, primeParams } from "@/lib/models/params-store";
 
 // Our NBA props model, live. Each run:
 // 1. Ingests finished games it hasn't seen (ESPN summaries) into the season's
@@ -41,14 +42,14 @@ import FB_PARAMS from "./fb-params.json";
 //   props:v1:ours:nba:{season}:w{week} hash event id -> OurStoredProps
 //   props:v1:ours:nba:{season}:weeks   set of weeks
 
-const P = PARAMS as NbaParams;
+const P = live("nba-props", PARAMS as NbaParams);
 /** Players projected under this many minutes can't lead a night; left off the King of the Court list. */
 const KOTC_MIN_MINUTES = 8;
 const r1 = (x: number) => Math.round(x * 10) / 10;
 /** History a player needs before a market gets our number (this season, last season). */
 export const MIN_GAMES_NOW = 2;
 export const MIN_GAMES_PRIOR = 10;
-const FBP = FB_PARAMS as FbParams;
+const FBP = live("nba-fb", FB_PARAMS as FbParams);
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
 const PROPS = (ev: string, page: number) => `https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/${ev}/competitions/${ev}/odds/100/propBets?limit=1000&page=${page}`;
 const UA = { "user-agent": "Mozilla/5.0 (fantasy-hub NBA model)" };
@@ -179,6 +180,7 @@ export interface RunOptions {
 
 /** Build tonight's boards, grade finals, review. Safe to call any time. */
 export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): Promise<OurNbaReport> {
+  await primeParams();
   const report: OurNbaReport = { ingested: [], saved: [], graded: [], learning: [], problems: [] };
   const season = nbaSeasonOfDate(now);
   let games: SbGame[] = [];
@@ -440,6 +442,7 @@ export interface OurNbaView {
 }
 
 export async function getOurNbaView(season: number, now = new Date()): Promise<OurNbaView> {
+  await primeParams();
   const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number).sort((a, b) => b - a);
   const recent = await Promise.all(nums.slice(0, 2).map((n) => loadWeek(season, n)));
   const yesterday = etDate(new Date(now.getTime() - 86_400_000));

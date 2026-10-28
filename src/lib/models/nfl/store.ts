@@ -16,6 +16,7 @@ import { fdProp, oddsPrice } from "./odds-api";
 import { morningOddsReads } from "./odds-api-store";
 import { projectNflGame, type NflParams, type NflPlayerInput, type NflProjection, type NflStat } from "./props";
 import PARAMS from "./params.json";
+import { live, primeParams } from "@/lib/models/params-store";
 
 // Our NFL props model, live. Each run:
 // 1. Reads this season's weekly player stats from nflverse (the release CSV,
@@ -34,7 +35,7 @@ import PARAMS from "./params.json";
 //   props:v1:ours:nfl:{season}:w{week}  hash ESPN event id -> OurNflStored
 //   props:v1:ours:nfl:{season}:weeks    set of weeks
 
-const P = PARAMS as NflParams;
+const P = live("nfl-props", PARAMS as NflParams);
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 const PROPS = (ev: string, page: number) => `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${ev}/competitions/${ev}/odds/100/propBets?limit=1000&page=${page}`;
 const NFLVERSE = (season: number) => `https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_${season}.csv.gz`;
@@ -91,6 +92,7 @@ interface SbEvent {
 }
 
 export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
+  await primeParams();
   const report: OurNflReport = { week: null, nflverseWeek: null, saved: [], graded: [], learning: [], problems: [] };
   const season = nflSeasonOf(now);
   let events: SbEvent[] = [];
@@ -301,6 +303,7 @@ export interface OurNflView {
 }
 
 export async function getOurNflView(season: number): Promise<OurNflView> {
+  await primeParams();
   const nums = ((await redis.smembers(NK.weeks(season))) ?? []).map(Number).sort((a, b) => b - a);
   const week = nums[0] ?? null;
   const board = week ? Object.values(await loadWeek(season, week)).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "")) : [];

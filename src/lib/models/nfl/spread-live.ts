@@ -3,6 +3,7 @@ import { parseCsv } from "./data";
 import { Ratings, residual, toSpreadGame, type Features, type SpreadGame, type SpreadParams } from "./spread";
 import type { ModelLine } from "@/lib/picks/parse";
 import PARAMS from "./spread-params.json";
+import { live, primeParams } from "@/lib/models/params-store";
 
 // Our NFL spread model, live (tracked only, Jack 2026-10-21: forward-test
 // it at early-week prices). For this week's games at the reference line
@@ -10,7 +11,7 @@ import PARAMS from "./spread-params.json";
 // predicted residual. Ratings come from nflverse's games file, every final
 // before now; nflverse's codes match the Picks abbreviations.
 
-const P = PARAMS as SpreadParams;
+const P = live("nfl-spread", PARAMS as SpreadParams);
 const GAMES = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv";
 
 let cache: { at: number; games: SpreadGame[] } | null = null;
@@ -30,6 +31,7 @@ export type OurLine = ModelLine & { x: Features };
 
 /** Our line per game, keyed `${home}|${away}`. `line` is the home spread (negative = home favored). */
 export async function ourSpreadLines(season: number, want: { home: string; away: string; line: number }[]): Promise<Map<string, OurLine>> {
+  await primeParams();
   const all = await games();
   const r = new Ratings(P.rating);
   for (const g of [...all].sort((a, b) => a.gameday.localeCompare(b.gameday) || a.id.localeCompare(b.id))) if (g.homeScore !== null) r.add(g);

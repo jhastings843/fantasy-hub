@@ -6,6 +6,7 @@ import { readOpenClose, type CoreOdds } from "./game-lines";
 import { signalRecords, type GameSnap, type SignalRecord, type TrackedNbaGame } from "./game-track";
 import PARAMS from "./game-params.json";
 import SEED from "./game-seed.json";
+import { live, primeParams } from "@/lib/models/params-store";
 
 // Our NBA game model, live (tracked only; see game-track.ts). The props run
 // (store.ts) calls `saveGameModel` for each game it builds a board for, with
@@ -20,7 +21,7 @@ import SEED from "./game-seed.json";
 //
 // Redis: models:v1:nba:{season}:gamemodel  hash event id -> TrackedNbaGame
 
-const P = PARAMS as GameParams;
+const P = live("nba-game", PARAMS as GameParams);
 const KEY = (s: number) => `models:v1:nba:${s}:gamemodel`;
 const GAMES = (s: number) => `models:v1:nba:${s}:games`;
 const ODDS = (id: string) => `https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/${id}/competitions/${id}/odds`;
@@ -34,6 +35,7 @@ async function odds(event: string) {
 
 /** Ratings as of now: the seed, carried into the season, then this season's finals in tip order. */
 export async function ratingsNow(season: number): Promise<GameRatings> {
+  await primeParams();
   const r = new GameRatings(P.rating);
   r.season = SEED.season;
   r.lg = SEED.lg;
@@ -58,6 +60,7 @@ export async function saveGameModel(
   out: { home: number; away: number },
   ratings: GameRatings,
 ): Promise<string | null> {
+  await primeParams();
   const l = await odds(g.event);
   if (!l || l.close.spread === null || l.close.total === null) return null;
   const x = ratings.features({ date: g.tip, home: g.home, away: g.away }, l.close.spread, l.close.total, l.open, avail);
@@ -82,6 +85,7 @@ export async function saveGameModel(
 
 /** Close and final for every saved game that has tipped and finished. */
 export async function gradeGameModel(season: number, now: Date): Promise<string[]> {
+  await primeParams();
   const rows = (await redis.hgetall<{ [id: string]: TrackedNbaGame }>(KEY(season))) ?? {};
   const todo = Object.values(rows).filter((r) => !r.final && new Date(r.tip) < now);
   if (!todo.length) return [];
@@ -105,6 +109,7 @@ export interface NbaGameModelView {
 }
 
 export async function getNbaGameModelView(season: number): Promise<NbaGameModelView> {
+  await primeParams();
   const games = Object.values((await redis.hgetall<{ [id: string]: TrackedNbaGame }>(KEY(season))) ?? {}).sort((a, b) => a.tip.localeCompare(b.tip));
   return { games, records: signalRecords(games, P.strongSpread), strong: P.strongSpread };
 }

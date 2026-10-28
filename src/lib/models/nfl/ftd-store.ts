@@ -19,6 +19,7 @@ import type { Books } from "./ftd-price";
 import { attdTeam, boxTds, gradeAttd, type AttdGraded, type AttdParams, type AttdResult, type AttdRow } from "./anytime";
 import { readTdScorers, type PropBetRow } from "../lines";
 import type { EspnBoxTeam } from "@/lib/props/grade";
+import { live, primeParams } from "@/lib/models/params-store";
 
 // Our NFL First TD model, live. Each run, for every game this week not yet
 // started: each team's players from its last 3 games (nflverse) less anyone
@@ -35,8 +36,8 @@ import type { EspnBoxTeam } from "@/lib/props/grade";
 //   ftd:v1:ours:{season}:w{week}        hash slug -> OurFtdStored
 //   ftd:v1:ours:{season}:weeks          set of weeks
 
-const P = PARAMS as FtdParams;
-const AP = ATTD_PARAMS as AttdParams;
+const P = live("nfl-ftd", PARAMS as FtdParams);
+const AP = live("nfl-attd", ATTD_PARAMS as AttdParams);
 const PROPS = (ev: string, page: number) => `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${ev}/competitions/${ev}/odds/100/propBets?limit=1000&page=${page}`;
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 const UA = { "user-agent": "Mozilla/5.0 (fantasy-hub first TD model)" };
@@ -94,6 +95,7 @@ export interface OurFtdReport {
 }
 
 export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
+  await primeParams();
   const report: OurFtdReport = { week: null, saved: [], graded: [], learning: [], problems: [] };
   const season = nflSeasonOf(now);
   type Ev = { id: string; date?: string; status?: { type?: { state?: string } }; competitions?: { competitors?: { homeAway?: string; team?: { id?: string; abbreviation?: string } }[] }[] };
@@ -261,6 +263,7 @@ export interface OurFtdView {
 }
 
 export async function getOurFtdView(season: number): Promise<OurFtdView> {
+  await primeParams();
   const nums = ((await redis.smembers(FK.weeks(season))) ?? []).map(Number).sort((a, b) => b - a);
   const week = nums[0] ?? null;
   const board = week ? Object.values(await loadWeek(season, week)).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "")) : [];
@@ -271,6 +274,7 @@ export async function getOurFtdView(season: number): Promise<OurFtdView> {
 
 /** Anytime TD's learner: its section, judged on ATTD_GATE. */
 export async function getAttdLearning(season: number): Promise<SectionView> {
+  await primeParams();
   const [state, journal, graded, venom] = await Promise.all([loadSection(SECTIONS.nflAttd, season), loadJournal(SECTIONS.nflAttd, season), attdGraded(season), loadVenomPicks(season)]);
   return sectionView(ATTD_GATE, state, attdCandidates(graded, venom), journal);
 }
