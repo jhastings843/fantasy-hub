@@ -150,3 +150,25 @@ describe("slices change between reviews", () => {
     expect(ids).toEqual(["b:value", "k:gone"]);
   });
 });
+
+describe("reviews every slate, activations capped per week", () => {
+  const ready: Candidate[] = ["a", "b", "c"].map((id) => ({ id, label: id.toUpperCase(), bets: bets(8, () => 1) }));
+  const one: Gate = { ...G, maxNew: 1 };
+
+  it("is due again on a new slate in the same week", () => {
+    const s = review(one, emptyState("t"), ready, T0, 8, "2026-10-20").state;
+    expect(reviewDue(s, 8, "2026-10-20")).toBe(false);
+    expect(reviewDue(s, 8, "2026-10-21")).toBe(true);
+    expect(reviewDue(s, 9)).toBe(true);
+  });
+
+  it("a second review in the week can't go past the week's cap", () => {
+    const r1 = review(one, emptyState("t"), ready, T0, 8, "2026-10-20");
+    const r2 = review(one, r1.state, ready, at(12), 8, "2026-11-01");
+    const active = (s: typeof r2.state) => Object.values(s.entries).filter((e) => e.status === "active").length;
+    expect(active(r1.state)).toBe(1);
+    expect(active(r2.state)).toBe(1);
+    // Next week the cap resets.
+    expect(active(review(one, r2.state, ready, at(13), 9, "2026-11-02").state)).toBe(active(r1.state) + 1);
+  });
+});

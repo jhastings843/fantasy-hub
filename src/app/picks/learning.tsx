@@ -21,8 +21,8 @@ export function marketOf(id: string): Market {
 
 const EMPTY: { [k in Market]: string } = {
   ats: "",
-  su: "Straight-up hypotheses register at the next Tuesday review: each method against the one in force, on later games.",
-  ou: "Totals hypotheses register at the next Tuesday review: each refinement against both models agreeing, on later games.",
+  su: "Straight-up hypotheses register at the next review: each method against the one in force, on later games.",
+  ou: "Totals hypotheses register at the next review: each refinement against both models agreeing, on later games.",
 };
 
 /**

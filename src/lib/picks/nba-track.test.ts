@@ -140,11 +140,21 @@ describe("the NBA learning review", () => {
     expect(r.hyps.every((h) => h.status === "collecting")).toBe(true);
   });
 
-  it("runs weekly", () => {
+  it("runs daily, after each night's games", () => {
     const now = new Date("2026-10-27T12:00:00Z");
     expect(reviewDue(undefined, now)).toBe(true);
-    expect(reviewDue("2026-10-24T12:00:00Z", now)).toBe(false);
-    expect(reviewDue("2026-10-20T12:00:00Z", now)).toBe(true);
+    expect(reviewDue("2026-10-27T06:30:00Z", now)).toBe(false);
+    expect(reviewDue("2026-10-26T06:30:00Z", now)).toBe(true);
+  });
+
+  it("a market that changed this past week waits, even with a daily review", () => {
+    const small = Array.from({ length: 40 }, (_, i) => game(i, { week: 1 + (i % 4), final: { home: 110, away: 100 } }));
+    const big = Array.from({ length: 40 }, (_, i) => game(100 + i, { week: 1 + (i % 4), final: { home: 100, away: 110 } }, { line: -12.5, model: -15 }));
+    const rows = settledRows([...small, ...big]);
+    const first = reviewNba(rows, registerNew([], "2026-10-19T00:00:00Z"), "2026-11-20T00:00:00Z");
+    const next = reviewNba(rows, first.hyps, "2026-11-21T00:00:00Z");
+    expect(next.hyps.filter((h) => h.status === "active")).toHaveLength(1);
+    expect(next.journal.some((j) => j.kind === "activate")).toBe(false);
   });
 });
 

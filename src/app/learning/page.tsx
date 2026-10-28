@@ -52,7 +52,7 @@ function picksMarket(state: ReviewState | null, policy: PicksPolicy, league: "nf
           : "Built-in cuts only";
   return {
     live,
-    collecting: ds.length ? `${count("retain")} collecting${count("reject") ? `, ${count("reject")} rejected` : ""}${count("report") ? `, ${count("report")} report only` : ""}` : "Registers at the next Tuesday review",
+    collecting: ds.length ? `${count("retain")} collecting${count("reject") ? `, ${count("reject")} rejected` : ""}${count("report") ? `, ${count("report")} report only` : ""}` : "Registers at the next review",
     last: state?.lastReviewAt ?? null,
   };
 }
@@ -63,7 +63,7 @@ function sourceRow(state: ReviewState | null, policy: PicksPolicy, src: Source):
   const d = state?.decisions?.find((x) => x.id === `cfb:source:${src}`);
   return {
     live: STATE_TEXT[sourceState(policy, src)],
-    collecting: d ? d.why : "Registers at the next Tuesday review",
+    collecting: d ? d.why : "Registers at the next review",
     last: state?.lastReviewAt ?? null,
   };
 }
@@ -97,8 +97,8 @@ export default async function LearningPage() {
   ]);
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
-  const PICKS = "Picks review: Tuesday 7am, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
-  const ENGINE = "Shared engine: weekly, judged per game, t 2.33, refinements must beat their parent, rollback";
+  const PICKS = "Picks review: 7am ET after each slate (Fri, Sun, Mon, Tue), one change per part per week, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
+  const ENGINE = "Shared engine: reviewed after every slate, new live slices capped per week, judged per game, t 2.33, refinements must beat their parent, rollback";
   const nbaCount = (m: string) => (nba?.hyps ?? []).filter((h) => h.id.startsWith(`${m}:`));
   const nbaRow = (m: "ats" | "ou"): Pick<Row, "live" | "collecting" | "last"> => ({
     live: nbaCount(m).filter((h) => h.status === "active").length ? `Core cuts plus ${nbaCount(m).filter((h) => h.status === "active").map((h) => h.label).join(", ")}` : "Core cuts only",
@@ -137,7 +137,7 @@ export default async function LearningPage() {
           loop: "Picks review: does skipping the rule bets each signal flags gain? Splits from Action Network's public feed, saved with every pregame snapshot since Oct 21. Report only: nothing changes a bet until Jack says so.",
           href: l === "nfl" ? "/picks?v=research" : "/picks/cfb?v=research",
           live: "Not used on any bet",
-          collecting: ds.length ? ds.map((d) => `${d.id.split(":mkt:")[1]}: ${d.why}`).join(" · ") : "Registers at the next Tuesday review",
+          collecting: ds.length ? ds.map((d) => `${d.id.split(":mkt:")[1]}: ${d.why}`).join(" · ") : "Registers at the next review",
           last: state?.lastReviewAt ?? null,
         };
       }),
@@ -145,8 +145,8 @@ export default async function LearningPage() {
     {
       title: "NBA picks",
       rows: [
-        { name: "NBA spreads", loop: "NBA review: games are daily, so evidence grows every night; the review runs every 7 days on a rolling clock, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ats") },
-        { name: "NBA totals", loop: "NBA review: games are daily, so evidence grows every night; the review runs every 7 days on a rolling clock, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ou") },
+        { name: "NBA spreads", loop: "NBA review: games are daily, so evidence grows every night; the review runs daily after each night's games with one change per market a week, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ats") },
+        { name: "NBA totals", loop: "NBA review: games are daily, so evidence grows every night; the review runs daily after each night's games with one change per market a week, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ou") },
         {
           name: "NBA straight up",
           loop: "Record only",
@@ -164,7 +164,7 @@ export default async function LearningPage() {
         { name: "NFL player props (our model)", loop: ENGINE, href: "/props?v=results", ...engineRow(ourNflProps) },
         { name: "NFL first TD (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 2.33", href: "/props?m=ftd&v=results", ...engineRow(ourFtd) },
         { name: "NFL player props (David)", loop: ENGINE, href: "/props?v=research", ...engineRow(davidOnly) },
-        { name: "NBA player props (our model)", loop: `${ENGINE}. Games are daily and graded overnight; the review runs once per Monday-to-Sunday week`, href: "/props?m=nba&v=results", ...engineRow(ourNbaProps) },
+        { name: "NBA player props (our model)", loop: `${ENGINE}. Games are daily and graded overnight; the cap on new live slices runs Monday to Sunday`, href: "/props?m=nba&v=results", ...engineRow(ourNbaProps) },
         { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 2.33", href: "/props?m=nba&v=results", ...engineRow(ourFb) },
         { name: "NFL anytime TD (our model)", loop: "Shared engine, Anytime TD gate: 30+ games over 3+ weeks, 100+ bets and 25+ winners. A live slice's players are marked as bets", href: "/props?m=attd&v=log", ...engineRow(attd) },
         { name: "NBA lottos (our model)", loop: "Shared engine, long-price gate: 60+ games over 4+ weeks, 12+ winners. A live slice's rungs, or the nightly ticket, are marked as bets", href: "/props?m=lotto&v=log", ...engineRow(lotto) },

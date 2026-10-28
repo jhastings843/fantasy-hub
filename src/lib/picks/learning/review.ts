@@ -115,6 +115,8 @@ export interface ReviewState {
   activatedFrom?: string;
   /** Every change still live, one per part at most; each is checked for rollback on its own. */
   activations?: Activation[];
+  /** Every activation and rollback in the last five weeks, by part: what locks a part for the rest of its NFL week. */
+  changes?: { part: string; at: string }[];
   /** Every hypothesis's verdict at the last review, for the page. */
   decisions?: { id: string; label: string; verdict: string; why: string; n?: number; weeks?: number; t?: number }[];
   calibration?: { n: number; meanP: number; winRate: number; brier: number };
@@ -186,13 +188,34 @@ export interface ReviewResult {
   state: ReviewState;
 }
 
-/** Next Tuesday, first hourly pulse (7am ET; 11:00 UTC in EDT), well before the 5:30pm card. */
+/**
+ * Reviews run the morning after each slate (Jack, 2026-10-27: learn after
+ * every slate, same evidence bar): Friday after Thursday night, Sunday after
+ * college Saturday, Monday after Sunday, Tuesday after Monday night. 11:00
+ * UTC is 7am EDT, the first hourly pulse, well before the 9am bets email.
+ */
+const SLATE_DAYS = new Set([5, 0, 1, 2]);
+
 export function nextReviewAt(now: Date): string {
   const d = new Date(now);
   d.setUTCHours(11, 0, 0, 0);
-  // The next Tuesday 11:00 UTC strictly after now (today's, if it is still ahead).
-  while (d.getUTCDay() !== 2 || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
+  // The next slot strictly after now (today's, if it is still ahead).
+  while (!SLATE_DAYS.has(d.getUTCDay()) || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString();
+}
+
+/** The NFL week's turnover before `now`: Tuesday 11:00 UTC, the week's first review. */
+function weekStart(now: Date): number {
+  const d = new Date(now);
+  d.setUTCHours(11, 0, 0, 0);
+  while (d.getUTCDay() !== 2 || d.getTime() > now.getTime()) d.setUTCDate(d.getUTCDate() - 1);
+  return d.getTime();
+}
+
+/** Parts that already changed (went live or rolled back) this NFL week: with several reviews a week, each part still changes once. */
+export function lockedParts(changes: { part: string; at: string }[], now: Date): Set<string> {
+  const from = weekStart(now);
+  return new Set(changes.filter((a) => Date.parse(a.at) >= from && Date.parse(a.at) < now.getTime()).map((a) => a.part));
 }
 
 /**
@@ -327,9 +350,11 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
   }
 
   // One activation per part: the strongest promotion in each part that
-  // validates, applied in turn. A part rolled back this review waits a week.
+  // validates, applied in turn. A part rolled back this review, or already
+  // changed this NFL week, waits.
   const activatedAll: ReviewResult["activatedAll"] = [];
-  const backParts = new Set(rolledBackAll.map((r) => r.part));
+  const priorChanges = prev?.changes ?? live.map((a) => ({ part: a.part, at: a.at }));
+  const backParts = new Set([...rolledBackAll.map((r) => r.part), ...lockedParts(priorChanges, x.now)]);
   const promos = bestPerPart(
     decisions
       .filter((y) => y.verdict === "promote")
@@ -396,6 +421,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
     activatedAt: kept.at(-1)?.at,
     activatedFrom: kept.at(-1)?.hypothesis,
     activations: kept,
+    changes: [...priorChanges, ...rolledBackAll.map((r) => ({ part: r.part, at })), ...activatedAll.map((a) => ({ part: a.part, at }))].filter((c) => x.now.getTime() - Date.parse(c.at) < 35 * 86_400_000),
     decisions: decisions.map((d) => {
       const h = hs.find((y) => y.id === d.id)!;
       const c = evaluations.find((e) => e.id === d.id)?.comparison;

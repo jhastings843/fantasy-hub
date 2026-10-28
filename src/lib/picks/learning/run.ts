@@ -14,7 +14,7 @@ import { firstSends } from "../update";
 import type { League } from "../parse";
 import { sourceState, type PicksPolicy } from "../policy";
 import { redisStore } from "./store";
-import { runReview, type ReviewInputs, type ReviewResult } from "./review";
+import { nextReviewAt, runReview, type ReviewInputs, type ReviewResult } from "./review";
 import { WEEKLY_CAP } from "../limits";
 
 // Gathers the real inputs and runs one review. Called by the pulse (weekly
@@ -79,10 +79,11 @@ export async function runStrategyReview(opts: { dryRun?: boolean; reason?: strin
 }
 
 /**
- * The weekly trigger, cheap enough for every hourly pulse: review once the
- * Tuesday 7am slot has passed. There is no mid-week catch-up: the rule and
- * the policy change week to week, at this review only. A failed review
- * retries after a 6-hour backoff (the slot stays due until one succeeds).
+ * The trigger, cheap enough for every hourly pulse: review once the next
+ * slate slot (7am ET Fri, Sun, Mon, Tue) has passed. The rule's record moves
+ * at the Tuesday turnover; the policy can change at any slate review, one
+ * change per part per NFL week. A failed review retries after a 6-hour
+ * backoff (the slot stays due until one succeeds).
  */
 const BACKOFF = "picks:v2:learning:backoff";
 
@@ -91,8 +92,10 @@ export async function reviewIfDue(now = new Date()): Promise<string> {
   const until = await redis.get<string>(BACKOFF).catch(() => null);
   if (until && now.toISOString() < until) return `backing off after a failed review until ${until}`;
   const state = await redisStore.state();
-  const due = !state || now.toISOString() >= state.nextReviewAt;
-  if (!due) return `not due (next ${state?.nextReviewAt})`;
+  // The slot follows from the last review, so a schedule change applies at once (state written under the weekly one said next Tuesday).
+  const next = state ? [state.nextReviewAt, nextReviewAt(new Date(state.lastReviewAt))].sort()[0] : null;
+  const due = !next || now.toISOString() >= next;
+  if (!due) return `not due (next ${next})`;
   try {
     const r = await runStrategyReview({ reason: "scheduled", now });
     // The Harris tracker rides along: report-only, it can file a proposal, never a change.

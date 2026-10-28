@@ -4,8 +4,11 @@ import type { StrategyBoard } from "./engine";
 import type { League } from "./parse";
 
 // The rule and Tier 2 are set once a week, at the Tuesday morning strategy
-// review, and hold until the next one. Finals that land mid-week are graded
-// and shown right away, but they only move the rule at the next review.
+// review, on every week before this one. Finals that land mid-week are graded
+// and shown right away, but only move the rule's record at the next turnover.
+// The slate reviews (Fri, Sun, Mon) can change the policy mid-week (a new
+// candidate cut, PEM's role); the freeze is then rebuilt on the same weeks so
+// the change applies to games still to come (refreezeRule).
 
 export interface RuleFreeze {
   league: League;
@@ -41,4 +44,17 @@ export async function saveRuleFreeze(f: RuleFreeze): Promise<RuleFreeze | null> 
   if (res === "saved") return f;
   if (res === "failed") return null;
   return loadRuleFreeze(f.league, f.season, f.week);
+}
+
+/**
+ * Replaces this week's freeze after a later review changed the policy. Same
+ * weeks, new candidates; bets already issued keep the lines and tiers they
+ * went out with (issued records), so nothing graded is rewritten.
+ */
+export async function refreezeRule(f: RuleFreeze): Promise<RuleFreeze | null> {
+  const ok = await redis.set(KEY(f.league, f.season, f.week), f, { ex: 200 * 24 * 3600 }).then(
+    () => true,
+    () => false,
+  );
+  return ok ? f : null;
 }

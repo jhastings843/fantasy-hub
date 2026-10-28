@@ -34,7 +34,7 @@ import { ourSpreadLines, type OurLine } from "@/lib/models/nfl/spread-live";
 import { fetchSplits } from "./splits-feed";
 import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
-import { loadRuleFreeze, saveRuleFreeze } from "./rule-freeze";
+import { loadRuleFreeze, refreezeRule, saveRuleFreeze } from "./rule-freeze";
 import { priceShadow } from "./price-shadow";
 import { redisStore } from "./learning/store";
 import {
@@ -325,8 +325,11 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // the same games.
   const priorWeeks = week ? j.graded.filter((g) => g.week < week) : j.graded;
   let frozen = week ? await loadRuleFreeze(league, season, week) : null;
-  if (!frozen && week && reviewState && reviewedThisWeek(league, reviewState.lastReviewAt, new Date())) {
-    frozen = await saveRuleFreeze({
+  // A slate review after the freeze changed the policy: rebuild on the same weeks.
+  const stale = !!frozen && !!reviewState && frozen.policyId !== policy.id && reviewState.lastReviewAt > frozen.reviewAt;
+  if ((!frozen || stale) && week && reviewState && reviewedThisWeek(league, reviewState.lastReviewAt, new Date())) {
+    const before = frozen;
+    frozen = await (stale ? refreezeRule : saveRuleFreeze)({
       league,
       season,
       week,
@@ -336,6 +339,8 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
       throughWeek: priorWeeks.length ? Math.max(...priorWeeks.map((g) => g.week)) : null,
       board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" }),
     });
+    // A rebuild that couldn't be stored leaves the week's freeze as it was.
+    if (stale && !frozen) frozen = before;
   }
   // Shadow, tracked only: every tier pick at -115 or better, replayed on each week's frozen rule.
   const shadowWeeks = [...new Set(snaps.map((x) => x.week))].filter((w) => !week || w <= week);

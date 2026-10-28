@@ -371,7 +371,7 @@ function NbaResearch({ v }: { v: NbaPicksView }) {
         </table>
       </div>
       <p className={`${s.notice} ${s.dim}`}>
-        {`Same bar as football's review: ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and t ${CRITERIA.MIN_T}+ to go in, at most one per market per review; rolled back when it trails its parent on ${CRITERIA.ROLLBACK_MIN_OPPORTUNITIES}+ games with t at or under -${CRITERIA.MIN_T}. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; it runs weekly.` : "Runs weekly."}`}
+        {`Same bar as football's review: ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and t ${CRITERIA.MIN_T}+ to go in, at most one per market a week; rolled back when it trails its parent on ${CRITERIA.ROLLBACK_MIN_OPPORTUNITIES}+ games with t at or under -${CRITERIA.MIN_T}. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; it runs daily, after each night's games.` : "Runs daily."}`}
       </p>
       {v.journal.length > 0 && (
         <ul className={s.journal}>

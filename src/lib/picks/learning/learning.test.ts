@@ -130,10 +130,14 @@ describe("review fixes from the independent review", () => {
     expect(activatedFor("cfb", ["nfl:dog-band-a", "cfb:big-dog"])).toEqual(["big-dog"]);
     expect(activatedFor("nfl", ["nfl:dog-band-a", "cfb:big-dog"])).toEqual(["dog-band-a"]);
   });
-  it("schedules the next review for today's Tuesday slot when it is still ahead", async () => {
+  it("schedules the next review for the next slate slot, today's if it is still ahead", async () => {
     const { nextReviewAt } = await import("./review");
     expect(nextReviewAt(new Date("2026-10-13T09:00:00Z"))).toBe("2026-10-13T11:00:00.000Z");
-    expect(nextReviewAt(new Date("2026-10-13T12:00:00Z"))).toBe("2026-10-20T11:00:00.000Z");
+    // After each slate (2026-10-27): Fri (Thursday night), Sun (college Saturday), Mon (Sunday), Tue (Monday night).
+    expect(nextReviewAt(new Date("2026-10-13T12:00:00Z"))).toBe("2026-10-16T11:00:00.000Z");
+    expect(nextReviewAt(new Date("2026-10-16T12:00:00Z"))).toBe("2026-10-18T11:00:00.000Z");
+    expect(nextReviewAt(new Date("2026-10-18T11:00:00Z"))).toBe("2026-10-19T11:00:00.000Z");
+    expect(nextReviewAt(new Date("2026-10-19T12:00:00Z"))).toBe("2026-10-20T11:00:00.000Z");
   });
   it("needs calibration before ANY policy that risks more, flat included", async () => {
     const { decide } = await import("./model");
@@ -247,5 +251,20 @@ describe("one change per part per review (2026-10-27)", () => {
     const r2 = await runReview(store, inputs([...good, ...bad], "2026-12-01T10:00:00Z"));
     expect(r2.rolledBackAll).toEqual([expect.objectContaining({ part: "nfl:rule", to: "p1" })]);
     expect(r2.state.activations).toEqual([]);
+  });
+});
+
+describe("slate reviews keep one change per part per NFL week", () => {
+  it("a part that changed since Tuesday's turnover waits for next week", async () => {
+    const { lockedParts } = await import("./review");
+    const live = [
+      { part: "nfl:rule", hypothesis: "a", at: "2026-10-16T11:00:00.000Z", from: "p1", to: "p2" },
+      { part: "staking", hypothesis: "b", at: "2026-10-12T11:00:00.000Z", from: "p0", to: "p1" },
+    ];
+    expect([...lockedParts(live, new Date("2026-10-19T11:00:00Z"))]).toEqual(["nfl:rule"]);
+    // The next Tuesday turnover frees it.
+    expect([...lockedParts(live, new Date("2026-10-20T11:00:00Z"))]).toEqual([]);
+    // A rollback counts as the part's change too.
+    expect([...lockedParts([{ part: "cfb:totals", at: "2026-10-18T11:00:00.000Z" }], new Date("2026-10-19T11:00:00Z"))]).toEqual(["cfb:totals"]);
   });
 });

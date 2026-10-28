@@ -1,4 +1,4 @@
-// Picks' Learner log view: what the Tuesday review changed and why, in plain
+// Picks' Learner log view: what the strategy reviews changed and why, in plain
 // language, newest first, with the full review detail (sizing, hypotheses,
 // scheduler health) one click down.
 import type { League } from "@/lib/picks/parse";
@@ -58,7 +58,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
       <Hero
         eyebrow="What changed, and why"
         title={<span id="picks-log">Learner log</span>}
-        sub={`Every idea counts only games after it was first tracked. It goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with a clear edge over ${AGAINST_SHORT[market]}, and comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "Tuesday 7am ET"}.`}
+        sub={`Every idea counts only games after it was first tracked. It goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with a clear edge over ${AGAINST_SHORT[market]}, and comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "the next slate review"}.`}
       />
       <TrackingProgress
         rows={ideas
@@ -81,12 +81,12 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
               note: counted ? undefined : d.why.replace(/^insufficient evidence: /, ""),
             };
           })}
-        sub={`${MARKET_NAME[market]} ideas, measured against the rule in force on games after each registered. Counts update at each Tuesday review.`}
-        empty={`${MARKET_NAME[market]} ideas register at the next Tuesday review.`}
+        sub={`${MARKET_NAME[market]} ideas, measured against the rule in force on games after each registered. Counts update at each review, the morning after every slate.`}
+        empty={`${MARKET_NAME[market]} ideas register at the next review.`}
       />
       <div className={s.section}>
         <h3 className={s.h2}>Latest</h3>
-        <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the next Tuesday review." />
+        <LearnerLog entries={entries.slice(0, 20)} empty="Nothing recorded yet. The first entries come from the next review." />
       </div>
       <div className={s.section}>
         <h3 className={s.h2}>Cut comparisons</h3>

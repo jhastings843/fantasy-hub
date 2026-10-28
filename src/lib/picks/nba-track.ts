@@ -451,7 +451,9 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
     .map((h) => ({ h, c: compareCut(rows, h.id, h.registeredAt) }))
     .filter(({ c }) => c.n >= CRITERIA.MIN_OPPORTUNITIES && c.weeks >= CRITERIA.MIN_WEEKS && c.t !== null && c.t >= CRITERIA.MIN_T)
     .sort((a, b) => (b.c.t ?? 0) - (a.c.t ?? 0));
-  const markets = new Set<string>();
+  // Daily reviews, one change per market per 7 days: a market with a cut that went in or came out this past week waits.
+  const recent = (x?: string) => !!x && Date.parse(now) - Date.parse(x) < 7 * 86_400_000;
+  const markets = new Set<string>(next.filter((h) => recent(h.activatedAt) || recent(h.rolledBackAt)).map((h) => NBA_CUT.get(h.id)!.market));
   const picked = ready.filter(({ h }) => {
     const m = NBA_CUT.get(h.id)!.market;
     if (markets.has(m)) return false;
@@ -474,9 +476,9 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
   return { hyps: next, journal };
 }
 
-/** The review runs weekly: due once a week has passed since the last one (or it never ran). */
+/** The review runs daily, after each night's games (2026-10-27; it was weekly): due 20 hours after the last one. */
 export function reviewDue(lastAt: string | undefined, now: Date): boolean {
-  return !lastAt || now.getTime() - Date.parse(lastAt) >= 6.5 * 86_400_000;
+  return !lastAt || now.getTime() - Date.parse(lastAt) >= 20 * 3_600_000;
 }
 
 /**

@@ -32,7 +32,7 @@ export async function HarrisCard() {
       <div className={s.detailsBody} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div className={s.eyebrow}>{`${status} · weeks ${r.weeks.join(", ")}`}</div>
         <p className={s.p}>
-          {`The strategy review checks him every Tuesday on the college rule's bets since its last switch: if skipping the games he disagrees with clearly makes money (30+ bets over 3+ weeks, t 1.645), he is added as a veto; if it clearly costs money, he is dropped. ${verdict ? `Latest: ${verdict}.` : "First check at the next Tuesday review."}`}
+          {`The strategy review checks him the morning after every slate on the college rule's bets since its last switch: if skipping the games he disagrees with clearly makes money (30+ bets over 3+ weeks, t 1.645), he is added as a veto; if it clearly costs money, he is dropped. ${verdict ? `Latest: ${verdict}.` : "First check at the next review."}`}
         </p>
         <div className={s.tiles}>
           <div className={s.tile}>

@@ -86,6 +86,8 @@ export interface SectionState {
   entries: { [id: string]: Entry };
   lastReviewAt?: string;
   lastReviewWeek?: number;
+  /** The slate (ET date) the last review ran on. */
+  lastReviewSlate?: string;
 }
 
 export interface JournalLine {
@@ -186,8 +188,12 @@ export function evidence(gate: Gate, c: Candidate, since: string, parent?: Candi
 
 export const emptyState = (section: string): SectionState => ({ v: 1, section, entries: {} });
 
-/** Due once per section week. */
-export const reviewDue = (s: SectionState, week: number) => s.lastReviewWeek !== week;
+/**
+ * Due once per slate: each new day of data (Jack, 2026-10-27: learn after
+ * every slate). Activations stay capped per section week (gate.maxNew), so
+ * reviewing more often reacts faster without going live more often.
+ */
+export const reviewDue = (s: SectionState, week: number, slate?: string) => s.lastReviewWeek !== week || (slate !== undefined && s.lastReviewSlate !== slate);
 
 /**
  * The weekly review: register new candidates, roll back failing active ones,
@@ -219,7 +225,7 @@ export function register(prev: SectionState, cands: Candidate[], now: string, we
   return { state: { ...prev, entries }, journal };
 }
 
-export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: string, week: number): { state: SectionState; journal: JournalLine[]; evidence: Map<string, Evidence> } {
+export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: string, week: number, slate?: string): { state: SectionState; journal: JournalLine[]; evidence: Map<string, Evidence> } {
   const reg = register(prev, cands, now, week);
   const entries = reg.state.entries;
   const journal: JournalLine[] = [...reg.journal];
@@ -248,7 +254,8 @@ export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: 
   const ready = Object.values(entries)
     .filter((e) => e.status === "collecting" && ev.get(e.id)?.ready && !(e.parent && activeIds.has(e.parent)))
     .sort((a, b) => ev.get(b.id)!.t - ev.get(a.id)!.t)
-    .slice(0, gate.maxNew);
+    // gate.maxNew is per section week, however many reviews the week has.
+    .slice(0, Math.max(0, gate.maxNew - Object.values(entries).filter((e) => e.activeWeek === week && e.activatedAt).length));
   for (const e of ready) {
     const x = ev.get(e.id)!;
     Object.assign(e, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units } });
@@ -265,7 +272,7 @@ export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: 
       best ? ` Closest: ${entries[best.id].label} (${best.checks.filter((c) => !c.pass).map((c) => c.note).join("; ") || "ready"}).` : " No games since registration yet."
     }`,
   });
-  return { state: { ...prev, entries, lastReviewAt: now, lastReviewWeek: week }, journal, evidence: ev };
+  return { state: { ...prev, entries, lastReviewAt: now, lastReviewWeek: week, ...(slate ? { lastReviewSlate: slate } : {}) }, journal, evidence: ev };
 }
 
 /** Active ids, for marking this week's bets. */
