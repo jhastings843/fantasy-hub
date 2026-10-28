@@ -35,6 +35,44 @@ function Explainer() {
   );
 }
 
+/** A graded anytime edge, 1u at DK's price: null when the player had no priced anytime edge or the bet was void. */
+function anytimeBet(r: AttdRow, t: number | null | undefined): { won: boolean; net: number } | null {
+  if (r.dk === undefined || t === null || t === undefined || !attdEdges(r).some((x) => x.side === "anytime")) return null;
+  return { won: t > 0, net: t > 0 ? payout(r.dk) : -1 };
+}
+
+function edgeResult(r: AttdRow, t: number | null | undefined) {
+  const b = anytimeBet(r, t);
+  if (!b) return <span className={s.dim}>·</span>;
+  return <b className={b.won ? s.pos : s.neg}>{`${b.won ? "Won" : "Lost"} ${u(b.net)}`}</b>;
+}
+
+/** Finished games, newest first: each game's anytime edges as a W-L record at 1u. */
+function gradedRowsOf(graded: Awaited<ReturnType<typeof attdGraded>>): GameRowData[] {
+  return [...graded]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .map((g) => {
+      const bets = g.rows.map((r) => anytimeBet(r, g.result[r.key])).filter((b): b is { won: boolean; net: number } => !!b);
+      const won = bets.filter((b) => b.won).length;
+      const units = bets.reduce((a, b) => a + b.net, 0);
+      const scorers = g.rows.filter((r) => (g.result[r.key] ?? 0) > 0).length;
+      const record = `${won}-${bets.length - won}`;
+      return {
+        key: g.slug,
+        title: g.slug.split("_").slice(2).join(" at "),
+        when: g.at,
+        final: true,
+        cells: [
+          ["Edges W-L", bets.length ? record : "none"],
+          ["Units", bets.length ? u(units) : "·"],
+          ["Scored", `${scorers} of ${g.rows.length}`],
+        ],
+        read: !bets.length ? ["No edges", s.readPass] : [`${record} · ${u(units)}`, units > 0 ? s.readW : units < 0 ? s.readL : s.readPass],
+        body: <PlayerTable rows={g.rows} result={g.result} />,
+      };
+    });
+}
+
 /** Every player on a board, ours against DK, as the game row's body. */
 function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: string]: number | null } }) {
   return (
@@ -48,6 +86,7 @@ function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: strin
             <th>Break-even</th>
             <th>2+ ours / DK</th>
             {result && <th>TDs</th>}
+            {result && <th>Anytime edge</th>}
           </tr>
         </thead>
         <tbody>
@@ -66,6 +105,7 @@ function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: strin
                 <td className={s.num}>{r.dk !== undefined ? pct(implied(r.dk)) : "·"}</td>
                 <td className={s.num}>{`${pct(r.two)} / ${r.dk2 !== undefined ? am(r.dk2) : "·"}`}</td>
                 {result && <td className={s.num}>{t === null || t === undefined ? "void" : t}</td>}
+                {result && <td className={s.num}>{edgeResult(r, t)}</td>}
               </tr>
             );
           })}
@@ -134,30 +174,6 @@ export async function AttdWeek({ season }: { season: number }) {
       body: <PlayerTable rows={g.attd!.rows} />,
     };
   });
-  const gradedRows: GameRowData[] = [...graded]
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .map((g) => {
-      const bets = g.rows.flatMap((r) => {
-        const t = g.result[r.key];
-        if (r.dk === undefined || t === null || t === undefined || !attdEdges(r).some((x) => x.side === "anytime")) return [];
-        return [{ won: t > 0, net: t > 0 ? payout(r.dk) : -1 }];
-      });
-      const won = bets.filter((b) => b.won).length;
-      const units = bets.reduce((a, b) => a + b.net, 0);
-      const scorers = g.rows.filter((r) => (g.result[r.key] ?? 0) > 0).length;
-      return {
-        key: g.slug,
-        title: g.slug.split("_").slice(2).join(" at "),
-        when: g.at,
-        cells: [
-          ["Scored", `${scorers} of ${g.rows.length}`],
-          ["Edges", bets.length ? `${won} of ${bets.length}` : "none"],
-          ["Units", bets.length ? u(units) : "·"],
-        ],
-        read: !bets.length ? ["No edge", s.readPass] : units >= 0 ? ["Up", s.readW] : ["Down", s.readL],
-        body: <PlayerTable rows={g.rows} result={g.result} />,
-      };
-    });
   const anytime = summarizeAttd(graded).edges.bySide.anytime;
   return (
     <section className={s.section} aria-labelledby="attd-week">
@@ -177,12 +193,6 @@ export async function AttdWeek({ season }: { season: number }) {
         <SecHead title="Every game" aside="Games still to finish, soonest first · open one for every player" />
         {rows.length ? <GameTable head={["Likeliest", "Priced", "Edges"]} rows={rows} /> : <p className={s.calm}>No games on the board.</p>}
       </div>
-      {gradedRows.length > 0 && (
-        <div className={s.pageFrame}>
-          <SecHead title="Graded" aside="Newest first · anytime edges at DK's price, 1u each" />
-          <GameTable head={["Scored", "Edges", "Units"]} rows={gradedRows} />
-        </div>
-      )}
       <div className={s.pageFrame}>
         <SecHead title="How it is doing" aside={live.length ? "Edges at 1u; bets once a slice went live" : "Tracked, never staked"} />
         <PropStats edges={edges.length} graded={{ w: anytime.won, l: anytime.n - anytime.won, p: 0, units: anytime.net }} learning={learning} logHref="/props?m=attd&v=log" unit="on games still to play" />
@@ -210,6 +220,12 @@ export async function AttdResults({ season }: { season: number }) {
           <Tile value={p.n ? `${p.hits} of ${p.n}` : "·"} label={p.n ? `priced players scored · we said ${p.ours.toFixed(0)}, DK ${p.dk.toFixed(0)}` : "priced players scored"} />
         </div>
       </div>
+      {graded.length > 0 && (
+        <div className={s.pageFrame}>
+          <SecHead title="Game by game" aside="Newest first · each anytime edge 1u at DK's price · open a game for every player" />
+          <GameTable head={["Edges W-L", "Units", "Scored"]} rows={gradedRowsOf(graded)} />
+        </div>
+      )}
       {p.n > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Are our chances right?" aside="Priced players by the chance we gave them · DK's column carries its vig" />
