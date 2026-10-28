@@ -6,7 +6,7 @@
 import { allBoards, getNbaSectionLearning } from "@/lib/models/nba/store";
 import { SECTIONS, rungStaked, ticketStaked } from "@/lib/models/sections";
 import { LEGS, STAKE, recipeRecords, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
-import { etDate, implied } from "@/lib/props/parse";
+import { etDate, implied, payout } from "@/lib/props/parse";
 import { Background, SecHead } from "../picks/board";
 import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } from "./week";
 import { LearnerLogBody } from "./top";
@@ -114,6 +114,48 @@ function ticketRow(t: Ticket): GameRowData {
   };
 }
 
+/** One graded night: the singles record (every edge rung at 1u) and the parlay of the day, side by side. */
+function nightRows(rungs: Rung[], all: Ticket[]): GameRowData[] {
+  const byDate = new Map<string, Rung[]>();
+  for (const r of rungs) if (r.ev > 0 && (r.hit === true || r.hit === false)) byDate.set(r.date, [...(byDate.get(r.date) ?? []), r]);
+  const dates = [...new Set([...byDate.keys(), ...all.filter((t) => t.outcome).map((t) => t.date)])].sort().reverse();
+  return dates.map((date) => {
+    const singles = (byDate.get(date) ?? []).sort((a, b) => b.ev - a.ev);
+    const hits = singles.filter((r) => r.hit === true).length;
+    const net = singles.reduce((a, r) => a + (r.hit === true ? payout(r.over) : -1), 0);
+    const t = all.find((x) => x.date === date && x.outcome);
+    const tNet = t ? (t.outcome === "W" ? STAKE * payout(t.price) : -STAKE) : 0;
+    const total = net + tNet;
+    return {
+      key: `night|${date}`,
+      title: new Date(`${date}T16:00:00Z`).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" }),
+      final: true,
+      cells: [
+        ["Singles W-L", singles.length ? `${hits}-${singles.length - hits}` : "none"],
+        ["Singles units", singles.length ? u(net) : "·"],
+        ["Parlay", t ? `${t.outcome === "W" ? "Hit" : "Missed"} ${u(tNet)}` : "none"],
+      ],
+      read: [`${u(total)} night`, total > 0 ? s.readW : total < 0 ? s.readL : s.readPass],
+      body: (
+        <>
+          {t && (
+            <>
+              <p className={s.thin}>{`Parlay of the day at ${am(t.price)}: ${t.legs.filter((l) => l.hit === true).length} of ${t.legs.length} legs hit.`}</p>
+              <RungTable rungs={t.legs} />
+            </>
+          )}
+          {singles.length > 0 && (
+            <>
+              <p className={s.thin}>{`Every edge rung as a single, 1u each: ${hits} of ${singles.length} hit, ${u(net)}.`}</p>
+              <RungTable rungs={singles} />
+            </>
+          )}
+        </>
+      ),
+    };
+  });
+}
+
 export async function LottoToday({ season }: { season: number }) {
   const [d, learning] = await Promise.all([load(season), getNbaSectionLearning(SECTIONS.nbaLotto, season).catch(() => null)]);
   if (!d || !learning) return <p className={s.calm}>Lottos couldn&apos;t be read just now.</p>;
@@ -129,13 +171,16 @@ export async function LottoToday({ season }: { season: number }) {
   const live = learning.entries.filter((e) => e.status === "active").map((e) => e.label);
   const byGame = new Map<string, Rung[]>();
   for (const r of todays) byGame.set(r.game, [...(byGame.get(r.game) ?? []), r]);
+  // Games still to be graded; graded nights live on Results (Jack, 2026-10-27).
   const games: GameRowData[] = [...byGame.values()]
+    .filter((rs) => rs.some((r) => r.hit === null))
     .sort((a, b) => a[0].at.localeCompare(b[0].at))
     .map((rs) => {
       const value = rs.filter((r) => r.ev > 0).sort((a, b) => b.ev - a.ev);
       return {
         key: rs[0].game,
         title: rs[0].matchup.replace("@", " at "),
+        ...(rs[0].matchup.includes("@") ? { match: { league: "nba" as const, away: rs[0].matchup.split("@")[0].trim(), home: rs[0].matchup.split("@")[1].trim() } } : {}),
         when: rs[0].at,
         live: Date.parse(rs[0].at) <= now && rs.every((r) => r.hit === null),
         cells: [
@@ -147,8 +192,8 @@ export async function LottoToday({ season }: { season: number }) {
         body: <RungTable rungs={[...rs].sort((a, b) => b.ev - a.ev)} />,
       };
     });
-  const graded = d.tickets.filter((x) => x.outcome).slice(0, 10);
   const sum = summarize(d.rungs, d.tickets);
+  const tk = sum.tickets;
   return (
     <section className={s.section} aria-labelledby="lotto-today">
       <div className={s.pageFrame}>
@@ -176,18 +221,19 @@ export async function LottoToday({ season }: { season: number }) {
         )}
       </div>
       <div className={s.pageFrame}>
-        <SecHead title="Every game" aside="Tonight, soonest first · open one for every long rung" />
+        <SecHead title="Every game" aside="Tonight's games until graded, soonest first · open one for every long rung" />
         {games.length ? <GameTable head={["Rungs", "With value", "Best"]} rows={games} /> : <p className={s.calm}>No long rungs saved for tonight yet.</p>}
       </div>
-      {graded.length > 0 && (
-        <div className={s.pageFrame}>
-          <SecHead title="Graded" aside="Newest first · the nightly ticket" />
-          <GameTable head={["Price", "Ours / DK", "Legs hit"]} rows={graded.map(ticketRow)} />
-        </div>
-      )}
       <div className={s.pageFrame}>
         <SecHead title="How it is doing" aside={live.length ? "Value rungs at 1u; bets once a slice went live" : "Tracked, never staked"} />
-        <PropStats edges={best.length} graded={{ w: sum.rungs.edge.hits, l: sum.rungs.edge.n - sum.rungs.edge.hits, p: 0, units: sum.rungs.edge.net }} learning={learning} logHref="/props?m=lotto&v=log" unit="value rungs still to tip" />
+        <PropStats
+          edges={best.length}
+          graded={{ w: sum.rungs.edge.hits, l: sum.rungs.edge.n - sum.rungs.edge.hits, p: 0, units: sum.rungs.edge.net }}
+          learning={learning}
+          logHref="/props?m=lotto&v=log"
+          unit="value rungs still to tip"
+          extra={{ k: "Parlay of the day", v: tk.n ? u(tk.net) : "0-0", sub: tk.n ? `${tk.won}-${tk.n - tk.won} at ${STAKE}u a ticket` : "first ticket pending", tone: tk.n ? (tk.net >= 0 ? "up" : "down") : undefined }}
+        />
       </div>
       <Gate learning={learning} label="lotto" />
       <Explainer />
@@ -202,17 +248,23 @@ export async function LottoResults({ season }: { season: number }) {
   const r = sum.rungs;
   const t = sum.tickets;
   const graded = d.tickets.filter((x) => x.outcome);
+  const nights = nightRows(d.rungs, d.tickets);
   return (
     <section className={s.section} aria-labelledby="lotto-results">
       <div className={s.pageFrame}>
-        <SecHead id="lotto-results" title="Record" aside="Since Oct 26, 2026 · the rung record is the real test; tickets need most of a season" />
+        <SecHead id="lotto-results" title="Two records" aside="Since Oct 26, 2026 · the singles record is the real test; the parlay needs most of a season" />
         <div className={s.tiles}>
-          <Tile value={r.n ? `${r.hits} of ${r.n}` : "·"} label={r.n ? `long rungs hit · we expected ${r.ours.toFixed(0)}, DK's prices ${r.book.toFixed(0)}` : "long rungs · first grades pending"} />
-          <Tile value={r.edge.n ? u(r.edge.net) : "·"} label={`value rungs, 1u each · ${r.edge.hits} of ${r.edge.n}`} />
-          <Tile value={t.n ? `${t.won} of ${t.n}` : "·"} label={t.n ? `tickets hit · we expected ${t.expected.toFixed(2)}` : "tickets"} />
-          <Tile value={t.n ? u(t.net) : "·"} label={`tickets at ${STAKE}u`} />
+          <Tile value={r.edge.n ? u(r.edge.net) : "·"} label={r.edge.n ? `Singles: every edge rung at 1u · ${r.edge.hits}-${r.edge.n - r.edge.hits}` : "Singles: every edge rung at 1u · first grades pending"} />
+          <Tile value={t.n ? u(t.net) : "·"} label={t.n ? `Parlay of the day at ${STAKE}u · ${t.won}-${t.n - t.won}, we expected ${t.expected.toFixed(2)} hits` : `Parlay of the day at ${STAKE}u · first ticket pending`} />
+          <Tile value={r.n ? `${r.hits} of ${r.n}` : "·"} label={r.n ? `every long rung hit · we expected ${r.ours.toFixed(0)}, DK's prices ${r.book.toFixed(0)}` : "every long rung · first grades pending"} />
         </div>
       </div>
+      {nights.length > 0 && (
+        <div className={s.pageFrame}>
+          <SecHead title="Night by night" aside="Newest first · both records each night · open a night for the ticket and every edge rung" />
+          <GameTable head={["Singles W-L", "Singles units", "Parlay"]} rows={nights} />
+        </div>
+      )}
       {r.n > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Are our long-shot chances right?" aside="Rungs grouped by the chance we gave them" />
@@ -247,7 +299,7 @@ export async function LottoResults({ season }: { season: number }) {
       <RecipeTable rungs={d.rungs} />
       {graded.length > 0 && (
         <div className={s.pageFrame}>
-          <SecHead title="Every ticket" aside="Newest first" />
+          <SecHead title="Every parlay of the day" aside="Newest first · open one for its legs" />
           <GameTable head={["Price", "Ours / DK", "Legs hit"]} rows={graded.map(ticketRow)} />
         </div>
       )}

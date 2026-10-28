@@ -101,16 +101,20 @@ export default async function PropsView({
         {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
         {market === "kotc" && shown === "results" && <KotcResults season={season} />}
         {market === "pp" && shown === "results" && <OurNflResults season={season} />}
-        {/* David's board is research only (Jack, 2026-10-22): still saved and graded by the data jobs, shown folded here. */}
+        {/* David's board is research only (Jack, 2026-10-22), folded into the view it belongs to (2026-10-27): his board on Board, his record on Results, his trends on Research. */}
+        {market === "pp" && shown === "week" && (
+          <Background title="David Sasser's board this week · research only">
+            <DavidWeek season={season} />
+          </Background>
+        )}
+        {market === "pp" && shown === "results" && (
+          <Background title="David Sasser's results · research only">
+            <DavidResults season={season} />
+          </Background>
+        )}
         {market === "pp" && shown === "research" && (
           <>
             <SecHead title="David Sasser's props board" aside="Research only · tracked in the background" />
-            <Background title="This week's board">
-              <DavidWeek season={season} />
-            </Background>
-            <Background title="Results">
-              <DavidResults season={season} />
-            </Background>
             <Background title="Research: what beats the price">
               <DavidResearch season={season} />
             </Background>

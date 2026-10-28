@@ -23,6 +23,7 @@ import type { AttdGraded } from "./nfl/anytime";
 import { STAKE, type Rung, type Ticket } from "./nba/lotto";
 import type { OurStoredProps } from "./nba/store";
 import type { KotcNight } from "./nba/kotc-store";
+import { bestTag, gradeTag } from "./nba/kotc-tag";
 
 export const SECTIONS = {
   nflAttd: "nfl-attd-ours",
@@ -132,29 +133,18 @@ export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number
 
 // ------------------------------------------------------- King of the Court
 
-/** DK's rule for the tagged prop. */
-export const KOTC_QUALIFIES = -200;
-/** NBA games a player needs this season before his prop edge counts (as the props board). */
-const CARD_GAMES = 3;
+export { KOTC_QUALIFIES } from "./nba/kotc-tag";
 
 /**
- * The prop we would tag for a player on a night: his biggest model edge priced
- * -200 or longer, graded from the board's result (null when he has none, the
- * game isn't graded yet, or he didn't play).
+ * The prop we would tag for a player on a night (kotc-tag.ts bestTag: his best
+ * side at -200 or longer, edge or not, since a tag only counts with a bet on
+ * him; was edge-only until 2026-10-27), graded from the board's result (null
+ * when no prop qualifies, the game isn't graded yet, or he didn't play).
  */
 export function taggedProp(boards: OurStoredProps[], name: string): { id: string; net: number } | null {
-  let best: { board: OurStoredProps; id: string; gap: number } | null = null;
-  for (const b of boards)
-    for (const m of b.game.markets) {
-      if (m.player !== name || !m.clears || !m.side || m.gap === null) continue;
-      if ((b.extra[m.id]?.games ?? 0) < CARD_GAMES) continue;
-      const price = m.books[0]?.[m.side];
-      if (price === null || price === undefined || price < KOTC_QUALIFIES) continue;
-      if (!best || m.gap > best.gap) best = { board: b, id: m.id, gap: m.gap };
-    }
-  if (!best || !best.board.result) return null;
-  const play = best.board.result.markets.find((x) => x.id === best.id)?.play;
-  return play ? { id: best.id, net: play.net } : null;
+  const t = bestTag(boards, name);
+  const g = t ? gradeTag(t) : null;
+  return g ? { id: g.id, net: g.net } : null;
 }
 
 const KOTC_SLICES: [string, string, number][] = [

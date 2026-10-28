@@ -144,9 +144,9 @@ export async function OurFtdResults({ season }: { season: number }) {
       )}
       {v.graded.length > 0 && (
         <div className={s.pageFrame}>
-          <SecHead title="Graded" aside="Newest first · value bets at the best price (Kalshi with fee, DK or FanDuel), 1u each" />
+          <SecHead title="Game by game" aside="Newest first · each value bet 1u at the best price (Kalshi with fee, DK or FanDuel) · open a game for its bets" />
           <GameTable
-            head={["First TD", "We gave him", "Our pick", "Value bets"]}
+            head={["First TD", "We gave him", "Our pick", "Bets W-L"]}
             rows={[...v.graded]
               .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""))
               .map((x): GameRowData => {
@@ -161,14 +161,16 @@ export async function OurFtdResults({ season }: { season: number }) {
                 return {
                   key: x.slug,
                   title: `${x.game.away} at ${x.game.home}`,
+                  match: { league: "nfl", away: x.game.away, home: x.game.home },
                   when: x.kickoff,
+                  final: true,
                   cells: [
                     ["First TD", r.first.kind === "offense" ? r.first.scorer : "none"],
                     ["We gave him", r.p !== null ? `${pct(r.p)}${r.rank ? ` (#${r.rank})` : ""}` : "·"],
                     ["Our pick", x.game.pick ? `${x.game.pick.name} ${r.pickHit ? "hit" : "missed"}` : "·"],
-                    ["Value bets", bets.length ? `${won} of ${bets.length}, ${u(units)}` : "none"],
+                    ["Bets W-L", bets.length ? `${won}-${bets.length - won}` : "none"],
                   ],
-                  read: !bets.length ? ["No bet", s.readPass] : won ? ["Hit", s.readW] : ["Missed", s.readL],
+                  read: !bets.length ? ["No bet", s.readPass] : [`${won}-${bets.length - won} · ${u(units)}`, units > 0 ? s.readW : s.readL],
                   body: (
                     <div className={s.tw}>
                       <table className={s.table}>
@@ -187,7 +189,7 @@ export async function OurFtdResults({ season }: { season: number }) {
                                 <td>{`${b.pl.name} ${b.pl.team}`}</td>
                                 <td className={s.num}>{pct(b.pl.p)}</td>
                                 <td className={s.num}>{b.c.where}</td>
-                                <td className={s.num}>{b.win ? "scored first" : "lost"}</td>
+                                <td className={s.num}><b className={b.win ? s.pos : s.neg}>{b.win ? `Won ${u(b.net)}` : "Lost −1.0u"}</b></td>
                               </tr>
                             ))
                           ) : (

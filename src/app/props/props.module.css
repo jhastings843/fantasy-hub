@@ -16,3 +16,47 @@
 .bbRow:first-child { border-top: 0; }
 .bbMain { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
 .bbMeta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 12px; color: var(--ink2); }
+
+/* Matchup cell (matchup.tsx): away over home with logos, time and channel beneath. Two classes deep so the
+   board's ".gGame span" rule (one class plus a tag) never restyles these. */
+.mu { display: grid; gap: 3px; min-width: 0; }
+.mu .muTeam { display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; color: var(--ink); font-family: var(--font-plex), sans-serif; font-size: 14px; font-weight: 600; }
+.mu .muName { margin: 0; min-width: 0; color: inherit; font-size: inherit; font-weight: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu .muAt { margin: 0; color: var(--mute); font-size: 11.5px; font-weight: 400; }
+.mu .muWhen { margin: 2px 0 0; padding-left: 26px; color: var(--mute); font-family: var(--font-plex), sans-serif; font-size: 12px; font-weight: 400; }
+.mu .muWhen span { margin: 0; font-size: inherit; color: inherit; font-weight: inherit; }
+.mu .muWhen .muLive { color: var(--gold); font-weight: 600; }
+.mu .muWhen .muScore { color: var(--ink2); font-family: var(--font-plex-mono), monospace; }
+.mu.mu { margin: 0; color: var(--ink); font-size: 14px; font-weight: 600; }
+
+/* A prop row's bet, as visible as the player (Jack, 2026-10-27): the line and stat in the ink color, team muted. */
+.propBet.propBet { margin-top: 1px; color: var(--ink); font-family: var(--font-plex-mono), monospace; font-size: 14px; font-weight: 600; }
+.propBet .propTeam.propTeam { color: var(--mute); font-family: var(--font-plex), sans-serif; font-size: 12.5px; font-weight: 400; }
+
+/* King of the Court (kotc.tsx): the best tags as cards, the top 30 with two-tone king bars. */
+.kCards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .kCards { grid-template-columns: 1fr; } }
+.kCard { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--rule); border-left: 4px solid var(--gold); border-radius: 10px; background: var(--surface); min-width: 0; }
+.kCardTop { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface)); }
+.kCardHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.kRank { font-family: var(--font-plex-mono), monospace; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+.kCardTop .kRank { color: var(--accent); }
+.kMeta { font-size: 12px; color: var(--mute); text-align: right; }
+.kWho { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-size: 24px; font-weight: 700; line-height: 1.05; }
+.kTag { font-family: var(--font-plex-mono), monospace; font-size: 15px; font-weight: 600; color: var(--ink); }
+.kPrice { color: var(--mute); font-weight: 400; }
+.kTrio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 2px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); }
+.kTrio dt { font-size: 10px; letter-spacing: .04em; line-height: 1.3; text-transform: uppercase; color: var(--mute); }
+.kTrio dd { margin: 2px 0 0; font-family: var(--font-plex-mono), monospace; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.kNote { margin: 0; font-size: 12.5px; color: var(--ink2); }
+.kTable td { vertical-align: middle; }
+.kHot td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+.kBars { display: grid; gap: 3px; min-width: 120px; }
+.kBarRow { display: flex; align-items: center; gap: 6px; font-family: var(--font-plex-mono), monospace; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.kBarRow i { display: inline-block; height: 7px; border-radius: 4px; flex: none; max-width: 90px; }
+.kBarRow span { color: var(--mute); }
+.kBarOurs { background: var(--accent); }
+.kBarCrowd { background: var(--gold); opacity: .75; height: 5px !important; }
+.kEdge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-family: var(--font-plex-mono), monospace; font-size: 12.5px; font-weight: 600; }
+.kEdgePos { color: var(--pos); background: color-mix(in srgb, var(--pos) 16%, transparent); }
+.kEdgeNeg { color: var(--neg); background: color-mix(in srgb, var(--neg) 14%, transparent); }

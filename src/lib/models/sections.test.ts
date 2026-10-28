@@ -43,15 +43,24 @@ describe("Lotto slices", () => {
 });
 
 describe("King of the Court tagged prop", () => {
-  it("takes the biggest qualifying edge and its graded net", () => {
-    const market = (id: string, gap: number, price: number) => ({ id, player: "Jokic", clears: true, side: "over", gap, books: [{ over: price, under: -110 }] });
-    const board = {
-      game: { markets: [market("pts|Jokic", 0.08, -150), market("ast|Jokic", 0.12, -250), market("reb|Jokic", 0.05, -110)] },
-      extra: { "pts|Jokic": { games: 5 }, "ast|Jokic": { games: 5 }, "reb|Jokic": { games: 5 } },
-      result: { markets: [{ id: "pts|Jokic", play: { net: 0.667 } }] },
-    } as never;
-    expect(taggedProp([board], "Jokic")).toEqual({ id: "pts|Jokic", net: 0.667 }); // -250 does not qualify
-    expect(taggedProp([board], "Embiid")).toBeNull();
+  const market = (id: string, stat: string, line: number, over: number, under: number, clears = false) => ({ id, stat, line, player: "Jokic", clears, side: clears ? "over" : null, gap: clears ? 0.1 : null, books: [{ over, under }] });
+  const board = (extra: Record<string, { over: number; under: number; games: number }>, actual: Record<string, number | null>) =>
+    ({
+      game: { markets: [market("pts|Jokic", "pts", 29.5, -150, 120, true), market("ast|Jokic", "ast", 9.5, -250, 190), market("reb|Jokic", "reb", 12.5, -110, -110)] },
+      extra,
+      result: { markets: Object.entries(actual).map(([id, a]) => ({ id, actual: a, play: null, lean: null })) },
+    }) as never;
+
+  it("takes the side with the biggest gap to DK's break-even at -200 or longer, edge or not, graded from the box score", () => {
+    const b = board({ "pts|Jokic": { over: 0.62, under: 0.38, games: 5 }, "ast|Jokic": { over: 0.9, under: 0.1, games: 5 }, "reb|Jokic": { over: 0.45, under: 0.55, games: 5 } }, { "pts|Jokic": 31, "reb|Jokic": 10 });
+    // pts over: 62% vs 60% (+2); reb under: 55% vs 52.4% (+2.6) wins; ast over at -250 doesn't qualify, ast under +190 is far below.
+    expect(taggedProp([b], "Jokic")).toEqual({ id: "reb|Jokic", net: 0.909 });
+    expect(taggedProp([b], "Embiid")).toBeNull();
+  });
+
+  it("prefers a read with 3+ games this season, and has no result before grading or when he sat", () => {
+    const b = board({ "pts|Jokic": { over: 0.62, under: 0.38, games: 5 }, "ast|Jokic": { over: 0.5, under: 0.5, games: 5 }, "reb|Jokic": { over: 0.2, under: 0.8, games: 2 } }, { "pts|Jokic": null });
+    expect(taggedProp([b], "Jokic")).toBeNull(); // pts (the 3+ game read) is the tag; he sat
   });
 });
 

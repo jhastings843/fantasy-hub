@@ -6,13 +6,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { SectionView } from "@/lib/learning/engine";
-import { etDate, implied, type PropMarket } from "@/lib/props/parse";
+import { etDate, implied, payout, type PropMarket } from "@/lib/props/parse";
 import { nameKey } from "@/lib/props/grade";
-import { liveBox } from "@/lib/live/espn";
+import type { GradedPropsGame } from "@/lib/props/trends";
+import { liveBox, tvByEvent } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { getPropsView } from "@/lib/props/store";
 import type { DavidMarket } from "@/lib/props/david";
-import { getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
+import { getOurNbaView, type OurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
+import type { FbBoard } from "@/lib/models/nba/firstbasket";
 import { getOurNflView, type OurNflStored } from "@/lib/models/nfl/store";
 import { getOurFtdView, type OurFtdStored } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
@@ -23,7 +25,9 @@ import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats, type Stat } from "../picks/board";
 import { LearningBlock } from "./learning";
+import { Matchup, type MatchupProps } from "./matchup";
 import s from "../picks/picks.module.css";
+import pp from "./props.module.css";
 
 export type PropTab = "pp" | "ftd" | "nba" | "fb";
 
@@ -69,6 +73,8 @@ export interface GameRowData {
   cells: [string, string][];
   read: [string, string];
   body: ReactNode;
+  /** Logos, time and channel under the teams (matchup.tsx). Without it the row shows `title`. */
+  match?: Omit<MatchupProps, "state" | "when">;
 }
 
 const started = (kickoff: string | undefined, graded: unknown) => !graded && !!kickoff && Date.parse(kickoff) <= nowMs();
@@ -174,8 +180,14 @@ export function GameTable({ head, rows }: { head: string[]; rows: GameRowData[] 
         <details key={r.key} className={s.gRow}>
           <summary>
             <span className={s.gGame}>
-              {r.title}
-              {r.final ? <span>Final</span> : r.live ? <span className={s.gLive}>Live</span> : r.when && <span>{whenEt(r.when)}</span>}
+              {r.match ? (
+                <Matchup {...r.match} when={r.when} state={r.final ? "final" : r.live ? "live" : "pre"} />
+              ) : (
+                <>
+                  {r.title}
+                  {r.final ? <span>Final</span> : r.live ? <span className={s.gLive}>Live</span> : r.when && <span>{whenEt(r.when)}</span>}
+                </>
+              )}
             </span>
             {r.cells.map(([k, v]) => (
               <span key={k} className={s.gNum} data-k={k}>
@@ -302,9 +314,10 @@ async function liveBoxes(board: (OurStoredProps | OurNflStored)[], sport: "nfl" 
   return new Map(boxes);
 }
 
-function PropGames({ board, sport, settled, live }: { board: (OurStoredProps | OurNflStored)[]; sport: "nfl" | "nba"; settled?: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean; live?: LiveBoxes }) {
+function PropGames({ board, sport, settled, live, tv }: { board: (OurStoredProps | OurNflStored)[]; sport: "nfl" | "nba"; settled?: (g: OurStoredProps | OurNflStored, m: PropMarket) => boolean; live?: LiveBoxes; tv?: Map<string, string> }) {
   const now = nowMs();
-  const stateOf = (g: OurStoredProps | OurNflStored) => (g.result ? "final" : g.kickoff && Date.parse(g.kickoff) <= now ? "live" : "pre");
+  // ESPN's final counts as final here even before the grading run: it sorts below the games still to play.
+  const stateOf = (g: OurStoredProps | OurNflStored) => (g.result || live?.get(g.game.slug)?.game?.state === "post" ? "final" : g.kickoff && Date.parse(g.kickoff) <= now ? "live" : "pre");
   const order = { live: 0, pre: 1, final: 2 } as const;
   const games = [...board].sort((a, b) => order[stateOf(a)] - order[stateOf(b)] || (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
   if (!games.length) return <p className={s.calm}>No games on the board yet.</p>;
@@ -322,9 +335,15 @@ function PropGames({ board, sport, settled, live }: { board: (OurStoredProps | O
           <details key={g.game.slug} className={s.propGroup} open={st === "live"}>
             <summary>
               <span className={s.propGroupTitle}>
-                <b>{`${g.away} at ${g.home}`}</b>
-                {st === "live" && lg?.state !== "post" ? <span className={`${s.readChip} ${s.readLive}`}>Live</span> : <span className={s.muted}>{st === "final" || lg?.state === "post" ? "Final" : g.kickoff ? whenEt(g.kickoff) : ""}</span>}
-                {lg && lg.state !== "pre" && <span className={`${s.num} ${s.muted}`}>{`${lg.away.abbr} ${lg.away.score}, ${lg.home.abbr} ${lg.home.score}${lg.state === "in" ? ` · ${lg.detail}` : ""}`}</span>}
+                <Matchup
+                  league={sport}
+                  away={g.away}
+                  home={g.home}
+                  when={g.kickoff}
+                  state={st === "final" || lg?.state === "post" ? "final" : st === "live" ? "live" : "pre"}
+                  score={lg && lg.state !== "pre" ? `${lg.away.abbr} ${lg.away.score}, ${lg.home.abbr} ${lg.home.score}${lg.state === "in" ? ` · ${lg.detail}` : ""}` : undefined}
+                  tv={g.espnId ? tv?.get(g.espnId) : undefined}
+                />
               </span>
               <span className={s.propGroupAside}>
                 {`${g.game.markets.length} props${sport === "nfl" && st === "pre" && priced < g.game.markets.length ? ` · ${g.game.markets.length - priced} wait on the morning price` : ""}${net !== null ? ` · shadow ${u(net)}` : ""}`}
@@ -364,7 +383,10 @@ function PropGames({ board, sport, settled, live }: { board: (OurStoredProps | O
                     <summary>
                       <span className={s.propWho}>
                         <b>{m.player}</b>
-                        <span>{`${m.team} · ${SHORT[m.stat ?? ""] ?? m.statLabel}`}</span>
+                        <span className={pp.propBet}>
+                          {`${m.line} ${SHORT[m.stat ?? ""] ?? m.statLabel}`}
+                          <span className={pp.propTeam}>{` · ${m.team}`}</span>
+                        </span>
                       </span>
                       <span className={s.gNum} data-k="Line">
                         {m.line}
@@ -445,7 +467,6 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
     const today = etDate(new Date(now));
     const tonight = v.board.filter((g) => !g.result && g.kickoff && etDate(new Date(g.kickoff)) === today);
     const ahead = tonight.filter((g) => Date.parse(g.kickoff!) > now);
-    const results = v.board.filter((g) => g.result).sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""));
     // A card needs the player's minutes from this season's role: 3+ games. Before that the number leans on last season, and a summer role change reads as a huge fake edge.
     const settled = (g: OurStoredProps | OurNflStored, m: PropMarket) => ((g as OurStoredProps).extra[m.id]?.games ?? 0) >= NBA_CARD_GAMES;
     const allEdges = propEdges(ahead, (g, m) => [
@@ -459,7 +480,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
     const edges = allEdges.filter((e) => keys.has(e.key));
     const early = allEdges.length - edges.length;
     const graded = record(ourSliceBets(v.graded, "edge:all"));
-    const nbaLive = await liveBoxes(tonight, "nba");
+    const [nbaLive, nbaTv] = await Promise.all([liveBoxes(tonight, "nba"), tvByEvent("nba")]);
     return (
       <section className={s.section} aria-labelledby="pp-week">
         <div className={s.pageFrame}>
@@ -475,16 +496,10 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
           )}
         </div>
         <div className={s.pageFrame}>
-          <SecHead title="Every game" aside="Started games pinned on top · open a player for detail" />
+          <SecHead title="Every game" aside="Tonight's games until graded · started games pinned on top" />
           {nbaLive.size > 0 && <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />}
-          {tonight.length ? <PropGames board={tonight} sport="nba" settled={settled} live={nbaLive} /> : <p className={s.calm}>No NBA games today. Later days show up the morning of.</p>}
+          {tonight.length ? <PropGames board={tonight} sport="nba" settled={settled} live={nbaLive} tv={nbaTv} /> : <p className={s.calm}>No NBA games left today. Later days show up the morning of; graded games are under Results.</p>}
         </div>
-        {results.length > 0 && (
-          <div className={s.pageFrame}>
-            <SecHead title="Graded" aside="Newest first · shadow results at the saved price" />
-            <PropGames board={results} sport="nba" settled={settled} />
-          </div>
-        )}
         <div className={s.pageFrame}>
           <SecHead title="How it is doing" aside="Tracked, never staked" />
           <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=nba&v=log" unit={early ? `${early} more wait on 3 games` : "on games still to play"} />
@@ -516,7 +531,9 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
   const waiting = ahead.reduce((a, g) => a + Object.values(g.extra).filter((x) => x.price === "assumed").length, 0);
   const all = ahead.reduce((a, g) => a + g.game.markets.length, 0);
   const graded = record(ourSliceBets(v.graded, "edge:all"));
-  const nflLive = await liveBoxes(done, "nfl");
+  const [nflLive, nflTv] = await Promise.all([liveBoxes(done, "nfl"), tvByEvent("nfl")]);
+  // The board is games still to finish; a final game moves to Results (Jack, 2026-10-27).
+  const playing = done.filter((g) => !g.result && nflLive.get(g.game.slug)?.game?.state !== "post");
   return (
     <section className={s.section} aria-labelledby="pp-week">
       <div className={s.pageFrame}>
@@ -533,9 +550,9 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
         {waiting > 0 && <p className={s.thin}>{`${waiting} of ${all} props wait on DraftKings' game-day morning price, so they show our number with no edge.`}</p>}
       </div>
       <div className={s.pageFrame}>
-        <SecHead title="Every game" aside="Started games pinned on top · open a player for detail" />
+        <SecHead title="Every game" aside="Games still to finish · started games pinned on top" />
         {nflLive.size > 0 && <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />}
-        <PropGames board={[...ahead, ...done]} sport="nfl" live={nflLive} />
+        {ahead.length + playing.length ? <PropGames board={[...ahead, ...playing]} sport="nfl" live={nflLive} tv={nflTv} /> : <p className={s.calm}>Every game this week is final. Results has them game by game.</p>}
       </div>
       <div className={s.pageFrame}>
         <SecHead title="How it is doing" aside="Tracked, never staked" />
@@ -546,7 +563,130 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
   );
 }
 
+/** Graded player-prop games, newest first: each game's tracked edges as a W-L at the saved price, every prop one click down. */
+export function propGradedRows(graded: GradedPropsGame[], league: "nfl" | "nba"): GameRowData[] {
+  return graded.map((x) => {
+    const g = x as GradedPropsGame & { kickoff?: string; capturedAt?: string };
+    const byId = new Map(g.game.markets.map((m) => [m.id, m]));
+    const plays = g.result.markets.filter((r) => r.play && r.actual !== null);
+    const won = plays.filter((r) => r.play!.outcome === "W").length;
+    const lost = plays.filter((r) => r.play!.outcome === "L").length;
+    const pushed = plays.length - won - lost;
+    const units = plays.reduce((a, r) => a + r.play!.net, 0);
+    const record = `${won}-${lost}${pushed ? `-${pushed}` : ""}`;
+    const graded = g.result.markets.filter((r) => r.actual !== null).length;
+    const rows = [...g.result.markets].sort((a, b) => Number(!!b.play) - Number(!!a.play) || (byId.get(a.id)?.player ?? "").localeCompare(byId.get(b.id)?.player ?? ""));
+    return {
+      key: `${g.week}|${g.slug}`,
+      title: `${g.game.away} at ${g.game.home}`,
+      match: { league, away: g.game.away, home: g.game.home },
+      when: g.kickoff ?? g.capturedAt,
+      final: true,
+      cells: [
+        ["Edges W-L", plays.length ? record : "none"],
+        ["Units", plays.length ? u(units) : "·"],
+        ["Props graded", `${graded}`],
+      ],
+      read: !plays.length ? ["No edges", s.readPass] : [`${record} · ${u(units)}`, units > 0 ? s.readW : units < 0 ? s.readL : s.readPass],
+      body: (
+        <div className={s.tw}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Player and prop</th>
+                <th>Ours</th>
+                <th>Edge bet</th>
+                <th>Actual</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const m = byId.get(r.id);
+                if (!m) return null;
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <b>{m.player}</b>
+                      <span className={s.dim}>{` ${m.team} · ${m.line} ${SHORT[m.stat ?? ""] ?? m.statLabel}`}</span>
+                    </td>
+                    <td className={s.num}>{m.model}</td>
+                    <td className={s.num}>{r.play ? `${sideWord(r.play.side)} ${r.play.line} ${am(r.play.price)}` : <span className={s.dim}>·</span>}</td>
+                    <td className={s.num}>{r.actual === null ? "DNP" : r.actual}</td>
+                    <td className={s.num}>{r.play && r.actual !== null ? <b className={r.play.outcome === "W" ? s.pos : r.play.outcome === "L" ? s.neg : undefined}>{`${r.play.outcome === "W" ? "Won" : r.play.outcome === "L" ? "Lost" : "Push"} ${u(r.play.net)}`}</b> : <span className={s.dim}>·</span>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ),
+    };
+  });
+}
+
 /* ------------------------------------------------------- first basket --- */
+
+/** Every starter on one First Basket board: ours against DraftKings, and who scored first once graded. */
+export function FbTable({ b }: { b: FbBoard }) {
+  const res = b.result;
+  return (
+    <div className={s.tw}>
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Ours</th>
+            <th>DK, vig out</th>
+            <th>DK price</th>
+            <th>Edge</th>
+            {res !== undefined && <th>Result</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {b.players.map((x) => {
+            const hit = res?.player === x.id;
+            return (
+              <tr key={x.id}>
+                <td>{`${x.name} `}<span className={s.dim}>{x.team}</span>{hit && <b className={s.pos}> · first basket</b>}</td>
+                <td className={s.num}>{pct(x.p)}</td>
+                <td className={s.num}>{x.fair !== null ? pct(x.fair) : "·"}</td>
+                <td className={s.num}>{x.price !== null ? am(x.price) : "·"}</td>
+                <td className={`${s.num} ${x.edge ? s.pos : s.dim}`}>{x.edge ? `+${((x.p - implied(x.price!)) * 100).toFixed(1)}` : "·"}</td>
+                {res !== undefined && <td className={s.num}>{x.edge && x.price !== null ? <b className={hit ? s.pos : s.neg}>{hit ? `Won ${u(payout(x.price))}` : "Lost −1.0u"}</b> : <span className={s.dim}>·</span>}</td>}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {res === null && <p className={s.thin}>No first basket found in the play-by-play.</p>}
+    </div>
+  );
+}
+
+/** Graded First Basket games, newest first: each game's edges as a W-L at 1u (DraftKings' price). */
+export function fbGradedRows(graded: OurNbaView["fb"]["graded"]): GameRowData[] {
+  return graded.map((g) => {
+    const won = g.bets.filter((x) => x.net > 0).length;
+    const units = g.bets.reduce((a, x) => a + x.net, 0);
+    const scorer = g.board.result ? g.board.players.find((x) => x.id === g.board.result!.player)?.name ?? "a non-starter" : "none found";
+    const record = `${won}-${g.bets.length - won}`;
+    return {
+      key: g.event,
+      title: `${g.board.away} at ${g.board.home}`,
+      match: { league: "nba", away: g.board.away, home: g.board.home },
+      when: g.at,
+      final: true,
+      cells: [
+        ["Edges W-L", g.bets.length ? record : "none"],
+        ["Units", g.bets.length ? u(units) : "·"],
+        ["First basket", scorer],
+      ],
+      read: !g.bets.length ? ["No edges", s.readPass] : [`${record} · ${u(units)}`, units > 0 ? s.readW : units < 0 ? s.readL : s.readPass],
+      body: <FbTable b={g.board} />,
+    };
+  });
+}
 
 async function FirstBasketWeek({ season }: { season: number }) {
   const v = await getOurNbaView(season).catch(() => null);
@@ -583,50 +723,27 @@ async function FirstBasketWeek({ season }: { season: number }) {
     .sort((a, b) => b.gap - a.gap);
   const bets = v.fb.graded.flatMap((b) => b.bets);
   const graded = { w: bets.filter((x) => x.net > 0).length, l: bets.filter((x) => x.net <= 0).length, p: 0, units: bets.reduce((a, x) => a + x.net, 0) };
-  const rows: GameRowData[] = boards.map((g) => {
+  // Games still to be graded, soonest first; a graded game moves to Results (Jack, 2026-10-27).
+  const open = boards.filter((g) => g.fb!.result === undefined);
+  const [ended, tv] = await Promise.all([endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: undefined })), "nba"), tvByEvent("nba")]);
+  const rows: GameRowData[] = open.map((g) => {
     const b = g.fb!;
     const e = b.players.filter((x) => x.edge);
     const tipTeam = b.tip >= 0.5 ? b.home : b.away;
-    const res = b.result;
-    const scorer = res ? b.players.find((x) => x.id === res.player)?.name ?? "a non-starter" : null;
     return {
       key: g.game.slug,
       title: `${g.away} at ${g.home}`,
+      match: { league: "nba", away: b.away, home: b.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
       when: g.kickoff,
-      live: started(g.kickoff, res),
+      live: started(g.kickoff, undefined),
+      final: ended.has(g.game.slug),
       cells: [
         ["Tip", `${tipTeam} ${pct(Math.max(b.tip, 1 - b.tip))}`],
         ["Likeliest", `${b.players[0].name.split(" ").slice(-1)[0]} ${pct(b.players[0].p)}`],
         ["Edges", `${e.length}`],
-        ["First basket", scorer ?? "·"],
       ],
-      read: res !== undefined ? (e.some((x) => x.id === res?.player) ? ["Hit", s.readW] : e.length ? ["Missed", s.readL] : ["No edges", s.readPass]) : e.length ? [`${e.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
-      body: (
-        <div className={s.tw}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Ours</th>
-                <th>DK, vig out</th>
-                <th>DK price</th>
-                <th>Edge</th>
-              </tr>
-            </thead>
-            <tbody>
-              {b.players.map((x) => (
-                <tr key={x.id}>
-                  <td>{`${x.name} `}<span className={s.dim}>{x.team}</span>{res?.player === x.id && <b className={s.pos}> · first basket</b>}</td>
-                  <td className={s.num}>{pct(x.p)}</td>
-                  <td className={s.num}>{x.fair !== null ? pct(x.fair) : "·"}</td>
-                  <td className={s.num}>{x.price !== null ? am(x.price) : "·"}</td>
-                  <td className={`${s.num} ${x.edge ? s.pos : s.dim}`}>{x.edge ? `+${((x.p - implied(x.price!)) * 100).toFixed(1)}` : "·"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ),
+      read: e.length ? [`${e.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
+      body: <FbTable b={b} />,
     };
   });
   return (
@@ -647,9 +764,9 @@ async function FirstBasketWeek({ season }: { season: number }) {
       <div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>Every game</h3>
-          <p className={s.p}>Open a game for every starter: our chance, DraftKings&apos; with the vig removed across the field, and the edge.</p>
+          <p className={s.p}>Games still to play, soonest first; a game moves to Results once it is graded. Open one for every starter: our chance, DraftKings&apos; with the vig removed across the field, and the edge.</p>
         </div>
-        <GameTable head={["Tip", "Likeliest", "Edges", "First basket"]} rows={rows} />
+        {rows.length ? <GameTable head={["Tip", "Likeliest", "Edges"]} rows={rows} /> : <p className={s.calm}>No games waiting on a first basket. Graded games are under Results.</p>}
       </div>
       <Gate learning={v.fb.learning} label="First Basket" />
     </section>
@@ -738,7 +855,7 @@ async function FirstTdWeek({ season }: { season: number }) {
   const graded = ftdBestRecord(v.graded);
   // The board holds games still to finish, soonest first; a graded game moves to Results (Jack, 2026-10-26).
   const open = v.board.filter((g) => !g.result).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
-  const ended = await endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: g.result })), "nfl");
+  const [ended, tv] = await Promise.all([endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: g.result })), "nfl"), tvByEvent("nfl")]);
   const rows: GameRowData[] = open.map((g) => {
     const fav = [...g.game.teams].sort((a, b) => b.pFirst - a.pFirst)[0];
     const keeps = keepsFor(g.kickoff);
@@ -754,6 +871,7 @@ async function FirstTdWeek({ season }: { season: number }) {
     return {
       key: g.game.slug,
       title: `${g.game.away} at ${g.game.home}`,
+      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
       when: g.kickoff,
       live: started(g.kickoff, r),
       final: ended.has(g.game.slug),
@@ -829,7 +947,7 @@ async function FirstTdWeek({ season }: { season: number }) {
           <h3 className={s.h2}>Every game</h3>
           <p className={s.p}>Games still to finish, soonest first; a game moves to Results once it is graded. Open one for every player: our chance against Kalshi&apos;s cost (fee in) and DraftKings&apos; price, read the morning of game day. It&apos;s an edge when our chance beats the best price.</p>
         </div>
-        <GameTable head={["Scores first", "Likeliest", "Edges", "First TD"]} rows={rows} />
+        {rows.length ? <GameTable head={["Scores first", "Likeliest", "Edges", "First TD"]} rows={rows} /> : <p className={s.calm}>Every game on this board is graded (see Results). The next week&apos;s boards are built at the Tuesday and Wednesday evening captures.</p>}
       </div>
       <Gate learning={v.learning} label="First TD" />
     </section>

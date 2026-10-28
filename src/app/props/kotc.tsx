@@ -3,38 +3,67 @@
 // Today: our chance for every player to lead the slate (lib/models/nba/kotc),
 // the prop of his we'd attach, and how to read the pool. Results: every
 // graded night against the board as it stood at the first tip.
-import type { PropMarket } from "@/lib/props/parse";
-import { getNbaSectionLearning, getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
+import { allBoards, getNbaSectionLearning, getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
+import { bestTag, gradeTag, type KotcTag } from "@/lib/models/nba/kotc-tag";
+import KOTC from "@/lib/models/nba/kotc-params.json";
+import { implied, payout } from "@/lib/props/parse";
 import { SECTIONS, kotcStakedTop } from "@/lib/models/sections";
 import { LearnerLogBody } from "./top";
 import { getKotcNights, type KotcNight } from "@/lib/models/nba/kotc-store";
 import { whenEt } from "../picks/ui";
-import { Background, Hero, Stats } from "../picks/board";
+import { Background, Hero, SecHead, Stats } from "../picks/board";
+import { GameTable, type GameRowData } from "./week";
 import s from "../picks/picks.module.css";
+import k from "./props.module.css";
 
 const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes" };
-/** DK's rule: the tagged prop must be priced -200 or longer. */
-const QUALIFIES = -200;
-/** NBA games a player needs this season before his prop edge counts (as on the props board). */
-const CARD_GAMES = 3;
-const ROWS = 20;
+const ROWS = 30;
+/** Cards up top: the best tags tonight. */
+const CARDS = 3;
+/** DK's standard pool, the minimum tagged bet, and what a bonus bet converts to (estimate, see the explainer). */
+const POOL = 1_000_000;
+const STAKE_USD = 5;
+const BONUS_CASH = 0.7;
 const nowMs = () => Date.now();
+const usd = (x: number) => `${x < 0 ? "−" : ""}$${Math.abs(x).toFixed(2)}`;
+const tagText = (t: KotcTag) => `${t.side === "over" ? "Over" : "Under"} ${t.m.line} ${SHORT[t.m.stat ?? ""] ?? t.m.statLabel}`;
 
-/** His best qualifying prop: our edge side at -200 or longer, biggest edge first. */
-function attach(boards: OurStoredProps[], name: string): { text: string; gap: number } | null {
-  let best: { m: PropMarket; price: number; gap: number } | null = null;
-  for (const g of boards)
-    for (const m of g.game.markets) {
-      if (m.player !== name || !m.clears || !m.side || m.gap === null) continue;
-      if ((g.extra[m.id]?.games ?? 0) < CARD_GAMES) continue;
-      const price = m.books[0][m.side];
-      if (price === null || price < QUALIFIES) continue;
-      if (!best || m.gap > best.gap) best = { m, price, gap: m.gap };
-    }
-  if (!best) return null;
-  return { text: `${best.m.side === "over" ? "Over" : "Under"} ${best.m.line} ${SHORT[best.m.stat ?? ""] ?? best.m.statLabel} ${am(best.price)}`, gap: best.gap };
+/**
+ * Who the crowd backs, from the fit on DK's posted payouts (kotc-params.json
+ * crowd: backers per pool = e^a x chance^b, 18 paid nights). Each player's share
+ * of tonight's tags is his e^a x p^b over the slate's total. Estimate.
+ */
+function crowdShares(rows: { id: string; p: number }[]): Map<string, number> {
+  const w = rows.map((r) => Math.pow(Math.max(r.p, 1e-6), KOTC.crowd.b));
+  const tot = w.reduce((a, x) => a + x, 0) || 1;
+  return new Map(rows.map((r, i) => [r.id, w[i] / tot]));
+}
+
+/** What one $5 tag is worth (estimate): the bonus-bet pool share if he is king, plus the prop's own expected profit. */
+function tagValue(p: number, t: KotcTag | null): { bonus: number; prop: number; total: number } {
+  const backers = Math.exp(KOTC.crowd.a) * Math.pow(Math.max(p, 1e-6), KOTC.crowd.b);
+  const bonus = (BONUS_CASH * POOL * p) / Math.max(backers, 1);
+  const prop = t ? STAKE_USD * (t.ours * (1 + payout(t.price)) - 1) : 0;
+  return { bonus, prop, total: bonus + prop };
+}
+
+/** Our chance and the crowd's share as two bars on one scale. */
+function KingBars({ ours, crowd, top }: { ours: number; crowd: number; top: number }) {
+  const w = (x: number) => `${Math.max(2, Math.min(90, (x / top) * 90)).toFixed(0)}px`;
+  return (
+    <span className={k.kBars} aria-label={`Ours ${pct(ours)}, crowd ${pct(crowd)} (estimate)`}>
+      <span className={k.kBarRow}>
+        <i className={k.kBarOurs} style={{ width: w(ours) }} />
+        <b>{pct(ours)}</b>
+      </span>
+      <span className={k.kBarRow}>
+        <i className={k.kBarCrowd} style={{ width: w(crowd) }} />
+        <span>{pct(crowd)}</span>
+      </span>
+    </span>
+  );
 }
 
 function Explainer() {
@@ -97,14 +126,24 @@ export async function KotcWeek({ season }: { season: number }) {
   const boards = (v?.board ?? []).filter((g) => n.games.some((x) => x.id === g.espnId));
   const top = n.board.rows[0];
   const started = Date.parse(n.firstTip) <= now;
-  const rows = n.board.rows.slice(0, ROWS);
+  const crowd = crowdShares(n.board.rows);
+  // Every player in our top 30 gets a prop to tag (Jack, 2026-10-27), edge or not: a tag only counts with a bet on him.
+  const rows = n.board.rows.slice(0, ROWS).map((r, i) => {
+    const t = bestTag(boards, r.name);
+    return { r, i, t, crowd: crowd.get(r.id) ?? 0, value: tagValue(r.p, t) };
+  });
+  // Cards come from reads with 3+ games this season when there are any: earlier numbers lean on last season, and their big "edges" are mostly that.
+  const settled = rows.filter((x) => x.t && !x.t.early);
+  const best = [...(settled.length >= CARDS ? settled : rows.filter((x) => x.t))].sort((a, b) => b.value.total - a.value.total).slice(0, CARDS);
+  const scale = Math.max(top.p, ...rows.map((x) => x.crowd));
   // A live learner slice turns our top N's tagged props into bets (Jack, 2026-10-26).
   const betTop = learning ? kotcStakedTop(learning.entries, n.firstTip) : 0;
+  const tagged = rows.filter((x) => x.t).length;
   return (
     <section className={s.section} aria-labelledby="kotc-today">
       <Hero
         eyebrow={`King of the Court · ${n.date}`}
-        title={<span id="kotc-today">{`${top.name} leads at ${pct(top.p)}`}</span>}
+        title={<span id="kotc-today">{best[0] ? `Best tag: ${best[0].r.name}, ${tagText(best[0].t!)}` : `${top.name} leads at ${pct(top.p)}`}</span>}
         sub={`${n.games.length} game${n.games.length === 1 ? "" : "s"}${n.slateGames > n.games.length ? ` of ${n.slateGames} on the slate (the rest had no props yet)` : ""}, ${n.board.rows.length} players. ${started ? "Frozen at the first tip" : `Updates until the first tip, ${whenEt(n.firstTip)}`}; saved ${whenEt(n.at)}.`}
       />
       <Stats
@@ -112,50 +151,100 @@ export async function KotcWeek({ season }: { season: number }) {
         items={[
           { k: "Favorite", v: pct(top.p), sub: top.name },
           { k: "Winning PRA", v: `${n.board.winning.p50}`, sub: `middle 80%: ${n.board.winning.p10} to ${n.board.winning.p90}` },
-          { k: "Top 5 combined", v: pct(n.board.rows.slice(0, 5).reduce((a, r) => a + r.p, 0)), sub: "the rest of the field takes the other share", small: true },
+          { k: "Top 30 with a tag", v: `${tagged} of ${rows.length}`, sub: "a prop at -200 or longer", small: true },
           { k: "Last night", v: last?.result ? `${last.result.kings[0]?.name.split(" ").slice(-1)[0]} ${last.result.pra}` : "·", sub: last?.result ? `we had him ${pct(last.result.p)}` : "first grade pending", small: true },
         ]}
       />
-      <div className={s.section}>
-        <div className={s.sectionHead}>
-          <h3 className={s.h2}>Chance to be king</h3>
-          <p className={s.p}>Top {ROWS} by chance to lead the slate in PRA. Ceiling is his 90th percentile night. The prop is his biggest model edge at -200 or longer (it qualifies for the promo); a dash means none, so any qualifying prop of his works.{betTop ? ` A learner slice is live, so the props of our top ${betTop === 1 ? "pick" : betTop} are bets tonight.` : " Tracked only: no prop here is a bet until a learner slice clears its gate."}</p>
+      {best.length > 0 && (
+        <div className={s.pageFrame}>
+          <SecHead title="Best tags tonight" aside={betTop ? `A learner slice is live: our top ${betTop === 1 ? "pick's" : `${betTop}'s`} props are bets` : "Tracked only · ranked by what one $5 tag is worth (estimate)"} />
+          <ul className={k.kCards} data-first-pick>
+            {best.map((x, j) => (
+              <li key={x.r.id} className={`${k.kCard} ${j === 0 ? k.kCardTop : ""}`}>
+                <div className={k.kCardHead}>
+                  <span className={k.kRank}>{`#${j + 1} tag`}</span>
+                  <span className={k.kMeta}>{`${x.r.team} · our #${x.i + 1} to be king`}</span>
+                </div>
+                <div className={k.kWho}>{x.r.name}</div>
+                <div className={k.kTag}>
+                  {tagText(x.t!)} <span className={k.kPrice}>{am(x.t!.price)}</span>
+                </div>
+                <dl className={k.kTrio}>
+                  <div>
+                    <dt>King, ours / crowd</dt>
+                    <dd>{`${pct(x.r.p)} / ${pct(x.crowd)}`}</dd>
+                  </div>
+                  <div>
+                    <dt>Prop, ours / DK</dt>
+                    <dd>{`${pct(x.t!.ours)} / ${pct(x.t!.fair ?? implied(x.t!.price))}`}</dd>
+                  </div>
+                  <div>
+                    <dt>$5 tag worth</dt>
+                    <dd className={x.value.total >= 0 ? s.pos : s.neg}>{usd(x.value.total)}</dd>
+                  </div>
+                </dl>
+                <p className={k.kNote}>{`${x.t!.edge ? "A tracked edge on the props board" : x.t!.gap > 0 ? "Above DK's break-even, though not an edge the props board tracks" : "No edge; the least bad qualifying prop"} (${x.t!.gap >= 0 ? "+" : ""}${(x.t!.gap * 100).toFixed(1)} vs break-even)${x.t!.early ? ", read from under 3 games this season" : ""}. Bonus share ${usd(x.value.bonus)}, prop ${usd(x.value.prop)}.`}</p>
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
+      <div className={s.pageFrame}>
+        <SecHead title="Top 30: chance to be king and the prop to tag" aside="Ours in color, the crowd's share in gold (estimate) · edge is ours minus DK's break-even" />
         <div className={s.tw}>
-          <table className={s.table}>
+          <table className={`${s.table} ${k.kTable}`}>
             <thead>
               <tr>
+                <th>#</th>
                 <th>Player</th>
-                <th>King</th>
-                <th>Top 3</th>
-                <th>Proj PRA</th>
-                <th>Ceiling</th>
+                <th>King: ours / crowd</th>
+                <th className={s.hideSm}>Proj PRA</th>
                 <th>Prop to tag</th>
+                <th>Ours / DK no-vig</th>
+                <th>Edge</th>
+                <th className={s.hideSm}>$5 tag</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => {
-                const g = n.games.find((x) => x.id === r.game);
-                const a = attach(boards, r.name);
+              {rows.map((x) => {
+                const g = n.games.find((y) => y.id === x.r.game);
+                const hot = best.some((b) => b.r.id === x.r.id);
                 return (
-                  <tr key={r.id}>
+                  <tr key={x.r.id} className={hot ? k.kHot : undefined}>
+                    <td className={s.num}>{x.i + 1}</td>
                     <td>
-                      {r.name} <span className={s.dim}>{`${r.team}${g ? ` · ${g.away} at ${g.home}` : ""}`}</span>
+                      <b>{x.r.name}</b>
+                      <div className={s.dim}>{`${x.r.team}${g ? ` · ${g.away} at ${g.home}` : ""}`}</div>
                     </td>
-                    <td className={s.num}>{pct(r.p)}</td>
-                    <td className={s.num}>{pct(r.top3)}</td>
-                    <td className={s.num}>{r.pra.toFixed(1)}</td>
-                    <td className={s.num}>{r.p90}</td>
+                    <td>
+                      <KingBars ours={x.r.p} crowd={x.crowd} top={scale} />
+                    </td>
+                    <td className={`${s.num} ${s.hideSm}`}>
+                      {x.r.pra.toFixed(1)}
+                      <div className={s.dim}>{`ceiling ${x.r.p90}`}</div>
+                    </td>
                     <td className={s.num}>
-                      {a ? `${a.text} · edge ${Math.round(a.gap * 100)} pts` : "·"}
-                      {a && i < betTop && <b className={s.pos}> · Bet</b>}
+                      {x.t ? (
+                        <>
+                          <b>{tagText(x.t)}</b> <span className={s.dim}>{am(x.t.price)}</span>
+                          {x.i < betTop && <b className={s.pos}> · Bet</b>}
+                        </>
+                      ) : (
+                        <span className={s.dim}>no prop at -200 or longer yet</span>
+                      )}
                     </td>
+                    <td className={s.num}>{x.t ? `${pct(x.t.ours)} / ${x.t.fair !== null ? pct(x.t.fair) : "·"}` : "·"}</td>
+                    <td className={s.num}>{x.t ? <span className={`${k.kEdge} ${x.t.gap > 0 ? k.kEdgePos : k.kEdgeNeg}`}>{`${x.t.gap >= 0 ? "+" : "−"}${Math.abs(x.t.gap * 100).toFixed(1)}`}</span> : "·"}</td>
+                    <td className={`${s.num} ${s.hideSm} ${x.value.total >= 0 ? s.pos : s.neg}`}>{x.t ? usd(x.value.total) : "·"}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        <p className={s.thin}>
+          {`Crowd share and tag value are estimates: the crowd from DraftKings' posted payouts on 18 nights (backers rose in step with our chance, R² ${KOTC.crowd.r2}), the bonus at a $1M pool and 70 cents a bonus dollar, the prop at our chance and DK's price on a $5 bet. The crowd fit can't see fame: a household name is likely backed more than shown.${betTop ? "" : " Tracked only: no prop here is a bet until a learner slice clears its gate."}`}
+        </p>
       </div>
       {last && <LastNight n={last} />}
       <Explainer />
@@ -175,12 +264,67 @@ function LastNight({ n }: { n: KotcNight }) {
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 
+/** One graded night: who was king, and our top 10's tagged props as a W-L at 1u. */
+function nightRow(x: KotcNight, boards: OurStoredProps[]): GameRowData {
+  const r = x.result!;
+  const mine = boards.filter((b) => x.games.some((g) => g.id === b.espnId));
+  const tags = x.board.rows.slice(0, 10).map((row, i) => {
+    const t = bestTag(mine, row.name);
+    return { row, i, t, g: t ? gradeTag(t) : null };
+  });
+  const done = tags.filter((y) => y.g);
+  const won = done.filter((y) => y.g!.outcome === "W").length;
+  const lost = done.filter((y) => y.g!.outcome === "L").length;
+  const units = done.reduce((a, y) => a + y.g!.net, 0);
+  const kingIn = r.rank > 0 && r.rank <= 10;
+  return {
+    key: x.date,
+    title: new Date(`${x.date}T16:00:00Z`).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" }),
+    final: true,
+    cells: [
+      ["King", `${r.kings.map((kk) => kk.name.split(" ").slice(-1)[0]).join(", ")} ${r.pra}`],
+      ["We gave", `${pct(r.p)}${r.rank ? ` (#${r.rank})` : ""}`],
+      ["Top 10 tags", done.length ? `${won}-${lost}${done.length - won - lost ? `-${done.length - won - lost}` : ""}, ${units >= 0 ? "+" : "−"}${Math.abs(units).toFixed(1)}u` : "none graded"],
+    ],
+    read: kingIn ? [`King was our #${r.rank}`, s.readW] : [r.rank ? `King was our #${r.rank}` : "King off our board", s.readL],
+    body: (
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Player</th>
+              <th>We gave</th>
+              <th>Prop tagged</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tags.map((y) => (
+              <tr key={y.row.id}>
+                <td className={s.num}>{y.i + 1}</td>
+                <td>
+                  {y.row.name}
+                  {r.kings.some((kk) => kk.id === y.row.id) && <b className={s.pos}> · king</b>}
+                </td>
+                <td className={s.num}>{pct(y.row.p)}</td>
+                <td className={s.num}>{y.t ? `${tagText(y.t)} ${am(y.t.price)}` : <span className={s.dim}>none qualified</span>}</td>
+                <td className={s.num}>{y.g ? <b className={y.g.outcome === "W" ? s.pos : y.g.outcome === "L" ? s.neg : undefined}>{`${y.g.outcome === "W" ? "Won" : y.g.outcome === "L" ? "Lost" : "Push"} ${y.g.net >= 0 ? "+" : "−"}${Math.abs(y.g.net).toFixed(2)}u`}</b> : <span className={s.dim}>{y.t ? "void" : "·"}</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ),
+  };
+}
+
 export async function KotcResults({ season }: { season: number }) {
-  const nights = await getKotcNights(season).catch(() => null);
+  const [nights, boards] = await Promise.all([getKotcNights(season).catch(() => null), allBoards(season).catch(() => [] as OurStoredProps[])]);
   if (!nights) return <p className={s.calm}>King of the Court couldn&apos;t be read just now.</p>;
-  const graded = nights.filter((x) => x.result);
+  const graded = nights.filter((x) => x.result).sort((a, b) => b.date.localeCompare(a.date));
   const n = graded.length;
-  const favWon = graded.filter((x) => x.result!.kings.some((k) => k.id === x.board.rows[0]?.id)).length;
+  const favWon = graded.filter((x) => x.result!.kings.some((kk) => kk.id === x.board.rows[0]?.id)).length;
   const favP = n ? graded.reduce((a, x) => a + x.result!.favorite.p, 0) / n : 0;
   const ll = n ? graded.reduce((a, x) => a + x.result!.logLoss, 0) / n : 0;
   const flat = n ? graded.reduce((a, x) => a + Math.log(Math.max(1, x.board.rows.length)), 0) / n : 0;
@@ -202,33 +346,9 @@ export async function KotcResults({ season }: { season: number }) {
         ]}
       />
       {n > 0 && (
-        <div className={s.tw}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Night</th>
-                <th>King</th>
-                <th>PRA</th>
-                <th>We gave</th>
-                <th>Our rank</th>
-                <th>Our favorite</th>
-              </tr>
-            </thead>
-            <tbody>
-              {graded.map((x) => (
-                <tr key={x.date}>
-                  <td className={s.num}>{x.date}</td>
-                  <td>{x.result!.kings.map((k) => k.name).join(", ")}</td>
-                  <td className={s.num}>{x.result!.pra}</td>
-                  <td className={s.num}>{pct(x.result!.p)}</td>
-                  <td className={s.num}>{x.result!.rank || "·"}</td>
-                  <td>
-                    {x.result!.favorite.name} <span className={s.dim}>{`${pct(x.result!.favorite.p)} · ${x.result!.favorite.pra ?? "·"} PRA`}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className={s.pageFrame}>
+          <SecHead title="Night by night" aside="Newest first · our top 10's tagged props at 1u · open a night for each tag" />
+          <GameTable head={["King", "We gave", "Top 10 tags"]} rows={graded.map((x) => nightRow(x, boards))} />
         </div>
       )}
       <Backtest />

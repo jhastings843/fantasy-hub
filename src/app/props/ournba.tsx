@@ -10,6 +10,8 @@ import { ourSliceBets, record, ourPropSlices } from "@/lib/models/learn";
 import { noVig } from "@/lib/models/nba/market";
 import { whenEt } from "../picks/ui";
 import { LearningBlock } from "./learning";
+import { GameTable, fbGradedRows, propGradedRows } from "./week";
+import { SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
 
@@ -200,6 +202,9 @@ export async function OurNbaResults({ season }: { season: number }) {
   const all = rec("edge:all");
   const lean = rec("lean:all");
   const props = v.graded.reduce((a, x) => a + x.result.markets.filter((r) => r.actual !== null).length, 0);
+  // Every graded game stays in the record; the visible log keeps a week (Jack, 2026-10-27).
+  const weekAgo = new Date(renderedAt() - 7 * 86_400_000).toISOString();
+  const recent = v.graded.filter((x) => ((x as { kickoff?: string }).kickoff ?? "") >= weekAgo);
   return (
     <section className={s.section} aria-labelledby="our-nba-results">
       <div className={s.sectionHead}>
@@ -214,6 +219,10 @@ export async function OurNbaResults({ season }: { season: number }) {
             <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
             <Tile value={u(lean.units)} label={`Every lean · ${lean.w}-${lean.l}${lean.p ? `-${lean.p}` : ""}`} />
             <Tile value={`${props}`} label="props graded" />
+          </div>
+          <div className={s.pageFrame}>
+            <SecHead title="Game by game" aside={`Last 7 days, newest first · ${v.graded.length - recent.length ? `${v.graded.length - recent.length} older games stay in the record above` : "every graded game"} · each edge 1u at DraftKings' price`} />
+            {recent.length ? <GameTable head={["Edges W-L", "Units", "Props graded"]} rows={propGradedRows(recent, "nba")} /> : <p className={s.calm}>No games graded in the last 7 days.</p>}
           </div>
           <div className={s.tw}>
             <table className={s.table}>
@@ -354,10 +363,16 @@ export async function OurFirstBasketResults({ season }: { season: number }) {
         <p className={s.p}>Every edge on a graded board, 1 unit at DraftKings&apos; price.</p>
       </div>
       {v.fb.graded.length ? (
-        <div className={s.tiles}>
-          <Tile value={u(units)} label={`Every edge · ${w}-${bets.length - w}`} />
-          <Tile value={`${tipRight} of ${v.fb.graded.length}`} label="games our favored team scored first" />
-        </div>
+        <>
+          <div className={s.tiles}>
+            <Tile value={u(units)} label={`Every edge · ${w}-${bets.length - w}`} />
+            <Tile value={`${tipRight} of ${v.fb.graded.length}`} label="games our favored team scored first" />
+          </div>
+          <div className={s.pageFrame}>
+            <SecHead title="Game by game" aside="Newest first · each edge 1u at DraftKings' price · open a game for every starter" />
+            <GameTable head={["Edges W-L", "Units", "First basket"]} rows={fbGradedRows(v.fb.graded)} />
+          </div>
+        </>
       ) : (
         <p className={s.calm}>Nothing graded yet. Boards are graded from ESPN&apos;s play-by-play at the overnight run.</p>
       )}

@@ -10,6 +10,7 @@ import { Background, SecHead } from "../picks/board";
 import { EdgeCard, Gate, GameTable, PropStats, endedOnEspn, type Edge, type GameRowData } from "./week";
 import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
+import { tvByEvent } from "@/lib/live/espn";
 import s from "../picks/picks.module.css";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -57,9 +58,11 @@ function gradedRowsOf(graded: Awaited<ReturnType<typeof attdGraded>>): GameRowDa
       const units = bets.reduce((a, b) => a + b.net, 0);
       const scorers = g.rows.filter((r) => (g.result[r.key] ?? 0) > 0).length;
       const record = `${won}-${bets.length - won}`;
+      const [away, home] = g.slug.split("_").slice(2);
       return {
         key: g.slug,
         title: g.slug.split("_").slice(2).join(" at "),
+        ...(away && home ? { match: { league: "nfl" as const, away, home } } : {}),
         when: g.at,
         final: true,
         cells: [
@@ -155,13 +158,14 @@ export async function AttdWeek({ season }: { season: number }) {
     .sort((a, b) => Number(!!b.staked) - Number(!!a.staked) || b.gap - a.gap);
   const live = learning.entries.filter((e) => e.status === "active").map((e) => e.label);
   const priced = (rows: AttdRow[]) => rows.filter((r) => r.dk !== undefined).length;
-  const ended = await endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: g.attdResult })), "nfl");
+  const [ended, tv] = await Promise.all([endedOnEspn(open.map((g) => ({ slug: g.game.slug, kickoff: g.kickoff, espnId: g.espnId, graded: g.attdResult })), "nfl"), tvByEvent("nfl")]);
   const rows: GameRowData[] = open.map((g) => {
     const e = g.attd!.rows.filter((r) => attdEdges(r).length);
     const top = g.attd!.rows[0];
     return {
       key: g.game.slug,
       title: `${g.game.away} at ${g.game.home}`,
+      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
       when: g.kickoff,
       live: !!g.kickoff && Date.parse(g.kickoff) <= now,
       final: ended.has(g.game.slug),

@@ -5,6 +5,8 @@ import { getOurNflView, type OurNflView } from "@/lib/models/nfl/store";
 import { ourPropSlices, ourSliceBets, record } from "@/lib/models/learn";
 import { GameCard, Tile } from "./ournba";
 import { LearningBlock } from "./learning";
+import { GameTable, propGradedRows } from "./week";
+import { SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
 
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
@@ -57,6 +59,10 @@ export async function OurNflResults({ season }: { season: number }) {
           <div className={s.tiles}>
             <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
             <Tile value={u(lean.units)} label={`Every lean · ${lean.w}-${lean.l}${lean.p ? `-${lean.p}` : ""}`} />
+          </div>
+          <div className={s.pageFrame}>
+            <SecHead title="Game by game" aside="Newest first · each tracked edge 1u at the saved price · open a game for every prop" />
+            <GameTable head={["Edges W-L", "Units", "Props graded"]} rows={propGradedRows(v.graded, "nfl")} />
           </div>
           <div className={s.tw}>
             <table className={s.table}>

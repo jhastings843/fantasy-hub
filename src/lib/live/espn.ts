@@ -87,3 +87,25 @@ export function findGame(games: LiveGame[], sport: LiveSport, away: string, home
     sport === "cfb" ? [t.location, t.name, t.abbr].some((x) => x && nameKey(x) === nameKey(key)) : t.abbr === (NFL_ALIAS[key] ?? key) || t.abbr === key;
   return games.find((g) => is(g.away, away) && is(g.home, home));
 }
+
+interface EspnBroadcastComp {
+  broadcasts?: { names?: string[]; market?: string }[];
+  geoBroadcasts?: { media?: { shortName?: string }; market?: { type?: string } }[];
+}
+
+/** The channel per ESPN event id on today's / this week's scoreboard: a national feed when listed, else the first. One cached call. */
+export async function tvByEvent(sport: LiveSport): Promise<Map<string, string>> {
+  const q = sport === "cfb" ? "?groups=80&limit=300" : "";
+  const d = await get<{ events?: { id?: string; competitions?: EspnBroadcastComp[] }[] }>(`${BASE}/${PATH[sport]}/scoreboard${q}`);
+  const out = new Map<string, string>();
+  for (const e of d?.events ?? []) {
+    const c = e.competitions?.[0];
+    const all = [
+      ...(c?.geoBroadcasts ?? []).map((b) => ({ name: b.media?.shortName, national: /national/i.test(b.market?.type ?? "") })),
+      ...(c?.broadcasts ?? []).flatMap((b) => (b.names ?? []).map((n) => ({ name: n, national: /national/i.test(b.market ?? "") }))),
+    ].filter((b) => b.name);
+    const pick = all.find((b) => b.national) ?? all[0];
+    if (e.id && pick?.name) out.set(e.id, pick.name);
+  }
+  return out;
+}
