@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FTD_GATE, PROPS_GATE, emptyState, evidence, review, reviewDue, sectionView, liveBets, tOf, type Bet, type Candidate, type Gate } from "./engine";
+import { FTD_GATE, PROPS_GATE, emptyState, evidence, register, review, reviewDue, sectionView, liveBets, tOf, type Bet, type Candidate, type Gate } from "./engine";
 import { parentOf } from "../props/learn";
 
 // Small gate so the tests can reach it.
@@ -118,5 +118,29 @@ describe("props parents", () => {
     expect(parentOf("h2h:david")).toBeUndefined();
     expect(parentOf("h2h:agree")).toBe("h2h:david");
     expect(parentOf("h2h:split-sam")).toBe("h2h:sam");
+  });
+});
+
+describe("slices change between reviews", () => {
+  // First TD, Oct 26: slices renamed for best-price grading mid-week. The new ones waited for the next
+  // weekly review, and the log showed the retired Kalshi slices at 0 games in the meantime.
+  const old: Candidate = { id: "k:value", label: "Our chance above Kalshi's cost", bets: [] };
+  const fresh: Candidate = { id: "b:value", label: "Every value bet, best price", bets: bets(3, () => 1) };
+  const reviewed = review(G, emptyState("t"), [old], T0, 8).state;
+
+  it("registers new slices on any pull, without counting as the week's review", () => {
+    const r = register(reviewed, [fresh], at(1), 8);
+    expect(r.state.entries["b:value"]).toMatchObject({ status: "collecting", registeredAt: at(1), registeredWeek: 8 });
+    expect(r.state.lastReviewWeek).toBe(8);
+    expect(r.state.lastReviewAt).toBe(T0);
+    expect(r.journal.map((j) => j.kind)).toEqual(["registered"]);
+    expect(register(r.state, [fresh], at(2), 8).journal).toEqual([]);
+  });
+
+  it("the log hides a collecting slice whose definition is gone, but keeps a live one", () => {
+    const s = register(reviewed, [fresh], at(1), 8).state;
+    const withLive = { ...s, entries: { ...s.entries, "k:gone": { ...s.entries["k:value"], id: "k:gone", status: "active" as const, activatedAt: T0 } } };
+    const ids = sectionView(G, withLive, [fresh], []).entries.map((e) => e.id);
+    expect(ids).toEqual(["b:value", "k:gone"]);
   });
 });

@@ -194,17 +194,29 @@ export const reviewDue = (s: SectionState, week: number) => s.lastReviewWeek !==
  * then activate up to gate.maxNew ready ones (strongest t first). Returns the
  * new state and the journal lines to append.
  */
-export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: string, week: number): { state: SectionState; journal: JournalLine[]; evidence: Map<string, Evidence> } {
+/**
+ * Registers candidates the section hasn't seen, on any pull. Registration
+ * only starts a slice's clock (games after it count), so it needn't wait for
+ * the weekly review; a slice added mid-week would otherwise sit unseen until
+ * then (First TD, Oct 26). Leaves the review stamps alone.
+ */
+export function register(prev: SectionState, cands: Candidate[], now: string, week: number): { state: SectionState; journal: JournalLine[] } {
   const entries: { [id: string]: Entry } = Object.fromEntries(Object.entries(prev.entries).map(([k, v]) => [k, { ...v }]));
-  const journal: JournalLine[] = [];
-  const byId = new Map(cands.map((c) => [c.id, c]));
   const fresh: string[] = [];
   for (const c of cands) {
     if (entries[c.id]) continue;
     entries[c.id] = { id: c.id, label: c.label, ...(c.parent ? { parent: c.parent } : {}), status: "collecting", registeredAt: now, registeredWeek: week };
     fresh.push(c.label);
   }
-  if (fresh.length) journal.push({ at: now, week, kind: "registered", text: `Registered ${fresh.length} slice${fresh.length > 1 ? "s" : ""}; only games after today count toward them.` });
+  const journal: JournalLine[] = fresh.length ? [{ at: now, week, kind: "registered", text: `Registered ${fresh.length} slice${fresh.length > 1 ? "s" : ""}; only games after today count toward them.` }] : [];
+  return { state: { ...prev, entries }, journal };
+}
+
+export function review(gate: Gate, prev: SectionState, cands: Candidate[], now: string, week: number): { state: SectionState; journal: JournalLine[]; evidence: Map<string, Evidence> } {
+  const reg = register(prev, cands, now, week);
+  const entries = reg.state.entries;
+  const journal: JournalLine[] = [...reg.journal];
+  const byId = new Map(cands.map((c) => [c.id, c]));
 
   const ev = new Map<string, Evidence>();
   for (const e of Object.values(entries)) {
@@ -337,7 +349,8 @@ export interface SectionView {
 /** What a page shows for a section, computed fresh from the saved state and today's data. */
 export function sectionView(gate: Gate, s: SectionState, cands: Candidate[], journal: JournalLine[]): SectionView {
   const byId = new Map(cands.map((c) => [c.id, c]));
-  const entries = Object.values(s.entries).map((e): EntryView => {
+  // A slice whose definition was retired never gathers evidence again; only a live one (its record) stays in view.
+  const entries = Object.values(s.entries).filter((e) => byId.has(e.id) || e.activatedAt).map((e): EntryView => {
     const c = byId.get(e.id);
     if (!c) return e;
     const ev = evidence(gate, c, e.registeredAt, e.parent ? byId.get(e.parent) : undefined);

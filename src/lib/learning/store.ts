@@ -1,6 +1,6 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
-import { emptyState, review, reviewDue, type Candidate, type Gate, type JournalLine, type SectionState } from "./engine";
+import { emptyState, register, review, reviewDue, type Candidate, type Gate, type JournalLine, type SectionState } from "./engine";
 
 // Redis side of the shared learning engine. One state object and one
 // append-only journal per section and season; nothing else is written. Keys
@@ -22,8 +22,17 @@ export async function loadJournal(section: string, season: number, limit = 20): 
 /** Run the section's review if it hasn't run this week. Returns what it journaled (empty when not due). */
 export async function reviewIfDue(section: string, season: number, week: number, gate: Gate, cands: Candidate[], now: Date): Promise<JournalLine[]> {
   if (!week) return [];
-  const prev = await loadSection(section, season);
-  if (!reviewDue(prev, week)) return [];
+  const before = await loadSection(section, season);
+  if (!reviewDue(before, week)) {
+    // Not the week's review, but new slices start their clock now.
+    const { state, journal } = register(before, cands, now.toISOString(), week);
+    if (journal.length) {
+      await redis.set(stateKey(section, season), state);
+      await redis.rpush(journalKey(section, season), ...journal.map((j) => JSON.stringify(j)));
+    }
+    return journal;
+  }
+  const prev = before;
   const { state, journal } = review(gate, prev, cands, now.toISOString(), week);
   await redis.set(stateKey(section, season), state);
   if (journal.length) await redis.rpush(journalKey(section, season), ...journal.map((j) => JSON.stringify(j)));
