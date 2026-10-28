@@ -182,3 +182,19 @@ describe("totalSpread", () => {
     expect(totalSpread([g(20, 20, 43)], 2)).toBeNull();
   });
 });
+
+describe("the field's lean is refit after each slate (2026-10-27)", () => {
+  it("recovers the lean from real pick shares, shrunk toward the old fit on few games", async () => {
+    const { fitLean } = await import("./pool");
+    const ps = [0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.3, 0.4, 0.2];
+    const many = Array.from({ length: 12 }, () => ps).flat().map((pHome) => ({ pHome, share: estimatedPublicHome(pHome, 2.0) }));
+    const fit = fitLean(many, 2.7)!;
+    expect(fit.n).toBe(120);
+    expect(fit.lean).toBeGreaterThan(2.0);
+    expect(fit.lean).toBeLessThan(2.25);
+    // Ten games barely move it off the prior.
+    expect(fitLean(many.slice(0, 10), 2.7)!.lean).toBeGreaterThan(2.45);
+    // Coin flips carry no information about lean.
+    expect(fitLean([{ pHome: 0.5, share: 0.7 }], 2.7)).toBeNull();
+  });
+});

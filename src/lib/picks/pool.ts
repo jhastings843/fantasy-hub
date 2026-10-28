@@ -375,6 +375,37 @@ export function estimatedPublicHome(pHome: number, lean = 1.6): number {
   return 1 / (1 + Math.exp(-z));
 }
 
+/** Games of evidence the prior lean is worth when refitting (about two weeks' slates). */
+const LEAN_PRIOR_GAMES = 30;
+
+/**
+ * The field's lean, refit from the pool's real pick shares on every game seen
+ * so far (Jack, 2026-10-27: a little learning after each slate). Least squares
+ * through the origin on logits, logit(share) = lean x logit(pHome), shrunk
+ * toward the prior by LEAN_PRIOR_GAMES. Games near a coin flip say nothing
+ * about lean and are left out. Null with no usable game. Pure.
+ *
+ *   fitLean([{ pHome: 0.7, share: 0.9 }, ...], 2.7) -> { lean: 2.6, n: 48 }
+ */
+export function fitLean(points: { pHome: number; share: number }[], prior: number): { lean: number; n: number } | null {
+  const logit = (x: number) => {
+    const c = Math.min(0.99, Math.max(0.01, x));
+    return Math.log(c / (1 - c));
+  };
+  const use = points.filter((p) => Math.abs(p.pHome - 0.5) >= 0.03);
+  if (!use.length) return null;
+  let sxy = 0;
+  let sxx = 0;
+  for (const p of use) {
+    const x = logit(p.pHome);
+    sxy += x * logit(p.share);
+    sxx += x * x;
+  }
+  const n = use.length;
+  const raw = sxy / sxx;
+  return { lean: Math.round(((raw * n + prior * LEAN_PRIOR_GAMES) / (n + LEAN_PRIOR_GAMES)) * 100) / 100, n };
+}
+
 /** One game's pick in the pool entry, as last shown before kickoff. */
 export interface EntryPick {
   team: string;

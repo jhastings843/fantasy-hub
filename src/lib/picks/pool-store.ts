@@ -5,7 +5,7 @@ import { getSeasonGames } from "@/lib/survivor/odds";
 import { getLegPicks } from "@/lib/survivor/sleeper-pool";
 import { SEASON } from "@/lib/survivor/report";
 import { getPicksCore } from "./report";
-import { tiebreakTotal, totalSpread, entryRecords, estimatedPublicHome, gradeTeams, optimizeStandings, type EntryWeek, type LiveGame, type Rival, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
+import { fitLean, tiebreakTotal, totalSpread, entryRecords, estimatedPublicHome, gradeTeams, optimizeStandings, type EntryWeek, type LiveGame, type Rival, optimizePool, type EntryPick, type PoolGame, type PoolResult } from "./pool";
 
 // Jack's Sleeper "Weekly payout" pick'em: straight up, no spread, no
 // confidence points, a winner each week (ties go to a tiebreaker). Its
@@ -95,6 +95,22 @@ async function fieldPicks(
  */
 export const FITTED_LEAN = 2.7;
 
+/**
+ * Every game's market chance and the pool's real pick share, as last seen
+ * before kickoff, across the season: what the lean refits on after each slate.
+ */
+const LEAN_OBS = `picks:v1:pool:${POOL.leagueId}:lean-obs:${SEASON}`;
+
+async function learnedLean(): Promise<{ lean: number; n: number }> {
+  const obs = ((await redis.hgetall<Record<string, { pHome: number; share: number }>>(LEAN_OBS).catch(() => null)) ?? {}) as Record<string, { pHome: number; share: number }>;
+  return fitLean(Object.values(obs), FITTED_LEAN) ?? { lean: FITTED_LEAN, n: 0 };
+}
+
+async function saveLeanObs(week: number, games: { key: string; pHome: number; publicHome: number; real: boolean }[]): Promise<void> {
+  const fields = Object.fromEntries(games.filter((g) => g.real).map((g) => [`${week}|${g.key}`, { pHome: g.pHome, share: g.publicHome }]));
+  if (Object.keys(fields).length) await redis.hset(LEAN_OBS, fields).catch(() => {});
+}
+
 /** Points a game's total misses its market total by (one SD) when the season has too few finals to measure: an estimate. */
 const FALLBACK_TOTAL_SD = 13.5;
 
@@ -113,17 +129,24 @@ export async function buildPoolView(): Promise<PoolView | null> {
   const open = slate.filter((g) => !g.completed && new Date(g.kickoff).getTime() > now);
   if (!open.length) return null;
 
-  const field = await fieldPicks(week).catch(() => null);
+  const [field, lean] = await Promise.all([fieldPicks(week).catch(() => null), learnedLean()]);
   let realGames = 0;
+  const realKeys = new Set<string>();
   const games: PoolGame[] = open
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff))
     .map((g) => {
       const h = field?.teamShare.get(canon(g.home));
       const a = field?.teamShare.get(canon(g.away));
       const real = h !== undefined ? h : a !== undefined ? 1 - a : null;
-      if (real !== null) realGames++;
-      return { key: `${g.away}@${g.home}`, home: g.home, away: g.away, pHome: g.homeWinProb, publicHome: real ?? estimatedPublicHome(g.homeWinProb, FITTED_LEAN), kickoff: g.kickoff };
+      if (real !== null) {
+        realGames++;
+        realKeys.add(`${g.away}@${g.home}`);
+      }
+      return { key: `${g.away}@${g.home}`, home: g.home, away: g.away, pHome: g.homeWinProb, publicHome: real ?? estimatedPublicHome(g.homeWinProb, lean.lean), kickoff: g.kickoff };
     });
+  // Open games only: the share and chance as they stand before kickoff (overwritten until then).
+  await saveLeanObs(week, games.map((g) => ({ key: g.key, pHome: g.pHome, publicHome: g.publicHome, real: realKeys.has(g.key) })));
+  const leanNote = lean.n ? `lean ${lean.lean}, refit after each slate on ${lean.n} games of this pool's real picks` : `lean ${FITTED_LEAN}, fitted on Weeks 3-4`;
   // Who is actually playing: this week's pickers if visible and not fewer than last week's scorers.
   const n = Math.max(field?.entries ?? 0, entrants);
   // Once a game has started, solve from the real board: everyone's correct
@@ -151,8 +174,8 @@ export async function buildPoolView(): Promise<PoolView | null> {
     entrantsSource: field && field.entries >= entrants ? `entries that have picked Week ${week} so far` : active ? `entries that scored in Week ${Number(lastLeg!.split(":").pop())}` : "all entries",
     fieldSource: realGames === games.length ? "actual" : "estimate",
     fieldNote: field
-      ? `real picks from ${field.entries} entries on ${realGames} of ${games.length} games${realGames < games.length ? `; the rest estimated from this pool's habit of backing favorites (lean ${FITTED_LEAN}, fitted on Weeks 3-4)` : ""}`
-      : `this week's picks aren't visible yet; estimated from this pool's habit of backing favorites (lean ${FITTED_LEAN}, fitted on Weeks 3-4)`,
+      ? `real picks from ${field.entries} entries on ${realGames} of ${games.length} games${realGames < games.length ? `; the rest estimated from this pool's habit of backing favorites (${leanNote})` : ""}`
+      : `this week's picks aren't visible yet; estimated from this pool's habit of backing favorites (${leanNote})`,
     games: games.map((g, i) => ({ ...g, pick: result.picks[i] })),
     result,
     tiebreaker: tb ? { game: `${last.away} at ${last.home}`, ...tb } : null,
