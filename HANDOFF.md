@@ -569,3 +569,8 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Sam: 3 legs, points only, cross-game, about +19,000 to +20,500 (about +479 a leg), role players with usage spikes, several tickets a day plus a ~+1000 "water down". Public: 1 hit (+19300 ~10/24), 1 near miss, no full record. At 1 in 194, at least one hit by luck is 5% over 10 tickets, 14% over 30.
 - Ours: main ticket 0-2 (-0.2u), legs +670 to +1880 so tickets run +80k to +650k; edge rungs 212 at 1u, 30 hits, -20.02u; long-rung calibration good (80 hits vs 79.2 ours, 88.4 DK).
 - Built (Jack's yes): RECIPES `sam-pts` (3 legs, pts only, legs +300 to +700, ranked by raw-model value, raw EV > 0) and `sam-pts-water` (same players, shortest stored pts rung; stored rungs start at +250 so it lands ~+4k to +6k, not Sam's ~+1000; storing shorter rungs would need market.ts LONG_MIN lowered). Judge from 10/29 on. Not built: boost for minutes-up after a teammate is ruled Out (news.ts extraOut).
+
+## Over/under lean check (2026-10-28)
+- Leans are ~70% under (NFL 525/215, NBA 1898/957); real outcomes went over only 45.7% (NFL) and 47.7% (NBA), so the tilt is partly right.
+- Edges vs 52.4% break-even (assumed -110): over edges NBA 212-238 (47.1%, p 0.025), NFL 39-44 (47.0%), both 251-282 (p 0.014). Under edges NBA 611-559 (52.2%), NFL 136-110 (55.3%), both 747-669 (52.8%). Over edges look like the leak; under edges are about break-even. NBA = 65 games (weeks 1-2), NFL = week 7 only.
+- Props edges are tracked only, so no money lost. The props learners can cut "over" slices on their own once the gate clears.
