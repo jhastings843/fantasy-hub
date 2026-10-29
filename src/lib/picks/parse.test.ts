@@ -82,6 +82,18 @@ describe("David's pages", () => {
     expect(b.rows).toHaveLength(14);
     expect(b.rows[0]).toMatchObject({ home: "DEN", away: "SEA", line: { market: 2.5, model: 1.5 } });
   });
+  it("reads the NFL board after David's 2026-10-28 rebuild (RSC payload)", () => {
+    const b = parseDavidBoard("nfl", fx("ds-board-wk8.html"));
+    expect(b.week).toBe(8);
+    expect(b.season).toBe(2026);
+    expect(b.rows).toHaveLength(14);
+    // projection.homeSpread -3.79, market.homeSpread -3.5, scores 21.99 and 25.78.
+    expect(b.rows[0]).toMatchObject({ home: "GB", away: "CAR", line: { market: -3.5, model: -3.8 }, modelTotal: 47.8 });
+    // Away favorite: Miami +7 at home, David has them +6.8.
+    expect(b.rows.find((r) => r.home === "MIA")!.line).toEqual({ market: 7, model: 6.8 });
+    // "LA" on his page is the Rams.
+    expect(b.rows.find((r) => r.away === "LAC")).toMatchObject({ home: "LA", line: { market: -6.5, model: -10.6 } });
+  });
   it("reads the college board", () => {
     const b = parseDavidBoard("cfb", fx("ds-cfb-board.html"));
     expect(b.week).toBe(6);

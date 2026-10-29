@@ -337,14 +337,16 @@ export function parseSheetWeek(league: League, week: number, csv: string): Grade
  * ("Projected margin" and "Vegas spread", both "<team> <number>", and no
  * projected scores in the markup), which emptied the board for Week 8's
  * Saturday. College now reads the games from the page's RSC payload first
- * (`davidCfbGames`) and falls back to the old text layout.
+ * (`davidCfbGames`) and falls back to the old text layout. The NFL page got the
+ * same rebuild on 2026-10-28 (Week 8 showed "not posted" for every game) and
+ * reads `davidNflGames` first the same way.
  */
 export function parseDavidBoard(league: League, html: string): Board {
   const t = textCells(html);
   const wk = t.match(/\| Week \| (\d+) \| Projections/);
   const season = t.match(/\| (20\d\d) \| /);
   const rows: BoardRow[] = [];
-  if (league === "nfl") {
+  if (league === "nfl" && (rows.push(...davidNflGames(html)), rows.length === 0)) {
     const re =
       /\| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| [A-Z]{2,3} \| ([A-Z][A-Za-z0-9. ']+?) \| [\d–-]+ \| Projected score \| ([\d.]+) \| Market [Ll]ine \| ([^|]+?) \| Model [Ll]ine \| ([^|]+?) \|/g;
     for (const m of t.matchAll(re)) {
@@ -363,7 +365,7 @@ export function parseDavidBoard(league: League, html: string): Board {
       if (isNaN(market) || isNaN(model)) continue;
       rows.push({ home, away, homeName: m[3], awayName: m[1], line: { market, model }, modelTotal: isNaN(total) ? undefined : total });
     }
-  } else if ((rows.push(...davidCfbGames(html)), rows.length === 0)) {
+  } else if (league === "cfb" && (rows.push(...davidCfbGames(html)), rows.length === 0)) {
     const re =
       /\| ([^|]+?) \| at \| ([^|]+?) \| ((?:[^|]+? \| ){0,12}?)Open \| [^|]+? \| Current \| ([^|]+?) \| Proj\. Line \| ([^|]+?) \|/g;
     for (const m of t.matchAll(re)) {
@@ -379,6 +381,49 @@ export function parseDavidBoard(league: League, html: string): Board {
     }
   }
   return { week: wk ? Number(wk[1]) : null, season: season ? Number(season[1]) : null, rows };
+}
+
+/**
+ * David's NFL games from the RSC payload (layout of 2026-10-28 on, same rebuild
+ * as the college page). Each game has away/home names, `projection.homeSpread`
+ * (his model, home side, unrounded) and `market.homeSpread` (home side). Lines
+ * and projected scores are rounded to a tenth, as the old layout printed them.
+ */
+function davidNflGames(html: string): BoardRow[] {
+  const rsc = rscText(html);
+  const rows: BoardRow[] = [];
+  for (const m of rsc.matchAll(/\{"id":"\d+","startDate":/g)) {
+    const raw = objectAt(rsc, m.index!);
+    if (!raw) continue;
+    let g: {
+      away?: { name?: string };
+      home?: { name?: string };
+      projection?: { awayScore?: number; homeScore?: number; homeSpread?: number };
+      market?: { homeSpread?: number | null };
+    };
+    try {
+      g = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const awayName = g.away?.name?.trim();
+    const homeName = g.home?.name?.trim();
+    const market = g.market?.homeSpread;
+    const model = g.projection?.homeSpread;
+    if (!awayName || !homeName || typeof market !== "number" || typeof model !== "number") continue;
+    const a = g.projection?.awayScore;
+    const h = g.projection?.homeScore;
+    const modelTotal = typeof a === "number" && typeof h === "number" ? round1(round1(a) + round1(h)) : undefined;
+    rows.push({
+      home: teamKey("nfl", homeName),
+      away: teamKey("nfl", awayName),
+      homeName,
+      awayName,
+      line: { market, model: round1(model) || 0 },
+      modelTotal,
+    });
+  }
+  return rows;
 }
 
 /**
