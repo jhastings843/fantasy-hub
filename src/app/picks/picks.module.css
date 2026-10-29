@@ -639,10 +639,9 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .edgeTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; }
 .edgeWho { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; letter-spacing: -.005em; overflow-wrap: anywhere; }
 /* The prop sits on the name's line, as loud as the name, so the bet reads at a glance; it wraps under a long name. */
-.edgeCard .edgeWho { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
-.edgeCard .edgeWho > span { font: inherit; color: var(--ink); }
-.edgeCard .edgeWho > .edgePick { font-weight: 800; white-space: nowrap; }
-.edgeCard .edgeWho > .edgePick::before { content: "·"; color: var(--mute); font-weight: 400; margin-right: 10px; }
+.edgeLine { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; letter-spacing: -.005em; overflow-wrap: anywhere; }
+.edgePick { font-weight: 800; white-space: nowrap; }
+.edgePick::before { content: "·"; color: var(--mute); font-weight: 400; margin-right: 10px; }
 .edgeBet { font-size: 13.5px; color: var(--ink2); margin-top: 2px; }
 .edgeTrio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid var(--rule); padding-top: 8px; margin: 0; }
 .edgeTrio dt { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
