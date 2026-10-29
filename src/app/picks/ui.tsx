@@ -3,7 +3,7 @@ import { BREAK_EVEN, MIN_SAMPLE, type Record as Rec, type Tier } from "@/lib/pic
 import type { League } from "@/lib/picks/parse";
 import type { RefLine } from "@/lib/picks/engine";
 import { TeamLogo } from "@/components/TeamLogo";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import s from "./picks.module.css";
 
 export const LEAGUE_NAME: { [k in League]: string } = { nfl: "NFL", cfb: "College" };
@@ -116,10 +116,12 @@ export function drawdown(steps: number[]): number {
 
 /** "Fri, Oct 30 · 7:30 PM · League Pass" wraps only at the dots, never inside "League Pass" or a score. */
 export function pieces(text: string): ReactNode {
+  // The space before each dot sits outside the no-wrap pieces: that is where the line may break.
   return text.split(" · ").map((x, i) => (
-    <span key={i} style={{ whiteSpace: "nowrap" }}>
-      {i ? ` · ${x}` : x}
-    </span>
+    <Fragment key={i}>
+      {i ? " " : ""}
+      <span style={{ whiteSpace: "nowrap" }}>{i ? `· ${x}` : x}</span>
+    </Fragment>
   ));
 }
 
