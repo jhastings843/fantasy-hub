@@ -7,7 +7,7 @@ import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import Link from "next/link";
 import { bookOf, priceWithBook } from "@/lib/picks/shop";
-import { GameCell, StrategyRow, TierChip, drawdown, href, kickoffEt, line, n, pct, price, rec, units } from "./ui";
+import { GameCell, pieces, StrategyRow, TierChip, drawdown, href, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
@@ -217,7 +217,7 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
             ) : st === "started" ? (
               <>
                 <span className={s.gLive}>Live</span>
-                {live && <span className={s.scoreLine}>{`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`}</span>}
+                {live && <span className={s.scoreLine}>{pieces(`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`)}</span>}
               </>
             ) : g.final ? (
               `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}`

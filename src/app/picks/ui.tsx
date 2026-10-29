@@ -114,6 +114,15 @@ export function drawdown(steps: number[]): number {
   return Math.round(worst * 100) / 100;
 }
 
+/** "Fri, Oct 30 · 7:30 PM · League Pass" wraps only at the dots, never inside "League Pass" or a score. */
+export function pieces(text: string): ReactNode {
+  return text.split(" · ").map((x, i) => (
+    <span key={i} style={{ whiteSpace: "nowrap" }}>
+      {i ? ` · ${x}` : x}
+    </span>
+  ));
+}
+
 /**
  * A board row's game: away over home, each with its logo, and the kickoff
  * (with the channel when ESPN lists one) underneath, so every row lines up
@@ -137,7 +146,7 @@ export function GameCell({ league, away, home, awayName, homeName, quote, status
         </span>
         {extra}
       </span>
-      <span className={s.matchWhen}>{status ?? when ?? "time TBD"}</span>
+      <span className={s.matchWhen}>{typeof status === "string" ? pieces(status) : status ?? (when ? pieces(when) : "time TBD")}</span>
     </span>
   );
 }

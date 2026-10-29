@@ -5,7 +5,7 @@ import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecor
 import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { BREAK_EVEN, MIN_SAMPLE } from "@/lib/picks/engine";
-import { drawdown, GameCell, href, line, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
+import { drawdown, GameCell, href, line, pieces, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow } from "../board";
 import { NbaGameModelCard } from "./game-model";
 import s from "../picks.module.css";
@@ -211,7 +211,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
             g.state === "in" ? (
               <>
                 <span className={s.gLive}>Live</span>
-                <span className={s.scoreLine}>{`${score}${score ? " · " : ""}${g.detail}`}</span>
+                <span className={s.scoreLine}>{pieces(`${score}${score ? " · " : ""}${g.detail}`)}</span>
               </>
             ) : g.state === "post" ? (
               `Final${score ? ` ${score}` : ""}`
