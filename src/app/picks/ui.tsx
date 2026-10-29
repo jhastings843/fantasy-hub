@@ -120,8 +120,8 @@ export function drawdown(steps: number[]): number {
  * the same whatever the team names. `status` replaces the kickoff line
  * (live score, final) and `extra` adds a chip after the home team.
  */
-export function GameCell({ league, away, home, awayName, homeName, quote, status, extra }: { league: League; away: string; home: string; awayName: string; homeName: string; quote?: Pick<RefLine, "kickoff" | "tv" | "homeId" | "awayId">; status?: ReactNode; extra?: ReactNode }) {
-  const lg = league === "nfl" ? "nfl" : "cfb";
+export function GameCell({ league, away, home, awayName, homeName, quote, status, extra }: { league: League | "nba"; away: string; home: string; awayName: string; homeName: string; quote?: Pick<RefLine, "kickoff" | "tv" | "homeId" | "awayId">; status?: ReactNode; extra?: ReactNode }) {
+  const lg = league === "nba" ? "nba" : league === "nfl" ? "nfl" : "cfb";
   const when = quote?.kickoff ? `${kickoffEt(quote.kickoff)}${quote.tv ? ` · ${quote.tv}` : ""}` : undefined;
   return (
     <span className={s.matchCell}>

@@ -724,7 +724,8 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .matchTeam { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; font-size: 14px; line-height: 1.25; color: var(--ink); }
 .matchName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .matchAt { font-weight: 400; color: var(--mute); font-size: 12.5px; }
-.matchWhen { padding-left: 26px; font-size: 12.5px; color: var(--mute); font-family: var(--font-plex-mono), monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Flush left under the logos and allowed to wrap, so a live score with its clock always shows in full (Jack, 2026-10-28). */
+.matchWhen { font-size: 12.5px; color: var(--mute); font-family: var(--font-plex-mono), monospace; line-height: 1.5; }
 .matchWhen .gLive { margin-left: 0; margin-right: 6px; padding: 1px 8px; border-radius: 5px; font-size: 11.5px; font-weight: 600; color: var(--gold); background: var(--gold-soft); font-family: var(--font-plex), sans-serif; }
 .matchWhen .scoreLine { margin-left: 0; }
 .ledger .gNum small.mktTeam { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

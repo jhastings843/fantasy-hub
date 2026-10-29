@@ -5,8 +5,7 @@ import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecor
 import { readNba } from "@/lib/picks/nba";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { BREAK_EVEN, MIN_SAMPLE } from "@/lib/picks/engine";
-import { TeamLogo } from "@/components/TeamLogo";
-import { drawdown, href, line, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
+import { drawdown, GameCell, href, line, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow } from "../board";
 import { NbaGameModelCard } from "./game-model";
 import s from "../picks.module.css";
@@ -191,54 +190,55 @@ function NbaWhy({ g }: { g: NbaBoardGame }) {
   );
 }
 
-function TeamLine({ t, score }: { t: NbaBoardGame["home"]; score?: number }) {
-  return (
-    <span className={n.team}>
-      <TeamLogo league="nba" team={t.abbr} size={22} />
-      <span className={n.name}>{t.short}</span>
-      {score !== undefined && <span className={n.score}>{score}</span>}
-    </span>
-  );
-}
-
+/** One game on the board, in the football boards' ledger shape (ats.tsx LedgerRow): matchup, market, Sam, our side and the read. */
 function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
   const { g } = x;
   const c = cells(x, m);
   const chip = readChip(x, m);
-  const when = g.state === "in" ? g.detail : `${day ? `${day} · ` : ""}${tipTime(g.tip)}`;
+  const tv = g.tv ? g.tv.replace(/^NBA League Pass$/, "League Pass") : "";
+  const score = g.score ? `${g.away.abbr} ${g.score.away}, ${g.home.abbr} ${g.score.home}` : "";
+  const sub = [c.pickSub, c.edge !== "·" ? `${m === "su" ? "margin" : "edge"} ${c.edge} pts` : ""].filter(Boolean).join(" · ");
   return (
-    <details className={n.row}>
+    <details className={`${s.gRow} ${s.ledger}`}>
       <summary>
-        <span className={n.teams}>
-          <TeamLine t={g.away} score={g.score?.away} />
-          <TeamLine t={g.home} score={g.score?.home} />
-          <span className={n.meta}>
-            {g.state === "in" ? <span className={n.live}>{`Live · ${when}`}</span> : when}
-            {g.tv ? ` · ${g.tv.replace(/^NBA League Pass$/, "League Pass")}` : ""}
-          </span>
-        </span>
-        <span className={n.num} data-k="Market" data-empty={c.market === "·" || undefined}>
+        <GameCell
+          league="nba"
+          away={g.away.abbr}
+          home={g.home.abbr}
+          awayName={g.away.short}
+          homeName={g.home.short}
+          status={
+            g.state === "in" ? (
+              <>
+                <span className={s.gLive}>Live</span>
+                <span className={s.scoreLine}>{`${score}${score ? " · " : ""}${g.detail}`}</span>
+              </>
+            ) : g.state === "post" ? (
+              `Final${score ? ` ${score}` : ""}`
+            ) : (
+              `${day ? `${day} · ` : ""}${tipTime(g.tip)}${tv ? ` · ${tv}` : ""}`
+            )
+          }
+        />
+        <span className={s.gNum} data-k={m === "su" ? "Moneyline" : "DraftKings"}>
           {c.market}
           {"marketSub" in c && c.marketSub ? <small>{c.marketSub}</small> : null}
         </span>
-        <span className={`${n.num} ${s.cSam}`} data-k="Sam" data-empty={c.sam === "·" || undefined}>
-          {c.sam}
+        <span className={s.gNum} data-k="Sam">
+          <span className={s.cSam} style={{ whiteSpace: "nowrap" }}>{c.sam === "·" ? "·" : `Sam ${c.sam}`}</span>
         </span>
-        <span className={n.num} data-k="Pick" data-empty={!x.bet || undefined}>
+        <span className={s.gNum} data-k="Side">
           {c.pick}
-          {c.pickSub ? <small>{c.pickSub}</small> : null}
+          {sub && <small>{sub}</small>}
         </span>
-        <span className={`${n.num} ${n.edge}`} data-k="Edge" data-empty={c.edge === "·" || undefined}>
-          {c.edge}
-        </span>
-        <span className={n.read}>
+        <span className={s.ledgerRead}>
           <span className={`${s.readChip} ${chip[1]}`}>{chip[0]}</span>
         </span>
-        <span className={n.chev} aria-hidden>
+        <span className={s.chev} aria-hidden>
           ›
         </span>
       </summary>
-      <div className={n.body}>
+      <div className={s.gBody}>
         <NbaWhy g={g} />
       </div>
     </details>
@@ -247,13 +247,12 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
 
 function RowsTable({ rows, m }: { rows: { x: Read; day: string }[]; m: Market }) {
   return (
-    <div className={n.table}>
-      <div className={n.head} aria-hidden>
+    <div className={s.gtable}>
+      <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
         <span>Game</span>
         <span>{m === "su" ? "Moneyline" : "DraftKings"}</span>
         <span>Sam</span>
-        <span>Pick</span>
-        <span>{m === "su" ? "Margin" : "Edge"}</span>
+        <span>Side</span>
         <span>Read</span>
         <span />
       </div>
