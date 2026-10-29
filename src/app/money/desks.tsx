@@ -162,7 +162,7 @@ export function desks(v: View): Desk[] {
     out.push({
       id: "intraday",
       money: "usd",
-      name: "Intraday",
+      name: "Day Trader",
       what: "Opening-range breakouts, Time Machine filter",
       result: pct(ret),
       rec: days ? `${days} ${days === 1 ? "session" : "sessions"}, ${ix.record?.taken.n ?? 0} trades` : "Waiting for the first session",

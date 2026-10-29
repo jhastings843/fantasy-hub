@@ -91,18 +91,18 @@ export function IntradayHero({ d }: { d: Intraday }) {
   const days = d.record?.days ?? (d.curve ?? []).length;
   return (
     <DeskHero
-      eyebrow="Intraday · opening-range breakouts · paper"
+      eyebrow="Day Trader · opening-range breakouts · paper"
       title={
         h.waiting ? (
-          "Intraday: waiting for the first session"
+          "Day Trader: waiting for the first session"
         ) : h.edge !== null ? (
           <>
-            {"Intraday: "}
+            {"Day Trader: "}
             <span className={h.edge >= 0 ? s.pos : s.neg}>{`${pct(h.edge, 2)} vs SPY`}</span>
           </>
         ) : (
           <>
-            {"Intraday: "}
+            {"Day Trader: "}
             <span className={h.ret >= 0 ? s.pos : s.neg}>{usd(h.equity - h.start, true)}</span>
           </>
         )
@@ -136,7 +136,7 @@ export function IntradayTab({ d }: { d: Intraday }) {
   return (
     <section className={s.section}>
       <Stats
-        label="Intraday at a glance"
+        label="Day Trader at a glance"
         items={[
           { k: "Book", v: pct(h.ret, 2), sub: `${usd(h.equity)} of ${usd(h.start)}`, tone: h.ret > 0 ? "up" : h.ret < 0 ? "down" : undefined },
           { k: "SPY, same days", v: h.spyRet !== null ? pct(h.spyRet, 2) : "·", sub: "open to close each day" },
@@ -152,14 +152,14 @@ export function IntradayTab({ d }: { d: Intraday }) {
           </div>
           <LineChart
             series={[
-              { label: "Intraday book", points: curve.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
+              { label: "Day Trader book", points: curve.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
               { label: "SPY, open to close", points: curve.filter((c) => c.spy !== null).map((c) => ({ x: t(c.day), y: c.spy! })) },
             ]}
             baseline={h.start}
             format={(y) => `$${(y / 1000).toFixed(1)}k`}
             height={240}
             width={900}
-            ariaLabel="The intraday book against SPY"
+            ariaLabel="The Day Trader book against SPY"
           />
         </div>
       ) : (

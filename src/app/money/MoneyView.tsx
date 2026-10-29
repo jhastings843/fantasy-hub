@@ -29,7 +29,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "kalshi", label: "Kalshi" },
   { id: "books", label: "Stock books" },
   { id: "trends", label: "Trends" },
-  { id: "intraday", label: "Intraday" },
+  { id: "intraday", label: "Day Trader" },
   { id: "weather", label: "Weather" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
@@ -1628,11 +1628,11 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
         )}
         {ix && (
           <div className={m.panel}>
-            <div className={m.panelHead}><h2 className={m.panelTitle}>Intraday</h2><Link className={m.panelLink} href={href("intraday")}>Breakouts and filter</Link></div>
+            <div className={m.panelHead}><h2 className={m.panelTitle}>Day Trader</h2><Link className={m.panelLink} href={href("intraday")}>Breakouts and filter</Link></div>
             {(ix.curve ?? []).length > 1 ? (
               <LineChart
                 series={[
-                  { label: "Intraday book", points: ix.curve!.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
+                  { label: "Day Trader book", points: ix.curve!.map((c) => ({ x: t(c.day), y: c.equity })), tone: "auto" },
                   { label: "SPY, open to close", points: ix.curve!.filter((c) => c.spy !== null).map((c) => ({ x: t(c.day), y: c.spy! })) },
                 ]}
                 baseline={ix.start ?? 100_000}
@@ -1789,12 +1789,12 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
           : <p className={s.calm}>The trend book hasn&apos;t posted yet. It reports after the next 6:30am run.</p>)}
         {v && tab === "intraday" && snap?.intraday && !snap.intraday.error && <IntradayHero d={snap.intraday} />}
         {v && tab === "intraday" && snap && (snap.intraday
-          ? (snap.intraday.error ? <p className={s.error}>{`The intraday desk failed: ${snap.intraday.error}`}</p> : <IntradayTab d={snap.intraday} />)
-          : <p className={s.calm}>The intraday desk hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
+          ? (snap.intraday.error ? <p className={s.error}>{`The Day Trader desk failed: ${snap.intraday.error}`}</p> : <IntradayTab d={snap.intraday} />)
+          : <p className={s.calm}>The Day Trader hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
 
         <footer className={s.footer}>
           <span>
-            Phil, Kalshi Phil, the stock books and the intraday desk run on the Mac and post a snapshot here after each run. Bets grade from ESPN. Everything here is paper
+            Phil, Kalshi Phil, the stock books and the Day Trader run on the Mac and post a snapshot here after each run. Bets grade from ESPN. Everything here is paper
             money or betting units, a record and not advice.
           </span>
         </footer>
