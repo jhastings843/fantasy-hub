@@ -89,8 +89,8 @@ describe("ticket recipes", () => {
   const rungs = rungsOf(boards);
   const by = (id: string) => RECIPES.find((r) => r.id === id)!;
 
-  it("is a fixed list of 12, the original first", () => {
-    expect(RECIPES).toHaveLength(12);
+  it("is a fixed list of 12 plus the two Sam-style tickets, the original first", () => {
+    expect(RECIPES).toHaveLength(14);
     expect(recipeRecords(rungs)[0].recipe.id).toBe("l3-value");
   });
   it("picks each game's leg by the recipe", () => {
@@ -103,5 +103,27 @@ describe("ticket recipes", () => {
     expect(rec["l2-chance"]).toMatchObject({ n: 1, won: 1 });
     expect(rec["l2-long"]).toMatchObject({ n: 1, won: 0, net: -0.1 });
     expect(rec["l5-value"].n).toBe(0);
+  });
+});
+
+describe("Sam-style recipes", () => {
+  const tip = "2026-10-27T23:10:00Z";
+  const boards = [
+    board("1", tip, "Tyson", [{ line: 9.5, over: 260, ours: 0.35 }, { line: 14.5, over: 420, ours: 0.25 }], 20),
+    board("2", tip, "Hardaway", [{ line: 14.5, over: 500, ours: 0.2 }, { line: 19.5, over: 900, ours: 0.12 }], 16),
+    board("3", tip, "Jakucionis", [{ line: 14.5, over: 630, ours: 0.16 }], 10),
+  ];
+  const rungs = rungsOf(boards);
+  const by = (id: string) => RECIPES.find((r) => r.id === id)!;
+
+  it("takes points legs priced +300 to +700 only", () => {
+    const t = ticket("2026-10-27", rungs, by("sam-pts"))!;
+    expect(t.legs.map((l) => `${l.player} ${l.line}`).sort()).toEqual(["Hardaway 14.5", "Jakucionis 14.5", "Tyson 14.5"]);
+    expect(t.legs.every((l) => l.over >= 300 && l.over <= 700)).toBe(true);
+  });
+  it("waters down to the same players' shortest rungs", () => {
+    const w = ticket("2026-10-27", rungs, by("sam-pts-water"))!;
+    expect(w.legs.map((l) => `${l.player} ${l.line}`).sort()).toEqual(["Hardaway 14.5", "Jakucionis 14.5", "Tyson 9.5"]);
+    expect(w.price).toBeLessThan(ticket("2026-10-27", rungs, by("sam-pts"))!.price);
   });
 });

@@ -322,8 +322,10 @@ function RecipeTable({ rungs }: { rungs: Rung[] }) {
       <SecHead title="Ticket recipes" aside={`${rows.length} built every night, paper only, ${STAKE}u each`} />
       <p className={s.p}>
         Same rungs, different ways to build the ticket: 2 to 5 legs, each leg the game&apos;s best value, likeliest or longest price
-        (value rungs only). The list was fixed before any results, so the winner can&apos;t be picked after the fact. With a dozen recipes
-        one will look good by luck: trust a recipe only when its hits run ahead of what our chances expected over many nights.
+        (value rungs only). The list was fixed before any results, so the winner can&apos;t be picked after the fact. Two Sam-style
+        tickets joined on Oct 28: 3 points legs at +300 to +700 picked on our raw model (near +20,000), and a watered-down copy with the
+        same players on their shortest points rung. With this many recipes one will look good by luck: trust a recipe only when its hits
+        run ahead of what our chances expected over many nights.
       </p>
       <div className={s.tw}>
         <table className={s.table}>

@@ -563,9 +563,9 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 
 ## NFL props: early line vs game-day line (2026-10-28)
 - Jack asked if NFL props are worth looking at before game day. Free check from saved data (`first` line vs final line): week 7 only (14 games, 442 graded props). Lines moved on 226, avg 2.69; toward our number 112, away 114. Our lean hit 55.9% at the final line vs 54.5% at the first; edges 53.9% vs 52.6%. No sign early is better; one week is thin. Re-run after more weeks (script pattern: scratchpad early-lines.mts reading NK.week).
-- FLAG: `props:v1:ours:nfl:2026:weeks` holds only week 7 on 10/28; week 8 looks unsaved. Check runOurNflProps for week 8.
+- Week 8 was not missing: the 14 graded games ARE week 7 (Oct 22-26). ESPN still said week 7 Tuesday night and GitHub skipped Wednesday's 6:30pm first-td.yml slot; a hand run 10/29 01:50Z saved week 8 (14 games props, 14 First TD). If Wednesday slots keep getting skipped, early lines for the Thursday game are lost.
 
 ## Lottos vs Sam (2026-10-28, research only, nothing changed)
 - Sam: 3 legs, points only, cross-game, about +19,000 to +20,500 (about +479 a leg), role players with usage spikes, several tickets a day plus a ~+1000 "water down". Public: 1 hit (+19300 ~10/24), 1 near miss, no full record. At 1 in 194, at least one hit by luck is 5% over 10 tickets, 14% over 30.
 - Ours: main ticket 0-2 (-0.2u), legs +670 to +1880 so tickets run +80k to +650k; edge rungs 212 at 1u, 30 hits, -20.02u; long-rung calibration good (80 hits vs 79.2 ours, 88.4 DK).
-- Candidate changes (not built): points-only recipe with legs +300 to +700; rank by raw model vs DK and boost minutes-up-after-teammate-Out; water-down companion ticket.
+- Built (Jack's yes): RECIPES `sam-pts` (3 legs, pts only, legs +300 to +700, ranked by raw-model value, raw EV > 0) and `sam-pts-water` (same players, shortest stored pts rung; stored rungs start at +250 so it lands ~+4k to +6k, not Sam's ~+1000; storing shorter rungs would need market.ts LONG_MIN lowered). Judge from 10/29 on. Not built: boost for minutes-up after a teammate is ruled Out (news.ts extraOut).

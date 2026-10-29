@@ -107,33 +107,72 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
  * - long:   the game's longest price, games ranked by price
  * The list is fixed up front so a lucky recipe can't be picked after the fact.
  */
-export type Pick = "value" | "chance" | "long";
+export type Pick = "value" | "chance" | "long" | "raw";
 export interface Recipe {
   id: string;
   label: string;
   legs: number;
   pick: Pick;
+  /** Only this stat's rungs (Sam's are points only). */
+  stat?: string;
+  /** Only legs DK prices in this band (American). */
+  band?: [number, number];
+  /** Water-down: the same players as `of`, each on his shortest rung of the stat. */
+  water?: string;
 }
-const PICK_LABEL: { [k in Pick]: string } = { value: "best value", chance: "likeliest", long: "longest price" };
-export const RECIPES: Recipe[] = [2, 3, 4, 5].flatMap((legs) =>
-  (["value", "chance", "long"] as const).map((pick) => ({ id: `l${legs}-${pick}`, label: `${legs} legs, ${PICK_LABEL[pick]}`, legs, pick })),
-);
+const PICK_LABEL: { [k in Pick]: string } = { value: "best value", chance: "likeliest", long: "longest price", raw: "best raw value" };
+/**
+ * Sam style (Jack, 2026-10-28, after @TheModelManSam cashed +19,300): 3 legs,
+ * points only, legs +300 to +700 so a ticket lands near +20,000, picked on our
+ * raw model (the blend leans on DK, which hides a role player's usage spike).
+ * His "water down" ticket plays the same players lower; ours can only go down
+ * to the +250 rungs the boards store, so it lands near +4,000 to +6,000.
+ * Added after three nights of results; judged from 2026-10-29 on.
+ */
+const SAM: Recipe[] = [
+  { id: "sam-pts", label: "Sam style: 3 legs, points, +300 to +700", legs: 3, pick: "raw", stat: "pts", band: [300, 700] },
+  { id: "sam-pts-water", label: "Sam style, watered down: same players, shortest points rung", legs: 3, pick: "raw", stat: "pts", water: "sam-pts" },
+];
+export const RECIPES: Recipe[] = [
+  ...[2, 3, 4, 5].flatMap((legs) =>
+    (["value", "chance", "long"] as const).map((pick) => ({ id: `l${legs}-${pick}`, label: `${legs} legs, ${PICK_LABEL[pick]}`, legs, pick })),
+  ),
+  ...SAM,
+];
 /** The original nightly ticket, the one the learner and the Today page follow. */
 export const DEFAULT_RECIPE: Recipe = RECIPES.find((r) => r.id === `l${LEGS}-value`)!;
 
-const score: { [k in Pick]: (r: Rung) => number } = { value: (r) => r.ev, chance: (r) => r.ours, long: (r) => r.over };
+/** A rung's value on our raw model, before the blend toward DK. */
+const rawEv = (r: Rung) => r.raw * dec(r.over) - 1;
+const score: { [k in Pick]: (r: Rung) => number } = { value: (r) => r.ev, chance: (r) => r.ours, long: (r) => r.over, raw: rawEv };
 
 /** The night's ticket under a recipe: one positive-value rung per game, the top games. Null when too few games qualify. */
 export function ticket(date: string, rungs: Rung[], recipe: Recipe = DEFAULT_RECIPE): Ticket | null {
+  if (recipe.water) return watered(date, rungs, recipe);
   const by = score[recipe.pick];
   const best = new Map<string, Rung>();
   for (const r of rungs) {
-    if (r.date !== date || r.ev <= 0) continue;
+    if (r.date !== date || (recipe.pick === "raw" ? rawEv(r) : r.ev) <= 0) continue;
+    if (recipe.stat && r.stat !== recipe.stat) continue;
+    if (recipe.band && (r.over < recipe.band[0] || r.over > recipe.band[1])) continue;
     const cur = best.get(r.game);
     if (!cur || by(r) > by(cur)) best.set(r.game, r);
   }
   const legs = [...best.values()].sort((a, b) => by(b) - by(a) || a.id.localeCompare(b.id)).slice(0, recipe.legs);
   if (legs.length < recipe.legs) return null;
+  return priced(date, legs);
+}
+
+/** The water-down ticket: the parent ticket's players, each on his shortest rung of the stat. */
+function watered(date: string, rungs: Rung[], recipe: Recipe): Ticket | null {
+  const parent = RECIPES.find((r) => r.id === recipe.water);
+  const base = parent ? ticket(date, rungs, parent) : null;
+  if (!base) return null;
+  const legs = base.legs.map((l) => rungs.filter((r) => r.date === date && r.id === l.id).sort((a, b) => a.over - b.over)[0] ?? l);
+  return priced(date, legs);
+}
+
+function priced(date: string, legs: Rung[]): Ticket {
   const standing = legs.filter((l) => l.hit !== "void");
   const graded = legs.every((l) => l.hit !== null);
   const d = standing.reduce((a, l) => a * dec(l.over), 1);
