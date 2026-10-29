@@ -130,8 +130,11 @@ export function EdgeCard({ e }: { e: Edge }) {
         <span className={s.muted}>{e.when ? whenEt(e.when) : ""}</span>
       </div>
       <div>
-        <div className={s.edgeWho}>{e.player}</div>
-        <div className={s.edgeBet}>{`${e.bet} · ${e.price} · ${e.game}`}</div>
+        <div className={s.edgeWho}>
+          <span>{e.player}</span>
+          <span className={s.edgePick}>{e.bet}</span>
+        </div>
+        <div className={s.edgeBet}>{`${e.price} · ${e.game}`}</div>
       </div>
       <dl className={s.edgeTrio}>
         <div>
