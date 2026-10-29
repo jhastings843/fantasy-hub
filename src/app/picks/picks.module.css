@@ -102,6 +102,8 @@
 .right { font-size: 13px; text-align: right; }
 .srow .right { white-space: nowrap; }
 .pos { color: var(--pos); }
+/* A graded table row that hit (the first basket scorer): green wash across the row. */
+.rowHit td { background: color-mix(in srgb, var(--pos) 16%, transparent); }
 .neg { color: var(--neg); }
 .track { position: relative; height: 14px; background: var(--track); border-radius: 3px; }
 .ci { position: absolute; top: 0; bottom: 0; background: var(--ci); border-radius: 3px; }
@@ -595,6 +597,11 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .slipDash { border: 1.5px dashed var(--rule); background: transparent; }
 .slipTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; }
 .slipPick { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: 24px; line-height: 1.1; letter-spacing: -.005em; }
+/* Pick line with its team logo; a total shows both teams, the home logo tucked under the away one. */
+.slipHead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.slipLogo { flex: 0 0 auto; display: inline-flex; }
+.slipLogoPair { flex: 0 0 auto; display: inline-flex; align-items: flex-start; width: 44px; height: 40px; }
+.slipLogoPair > :last-child { margin-left: -8px; align-self: flex-end; }
 .slipNote { margin: 0; font-size: 13px; color: var(--ink2); }
 .slipStub { display: flex; flex-wrap: wrap; gap: 4px 18px; border-top: 1px dashed var(--rule); padding-top: 9px; font-size: 13px; color: var(--ink2); }
 .slipStub b { color: var(--ink); font-weight: 600; }

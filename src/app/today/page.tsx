@@ -6,6 +6,7 @@ import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { readGame } from "../picks/nba/NbaView";
 import { findGame, scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { TeamLogo, type LogoLeague } from "@/components/TeamLogo";
 import { loadProducts } from "../props/top";
 import { ModelGrid, PageHead, SecHead, Stats, statusChip, type ModelRow } from "../picks/board";
 import { LEAGUE_NAME, kickoffEt, line, price, rec } from "../picks/ui";
@@ -27,8 +28,16 @@ export const metadata: Metadata = {
 const seasonOf = (d: Date) => (d.getMonth() < 7 ? d.getFullYear() - 1 : d.getFullYear());
 const u = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}u`;
 
+interface Logo {
+  team: string;
+  /** ESPN team id; college logos need it. */
+  id?: string;
+}
+
 interface Slip {
   key: string;
+  /** The side's team, or both teams for a total. */
+  logos: { league: LogoLeague; teams: Logo[] };
   /** Board team keys, to find the live score. */
   awayKey?: string;
   homeKey?: string;
@@ -54,18 +63,19 @@ function footballSlips(r: PicksReport): Slip[] {
     const kick = g.ref?.kickoff ?? "";
     const state = g.basis === "started" ? "live" : "next";
     const game = `${n(g.away)} at ${n(g.home)}`;
+    const team = (side: "home" | "away"): Logo => (side === "home" ? { team: g.home, id: g.ref?.homeId } : { team: g.away, id: g.ref?.awayId });
     if (g.issued) {
       const side = g.issued.side;
-      out.push({ key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
+      out.push({ key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, logos: { league: r.league, teams: [team(side)] }, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
     } else if (g.stake && g.side && g.homeLine !== undefined && state === "next") {
-      out.push({ key: `${r.league}-${g.home}`, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out with the next picks email." });
+      out.push({ key: `${r.league}-${g.home}`, logos: { league: r.league, teams: [team(g.side)] }, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out with the next picks email." });
     }
   }
   for (const t of r.totals.board) {
     const g = r.board.find((x) => x.home === t.home && x.away === t.away);
     if (!g || g.final || !t.issued) continue;
     const kick = g.ref?.kickoff ?? "";
-    out.push({ key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
+    out.push({ key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, logos: { league: r.league, teams: [{ team: g.away, id: g.ref?.awayId }, { team: g.home, id: g.ref?.homeId }] }, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
   }
   return out;
 }
@@ -85,9 +95,16 @@ function SlipCard({ x }: { x: Slip }) {
         {chip}
         <span className={s.muted}>{x.state === "live" ? <span className={`${s.readChip} ${s.readLive}`}>Live</span> : `${x.league} · ${x.when}`}</span>
       </div>
-      <div>
-        <div className={s.slipPick}>{x.pick}</div>
-        <div className={`${s.num} ${s.muted}`} style={{ fontSize: 13 }}>{`${x.league} · ${x.game}`}</div>
+      <div className={s.slipHead}>
+        <span className={x.logos.teams.length > 1 ? s.slipLogoPair : s.slipLogo}>
+          {x.logos.teams.map((t) => (
+            <TeamLogo key={t.team} league={x.logos.league} team={t.team} espnId={t.id} size={x.logos.teams.length > 1 ? 26 : 36} />
+          ))}
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div className={s.slipPick}>{x.pick}</div>
+          <div className={`${s.num} ${s.muted}`} style={{ fontSize: 13 }}>{`${x.league} · ${x.game}`}</div>
+        </div>
       </div>
       {x.note && <p className={s.slipNote}>{x.note}</p>}
       <div className={s.slipStub}>
@@ -134,8 +151,10 @@ export default async function TodayPage() {
     .filter((g) => g.state === "in")
     .map((raw) => {
       const x = readGame(raw, nbaView);
+      const picked = x.bet?.side === "home" ? raw.home : x.bet?.side === "away" ? raw.away : null;
       return {
         key: `nba-${raw.id}`,
+        logos: { league: "nba" as const, teams: picked ? [{ team: picked.abbr }] : [{ team: raw.away.abbr }, { team: raw.home.abbr }] },
         league: "NBA",
         // No saved read, or a read with no side (readGame then falls back to the matchup): nothing to show, so the card is left out.
         pick: x.r && x.pick !== `${raw.away.short} at ${raw.home.short}` ? x.pick : "",
