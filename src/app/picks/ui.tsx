@@ -116,11 +116,13 @@ export function drawdown(steps: number[]): number {
 
 /** "Fri, Oct 30 · 7:30 PM · League Pass" wraps only at the dots, never inside "League Pass" or a score. */
 export function pieces(text: string): ReactNode {
-  // The space before each dot sits outside the no-wrap pieces: that is where the line may break.
-  return text.split(" · ").map((x, i) => (
+  // Each dot stays at the end of the piece before it, and the space after it is the only place the line breaks,
+  // so a wrapped line never starts with a dot.
+  const xs = text.split(" · ");
+  return xs.map((x, i) => (
     <Fragment key={i}>
       {i ? " " : ""}
-      <span style={{ whiteSpace: "nowrap" }}>{i ? `· ${x}` : x}</span>
+      <span style={{ whiteSpace: "nowrap" }}>{i < xs.length - 1 ? `${x} ·` : x}</span>
     </Fragment>
   ));
 }
