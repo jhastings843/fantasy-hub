@@ -6,10 +6,12 @@
 import { allBoards, getNbaSectionLearning, getOurNbaView, type OurStoredProps } from "@/lib/models/nba/store";
 import { bestTag, gradeTag, type KotcTag } from "@/lib/models/nba/kotc-tag";
 import KOTC from "@/lib/models/nba/kotc-params.json";
-import { implied, payout } from "@/lib/props/parse";
+import { payout } from "@/lib/props/parse";
 import { SECTIONS, kotcStakedTop } from "@/lib/models/sections";
 import { LearnerLogBody } from "./top";
 import { getKotcNights, type KotcNight } from "@/lib/models/nba/kotc-store";
+import { crowdMultiplier, fetchMostBet, heatOf, type KotcCrowd } from "@/lib/models/nba/kotc-crowd";
+import { etDate } from "@/lib/props/parse";
 import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats } from "../picks/board";
 import { GameTable, type GameRowData } from "./week";
@@ -20,34 +22,46 @@ const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes" };
 const ROWS = 30;
-/** Cards up top: the best tags tonight. */
+/** Cards up top: the players to tag tonight, picked from our likeliest kings. */
 const CARDS = 3;
+/** Only our top 15 to be king compete for a card, so a pick always has a real chance (Jack: "balancing odds to win"). */
+const CANDIDATES = 15;
 /** DK's standard pool, the minimum tagged bet, and what a bonus bet converts to (estimate, see the explainer). */
 const POOL = 1_000_000;
 const STAKE_USD = 5;
 const BONUS_CASH = 0.7;
 const nowMs = () => Date.now();
+const usd0 = (x: number) => `$${Math.round(x).toLocaleString("en-US")}`;
 const usd = (x: number) => `${x < 0 ? "−" : ""}$${Math.abs(x).toFixed(2)}`;
 const tagText = (t: KotcTag) => `${t.side === "over" ? "Over" : "Under"} ${t.m.line} ${SHORT[t.m.stat ?? ""] ?? t.m.statLabel}`;
 
 /**
  * Who the crowd backs, from the fit on DK's posted payouts (kotc-params.json
- * crowd: backers per pool = e^a x chance^b, 18 paid nights). Each player's share
- * of tonight's tags is his e^a x p^b over the slate's total. Estimate.
+ * crowd: backers per pool = e^a x chance^b, 18 paid nights), times each
+ * player's heat on tonight's most-bet props list (kotc-crowd.ts). Each
+ * player's share of tonight's tags is his weight over the slate's total. Estimate.
  */
-function crowdShares(rows: { id: string; p: number }[]): Map<string, number> {
-  const w = rows.map((r) => Math.pow(Math.max(r.p, 1e-6), KOTC.crowd.b));
+function crowdShares(rows: { id: string; p: number; mult: number }[]): Map<string, number> {
+  const w = rows.map((r) => Math.pow(Math.max(r.p, 1e-6), KOTC.crowd.b) * r.mult);
   const tot = w.reduce((a, x) => a + x, 0) || 1;
   return new Map(rows.map((r, i) => [r.id, w[i] / tot]));
 }
 
-/** What one $5 tag is worth (estimate): the bonus-bet pool share if he is king, plus the prop's own expected profit. */
-function tagValue(p: number, t: KotcTag | null): { bonus: number; prop: number; total: number } {
-  const backers = Math.exp(KOTC.crowd.a) * Math.pow(Math.max(p, 1e-6), KOTC.crowd.b);
-  const bonus = (BONUS_CASH * POOL * p) / Math.max(backers, 1);
+/**
+ * What one $5 tag is worth (estimate): the bonus bet if he is king (face value),
+ * its expected cash value, and the prop's own expected profit. `mult` is the
+ * crowd multiplier from tonight's most-bet list (1 when he isn't on it).
+ */
+function tagValue(p: number, t: KotcTag | null, mult = 1): { ifKing: number; bonus: number; prop: number; total: number } {
+  const backers = Math.exp(KOTC.crowd.a) * Math.pow(Math.max(p, 1e-6), KOTC.crowd.b) * mult;
+  const ifKing = POOL / Math.max(backers, 1);
+  const bonus = BONUS_CASH * p * ifKing;
   const prop = t ? STAKE_USD * (t.ours * (1 + payout(t.price)) - 1) : 0;
-  return { bonus, prop, total: bonus + prop };
+  return { ifKing, bonus, prop, total: bonus + prop };
 }
+
+/** How the most-bet list reads on one player. */
+const heatText = (rows: number, mult: number) => (rows ? `${rows} of the top 50 most-bet props · ~${mult.toFixed(1)}x backers` : "Not on the most-bet list");
 
 /** Our chance and the crowd's share as two bars on one scale. */
 function KingBars({ ours, crowd, top }: { ours: number; crowd: number; top: number }) {
@@ -83,7 +97,8 @@ function Explainer() {
         worth about the same: roughly $7.60 of bonus-bet cash value per $1M of pool (a bonus bet converts to about 70 cents; estimate).
         The edge is in single players the crowd misses: Banchero (we gave 14%, 2,466 backers, paid $811) against Wembanyama (we
         gave 4.6%, 15,873 backers). Lesser names with a big chance are the tags to look for; a household name at the same chance is
-        likely over-backed.
+        likely over-backed. To catch that, each promo afternoon the board reads DraftKings Network&apos;s most-bet NBA props
+        list (ranked by money bet) and discounts players near the top of it, then picks the three tags from our 15 likeliest kings.
       </p>
       <p className={s.p}>
         Chances come from 20,000 runs of the whole slate on our props model&apos;s projections: each game&apos;s pace is shared by both
@@ -126,15 +141,26 @@ export async function KotcWeek({ season }: { season: number }) {
   const boards = (v?.board ?? []).filter((g) => n.games.some((x) => x.id === g.espnId));
   const top = n.board.rows[0];
   const started = Date.parse(n.firstTip) <= now;
-  const crowd = crowdShares(n.board.rows);
+  // Tonight's most-bet list: the copy saved with the night, or a live read while today's slate hasn't started.
+  let list: KotcCrowd | null = n.crowd ?? null;
+  if (!list && !started && n.date === etDate(new Date(now))) list = await fetchMostBet().catch(() => null);
+  const heat = (name: string) => (list ? heatOf(list.rows, name) : 0);
+  const listed = (name: string) => (list ? list.rows.filter((r) => heatOf([r], name) > 0).length : 0);
+  const crowd = crowdShares(n.board.rows.map((r) => ({ id: r.id, p: r.p, mult: crowdMultiplier(heat(r.name)) })));
   // Every player in our top 30 gets a prop to tag (Jack, 2026-10-27), edge or not: a tag only counts with a bet on him.
   const rows = n.board.rows.slice(0, ROWS).map((r, i) => {
     const t = bestTag(boards, r.name);
-    return { r, i, t, crowd: crowd.get(r.id) ?? 0, value: tagValue(r.p, t) };
+    const mult = crowdMultiplier(heat(r.name));
+    return { r, i, t, mult, listed: listed(r.name), crowd: crowd.get(r.id) ?? 0, value: tagValue(r.p, t, mult) };
   });
-  // Cards come from reads with 3+ games this season when there are any: earlier numbers lean on last season, and their big "edges" are mostly that.
-  const settled = rows.filter((x) => x.t && !x.t.early);
-  const best = [...(settled.length >= CARDS ? settled : rows.filter((x) => x.t))].sort((a, b) => b.value.total - a.value.total).slice(0, CARDS);
+  // Cards pick the player, not the prop (Jack, 2026-10-28: the 0.5u prop doesn't matter, the bonus does): of our 15
+  // likeliest kings with a prop to tag, the most expected bonus after the crowd discount, then the better chance.
+  // Expected bonus is compared to the dollar: the crowd fit's exponent (1.006) alone moves it by cents, and that is
+  // noise, so players the list doesn't flag tie and the likelier king goes first.
+  const best = rows
+    .filter((x) => x.t && x.i < CANDIDATES)
+    .sort((a, b) => Math.round(b.value.bonus) - Math.round(a.value.bonus) || b.r.p - a.r.p)
+    .slice(0, CARDS);
   const scale = Math.max(top.p, ...rows.map((x) => x.crowd));
   // A live learner slice turns our top N's tagged props into bets (Jack, 2026-10-26).
   const betTop = learning ? kotcStakedTop(learning.entries, n.firstTip) : 0;
@@ -143,8 +169,8 @@ export async function KotcWeek({ season }: { season: number }) {
     <section className={s.section} aria-labelledby="kotc-today">
       <Hero
         eyebrow={`King of the Court · ${n.date}`}
-        title={<span id="kotc-today">{best[0] ? `Best tag: ${best[0].r.name}, ${tagText(best[0].t!)}` : `${top.name} leads at ${pct(top.p)}`}</span>}
-        sub={`${n.games.length} game${n.games.length === 1 ? "" : "s"}${n.slateGames > n.games.length ? ` of ${n.slateGames} on the slate (the rest had no props yet)` : ""}, ${n.board.rows.length} players. ${started ? "Frozen at the first tip" : `Updates until the first tip, ${whenEt(n.firstTip)}`}; saved ${whenEt(n.at)}.`}
+        title={<span id="kotc-today">{best[0] ? `Tag ${best[0].r.name}` : `${top.name} leads at ${pct(top.p)}`}</span>}
+        sub={`${best[0] ? `${pct(best[0].r.p)} to be king, about ${usd0(best[0].value.ifKing)} in bonus bets per $5 tag if he is (estimate). ` : ""}${n.games.length} game${n.games.length === 1 ? "" : "s"}${n.slateGames > n.games.length ? ` of ${n.slateGames} on the slate (the rest had no props yet)` : ""}, ${n.board.rows.length} players. ${started ? "Frozen at the first tip" : `Updates until the first tip, ${whenEt(n.firstTip)}`}; saved ${whenEt(n.at)}.`}
       />
       <Stats
         label="Tonight's slate"
@@ -157,12 +183,12 @@ export async function KotcWeek({ season }: { season: number }) {
       />
       {best.length > 0 && (
         <div className={s.pageFrame}>
-          <SecHead title="Best tags tonight" aside={betTop ? `A learner slice is live: our top ${betTop === 1 ? "pick's" : `${betTop}'s`} props are bets` : "Tracked only · ranked by what one $5 tag is worth (estimate)"} />
+          <SecHead title="Who to tag tonight" aside={list ? `Our 15 likeliest kings, ranked by expected bonus after the crowd · most-bet list read ${whenEt(list.at)}` : "Our 15 likeliest kings, ranked by expected bonus · most-bet list not read yet, so no crowd discount"} />
           <ul className={k.kCards} data-first-pick>
             {best.map((x, j) => (
               <li key={x.r.id} className={`${k.kCard} ${j === 0 ? k.kCardTop : ""}`}>
                 <div className={k.kCardHead}>
-                  <span className={k.kRank}>{`#${j + 1} tag`}</span>
+                  <span className={k.kRank}>{`#${j + 1} pick`}</span>
                   <span className={k.kMeta}>{`${x.r.team} · our #${x.i + 1} to be king`}</span>
                 </div>
                 <div className={k.kWho}>{x.r.name}</div>
@@ -175,22 +201,26 @@ export async function KotcWeek({ season }: { season: number }) {
                     <dd>{`${pct(x.r.p)} / ${pct(x.crowd)}`}</dd>
                   </div>
                   <div>
-                    <dt>Prop, ours / DK</dt>
-                    <dd>{`${pct(x.t!.ours)} / ${pct(x.t!.fair ?? implied(x.t!.price))}`}</dd>
+                    <dt>If king, per tag</dt>
+                    <dd>{usd0(x.value.ifKing)}</dd>
                   </div>
                   <div>
-                    <dt>$5 tag worth</dt>
-                    <dd className={x.value.total >= 0 ? s.pos : s.neg}>{usd(x.value.total)}</dd>
+                    <dt>Expected bonus</dt>
+                    <dd className={s.pos}>{usd(x.value.bonus)}</dd>
                   </div>
                 </dl>
-                <p className={k.kNote}>{`${x.t!.edge ? "A tracked edge on the props board" : x.t!.gap > 0 ? "Above DK's break-even, though not an edge the props board tracks" : "No edge; the least bad qualifying prop"} (${x.t!.gap >= 0 ? "+" : ""}${(x.t!.gap * 100).toFixed(1)} vs break-even)${x.t!.early ? ", read from under 3 games this season" : ""}. Bonus share ${usd(x.value.bonus)}, prop ${usd(x.value.prop)}.`}</p>
+                <p className={k.kNote}>
+                  {`${heatText(x.listed, x.mult)}. Tag it with `}
+                  <b>{tagText(x.t!)}</b> {am(x.t!.price)}
+                  {` (${x.t!.gap >= 0 ? "+" : "−"}${Math.abs(x.t!.gap * 100).toFixed(1)} vs break-even${x.t!.early ? ", under 3 games this season" : ""}).`}
+                </p>
               </li>
             ))}
           </ul>
         </div>
       )}
       <div className={s.pageFrame}>
-        <SecHead title="Top 30: chance to be king and the prop to tag" aside="Ours in color, the crowd's share in gold (estimate) · edge is ours minus DK's break-even" />
+        <SecHead title="Top 30: chance to be king and the prop to tag" aside="Ours in color, the crowd's share in gold (estimate) · if king: bonus bets per $5 tag on a $1M pool" />
         <div className={s.tw}>
           <table className={`${s.table} ${k.kTable}`}>
             <thead>
@@ -202,7 +232,7 @@ export async function KotcWeek({ season }: { season: number }) {
                 <th>Prop to tag</th>
                 <th>Ours / DK no-vig</th>
                 <th>Edge</th>
-                <th className={s.hideSm}>$5 tag</th>
+                <th className={s.hideSm}>If king</th>
               </tr>
             </thead>
             <tbody>
@@ -235,7 +265,7 @@ export async function KotcWeek({ season }: { season: number }) {
                     </td>
                     <td className={s.num}>{x.t ? `${pct(x.t.ours)} / ${x.t.fair !== null ? pct(x.t.fair) : "·"}` : "·"}</td>
                     <td className={s.num}>{x.t ? <span className={`${k.kEdge} ${x.t.gap > 0 ? k.kEdgePos : k.kEdgeNeg}`}>{`${x.t.gap >= 0 ? "+" : "−"}${Math.abs(x.t.gap * 100).toFixed(1)}`}</span> : "·"}</td>
-                    <td className={`${s.num} ${s.hideSm} ${x.value.total >= 0 ? s.pos : s.neg}`}>{x.t ? usd(x.value.total) : "·"}</td>
+                    <td className={`${s.num} ${s.hideSm}`}>{usd0(x.value.ifKing)}</td>
                   </tr>
                 );
               })}
@@ -243,7 +273,7 @@ export async function KotcWeek({ season }: { season: number }) {
           </table>
         </div>
         <p className={s.thin}>
-          {`Crowd share and tag value are estimates: the crowd from DraftKings' posted payouts on 18 nights (backers rose in step with our chance, R² ${KOTC.crowd.r2}), the bonus at a $1M pool and 70 cents a bonus dollar, the prop at our chance and DK's price on a $5 bet. The crowd fit can't see fame: a household name is likely backed more than shown.${betTop ? "" : " Tracked only: no prop here is a bet until a learner slice clears its gate."}`}
+          {`Crowd share and payouts are estimates: backers from DraftKings' posted payouts on 18 nights (they rose in step with our chance, R² ${KOTC.crowd.r2}), times 1 + each player's heat on DraftKings Network's most-bet NBA props list (a guess, capped at 5x, until logged nights can fit it), at a $1M pool; expected bonus counts a bonus dollar as 70 cents.${betTop ? "" : " Tracked only: no prop here is a bet until a learner slice clears its gate."}`}
         </p>
       </div>
       {last && <LastNight n={last} />}

@@ -6,6 +6,7 @@ import { kingLogLoss, kingsOf, simulateSlate, type KotcBoard, type KotcParams, t
 import type { OurStoredProps, SbGame } from "./store";
 import KOTC_PARAMS from "./kotc-params.json";
 import { live, primeParams } from "@/lib/models/params-store";
+import { fetchMostBet, type KotcCrowd } from "./kotc-crowd";
 
 // King of the Court, live. Inside every run of our NBA props model
 // (runOurNbaProps), after the boards are saved:
@@ -37,6 +38,8 @@ export interface KotcNight {
   /** Every scoreboard game that night (missing on nights saved before 2026-10-21 late): grading reads all of them, so a king from a game we had no board for still counts. */
   slateIds?: string[];
   board: KotcBoard;
+  /** DK Network's most-bet NBA props at the last save before the first tip (kotc-crowd.ts); tonight's slate only. */
+  crowd?: KotcCrowd;
   result?: {
     kings: { id: string; name: string; team: string }[];
     pra: number;
@@ -84,8 +87,16 @@ export async function runKotc(season: number, now: Date, games: SbGame[], boards
     const n = nightOf(date, boards, gs.length, now);
     if (!n || !n.board.rows.length) continue;
     // The run can take a while: check the first tip again right before writing.
+    // The crowd list only covers today's games; a failed read keeps the last one saved.
+    let crowd = nights[date]?.crowd;
+    if (date === etDate(now))
+      try {
+        crowd = await fetchMostBet(now);
+      } catch (e) {
+        out.push(`${date} crowd: ${e instanceof Error ? e.message : String(e)}`);
+      }
     if (gs.some((g) => g.tip && new Date(g.tip) <= new Date())) continue;
-    await redis.hset(KEY(season), { [date]: { ...n, slateIds: gs.map((g) => g.id) } });
+    await redis.hset(KEY(season), { [date]: { ...n, slateIds: gs.map((g) => g.id), ...(crowd ? { crowd } : {}) } });
     const top = n.board.rows[0];
     out.push(`${date}: ${n.games.length} of ${gs.length} games, ${n.board.rows.length} players, favorite ${top?.name} ${Math.round((top?.p ?? 0) * 100)}%`);
   }
