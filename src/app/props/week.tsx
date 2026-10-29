@@ -131,7 +131,7 @@ export function EdgeCard({ e }: { e: Edge }) {
       </div>
       <div>
         <div className={s.edgeLine}>
-          <span>{e.player}</span>
+          <span title={e.player}>{e.player}</span>
           <span className={s.edgePick}>{e.bet}</span>
         </div>
         <div className={s.edgeBet}>{`${e.price} · ${e.game}`}</div>
