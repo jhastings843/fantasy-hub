@@ -727,7 +727,8 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 /* Flush left under the logos and allowed to wrap, so a live score with its clock always shows in full (Jack, 2026-10-28). */
 .matchWhen { font-size: 12.5px; color: var(--mute); font-family: var(--font-plex-mono), monospace; line-height: 1.5; }
 .matchWhen .gLive { margin-left: 0; margin-right: 6px; padding: 1px 8px; border-radius: 5px; font-size: 11.5px; font-weight: 600; color: var(--gold); background: var(--gold-soft); font-family: var(--font-plex), sans-serif; }
-.matchWhen .scoreLine { margin-left: 0; }
+.matchWhen .scoreLine { margin-left: 0; display: inline; white-space: normal; }
+.matchCell { overflow: hidden; }
 .ledger .gNum small.mktTeam { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* Expanded board row: chart beside every number, then the three cards, full width. */
