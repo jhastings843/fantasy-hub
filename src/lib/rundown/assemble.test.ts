@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assembleRundown, etDay, oneSentence, streakOf, yesterdayEt, type MarketSource, type Play } from "./assemble";
+import { assembleRundown, etDay, nightStreak, oneSentence, streakOf, yesterdayEt, type MarketSource, type Play } from "./assemble";
 
 const play = (day: string, result: Play["result"], net: number | null, label = "x", price: string | null = null): Play => ({ day, at: `${day}T23:00:00Z`, result, net, label, price });
 
@@ -54,7 +54,7 @@ describe("rundown assembly", () => {
     expect(r.markets.find((m) => m.key === "cfb-totals")).toMatchObject({ wins: 0, losses: 0, units: 0, seasonLosses: 1 });
     const all = assembleRundown({ date: "2026-10-29", now: new Date(), baseUrl: "", sources: [fb], events: [] });
     expect(all.movers.map((m) => m.kind)).toEqual(["record", "streak"]);
-    expect(all.movers[1].text).toBe("NBA first basket has won 4 straight (tracked only).");
+    expect(all.movers[1].text).toBe("NBA first basket has won 4 straight nights (tracked only).");
   });
 
   it("returns an empty night cleanly", () => {
@@ -69,6 +69,11 @@ describe("rundown helpers", () => {
     expect(etDay("2026-10-30T02:30:00Z")).toBe("2026-10-29"); // a 10:30pm ET finish
     expect(yesterdayEt(new Date("2026-10-30T03:00:00Z"))).toBe("2026-10-28"); // still Oct 29 in ET
     expect(yesterdayEt(new Date("2026-11-01T15:00:00Z"))).toBe("2026-10-31");
+  });
+  it("tracked markets run by night, so a night of long-shot misses is one loss", () => {
+    const longShots = [play("2026-10-27", "W", 8), play("2026-10-28", "L", -1), play("2026-10-28", "L", -1), play("2026-10-28", "W", 5), play("2026-10-29", "L", -1), play("2026-10-29", "L", -1)];
+    expect(streakOf(longShots)).toEqual({ kind: "L", n: 2 });
+    expect(nightStreak(longShots)).toEqual({ kind: "L", n: 1 }); // the 28th made +3u
   });
   it("streaks skip pushes", () => {
     expect(streakOf([play("2026-10-01", "L", -1), play("2026-10-02", "W", 1), play("2026-10-03", "P", 0), play("2026-10-04", "W", 1)])).toEqual({ kind: "W", n: 2 });

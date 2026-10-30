@@ -123,6 +123,26 @@ export function streakOf(plays: Play[]): { kind: "W" | "L"; n: number } | null {
   return { kind: last.result as "W" | "L", n };
 }
 
+/**
+ * A tracked market's run in nights, not bets: dozens of long shots a night
+ * make a per-bet run noise ("lost 56 straight" first TDs). A night is a win
+ * when it made units (or, with no units, won more than it lost); even nights are skipped.
+ */
+export function nightStreak(plays: Play[]): { kind: "W" | "L"; n: number } | null {
+  const byDay = new Map<string, { units: number; wl: number }>();
+  for (const p of plays) {
+    const d = byDay.get(dayOf(p)) ?? { units: 0, wl: 0 };
+    d.units += p.net ?? 0;
+    d.wl += p.result === "W" ? 1 : p.result === "L" ? -1 : 0;
+    byDay.set(dayOf(p), d);
+  }
+  const nights = [...byDay].map(([day, d]): Play => {
+    const score = plays.some((p) => p.net !== null) ? r2(d.units) : d.wl;
+    return { day, at: day, result: score > 0 ? "W" : score < 0 ? "L" : "P", net: null, label: "", price: null };
+  });
+  return streakOf(nights);
+}
+
 /** Is `date` this market's best night of the season in units (beating every earlier night)? */
 function bestNight(plays: Play[], date: string): number | null {
   const byDay = new Map<string, number>();
@@ -157,7 +177,8 @@ export function assembleRundown(input: {
     if (src.issued && src.hasUnits) seasonUnits = r2((seasonUnits ?? 0) + (s.units ?? 0));
     if (!today.length && !touched.has(src.key)) continue;
     const t = tally(today, src.hasUnits);
-    const streak = streakOf(season);
+    // Issued markets run bet by bet (the Picks pages' sense); tracked ones night by night.
+    const streak = src.issued ? streakOf(season) : nightStreak(season);
     markets.push({
       key: src.key,
       label: src.label,
@@ -188,7 +209,7 @@ export function assembleRundown(input: {
     if (streak && streak.n >= STREAK_MIN)
       movers.push({
         kind: "streak",
-        text: `${src.label} has ${streak.kind === "W" ? "won" : "lost"} ${streak.n} straight${src.issued ? "" : " (tracked only)"}.`,
+        text: `${src.label} has ${streak.kind === "W" ? "won" : "lost"} ${streak.n} straight${src.issued ? "" : " nights (tracked only)"}.`,
         rank: 4,
         size: streak.n,
       });
