@@ -1,11 +1,12 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
+import { push } from "@/lib/notify/pushover";
 import { samTeam } from "@/lib/firsttd/grade";
 import { isMembersPage, parsePropsLinks, parsePropsPage, parseSlug, type PropsGame } from "./parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "./grade";
 import { fetchProjections, projectionsFor } from "./rotowire";
 import { espnFor, fetchDkLines, fetchEspnProjections } from "./espn";
-import { davidFor, davidTrends, fetchDavidSlate, gradeDavid, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
+import { DAVID_URL, davidFor, davidPropsLinks, davidTrends, fetchDavidSlate, gradeDavid, samIndex, type DavidGame, type DavidSlate, type DavidTrends, type DavidWeekGame } from "./david";
 import { MIN_BETS, propTrends, SLICES, type GradedPropsGame, type PropTrends } from "./trends";
 import { PROPS_SECTION, propCandidates } from "./learn";
 import { PROPS_GATE, activeIds, liveBets, sectionView, type SectionView } from "@/lib/learning/engine";
@@ -153,6 +154,35 @@ async function saveDavid(slate: DavidSlate, now: Date): Promise<string[]> {
   return saved;
 }
 
+// David's props page has been gone since his Oct 28 rebuild (Jack, 2026-10-30:
+// watch for it, then judge him as agree/disagree slices on our NFL props).
+// While it 404s, once a day look for a props link on his home and NFL pages
+// and push once when one shows up; push again when the board reads again.
+const DAVID_WATCH = "props:v1:david:watch";
+interface DavidWatch { since: string; checked: string; alerted?: string[] }
+
+async function watchDavid(now: Date): Promise<string> {
+  const day = now.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const w = (await redis.get<DavidWatch>(DAVID_WATCH)) ?? { since: day, checked: "" };
+  if (w.checked === day) return `gone since ${w.since}, checked today`;
+  const origin = new URL(DAVID_URL).origin;
+  const pages = await Promise.all(["/", "/nfl"].map((p) => fetch(origin + p, { cache: "no-store", headers: { "user-agent": "Mozilla/5.0 (fantasy-hub props tracker)" }, signal: AbortSignal.timeout(10_000) }).then((r) => (r.ok ? r.text() : "")).catch(() => "")));
+  const links = [...new Set(pages.flatMap(davidPropsLinks))];
+  const fresh = links.filter((l) => !(w.alerted ?? []).includes(l));
+  if (fresh.length) {
+    await push({ title: "David's props page may be back", message: `His site links to ${fresh.join(", ")}. The tracker still reads ${new URL(DAVID_URL).pathname}; point it at the new page, then add the agree/disagree slices on our NFL props.`, url: origin + fresh[0], urlTitle: "Open it" });
+  }
+  await redis.set(DAVID_WATCH, { ...w, checked: day, alerted: [...(w.alerted ?? []), ...fresh] });
+  return fresh.length ? `found ${fresh.join(", ")}, pushed` : `gone since ${w.since}, no props link on his site`;
+}
+
+async function davidBack() {
+  const w = await redis.get<DavidWatch>(DAVID_WATCH);
+  if (!w) return;
+  await push({ title: "David's props board is back", message: `It reads again (gone since ${w.since}). Saving resumed; the agree/disagree slices on our NFL props can be built now.` });
+  await redis.del(DAVID_WATCH);
+}
+
 export interface PropsRunReport {
   week: number | null;
   captured: string[];
@@ -175,8 +205,11 @@ export async function runProps(now = new Date()): Promise<PropsRunReport> {
     slate = await fetchDavidSlate();
     report.david.week = slate.week;
     report.david.saved = await saveDavid(slate, now);
+    await davidBack();
   } catch (e) {
-    report.problems.push(`David's board: ${e instanceof Error ? e.message : String(e)}`);
+    const msg = e instanceof Error ? e.message : String(e);
+    const watch = msg.includes("404") ? await watchDavid(now) : null;
+    report.problems.push(`David's board: ${msg}${watch ? ` (${watch})` : ""}`);
   }
   let slugs: string[] = [];
   try {

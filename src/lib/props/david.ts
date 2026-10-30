@@ -106,6 +106,16 @@ export async function fetchDavidSlate(): Promise<DavidSlate> {
   return slate;
 }
 
+/**
+ * Links to a props page on one of David's pages. His Oct 28 rebuild dropped
+ * /nfl/props (404); the watch in store.ts looks for one to come back.
+ */
+export function davidPropsLinks(html: string): string[] {
+  const out = new Set<string>();
+  for (const m of html.matchAll(/href="(\/[^"#?]*)[^"]*"/g)) if (/prop/i.test(m[1]) && !m[1].startsWith("/_next/")) out.add(m[1]);
+  return [...out];
+}
+
 /** David's projection for each of a Sam game's markets he covers, by Sam's market id. */
 export function davidFor(gameId: string, markets: PropMarket[], props: DavidProp[]): { [id: string]: number } {
   const idx = new Map(props.filter((p) => p.gameId === gameId).map((p) => [`${nameKey(p.player)}|${p.team}|${p.market}`, p.projection]));

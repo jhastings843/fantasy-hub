@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { agreeEdge, davidBox, davidEdge, davidFor, davidSliceSide, davidTrends, gradeDavid, isDavidPlay, isDavidSlice, parseDavidSlate, type DavidProp } from "./david";
+import { agreeEdge, davidBox, davidPropsLinks, davidEdge, davidFor, davidSliceSide, davidTrends, gradeDavid, isDavidPlay, isDavidSlice, parseDavidSlate, type DavidProp } from "./david";
 import { gradeGame, type EspnBoxTeam } from "./grade";
 import { parsePropsPage } from "./parse";
 import { propTrends } from "./trends";
@@ -164,5 +164,15 @@ describe("David's plays", () => {
     expect(t.plays[0]).toMatchObject({ week: 6, actual: 51, samProj: 40, bet: { side: "over", outcome: "W" } });
     expect(isDavidSlice("dplay:all") && isDavidSlice("dboard:all") && isDavidSlice("h2h:agree")).toBe(true);
     expect(isDavidSlice("play:all") || isDavidSlice("david:all")).toBe(false);
+  });
+});
+
+describe("davidPropsLinks", () => {
+  it("finds props links on his pages and skips build files", () => {
+    const html = `<a href="/nfl">NFL</a><a href="/nfl/player-props?w=9">Props</a><link href="/_next/static/props-x.js"><a href="/nfl/matchups/1">m</a><a href="/NFL/Props">P</a>`;
+    expect(davidPropsLinks(html)).toEqual(["/nfl/player-props", "/NFL/Props"]);
+  });
+  it("finds nothing on today's rebuilt page", () => {
+    expect(davidPropsLinks(`<a href="/cfb">c</a><a href="/nfl/matchups/401873023">m</a>`)).toEqual([]);
   });
 });
