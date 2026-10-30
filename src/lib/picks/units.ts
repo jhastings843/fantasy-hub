@@ -92,6 +92,11 @@ export interface BetRow {
   result?: Result;
   /** Net units once settled. */
   net?: number;
+  /** Kickoff as saved with the play (absent on older records and parlays). */
+  kickoff?: string;
+  /** When the send that carried it went out, and which send. */
+  sentAt?: string;
+  slot?: Slot;
 }
 
 export interface UnitReport {
@@ -142,6 +147,7 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
       bets.push({
         kind: "spread", tier: p.tier, legs: [{ home: p.home, away: p.away, side: p.side, line: p.homeLine }],
         units: p.units, price, result, net: result && payout(result, p.units, price),
+        kickoff: p.kickoff, sentAt: rec.issuedAt, slot: rec.slot,
       });
     }
     for (const t of rec.totals ?? []) {
@@ -153,6 +159,7 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
       bets.push({
         kind: "total", legs: [{ home: t.home, away: t.away, side: t.side, line: t.line }],
         units: t.units, price, result, net: result && payout(result, t.units, price),
+        kickoff: t.kickoff, sentAt: rec.issuedAt, slot: rec.slot,
       });
     }
     for (const pr of rec.parlays ?? []) {
@@ -167,7 +174,7 @@ export function unitReport(records: IssuedRecord[], finals: Map<string, { home: 
       const net = done ? parlayPayout(legs.filter((x): x is { result: Result; price: number } => !!x), pr.units) : undefined;
       bets.push({
         kind: "parlay", legs: pr.legs.map((leg) => ({ home: leg.home, away: leg.away, side: leg.side, line: leg.homeLine })),
-        units: pr.units, decimal: pr.decimal, net,
+        units: pr.units, decimal: pr.decimal, net, sentAt: rec.issuedAt, slot: rec.slot,
         result: net === undefined ? undefined : net > 0 ? "W" : net < 0 ? "L" : "P",
       });
       for (const l of [total, byTier.parlays, bySlot[slot], wk]) {
