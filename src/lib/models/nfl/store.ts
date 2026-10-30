@@ -9,6 +9,7 @@ import type { GradedPropsGame } from "@/lib/props/trends";
 import type { StoredProps } from "@/lib/props/store";
 import { readPropBets, type PropBetRow } from "../lines";
 import { OUR_SECTION, ourPropCandidates } from "../learn";
+import { loadVenomProps } from "./venom";
 import { readStats, type NflRow } from "./data";
 import { NflRunning, defenseTables, type NflSummary } from "./history";
 import { ourNflMarkets, type NflMarketExtra } from "./market";
@@ -261,7 +262,7 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
   }
 
   try {
-    const cands = ourPropCandidates(await nflGradedList(season), ["pass_yds", "rush_yds", "rec_yds", "rec"]);
+    const cands = ourPropCandidates(await nflGradedList(season), ["pass_yds", "rush_yds", "rec_yds", "rec"], await loadVenomProps(season));
     for (const j of await reviewIfDue(OUR_SECTION.nflProps, season, report.week ?? weeks.at(-1) ?? 0, PROPS_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
   } catch (err) {
     report.problems.push(`learning: ${err instanceof Error ? err.message : String(err)}`);
@@ -308,6 +309,6 @@ export async function getOurNflView(season: number): Promise<OurNflView> {
   const week = nums[0] ?? null;
   const board = week ? Object.values(await loadWeek(season, week)).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? "")) : [];
   const graded = await nflGradedList(season);
-  const [state, journal] = await Promise.all([loadSection(OUR_SECTION.nflProps, season), loadJournal(OUR_SECTION.nflProps, season)]);
-  return { season, week, board, graded, learning: sectionView(PROPS_GATE, state, ourPropCandidates(graded, ["pass_yds", "rush_yds", "rec_yds", "rec"]), journal) };
+  const [state, journal, venom] = await Promise.all([loadSection(OUR_SECTION.nflProps, season), loadJournal(OUR_SECTION.nflProps, season), loadVenomProps(season)]);
+  return { season, week, board, graded, learning: sectionView(PROPS_GATE, state, ourPropCandidates(graded, ["pass_yds", "rush_yds", "rec_yds", "rec"], venom), journal) };
 }

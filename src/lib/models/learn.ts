@@ -5,7 +5,7 @@
 
 import type { Bet, Candidate } from "@/lib/learning/engine";
 import { STAT_LABEL, type Stat } from "@/lib/props/parse";
-import type { GradedBet } from "@/lib/props/grade";
+import { nameKey, type GradedBet } from "@/lib/props/grade";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import { marketBets, type GradedGame as FtdGradedGame } from "@/lib/firsttd/trends";
 import { bestBets, type Books } from "./nfl/ftd-price";
@@ -64,15 +64,54 @@ export function ourSliceBets(list: GradedPropsGame[], id: string): { x: GradedPr
   return out;
 }
 
-export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[]): Candidate[] {
-  return ourPropSlices(stats).map(([id, label]) => ({
+type SliceBet = ReturnType<typeof ourSliceBets>[number];
+const toBet = ({ x, bet, marketId, line }: SliceBet): Bet => ({ game: x.slug, key: `${x.week}|${x.slug}|${marketId}|${bet.side}`, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line) });
+
+// Venom's NFL prop boards (pass yards, rush yards, receptions; Jack, 2026-10-30).
+// No line and no side: a weekly 0-100 score per player for how well set up he is
+// for the stat (100 = the week's best spot), top 5 per game. Judged like PEM, as
+// our edges he agrees with and the ones he is against. He agrees with our over on
+// a player he scores VENOM_HIGH or more, and with our under on one he scores under
+// VENOM_LOW or leaves off a board he posted. In between he has no lean. Receiving
+// yards has no board of its own, so it is left out.
+export type VenomProps = Map<number, Map<string, Map<string, number>>>;
+export const VENOM_HIGH = 70;
+export const VENOM_LOW = 50;
+export const VENOM_PROP_SLICES: [string, string, boolean][] = [
+  ["venom:agree", "Our edges Venom agrees with (his yards and receptions boards)", true],
+  ["venom:against", "Our edges Venom is against", false],
+];
+
+/** Venom's lean on a player's stat that week: over, under, or none (no board, or a middling score). */
+export function venomLean(v: VenomProps, week: number, stat: Stat | null, player: string): "over" | "under" | null {
+  const board = stat ? v.get(week)?.get(stat) : undefined;
+  if (!board) return null;
+  const score = board.get(nameKey(player));
+  if (score === undefined || score < VENOM_LOW) return "under";
+  return score >= VENOM_HIGH ? "over" : null;
+}
+
+export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[], venom?: VenomProps): Candidate[] {
+  const base = ourPropSlices(stats).map(([id, label]) => ({
     id,
     label,
     ...(id.endsWith(":all") ? {} : { parent: `${id.split(":")[0]}:all` }),
-    bets: ourSliceBets(graded, id).map(
-      ({ x, bet, marketId, line }): Bet => ({ game: x.slug, key: `${x.week}|${x.slug}|${marketId}|${bet.side}`, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line) }),
-    ),
+    bets: ourSliceBets(graded, id).map(toBet),
   }));
+  if (!venom?.size) return base;
+  const edges = ourSliceBets(graded, "edge:all").map((b) => {
+    const m = b.x.game.markets.find((x) => x.id === b.marketId);
+    return { b, lean: m ? venomLean(venom, b.x.week, m.stat, m.player) : null };
+  });
+  return [
+    ...base,
+    ...VENOM_PROP_SLICES.map(([id, label, agrees]) => ({
+      id,
+      label,
+      parent: "edge:all",
+      bets: edges.filter(({ b, lean }) => lean !== null && (lean === b.bet.side) === agrees).map(({ b }) => toBet(b)),
+    })),
+  ];
 }
 
 /** Won, lost, pushed and units over a set of graded bets. */
