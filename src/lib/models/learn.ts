@@ -68,27 +68,46 @@ type SliceBet = ReturnType<typeof ourSliceBets>[number];
 const toBet = ({ x, bet, marketId, line }: SliceBet): Bet => ({ game: x.slug, key: `${x.week}|${x.slug}|${marketId}|${bet.side}`, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line) });
 
 // Venom's NFL prop boards (pass yards, rush yards, receptions; Jack, 2026-10-30).
-// No line and no side: a weekly 0-100 score per player for how well set up he is
-// for the stat (100 = the week's best spot), top 5 per game. Judged like PEM, as
-// our edges he agrees with and the ones he is against. He agrees with our over on
-// a player he scores VENOM_HIGH or more, and with our under on one he scores under
-// VENOM_LOW or leaves off a board he posted. In between he has no lean. Receiving
-// yards has no board of its own, so it is left out.
+// No line and no side: a weekly 0-100 score for every player on the board for how
+// well set up he is for the stat. Scores run differently by board (receptions sit
+// at 55-100 for most starters, rush yards spans 2-100), so each player is placed
+// by his percentile within that week's board instead of a fixed cutoff. Top 40%
+// is an over lean (top 20% strong), bottom 40% an under lean (bottom 20% strong),
+// the middle 20% no lean. Judged like PEM, as our edges he agrees with and the
+// ones he is against. Receiving yards has no board of its own; his receptions
+// board stands in for it, kept in its own slices so the stand-in is judged apart.
 export type VenomProps = Map<number, Map<string, Map<string, number>>>;
-export const VENOM_HIGH = 70;
-export const VENOM_LOW = 50;
-export const VENOM_PROP_SLICES: [string, string, boolean][] = [
-  ["venom:agree", "Our edges Venom agrees with (his yards and receptions boards)", true],
-  ["venom:against", "Our edges Venom is against", false],
+export type VenomLean = { side: "over" | "under"; strong: boolean };
+export const VENOM_STRONG = 0.2;
+export const VENOM_LEAN = 0.4;
+export const VENOM_PROP_SLICES: [string, string, string][] = [
+  ["venom:agree", "Our edges Venom agrees with (his yards and receptions boards)", "edge:all"],
+  ["venom:against", "Our edges Venom is against", "edge:all"],
+  ["venom:agree-strong", "Venom agrees strongly (his top or bottom fifth)", "venom:agree"],
+  ["venom:agree-mild", "Venom agrees mildly (his second fifth from either end)", "venom:agree"],
+  ["venom:recyds-agree", "Receiving yards edges his receptions board agrees with", "edge:rec_yds"],
+  ["venom:recyds-against", "Receiving yards edges his receptions board is against", "edge:rec_yds"],
 ];
 
-/** Venom's lean on a player's stat that week: over, under, or none (no board, or a middling score). */
-export function venomLean(v: VenomProps, week: number, stat: Stat | null, player: string): "over" | "under" | null {
-  const board = stat ? v.get(week)?.get(stat) : undefined;
-  if (!board) return null;
-  const score = board.get(nameKey(player));
-  if (score === undefined || score < VENOM_LOW) return "under";
-  return score >= VENOM_HIGH ? "over" : null;
+const pctCache = new WeakMap<Map<string, number>, Map<string, number>>();
+/** Each player's percentile on a board, 0 (lowest score) to 1 (highest); ties share the midpoint. */
+function percentiles(board: Map<string, number>): Map<string, number> {
+  const hit = pctCache.get(board);
+  if (hit) return hit;
+  const scores = [...board.values()];
+  const out = new Map([...board].map(([k, s]) => [k, (scores.filter((x) => x < s).length + (scores.filter((x) => x === s).length - 1) / 2) / Math.max(1, scores.length - 1)]));
+  pctCache.set(board, out);
+  return out;
+}
+
+/** Venom's lean on a player's stat that week, or null (no board, not on it, or the middle fifth). */
+export function venomLean(v: VenomProps, week: number, stat: Stat | null, player: string): VenomLean | null {
+  const board = stat ? v.get(week)?.get(stat === "rec_yds" ? "rec" : stat) : undefined;
+  const p = board ? percentiles(board).get(nameKey(player)) : undefined;
+  if (p === undefined) return null;
+  if (p >= 1 - VENOM_LEAN) return { side: "over", strong: p >= 1 - VENOM_STRONG };
+  if (p <= VENOM_LEAN) return { side: "under", strong: p <= VENOM_STRONG };
+  return null;
 }
 
 export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[], venom?: VenomProps): Candidate[] {
@@ -101,17 +120,18 @@ export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[], veno
   if (!venom?.size) return base;
   const edges = ourSliceBets(graded, "edge:all").map((b) => {
     const m = b.x.game.markets.find((x) => x.id === b.marketId);
-    return { b, lean: m ? venomLean(venom, b.x.week, m.stat, m.player) : null };
+    const lean = m ? venomLean(venom, b.x.week, m.stat, m.player) : null;
+    return { b, recYds: m?.stat === "rec_yds", agree: lean ? lean.side === b.bet.side : null, strong: !!lean?.strong };
   });
-  return [
-    ...base,
-    ...VENOM_PROP_SLICES.map(([id, label, agrees]) => ({
-      id,
-      label,
-      parent: "edge:all",
-      bets: edges.filter(({ b, lean }) => lean !== null && (lean === b.bet.side) === agrees).map(({ b }) => toBet(b)),
-    })),
-  ];
+  const keep: { [id: string]: (e: (typeof edges)[number]) => boolean } = {
+    "venom:agree": (e) => !e.recYds && e.agree === true,
+    "venom:against": (e) => !e.recYds && e.agree === false,
+    "venom:agree-strong": (e) => !e.recYds && e.agree === true && e.strong,
+    "venom:agree-mild": (e) => !e.recYds && e.agree === true && !e.strong,
+    "venom:recyds-agree": (e) => e.recYds && e.agree === true,
+    "venom:recyds-against": (e) => e.recYds && e.agree === false,
+  };
+  return [...base, ...VENOM_PROP_SLICES.map(([id, label, parent]) => ({ id, label, parent, bets: edges.filter(keep[id]).map(({ b }) => toBet(b)) }))];
 }
 
 /** Won, lost, pushed and units over a set of graded bets. */

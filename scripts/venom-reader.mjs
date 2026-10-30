@@ -114,14 +114,20 @@ async function main() {
     for (const [label, stat] of TABS) {
       if (!click(label)) throw new Error(`no ${label} tab`);
       await sleep(3500);
+      // Prop boards: every player, so each has a real score (since 2026-10-30). Anytime TD
+      // stays at the top 5 per game, his headline list, which is what its slice means.
+      if (stat !== "attd") {
+        inApp(`[...document.querySelectorAll("*")].filter((e) => e.children.length === 0 && /^show all \\d+ players$/i.test(e.textContent.trim())).forEach((e) => e.click())`);
+        await sleep(2500);
+      }
       const text = inApp("document.body.innerText");
       const cap = text.match(/(\d{4}) · WEEK (\d+) · SORTED/);
       if (!cap) throw new Error(`${label}: no "WEEK N" caption`);
       [season, week] = [Number(cap[1]), Number(cap[2])];
       const games = (text.match(/FULL MATCHUP/g) ?? []).length;
       const rows = parseBoard(text, stat);
-      // Every game shows up to 5 (pass yards: 2 QBs); far fewer means the page changed.
-      const floor = stat === "pass_yds" ? games * 2 - 2 : stat === "rush_yds" ? games * 3 : games * 5 - 2;
+      // Anytime TD shows 5 a game; full prop boards list every player (pass yards: the 2 QBs). Far fewer means the page changed.
+      const floor = stat === "attd" ? games * 5 - 2 : stat === "pass_yds" ? games * 2 - 2 : stat === "rush_yds" ? games * 4 : games * 8;
       if (games < 8 || rows.length < floor) throw new Error(`${label}: read ${rows.length} rows from ${games} games, expected at least ${floor}`);
       boards[stat] = { rows, games };
     }
@@ -137,12 +143,12 @@ async function main() {
 
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
     for (const [, stat] of TABS) {
-      const source = stat === "attd" ? `Venom Analytics app, Game Vault NFL Anytime TD, top 5 per game, read ${today}` : `Venom Analytics app, Game Vault NFL ${stat} board, top 5 per game (rank, 0-100 score), read ${today}`;
+      const source = stat === "attd" ? `Venom Analytics app, Game Vault NFL Anytime TD, top 5 per game, read ${today}` : `Venom Analytics app, Game Vault NFL ${stat} board, every player (rank, 0-100 score), read ${today}`;
       writeFileSync(file(stat, season, week), JSON.stringify({ season, week, stat, source, rows: boards[stat].rows }, null, 1));
     }
     const up = execFileSync(process.execPath, ["--env-file=.env.local", "scripts/venom-upload.mjs", String(week)], { cwd: ROOT, encoding: "utf8", env });
     log(`week ${week}: ${summary}\n${up.trim()}`);
-    await push(`Venom Week ${week} read`, `${boards.attd.games} games. Anytime TD ${boards.attd.rows.length}, pass yards ${boards.pass_yds.rows.length}, rush yards ${boards.rush_yds.rows.length}, receptions ${boards.rec.rows.length}. Uploaded for the learners.`);
+    if (!weekArg) await push(`Venom Week ${week} read`, `${boards.attd.games} games. Anytime TD ${boards.attd.rows.length}, pass yards ${boards.pass_yds.rows.length}, rush yards ${boards.rush_yds.rows.length}, receptions ${boards.rec.rows.length}. Uploaded for the learners.`);
   } catch (e) {
     log(`failed: ${e.message}`);
     await push("Venom reader couldn't read the boards", `${e.message}. If Whop logged you out, log in in Chrome; or run /venom.`);

@@ -17,6 +17,7 @@
   ],
   "last_worked": "2026-10-30",
   "notes": [
+    "2026-10-30: Venom v2: reader expands full prop boards; learner places players by percentile per board (strong/mild agree, against, receptions as rec_yds stand-in). Backfill W7-8: agree +8.3% n52, against -9.4% n103; the v1 Week 7 hint mostly came from the top-5 cutoff. Forward data decides.",
     "2026-10-30: Venom read is automatic: scripts/venom-reader.mjs via launchd com.jackh.venom-reader (Tue 10:00, Wed 18:00) reads all four boards through OpenCLI in Jack's Chrome, saves, uploads, pushes success/failure. Week 8 read matched the hand read 235/235.",
     "2026-10-30: NFL props learner gets venom:agree / venom:against slices from Venom's pass yards, rush yards and receptions boards (18ec509). Weeks 7-8 read and uploaded; backfill: agree 57-34 +16% (t 1.68), against 57-57 -2.5%, mostly Week 7. /venom skill now reads all four boards.",
     "2026-10-30: Venom/David review for NFL props: Venom adds nothing as a probability (log loss worse than ours, blend no gain) but stays as Anytime TD agree/disagree slices; Week 8 uploaded (W9 not posted yet). David's props page 404 since his Oct 28 rebuild; props run now watches his site daily and pushes when a props link appears (aebac66). Week 7 hint: our prop edges with David on the same side +7% (n127), against -17% (n74). Venom app now has pass/rush yards and receptions boards: untracked.",
