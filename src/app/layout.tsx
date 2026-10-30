@@ -102,8 +102,11 @@ function SiteFooter() {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  /** The game pop-up from the header search (app/@modal). */
+  modal: React.ReactNode;
 }>) {
   return (
     <html
@@ -116,6 +119,7 @@ export default function RootLayout({
         <HobbyTabs />
         <div className="flex-1">{children}</div>
         <SiteFooter />
+        {modal}
       </body>
     </html>
   );

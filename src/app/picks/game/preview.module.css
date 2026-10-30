@@ -1,0 +1,68 @@
+/* The game pop-up (GamePreview.tsx). Sits on the Picks tokens (.page). */
+
+.root { padding: 22px 20px 26px; display: flex; flex-direction: column; gap: 18px; flex: none; }
+@media (min-width: 640px) { .root { padding: 26px 28px 30px; } }
+
+/* Matchup */
+.match { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 12px; padding: 4px 0 2px; }
+.team { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; min-width: 0; }
+.teamName { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: clamp(20px, 4.4vw, 26px); line-height: 1.05; text-wrap: balance; overflow-wrap: anywhere; }
+.at { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); font-family: var(--font-plex-mono), monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+.score { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 800; font-size: 44px; line-height: 1; }
+.scoreLose { color: var(--mute); }
+.proj { font-size: 22px; font-weight: 600; line-height: 1; display: inline-flex; align-items: baseline; gap: 5px; }
+.proj small { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); font-weight: 400; }
+
+/* Win chance */
+.winWrap { display: flex; flex-direction: column; gap: 6px; }
+.winBar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--track); gap: 2px; }
+.winSide { background: color-mix(in srgb, var(--ink2) 35%, transparent); }
+.winLead { background: var(--ink2); }
+.winLabels { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--mute); }
+.winLabels > span:first-child, .winLabels > span:last-child { color: var(--ink); font-size: 14px; font-weight: 600; }
+
+/* The bet */
+.verdict { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--rule); color: var(--ink2); font-size: 14px; }
+.verdictBet { border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.verdictLabel { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); font-weight: 400; }
+.verdictBet .verdictLabel { color: var(--accent); }
+
+/* Lines */
+.grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cardHead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cardHead h3 { margin: 0; font-family: var(--font-plex-mono), monospace; font-size: 11px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+.cardHead b { font-size: 17px; text-align: right; }
+.prices { margin: -4px 0 0; font-size: 12px; color: var(--mute); text-align: right; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th, .tbl td { padding: 6px 0; text-align: left; border-top: 1px solid var(--rule); white-space: nowrap; }
+.tbl thead th { border-top: 0; padding-top: 0; font-weight: 400; font-size: 11px; color: var(--mute); }
+.tbl tbody th { font-weight: 500; color: var(--ink2); }
+.tbl td:last-child, .tbl th:last-child { text-align: right; }
+.tbl td { padding-left: 8px; }
+
+.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px 10px; }
+
+/* Calls */
+.h3 { margin: 0 0 8px; font-family: var(--font-plex-mono), monospace; font-size: 11px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+.calls { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.call { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.call:first-child { border-top: 0; padding-top: 0; }
+.callMk { flex: 0 0 64px; color: var(--mute); font-size: 13px; }
+.callTx { flex: 1; min-width: 0; }
+.tone_bet .callTx { color: var(--accent); font-weight: 600; }
+.tone_lean .callTx { color: var(--ink); }
+.tone_pass .callTx { color: var(--mute); }
+.tone_W .callTx { color: var(--pos); }
+.tone_L .callTx { color: var(--neg); }
+
+/* Stat strip */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+@media (max-width: 480px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stats > div { background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.stats dt { font-size: 11px; color: var(--mute); }
+.stats dd { margin: 0; font-size: 16px; font-weight: 600; }
+
+.note { margin: -8px 0 0; font-size: 12.5px; color: var(--mute); line-height: 1.5; }
+.more { align-self: flex-start; color: var(--accent); font-weight: 600; font-size: 14px; text-decoration: none; padding: 6px 0; }
+.more:hover { text-decoration: underline; }
