@@ -49,3 +49,4 @@ next-env.d.ts
 
 # Venom Analytics picks: members-only data, local only (repo is public)
 data/venom/*.json
+.venom-reader/
