@@ -13,8 +13,11 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-10-28",
+  "last_worked": "2026-10-29",
   "notes": [
+    "2026-10-29: David missing on NFL picks (all 14 Week 8 games 'not posted'): he rebuilt davidsasser.com/nfl on 10-28 like the college page on 10-23. parseDavidBoard now reads the NFL RSC payload first (davidNflGames), text fallback; fixture ds-board-wk8.html. Deployed ad22a35.",
+    "2026-10-28: KOTC cards now pick the player by crowd-adjusted bonus using DK Network's most-bet props list (logged per night); NFL early-line check (no edge yet, week 8 props look unsaved); Sam lotto research.",
+    "2026-10-28: Today slips show team logos (both logos on totals); First Basket scorer row highlighted green. Deployed.",
     "2026-10-27: price shadow record (-115 cap) + ledger/price card fixes, committed, awaiting deploy.",
     "2026-10-26: Pool solver settles ties by each entry's real Sleeper tiebreaker (closest guess, SD from this season's total misses) and recommends Jack's tiebreaker number (3a4456e). Sam's NBA reader accepts his 'Sam's line' label, which had dropped MIN@CLE and IND@MIL (9ece878). Both deployed.",
     "2026-10-26: Anytime TD, Lottos and King of the Court now act on their learners: a slice that clears its gate marks its plays as bets on the tab from that moment (helpers attdStaked/rungStaked/ticketStaked/kotcStakedTop in models/sections.ts), and all three are on /learning. Nothing live yet; first reviews pending.",

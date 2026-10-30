@@ -105,6 +105,11 @@ ORIGINAL Stage 2 order: (a) Picks one change per part per week; (b) review after
 - Page: Picks > NBA > Research, collapsed "Our game model" panel (`src/app/picks/nba/game-model.tsx`); Who decides row now "Spreads and totals, forward test".
 - First live save 2026-10-26 ~21:00Z from this Mac: 9 games. Grades start after tonight's finals on the next props run.
 
+## David's NFL page got the same rebuild; reader fixed (2026-10-29, ad22a35)
+- davidsasser.com/nfl rebuilt 10-28 (~9:58am CT update): "Projected margin" / "Vegas spread", so the text reader found 0 games and all 14 NFL Week 8 games showed "David model: not posted".
+- Fix: `davidNflGames` reads the RSC payload first (`projection.homeSpread` = model, `market.homeSpread` = market, both home side; scores rounded to a tenth then summed for the total), old text layout as fallback. Fixture `ds-board-wk8.html`. Deployed via push + `vercel --prod`.
+- Snapshots taken between his rebuild and the fix lack David; games had not kicked off, so the last pregame snapshot has him. No backfill done. If he rebuilds again, both leagues likely change together: check `rows with david` on both.
+
 ## David's college page redesign broke ingestion; Week 8 Saturday backfilled (2026-10-26, 85a1f52)
 - David rebuilt davidsasser.com/cfb Fri 10/23 ~11:40pm ET ("Projected margin" / "Vegas spread", no projected scores in markup). The text reader found 0 games: 41 of 44 Saturday Week 8 games were stored without his line, and the Saturday 10:30am send (it waited for his board, then gave up) had no college bets. NFL page unaffected.
 - Fix: `parseDavidBoard` (cfb) reads the RSC payload first (`davidCfbGames`: away/home names, `market.currentSpread`, `market.projected` home side, `projection` scores), old text layout as fallback. Model lines match all 56 stored pre-break copies exactly; totals = sum of rounded scores, as before. Shared `rscText`/`objectAt` now in `src/lib/rsc.ts` (props/david.ts uses them). Fixture `ds-cfb-board-wk8.html`.

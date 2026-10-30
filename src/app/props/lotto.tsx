@@ -89,7 +89,15 @@ function RungTable({ rungs }: { rungs: Rung[] }) {
               <td className={s.num}>{pct(r.ours)}</td>
               <td className={s.num}>{pct(implied(r.over))}</td>
               <td className={`${s.num} ${r.ev > 0 ? s.pos : s.dim}`}>{`${r.ev >= 0 ? "+" : ""}${r.ev.toFixed(2)}`}</td>
-              <td className={s.num}>{r.hit === null ? "·" : r.hit === "void" ? "void" : `${r.actual} ${r.hit ? "hit" : "missed"}`}</td>
+              <td className={`${s.num} ${r.hit === true ? s.pos : r.hit === false ? s.neg : s.dim}`}>
+                {r.hit === null ? "·" : r.hit === "void" ? "void" : (
+                  <>
+                    {r.actual}
+                    <span className={s.dim}> · </span>
+                    {r.hit ? "hit" : "missed"}
+                  </>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
