@@ -162,6 +162,7 @@ function lineup(r: PicksReport, market: Market, policy: PicksPolicy | null): Mod
             : { name, role: "College source", status: "input" as const, note: st === "veto" ? "Its agreement cuts can be the rule, and a rule bet it disagrees with is skipped." : "Its agreement cuts compete for the rule. It vetoes nothing." };
         })
       : [];
+  const cfbModel = (role: string, note: string): ModelRow[] => (r.league === "cfb" ? [{ name: "Our college model", role, status: "collecting", note }] : []);
   if (market === "ats")
     return [
       rule
@@ -170,6 +171,7 @@ function lineup(r: PicksReport, market: Market, policy: PicksPolicy | null): Mod
       ...inputs,
       ...sources,
       ...(r.league === "nfl" ? [{ name: "Our NFL spread model", role: "Our own number for every game", status: "collecting" as const, note: "Tracked only. Its leans are tested against the earlier price; it never touches the rule until it clears its gate." }] : []),
+      ...cfbModel("Projected spread for every game", "Tracked from Week 9. Its leans are tested against the opener and close; it never touches the rule until it clears its gate."),
     ];
   if (market === "ou")
     return [
@@ -177,10 +179,12 @@ function lineup(r: PicksReport, market: Market, policy: PicksPolicy | null): Mod
         ? { name: `Totals rule: ${totalsRule.label}`, role: `Decides ${L} totals bets`, status: "active", note: `${totalsRule.record.w}-${totalsRule.record.l}${totalsRule.record.p ? `-${totalsRule.record.p}` : ""} on ${totalsRule.games} games. Bets issue with a saved price and a stake.` }
         : { name: "Totals", role: `${L} over/unders`, status: "collecting", note: "No totals cut clears the bar, so totals are tracked with no stake." },
       ...inputs,
+      ...cfbModel("Projected total for every game", "Tracked from Week 9. Its overs and unders are graded with no stake until a review registers it as a source."),
     ];
   return [
     { name: "Straight-up picks", role: r.league === "nfl" ? "Pool entries" : "Winners, tracked", status: "projections", note: r.league === "nfl" ? "Picks for the pool, ranked by win chance. Pool entries only, never staked." : "Winner picks by the method in force. Tracked only, never staked." },
     ...inputs,
+    ...cfbModel("Win chance for every game", "Tracked from Week 9. Its winner picks are graded with no stake until a review registers it as a source."),
   ];
 }
 function lineupAside(r: PicksReport, market: Market): string {
