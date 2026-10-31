@@ -7,6 +7,7 @@ import type { JournalEntry } from "@/lib/picks/learning/review";
 import { CutRanges, Hero, LearnerLog, TrackingProgress, type CutRow, type LogEntry } from "./board";
 import { getPicksReport } from "@/lib/picks/report";
 import { CRITERIA } from "@/lib/picks/learning/model";
+import { ModelRecords } from "./model-records";
 import { LearningPanel, OTHER, leagueOf, marketOf } from "./learning";
 import Link from "next/link";
 import { LEAGUE_NAME, href, whenEt, type Market } from "./ui";
@@ -61,6 +62,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
         title={<span id="picks-log">Learner log</span>}
         sub={`Every idea counts only games after it was first tracked. It goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with a clear edge over ${AGAINST_SHORT[market]}, and comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "the next slate review"}.`}
       />
+      {rep && <ModelRecords league={league} market={market} report={rep} />}
       <TrackingProgress
         rows={ideas
           .filter((d) => d.verdict !== "reject")

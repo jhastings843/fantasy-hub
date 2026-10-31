@@ -10,6 +10,7 @@ import { BREAK_EVEN, MIN_SAMPLE } from "@/lib/picks/engine";
 import { drawdown, GameCell, href, line, pieces, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow } from "../board";
 import { NbaGameModelCard } from "./game-model";
+import { NbaModelRecords } from "../model-records";
 import s from "../picks.module.css";
 import n from "./nba.module.css";
 
@@ -644,6 +645,7 @@ function NbaLog({ v, m }: { v: NbaPicksView; m: Market }) {
         title={<span id="nba-log">Learner log</span>}
         sub={`NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered, and goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks at t ${CRITERIA.MIN_T}+. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; it runs after each night's games.` : "The first review runs after the first graded night."}`}
       />
+      <NbaModelRecords v={v} market={m} />
       <TrackingProgress
         rows={hyps.map((h) => ({
           id: h.id,
