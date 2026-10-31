@@ -26,7 +26,7 @@ import { runLockAlarm, runSundayBrief } from "@/lib/sunday/run";
 import { runLineupWatch } from "@/lib/watch/run";
 import { refreshAllLeagues } from "@/lib/refresh/run";
 import { archiveTracker } from "@/lib/picks/tracker";
-import { runPicksEmail, runPicksToday, todayLogKey } from "@/lib/picks/run";
+import { lateCheckResting, runPicksEmail, runPicksToday, todayLogKey } from "@/lib/picks/run";
 import { runPicksData } from "@/lib/picks/report";
 import { tracked } from "@/lib/picks/ops";
 import { reviewIfDue } from "@/lib/picks/learning/run";
@@ -474,8 +474,10 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
   // over by Tuesday evening, and asking it would read last week's log.
   if (id === "picks-day") {
     try {
+      // After the 9am email the send stays due for late adds (run.ts), which
+      // rest 30 minutes between looks; only a resting look is skipped here.
       const k = todayLogKey();
-      return (await sharedAlreadySent(k.id, k.season, k.day)) !== null;
+      return (await sharedAlreadySent(k.id, k.season, k.day)) !== null && (await lateCheckResting());
     } catch {
       return false;
     }

@@ -20,10 +20,13 @@ import type { TotalsBoardGame } from "./totals";
 /**
  * Which send issued a record. "tue", "sat", "sun": the old Tuesday card and
  * game-day updates (records before 2026-10-09). "g" + weekday: the daily 9am
- * bets email on that game day (run.ts). Records are ordered by issuedAt.
+ * bets email on that game day (run.ts), plus a digit for a late add that
+ * day. Records are ordered by issuedAt.
  */
 export type GameDaySlot = "gsun" | "gmon" | "gtue" | "gwed" | "gthu" | "gfri" | "gsat";
-export type Slot = "tue" | "sat" | "sun" | GameDaySlot;
+/** A late add on that game day: plays that qualified after the 9am email (run.ts), "gsat2", "gsat3", ... */
+export type LateSlot = `${GameDaySlot}${number}`;
+export type Slot = "tue" | "sat" | "sun" | GameDaySlot | LateSlot;
 export const SLOT_ORDER: Slot[] = ["tue", "sat", "sun"];
 export const GAME_DAY_SLOTS: GameDaySlot[] = ["gsun", "gmon", "gtue", "gwed", "gthu", "gfri", "gsat"];
 
@@ -264,6 +267,27 @@ export function onDate(d: UpdateDiff, date: string): UpdateDiff {
     stillOn: d.stillOn.filter((s) => today(s.sent.kickoff ?? s.sent.ref?.kickoff)),
     totalsStillOn: d.totalsStillOn.filter((s) => today(s.sent.kickoff)),
     pageOnly: [],
+  };
+}
+
+/** A late add needs time to be bet: none within this long of kickoff. */
+export const LATE_LEAD_MS = 60 * 60 * 1000;
+
+/** Plays (and totals) on the diff that kick off far enough out to bet; nothing else, since the 9am email covered the rest. Pure. */
+export function lateOnly(d: UpdateDiff, now: Date): UpdateDiff {
+  const betable = (k?: string) => !!k && new Date(k).getTime() - now.getTime() >= LATE_LEAD_MS;
+  return {
+    ...d,
+    added: d.added.filter((g) => betable(g.ref?.kickoff)),
+    addedTotals: d.addedTotals.filter((g) => betable(g.ref?.kickoff)),
+    off: [],
+    totalsOff: [],
+    stillOn: [],
+    totalsStillOn: [],
+    pageOnly: [],
+    kickedOff: 0,
+    noQuote: 0,
+    gone: 0,
   };
 }
 

@@ -11,7 +11,8 @@ import { toIssued, toIssuedUpdate } from "./issued";
 import { loadIssued } from "./issued-store";
 import { issueAndSend, loadIntent, recoverPending } from "./issue-send";
 import { weekOf } from "./parse";
-import { GAME_DAY_SLOTS, diffUpdate, onDate } from "./update";
+import { GAME_DAY_SLOTS, type GameDaySlot, type LateSlot, diffUpdate, lateOnly, onDate } from "./update";
+import { redis } from "@/lib/redis/client";
 import { RELEASE_MINUTE, etDate } from "./hold";
 import { redisStore } from "./learning/store";
 import { push } from "@/lib/notify/pushover";
@@ -194,8 +195,9 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   // A test never touches the production log or ledger.
   const logId = test ? `${id}-test` : id;
   if (!dry && !test) {
-    const previous = await alreadySent(id, season, day);
-    if (previous) return Response.json({ ok: true, skipped: true, reason: `Already handled at ${previous.sentAt} (${previous.subject}).` });
+    // The 9am email has gone (or the day was logged quiet): anything that
+    // qualifies after it goes out as a late add of its own.
+    if (await alreadySent(id, season, day)) return runLateAdds({ now, date, season, day, slot, appUrl });
     const rec = await recoverPending({ logId: id, season, week: day, idempotencyKey: idem });
     if (rec) {
       // The recovered card still gets its push; its details are in the email.
@@ -211,30 +213,7 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   // yet is "not ready": until 5pm ET the run retries rather than calling the
   // day quiet (a Tuesday-morning college game appears only once the new
   // week's boards are up).
-  const leagues: TodayLeague[] = [];
-  const notReady: string[] = [];
-  const shopNotes: string[] = [];
-  let reserved = 0;
-  for (const league of ["nfl", "cfb"] as const) {
-    const name = league === "nfl" ? "NFL" : "college";
-    const playsToday = (PLAY_DAYS[league] as readonly number[]).includes(clock.day);
-    // Shop Jack's other books before the quotes are re-read, so a -112 at
-    // DraftKings can size at FanDuel's or Fanatics' -110 (2 credits a read).
-    if (playsToday && !dry) {
-      const core = (await getPicksCore(league).catch(() => null))?.value;
-      shopNotes.push(`${name}: ${await refreshShop(league, core ? [...new Set(core.rows.flatMap((x) => [x.home, x.away]))] : [], now)}`);
-    }
-    const r = await refreshPicks(league, league === "cfb" ? { reserved } : undefined).catch(() => null);
-    if (!r?.week) {
-      if (playsToday) notReady.push(`${name} board unreadable`);
-      continue;
-    }
-    if (playsToday && (r.reference.stale || !r.reference.fetchedAt || (r.reference.games > 0 && r.reference.priced === 0))) notReady.push(`${name} lines missing or stale`);
-    else if (playsToday && (!r.boardUpdated.sam || !r.boardUpdated.david)) notReady.push(`${name} model boards not up`);
-    const diff = onDate(diffUpdate(r, await loadIssued(league, r.season), now), date);
-    reserved += diff.added.reduce((s, g) => s + (g.stake ?? 0), 0) + diff.addedTotals.reduce((s, g) => s + (g.stake ?? 0), 0);
-    leagues.push({ r, diff });
-  }
+  const { leagues, notReady, shopNotes } = await composeToday(now, date, clock.day, !dry);
   // Waiting must never cost a ready sport its bets: give up waiting 90
   // minutes before today's first kickoff on any loaded board, or at 5pm.
   const firstKick = Math.min(
@@ -282,4 +261,92 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
   const pushed = out.sent ? await push(todayPush({ date, leagues, appUrl })) : { pushed: false, reason: "email not sent" };
   return Response.json({ ok: true, sent: out.sent, subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason, shop: shopNotes });
+}
+
+/**
+ * Each sport's report and its diff against what was already issued, for
+ * games on `date`. NFL first; college is allocated with NFL's new stakes
+ * reserved, so the two together stay inside the cross-sport cap. A league
+ * that failed to load, has stale or missing quotes, or whose boards are not
+ * up yet is listed in notReady.
+ */
+async function composeToday(now: Date, date: string, weekday: number, shop: boolean): Promise<{ leagues: TodayLeague[]; notReady: string[]; shopNotes: string[] }> {
+  const leagues: TodayLeague[] = [];
+  const notReady: string[] = [];
+  const shopNotes: string[] = [];
+  let reserved = 0;
+  for (const league of ["nfl", "cfb"] as const) {
+    const name = league === "nfl" ? "NFL" : "college";
+    const playsToday = (PLAY_DAYS[league] as readonly number[]).includes(weekday);
+    // Shop Jack's other books before the quotes are re-read, so a -112 at
+    // DraftKings can size at FanDuel's or Fanatics' -110 (2 credits a read).
+    if (playsToday && shop) {
+      const core = (await getPicksCore(league).catch(() => null))?.value;
+      shopNotes.push(`${name}: ${await refreshShop(league, core ? [...new Set(core.rows.flatMap((x) => [x.home, x.away]))] : [], now)}`);
+    }
+    const r = await refreshPicks(league, league === "cfb" ? { reserved } : undefined).catch(() => null);
+    if (!r?.week) {
+      if (playsToday) notReady.push(`${name} board unreadable`);
+      continue;
+    }
+    if (playsToday && (r.reference.stale || !r.reference.fetchedAt || (r.reference.games > 0 && r.reference.priced === 0))) notReady.push(`${name} lines missing or stale`);
+    else if (playsToday && (!r.boardUpdated.sam || !r.boardUpdated.david)) notReady.push(`${name} model boards not up`);
+    const diff = onDate(diffUpdate(r, await loadIssued(league, r.season), now), date);
+    reserved += diff.added.reduce((s, g) => s + (g.stake ?? 0), 0) + diff.addedTotals.reduce((s, g) => s + (g.stake ?? 0), 0);
+    leagues.push({ r, diff });
+  }
+  return { leagues, notReady, shopNotes };
+}
+
+// ------------------------------------------------------------- late adds
+//
+// Jack, 2026-10-31: a play that qualifies after the 9am email (a line posts
+// late, a board updates, the number moves into range) goes out on its own,
+// not "with the next email", which is tomorrow and after the game. The diff
+// against the issued ledger is what makes this safe to repeat: a game issued
+// by any earlier send this week is never added again.
+
+/** How often a day already handled looks for late adds (each look reads both boards). */
+const LATE_CHECK_SECONDS = 30 * 60;
+/** Late slots per day: gsat2 .. gsat9. */
+const LATE_SLOTS = [2, 3, 4, 5, 6, 7, 8, 9];
+
+const lateCheckKey = (date: string) => `picks:v2:late-check:${date}`;
+
+/** True while today's late-add look is resting (the pulse skips the send without rebuilding anything). */
+export async function lateCheckResting(now = new Date()): Promise<boolean> {
+  return ((await redis.exists(lateCheckKey(todayLogKey(now).date)).catch(() => 0)) ?? 0) > 0;
+}
+
+async function runLateAdds(input: { now: Date; date: string; season: string; day: number; slot: GameDaySlot; appUrl: string }): Promise<Response> {
+  const { now, date, season, day, slot, appUrl } = input;
+  // A late add that never confirmed is finished before anything new is decided.
+  for (const n of LATE_SLOTS) {
+    const rec = await recoverPending({ logId: "picks-day-late", season, week: day * 10 + n, idempotencyKey: `picks-day:${date}:late${n}` });
+    if (rec) return Response.json({ ok: rec.outcome !== "failed", sent: rec.sent, reason: `recovered earlier late add: ${rec.outcome}`, issued: rec.issued, error: rec.error });
+  }
+  if ((await redis.set(lateCheckKey(date), now.toISOString(), { nx: true, ex: LATE_CHECK_SECONDS })) !== "OK") {
+    return Response.json({ ok: true, skipped: true, reason: "Today's email went out; late adds checked within the last 30 minutes." });
+  }
+  let n: number | undefined;
+  for (const k of LATE_SLOTS) if (!(await loadIntent(`picks-day:${date}:late${k}`))) { n = k; break; }
+  if (n === undefined) return Response.json({ ok: true, skipped: true, reason: "Today's late-add slots are used up." });
+
+  // No book shopping here: it spends credits on every look, and most looks find nothing.
+  const composed = await composeToday(now, date, etClock(now).day, false);
+  // A sport whose quotes are missing or stale adds nothing: a late add is judged at the line it shows.
+  const fresh = (l: TodayLeague) => !l.r.reference.stale && !!l.r.reference.fetchedAt;
+  const leagues = composed.leagues.filter(fresh).map((l) => ({ ...l, diff: lateOnly(l.diff, now) })).filter((l) => l.diff.added.length || l.diff.addedTotals.length);
+  if (!leagues.length) return Response.json({ ok: true, skipped: true, reason: "Today's email went out; no late adds." });
+
+  const idem = `picks-day:${date}:late${n}`;
+  const lateSlot: LateSlot = `${slot}${n}`;
+  const email = buildTodayEmail({ date, leagues, appUrl, generatedAt: now.toISOString(), late: true });
+  const meta = { issuedAt: now.toISOString(), subject: email.subject };
+  const records = leagues.map((l) => toIssuedUpdate(l.r, l.diff, lateSlot, meta));
+  await saveDecisionsBounded(decisionsFor(leagues, { at: now.toISOString(), sendKey: idem, date }), { season: leagues[0].r.season, sendKey: idem, at: now.toISOString() });
+  const out = await issueAndSend({ logId: "picks-day-late", season, week: day * 10 + n, subject: email.subject, html: email.html, idempotencyKey: idem, records });
+  if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
+  const pushed = out.sent ? await push(todayPush({ date, leagues, appUrl, late: true })) : { pushed: false, reason: "email not sent" };
+  return Response.json({ ok: true, sent: out.sent, subject: email.subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason });
 }

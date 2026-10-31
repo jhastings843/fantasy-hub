@@ -200,7 +200,6 @@ export async function OurNbaResults({ season }: { season: number }) {
   if (!v) return null;
   const rec = (id: string) => record(ourSliceBets(v.graded, id));
   const all = rec("edge:all");
-  const lean = rec("lean:all");
   const props = v.graded.reduce((a, x) => a + x.result.markets.filter((r) => r.actual !== null).length, 0);
   // Every graded game stays in the record; the visible log keeps a week (Jack, 2026-10-27).
   const weekAgo = new Date(renderedAt() - 7 * 86_400_000).toISOString();
@@ -217,7 +216,6 @@ export async function OurNbaResults({ season }: { season: number }) {
         <>
           <div className={s.tiles}>
             <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
-            <Tile value={u(lean.units)} label={`Every lean · ${lean.w}-${lean.l}${lean.p ? `-${lean.p}` : ""}`} />
             <Tile value={`${props}`} label="props graded" />
           </div>
           <div className={s.pageFrame}>
@@ -235,7 +233,10 @@ export async function OurNbaResults({ season }: { season: number }) {
                 </tr>
               </thead>
               <tbody>
-                {ourPropSlices(["pts", "reb", "ast", "threes"]).map(([id, labelText]) => {
+                {ourPropSlices(["pts", "reb", "ast", "threes"])
+                  // Edges only on the page for now (Jack, 2026-10-31); lean slices still feed learning.
+                  .filter(([id]) => !id.startsWith("lean:"))
+                  .map(([id, labelText]) => {
                   const r = rec(id);
                   return (
                     <tr key={id}>

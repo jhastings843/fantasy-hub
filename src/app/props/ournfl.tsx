@@ -45,7 +45,6 @@ export async function OurNflResults({ season }: { season: number }) {
   if (!v) return null;
   const rec = (id: string) => record(ourSliceBets(v.graded, id));
   const all = rec("edge:all");
-  const lean = rec("lean:all");
   return (
     <section className={s.section} aria-labelledby="our-nfl-results">
       <div className={s.sectionHead}>
@@ -58,7 +57,6 @@ export async function OurNflResults({ season }: { season: number }) {
         <>
           <div className={s.tiles}>
             <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
-            <Tile value={u(lean.units)} label={`Every lean · ${lean.w}-${lean.l}${lean.p ? `-${lean.p}` : ""}`} />
           </div>
           <div className={s.pageFrame}>
             <SecHead title="Game by game" aside="Newest first · each tracked edge 1u at the saved price · open a game for every prop" />
@@ -75,7 +73,10 @@ export async function OurNflResults({ season }: { season: number }) {
                 </tr>
               </thead>
               <tbody>
-                {ourPropSlices([...STATS]).map(([id, label]) => {
+                {ourPropSlices([...STATS])
+                  // Edges only on the page for now (Jack, 2026-10-31); lean slices still feed learning.
+                  .filter(([id]) => !id.startsWith("lean:"))
+                  .map(([id, label]) => {
                   const r = rec(id);
                   return (
                     <tr key={id}>

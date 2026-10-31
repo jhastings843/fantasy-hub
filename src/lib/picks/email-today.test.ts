@@ -36,3 +36,14 @@ describe("today's bets email and push", () => {
     expect(e.html).not.toContain("—");
   });
 });
+
+describe("late-add email", () => {
+  it("says late add in the subject, heading and push", () => {
+    const leagues: TodayLeague[] = [{ r: r("cfb"), diff: diff({ added: [tb] }) }];
+    const e = buildTodayEmail({ date: "2026-10-31", leagues, appUrl: "https://x", generatedAt: "2026-10-31T15:30:00Z", late: true });
+    expect(e.subject).toBe("Late add: 1 (2u) · Sat, Oct 31");
+    expect(e.html).toContain("Late add: qualified after the 9am email");
+    expect(e.html).toContain("11:30 AM ET");
+    expect(todayPush({ date: "2026-10-31", leagues, appUrl: "https://x", late: true }).title).toBe("Late add: 1 · 2u");
+  });
+});

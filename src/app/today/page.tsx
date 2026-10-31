@@ -68,7 +68,7 @@ function footballSlips(r: PicksReport): Slip[] {
       const side = g.issued.side;
       out.push({ key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, logos: { league: r.league, teams: [team(side)] }, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
     } else if (g.stake && g.side && g.homeLine !== undefined && state === "next") {
-      out.push({ key: `${r.league}-${g.home}`, logos: { league: r.league, teams: [team(g.side)] }, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out with the next picks email." });
+      out.push({ key: `${r.league}-${g.home}`, logos: { league: r.league, teams: [team(g.side)] }, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out as a late-add email within 30 minutes (none inside an hour of kickoff)." });
     }
   }
   for (const t of r.totals.board) {

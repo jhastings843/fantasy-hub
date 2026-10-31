@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type StrategyBoard, tierBoard } from "./engine";
 import { gradeIssued, type IssuedRecord } from "./issued";
-import { diffUpdate, firstSends, updateMatters } from "./update";
+import { diffUpdate, firstSends, lateOnly, updateMatters } from "./update";
 import { stakeBoard } from "./test-helpers";
 
 const staked = <T extends Parameters<typeof stakeBoard>[0]>(b: T) => stakeBoard(b, { t1: { w: 14, l: 2 } }, 7).board;
@@ -103,5 +103,29 @@ describe("a staked send supersedes an earlier unstaked one", () => {
     const fs = firstSends([unstaked, day]);
     expect(fs[0].plays.map((p) => p.home)).toEqual(["H2", "H3"]);
     expect(fs[1].plays.map((p) => [p.home, p.homeLine, p.units])).toEqual([["H1", 4, 2]]);
+  });
+});
+
+describe("lateOnly", () => {
+  const now = new Date("2026-10-31T20:00:00Z");
+  const g = (kickoff: string) => ({ home: "GASO", away: "APP", ref: { kickoff } }) as never;
+  const d = {
+    week: 9,
+    added: [g("2026-10-31T22:30:00Z"), g("2026-10-31T20:45:00Z"), g("2026-10-31T21:00:00Z")],
+    addedTotals: [g("2026-10-31T19:00:00Z")],
+    off: [{} as never],
+    totalsOff: [],
+    stillOn: [{} as never],
+    totalsStillOn: [],
+    pageOnly: ["x"],
+    kickedOff: 2,
+    noQuote: 1,
+    gone: 3,
+  };
+  it("keeps only adds kicking off an hour or more out, and drops the 9am email's on/off advice", () => {
+    const out = lateOnly(d, now);
+    expect(out.added.map((x) => (x as { ref: { kickoff: string } }).ref.kickoff)).toEqual(["2026-10-31T22:30:00Z", "2026-10-31T21:00:00Z"]);
+    expect(out.addedTotals).toEqual([]);
+    expect([out.off, out.stillOn, out.pageOnly, out.kickedOff, out.gone]).toEqual([[], [], [], 0, 0]);
   });
 });

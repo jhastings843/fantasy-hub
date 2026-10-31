@@ -387,13 +387,15 @@ const dayLabel = (date: string) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 
 /** The 9am game-day email: today's bets at this morning's line, and any sent bet that is now off. */
-export function buildTodayEmail(input: { date: string; leagues: TodayLeague[]; appUrl: string; generatedAt: string }): { html: string; subject: string } {
-  const { leagues, appUrl } = input;
+export function buildTodayEmail(input: { date: string; leagues: TodayLeague[]; appUrl: string; generatedAt: string; late?: boolean }): { html: string; subject: string } {
+  const { leagues, appUrl, late } = input;
   const bets = betsOf(leagues);
   const off = leagues.reduce((n, l) => n + l.diff.off.length + l.diff.totalsOff.length, 0);
-  const subject = bets
-    ? `Today's bets: ${bets} (${u(unitsOf(leagues))}) · ${dayLabel(input.date)}`
-    : `Today: ${off} sent bet${off === 1 ? " is" : "s are"} off · ${dayLabel(input.date)}`;
+  const subject = late
+    ? `Late add: ${bets} (${u(unitsOf(leagues))}) · ${dayLabel(input.date)}`
+    : bets
+      ? `Today's bets: ${bets} (${u(unitsOf(leagues))}) · ${dayLabel(input.date)}`
+      : `Today: ${off} sent bet${off === 1 ? " is" : "s are"} off · ${dayLabel(input.date)}`;
   const body = leagues
     .filter((l) => l.diff.added.length || l.diff.addedTotals.length || l.diff.off.length || l.diff.totalsOff.length)
     .map(({ r, diff }) => {
@@ -417,19 +419,19 @@ ${small(feedsLine(r))}`);
     .join("");
   const html = emailPage({
     title: subject,
-    kicker: `${dayLabel(input.date)} · 9am ET`,
-    heading: bets ? "Today's bets" : "Today: nothing new to bet",
+    kicker: `${dayLabel(input.date)} · ${late ? `${new Date(input.generatedAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} ET` : "9am ET"}`,
+    heading: late ? "Late add: qualified after the 9am email" : bets ? "Today's bets" : "Today: nothing new to bet",
     preheader: subject,
     body,
     cta: { href: `${appUrl}/picks`, text: "Open Picks" },
-    footnote: `<div>Bets for today's games only, judged at this morning's DraftKings line, at the best price of DraftKings and FanDuel on that same line (the book is named when it isn't DraftKings). Each is graded at the line and price shown; a better number elsewhere only helps. ${sizingNote(input.leagues[0]?.r ?? null)} Units are risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
+    footnote: `<div>Bets for today's games only, judged at ${late ? "the DraftKings line when this email went out" : "this morning's DraftKings line"}, at the best price of DraftKings and FanDuel on that same line (the book is named when it isn't DraftKings). Each is graded at the line and price shown; a better number elsewhere only helps. ${sizingNote(input.leagues[0]?.r ?? null)} Units are risked. Limits: 5u per bet and per game, 30u per week across both sports, 30u open at once. Check the live number before betting; the page has a checker for moved lines.</div>
 <div style="padding-top:6px;">${generatedLine(input.generatedAt)}</div>`,
   });
   return { html, subject };
 }
 
 /** The phone alert that rides with today's email. Pure. */
-export function todayPush(input: { date: string; leagues: TodayLeague[]; appUrl: string }): Push {
+export function todayPush(input: { date: string; leagues: TodayLeague[]; appUrl: string; late?: boolean }): Push {
   const { leagues } = input;
   const bets = betsOf(leagues);
   const lines: string[] = [];
@@ -445,7 +447,7 @@ export function todayPush(input: { date: string; leagues: TodayLeague[]; appUrl:
     for (const o of diff.totalsOff) lines.push(`OFF ${league} ${o.sent.play}: ${o.reason}`);
   }
   return {
-    title: bets ? `Today's bets: ${bets} · ${u(unitsOf(leagues))}` : "Picks: a sent bet is off",
+    title: input.late ? `Late add: ${bets} · ${u(unitsOf(leagues))}` : bets ? `Today's bets: ${bets} · ${u(unitsOf(leagues))}` : "Picks: a sent bet is off",
     message: lines.join("\n") || "Nothing today.",
     url: `${input.appUrl}/picks`,
     urlTitle: "Open Picks",
