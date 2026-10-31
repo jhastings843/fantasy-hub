@@ -5,7 +5,7 @@ import { confirmed } from "@/lib/picks/issued";
 import { unitReport } from "@/lib/picks/units";
 import { firstSends } from "@/lib/picks/update";
 import type { League } from "@/lib/picks/parse";
-import { ourPropsWeeks, type OurPropsWeek } from "@/lib/models/money";
+import { ourProps, type OurPropsType, type OurPropsWeek } from "@/lib/models/money";
 
 // The Money overview's two sports charts (Jack, 2026-10-19: "add a graph for
 // props and a graph for picks across all sports"). Read-only, from the same
@@ -40,6 +40,8 @@ export interface SportsView {
   picks: PicksWeek[];
   /** Our props models (Sam's props record is no longer shown, Jack 2026-10-21). */
   props: OurPropsWeek[];
+  /** The same edges split by prop type, for the Props row's breakdown. */
+  propTypes: OurPropsType[];
   problems: string[];
 }
 
@@ -50,6 +52,13 @@ export async function getSportsView(now = new Date()): Promise<SportsView> {
       problems.push(`${what}: ${e instanceof Error ? e.message : String(e)}`);
       return [] as T[];
     });
-  const [nfl, cfb, props] = await Promise.all([safe("NFL picks", picksWeeks("nfl")), safe("college picks", picksWeeks("cfb")), safe("props", ourPropsWeeks(now))]);
-  return { picks: [...nfl, ...cfb].sort((a, b) => a.at.localeCompare(b.at)), props, problems };
+  const [nfl, cfb, props] = await Promise.all([
+    safe("NFL picks", picksWeeks("nfl")),
+    safe("college picks", picksWeeks("cfb")),
+    ourProps(now).catch((e) => {
+      problems.push(`props: ${e instanceof Error ? e.message : String(e)}`);
+      return { weeks: [], byType: [] };
+    }),
+  ]);
+  return { picks: [...nfl, ...cfb].sort((a, b) => a.at.localeCompare(b.at)), props: props.weeks, propTypes: props.byType, problems };
 }

@@ -38,6 +38,8 @@ export interface Desk {
   read: string;
   readTone: "good" | "bad" | "neutral";
   href: string;
+  /** When present, clicking the row opens this list under it instead of navigating (Props, by prop type). */
+  breakdown?: { label: string; result: string; rec: string; tone?: "up" | "down" }[];
 }
 
 export function booksTotals(books: Book[]) {
@@ -190,6 +192,10 @@ export function desks(v: View): Desk[] {
       read: e.n ? "Tracked only" : "First grades pending",
       readTone: "neutral",
       href: "/props?v=results",
+      // Worst first: the list is there to show where the loss comes from.
+      breakdown: [...(sp.propTypes ?? [])]
+        .sort((a, b) => a.units - b.units)
+        .map((t) => ({ label: t.label, result: units(t.units), rec: `${t.w}-${t.l}${t.p ? `-${t.p}` : ""} · ${t.bets} edges`, tone: toneOf(t.units) })),
     });
   }
   return out;
@@ -209,8 +215,8 @@ export function DeskTable({ list }: { list: Desk[] }) {
       </div>
       {list.map((d) => {
         const top = d.bars ? Math.max(d.bars.ours, d.bars.yard, 1e-9) : 1;
-        return (
-          <Link key={d.id} href={d.href} className={`${m.deskRow} ${m.deskGrid}`}>
+        const cells = (
+          <>
             <span className={m.deskName}>
               <b>{d.name}</b>
               <span>{d.what}</span>
@@ -230,6 +236,34 @@ export function DeskTable({ list }: { list: Desk[] }) {
               </span>
             </span>
             <span className={`${s.readChip} ${READ_CLS[d.readTone]}`}>{d.read}</span>
+          </>
+        );
+        if (d.breakdown?.length)
+          return (
+            <details key={d.id} className={m.deskDetails}>
+              <summary className={`${m.deskRow} ${m.deskGrid}`}>
+                {cells}
+                <span className={`${s.chev} ${m.deskToggle}`} aria-hidden>
+                  ›
+                </span>
+              </summary>
+              <ul className={m.deskBreak}>
+                {d.breakdown.map((b) => (
+                  <li key={b.label}>
+                    <span>{b.label}</span>
+                    <span className={s.num}>{b.rec}</span>
+                    <b className={`${s.num} ${b.tone === "up" ? s.pos : b.tone === "down" ? s.neg : ""}`}>{b.result}</b>
+                  </li>
+                ))}
+                <li className={m.deskBreakLink}>
+                  <Link href={d.href}>Open {d.name} results ›</Link>
+                </li>
+              </ul>
+            </details>
+          );
+        return (
+          <Link key={d.id} href={d.href} className={`${m.deskRow} ${m.deskGrid}`}>
+            {cells}
             <span className={s.chev} aria-hidden>
               ›
             </span>
