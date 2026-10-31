@@ -62,11 +62,11 @@ function footballSlips(r: PicksReport): Slip[] {
   const out: Slip[] = [];
   for (const g of r.board) {
     if (g.final) continue;
-    const kick = g.ref?.kickoff ?? "";
+    const kick = (g.ref ?? g.lastRef)?.kickoff ?? "";
     const state = g.basis === "started" ? "live" : "next";
     const game = `${n(g.away)} at ${n(g.home)}`;
     const href = `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`;
-    const team = (side: "home" | "away"): Logo => (side === "home" ? { team: g.home, id: g.ref?.homeId } : { team: g.away, id: g.ref?.awayId });
+    const team = (side: "home" | "away"): Logo => (side === "home" ? { team: g.home, id: (g.ref ?? g.lastRef)?.homeId } : { team: g.away, id: (g.ref ?? g.lastRef)?.awayId });
     if (g.issued) {
       const side = g.issued.side;
       out.push({ href, key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, logos: { league: r.league, teams: [team(side)] }, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
@@ -77,8 +77,8 @@ function footballSlips(r: PicksReport): Slip[] {
   for (const t of r.totals.board) {
     const g = r.board.find((x) => x.home === t.home && x.away === t.away);
     if (!g || g.final || !t.issued) continue;
-    const kick = g.ref?.kickoff ?? "";
-    out.push({ href: `/picks/game?l=${r.league}&g=${encodeURIComponent(`${t.away}@${t.home}`)}`, key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, logos: { league: r.league, teams: [{ team: g.away, id: g.ref?.awayId }, { team: g.home, id: g.ref?.homeId }] }, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
+    const kick = (g.ref ?? g.lastRef)?.kickoff ?? "";
+    out.push({ href: `/picks/game?l=${r.league}&g=${encodeURIComponent(`${t.away}@${t.home}`)}`, key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, logos: { league: r.league, teams: [{ team: g.away, id: (g.ref ?? g.lastRef)?.awayId }, { team: g.home, id: (g.ref ?? g.lastRef)?.homeId }] }, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
   }
   return out;
 }
