@@ -1,3 +1,7 @@
+# ATTD parlay of the day (2026-10-31, deployed 267d543)
+Sundays only. src/lib/models/nfl/attd-parlay.ts (pure, tested) + buildSundayParlay/loadAttdParlays in ftd-store.ts, called from runOurFirstTd (first-td.yml Sunday 12:30 and 16:00 UTC captures). Leg = Venom top-5 pick with p (loadVenomChances) + our anytime > DK break-even + (ours+venom)/2 beats break-even by ATTD_EDGE; one per game, top 5 by gap, needs 3. Frozen at attd:v1:parlay:{season}:w{week} (set nx), Pushover push, graded 1u from attdResult. Jack OK'd showing legs publicly (Venom numbers shown). Paper only, not in learner or emails; if it ever goes out in an email, add to /records per the props rule.
+VERIFY Sun Nov 1: first-td run summary "ATTD parlay: ...", push arrived, Board shows ticket. If "N legs qualify, need 3" every run, the 5pt blended bar may be too strict for Venom's top 5 (his p sits near DK's).
+
 # Systems review plan (2026-10-27, from Jack's notes in the "Hobby Hub Systems Review" artifact)
 
 Artifact: https://claude.ai/artifact/DyhAJRDBgUecUKzJih5TMm. Jack's per-section notes live in its db, collection `notes` (read with ArtifactData list). All 24 sections reviewed.
