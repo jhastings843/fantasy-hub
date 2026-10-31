@@ -34,6 +34,8 @@ const dayLabel = (day: string, today: string) => {
   return day === today ? `Today · ${label}` : label;
 };
 
+export const nbaGameHref = (id: string) => `/picks/nba/game?id=${encodeURIComponent(id)}`;
+
 export const nbaHref = (m: Market, v: View) => {
   const q = new URLSearchParams();
   if (m !== "ats") q.set("m", m);
@@ -90,7 +92,7 @@ function asSaved(g: NbaBoardGame, t: NbaTracked | undefined): NbaBoardGame {
 const ruleOf = (v: NbaPicksView, m: Market): NbaRule | null => (m === "ats" ? v.ats : m === "ou" ? v.ou : null);
 
 /** One game's read in one market: the saved copy once tipped, Sam's bet, the rule's tier and any stake. */
-function readMarket(raw: NbaBoardGame, v: NbaPicksView | null, m: Market) {
+export function readMarket(raw: NbaBoardGame, v: NbaPicksView | null, m: Market) {
   const saved = v?.games.find((x) => x.id === raw.id);
   const g = asSaved(raw, saved);
   const t = snapOf(g);
@@ -164,7 +166,7 @@ function readChip(x: Read, m: Market): [string, string] {
 }
 
 /** Everything behind one game: spread, total, moneyline, Sam's numbers. */
-function NbaWhy({ g }: { g: NbaBoardGame }) {
+export function NbaWhy({ g }: { g: NbaBoardGame }) {
   const r = g.read;
   return (
     <dl className={s.kv}>
@@ -197,7 +199,7 @@ function NbaWhy({ g }: { g: NbaBoardGame }) {
 }
 
 /** The football pop-up's four boxes for one NBA market: Sam's side, his edge, a cover chance from the tracked record, and edge per unit. */
-function NbaStats({ x, m }: { x: Read; m: Market }) {
+export function NbaStats({ x, m }: { x: Read; m: Market }) {
   const { g, bet, cut, p, edgePct, tier } = x;
   if (!bet) return null;
   const word = m === "su" ? "Win chance" : "Cover chance";
@@ -280,6 +282,9 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
       <div className={s.gBody}>
         <NbaStats x={x} m={m} />
         <NbaWhy g={g} />
+        <Link href={nbaGameHref(g.id)} className={s.linkA} style={{ fontWeight: 600, fontSize: 14, display: "inline-block", marginTop: 10 }}>
+          Open the game: every market ›
+        </Link>
       </div>
     </details>
   );

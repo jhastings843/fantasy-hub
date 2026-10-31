@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getPicksReport, type PicksReport } from "@/lib/picks/report";
 import { getNbaBoard } from "@/lib/picks/nba-store";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
-import { readGame } from "../picks/nba/NbaView";
+import { nbaGameHref, readGame } from "../picks/nba/NbaView";
 import { findGame, scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { TeamLogo, type LogoLeague } from "@/components/TeamLogo";
@@ -52,6 +52,8 @@ interface Slip {
   stake?: number;
   price?: number;
   note?: string;
+  /** Where the card opens: the game pop-up. */
+  href?: string;
 }
 
 /** Issued and ready-to-issue football bets this week that are not final. */
@@ -63,19 +65,20 @@ function footballSlips(r: PicksReport): Slip[] {
     const kick = g.ref?.kickoff ?? "";
     const state = g.basis === "started" ? "live" : "next";
     const game = `${n(g.away)} at ${n(g.home)}`;
+    const href = `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`;
     const team = (side: "home" | "away"): Logo => (side === "home" ? { team: g.home, id: g.ref?.homeId } : { team: g.away, id: g.ref?.awayId });
     if (g.issued) {
       const side = g.issued.side;
-      out.push({ key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, logos: { league: r.league, teams: [team(side)] }, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
+      out.push({ href, key: `${r.league}-${g.home}`, awayKey: g.away, homeKey: g.home, logos: { league: r.league, teams: [team(side)] }, league: LEAGUE_NAME[r.league], pick: side === "home" ? `${n(g.home)} ${line(g.issued.homeLine)}` : `${n(g.away)} ${line(-g.issued.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "issued", tier: g.tier === "t1" ? "Tier 1" : g.tier === "t2" ? "Tier 2" : "Issued", stake: g.issued.units, price: g.issued.price });
     } else if (g.stake && g.side && g.homeLine !== undefined && state === "next") {
-      out.push({ key: `${r.league}-${g.home}`, logos: { league: r.league, teams: [team(g.side)] }, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out as a late-add email within 30 minutes (none inside an hour of kickoff)." });
+      out.push({ href, key: `${r.league}-${g.home}`, logos: { league: r.league, teams: [team(g.side)] }, league: LEAGUE_NAME[r.league], pick: g.side === "home" ? `${n(g.home)} ${line(g.homeLine)}` : `${n(g.away)} ${line(-g.homeLine)}`, game, when: kickoffEt(kick), kickoff: kick, state, kind: "ready", tier: g.tier === "t1" ? "Tier 1" : "Tier 2", stake: g.stake, price: g.price, note: g.held ? `Early look: it locks ${kickoffEt(g.held)} at that morning's price.` : "Sized, not sent yet: it goes out as a late-add email within 30 minutes (none inside an hour of kickoff)." });
     }
   }
   for (const t of r.totals.board) {
     const g = r.board.find((x) => x.home === t.home && x.away === t.away);
     if (!g || g.final || !t.issued) continue;
     const kick = g.ref?.kickoff ?? "";
-    out.push({ key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, logos: { league: r.league, teams: [{ team: g.away, id: g.ref?.awayId }, { team: g.home, id: g.ref?.homeId }] }, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
+    out.push({ href: `/picks/game?l=${r.league}&g=${encodeURIComponent(`${t.away}@${t.home}`)}`, key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, logos: { league: r.league, teams: [{ team: g.away, id: g.ref?.awayId }, { team: g.home, id: g.ref?.homeId }] }, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
   }
   return out;
 }
@@ -89,7 +92,7 @@ function SlipCard({ x }: { x: Slip }) {
     ) : (
       <span className={`${s.readChip} ${s.readTrack}`}>{`${x.tier} · no stake`}</span>
     );
-  return (
+  const card = (
     <article className={`${s.slip} ${x.kind === "issued" ? s.slipReal : x.kind === "ready" ? s.slipReady : s.slipDash}`}>
       <div className={s.slipTop}>
         {chip}
@@ -123,6 +126,14 @@ function SlipCard({ x }: { x: Slip }) {
       </div>
     </article>
   );
+  // The whole card opens the game pop-up (Jack, 2026-10-31: "click a bet from any sport and get the full picture").
+  return x.href ? (
+    <Link href={x.href} scroll={false} className={s.slipLink} aria-label={`${x.pick}: open the game`}>
+      {card}
+    </Link>
+  ) : (
+    card
+  );
 }
 
 export default async function TodayPage() {
@@ -154,6 +165,7 @@ export default async function TodayPage() {
       const picked = x.bet?.side === "home" ? raw.home : x.bet?.side === "away" ? raw.away : null;
       return {
         key: `nba-${raw.id}`,
+        href: nbaGameHref(raw.id),
         logos: { league: "nba" as const, teams: picked ? [{ team: picked.abbr }] : [{ team: raw.away.abbr }, { team: raw.home.abbr }] },
         league: "NBA",
         // No saved read, or a read with no side (readGame then falls back to the matchup): nothing to show, so the card is left out.
