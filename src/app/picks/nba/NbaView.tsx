@@ -3,6 +3,8 @@ import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard, type NbaBoardGame } fro
 import { getNbaPicksView, type NbaPicksView } from "@/lib/picks/nba-track-store";
 import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord, type NbaRule, type NbaTracked } from "@/lib/picks/nba-track";
 import { readNba } from "@/lib/picks/nba";
+import { decimal, shrunk } from "@/lib/picks/staking";
+import pv from "../game/preview.module.css";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { BREAK_EVEN, MIN_SAMPLE } from "@/lib/picks/engine";
 import { drawdown, GameCell, href, line, pieces, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
@@ -96,7 +98,11 @@ function readMarket(raw: NbaBoardGame, v: NbaPicksView | null, m: Market) {
   const rule = v ? ruleOf(v, m) : null;
   const tier = bet && rule && g.state === "pre" ? tierOf(bet, rule) : null;
   const stake = tier && v?.gate.live && m === "ats" ? (saved?.stake ?? null) : null;
-  return { g, bet, tier, stake };
+  // The record behind the cover chance: the tier's cut, else every Sam pick in this market.
+  const cut = bet && v ? (tier === 1 ? rule?.tier1 : tier === 2 ? rule?.tier2 : v.cuts.find((c) => c.id === `${m}:all`)) ?? null : null;
+  const p = cut && cut.w + cut.l > 0 ? shrunk(cut.w, cut.l, NBA_LIMITS.SHRINK_GAMES) : null;
+  const edgePct = p !== null && bet?.price !== undefined ? (p * decimal(bet.price) - 1) * 100 : null;
+  return { g, bet, tier, stake, cut, p, edgePct };
 }
 type Read = ReturnType<typeof readMarket>;
 
@@ -190,6 +196,39 @@ function NbaWhy({ g }: { g: NbaBoardGame }) {
   );
 }
 
+/** The football pop-up's four boxes for one NBA market: Sam's side, his edge, a cover chance from the tracked record, and edge per unit. */
+function NbaStats({ x, m }: { x: Read; m: Market }) {
+  const { g, bet, cut, p, edgePct, tier } = x;
+  if (!bet) return null;
+  const word = m === "su" ? "Win chance" : "Cover chance";
+  return (
+    <div className={pv.statsWrap} style={{ marginBottom: 12 }}>
+      <dl className={pv.stats}>
+        <div>
+          <dt>Sam&apos;s side</dt>
+          <dd>{betText(bet, g.home.short, g.away.short)}</dd>
+        </div>
+        <div>
+          <dt>{m === "su" ? "Margin" : "Edge"}</dt>
+          <dd className={s.num}>{`${bet.edge.toFixed(1)} pts`}</dd>
+        </div>
+        <div>
+          <dt>{word}</dt>
+          <dd className={s.num}>{p !== null ? pctOf(p) : "·"}</dd>
+        </div>
+        <div>
+          <dt>Edge per unit</dt>
+          <dd className={`${s.num} ${edgePct !== null ? cls(edgePct) : ""}`}>{edgePct !== null ? `${edgePct >= 0 ? "+" : ""}${edgePct.toFixed(1)}%` : "·"}</dd>
+          {edgePct === null && p !== null && <small className={pv.statSub}>no price yet</small>}
+        </div>
+      </dl>
+      {cut && p !== null && (
+        <p className={pv.statNote}>{`${tier ? `Tier ${tier}: ` : ""}${cut.label} (${rec(cut)}). ${word} is that record pulled toward 50%, an estimate.${tier ? "" : " Outside the tiers, so tracked only."}`}</p>
+      )}
+    </div>
+  );
+}
+
 /** One game on the board, in the football boards' ledger shape (ats.tsx LedgerRow): matchup, market, Sam, our side and the read. */
 function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
   const { g } = x;
@@ -239,6 +278,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
         </span>
       </summary>
       <div className={s.gBody}>
+        <NbaStats x={x} m={m} />
         <NbaWhy g={g} />
       </div>
     </details>

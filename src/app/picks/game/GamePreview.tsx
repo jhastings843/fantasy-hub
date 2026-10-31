@@ -6,11 +6,11 @@
 import type { BoardGame } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import { TeamLogo } from "@/components/TeamLogo";
-import { decimal } from "@/lib/picks/staking";
+import { GameStats } from "./GameStats";
 import { MarketLine } from "../board";
 import { picksSearchIndex } from "../search";
 import { gameHref, statusOf, suWhy } from "../ats";
-import { kickoffEt, line, price, rec } from "../ui";
+import { kickoffEt, line, price } from "../ui";
 import s from "../picks.module.css";
 import p from "./preview.module.css";
 
@@ -51,8 +51,6 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
   const proj = o?.total !== undefined ? { away: (o.total + o.spread) / 2, home: (o.total - o.spread) / 2 } : null;
   const win = o?.homeWin;
   const cut = g.tier === "t1" ? r.strategies.rule : g.tier === "t2" ? r.strategies.second : null;
-  const usedPrice = st === "sent" ? g.issued?.price : g.price;
-  const edgePct = g.p !== undefined && usedPrice !== undefined ? (g.p * decimal(usedPrice) - 1) * 100 : null;
   const when = `${kickoffEt(q?.kickoff)}${q?.tv ? ` · ${q.tv}` : ""}`;
   const bet = ["bet", "sent", "early"].includes(st) || !!tot?.stake || !!tot?.issued;
 
@@ -191,25 +189,7 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
       )}
 
       {/* The numbers behind the spread call */}
-      <dl className={p.stats}>
-        <div>
-          <dt>Models</dt>
-          <dd>{g.read ? (g.read.agree ? "Agree" : "Split") : "One or none"}</dd>
-        </div>
-        <div>
-          <dt>Avg edge</dt>
-          <dd className={s.num}>{g.read?.agree ? `${g.read.avgEdge.toFixed(1)} pts` : "·"}</dd>
-        </div>
-        <div>
-          <dt>Cover chance</dt>
-          <dd className={s.num}>{g.p !== undefined ? `${(g.p * 100).toFixed(1)}%` : "·"}</dd>
-        </div>
-        <div>
-          <dt>Edge per unit</dt>
-          <dd className={`${s.num} ${edgePct !== null ? (edgePct >= 0 ? s.pos : s.neg) : ""}`}>{edgePct !== null ? `${edgePct >= 0 ? "+" : ""}${edgePct.toFixed(1)}%` : "·"}</dd>
-        </div>
-      </dl>
-      {cut && <p className={p.note}>{`${g.tier === "t1" ? "The rule" : "Tier 2"}: ${cut.label} (${rec(cut.record)}). Cover chance is that record pulled toward 50%, an estimate.`}</p>}
+      <GameStats g={g} r={r} />
       {g.su && <p className={p.note}>{suWhy(g, name)}</p>}
 
       {/* A plain link, so it loads the full page rather than reopening this window. */}

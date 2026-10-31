@@ -63,6 +63,10 @@
 .stats dt { font-size: 11px; color: var(--mute); }
 .stats dd { margin: 0; font-size: 16px; font-weight: 600; }
 
+.statsWrap { display: flex; flex-direction: column; gap: 8px; }
+.statSub { font-size: 11.5px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statNote { margin: 0; font-size: 12.5px; color: var(--mute); line-height: 1.5; }
+
 .note { margin: -8px 0 0; font-size: 12.5px; color: var(--mute); line-height: 1.5; }
 .more { align-self: flex-start; color: var(--accent); font-weight: 600; font-size: 14px; text-decoration: none; padding: 6px 0; }
 .more:hover { text-decoration: underline; }

@@ -28,6 +28,7 @@ export type OurBoard = StoredProps & {
 };
 const statShort = (m: PropMarket) => (m.stat ? short[m.stat] : m.statLabel.toLowerCase());
 const sideWord = (x: "over" | "under") => (x === "over" ? "Over" : "Under");
+const perUnit = (x: number) => `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
 /** How many edges a card lists before "every prop". */
 const TOP = 8;
 const renderedAt = () => Date.now();
@@ -58,6 +59,8 @@ function EdgeRow({ m, g }: { m: PropMarket; g: OurBoard }) {
           price !== null ? `${am(price)} DraftKings${g.extra[m.id]?.price === "assumed" ? " (assumed, no price posted)" : g.extra[m.id]?.price === "david" ? " (via David's board)" : g.extra[m.id]?.price === "odds-api" ? " (game-day morning, via The Odds API)" : ""}` : null,
           ours !== undefined ? `our chance ${pct(ours)}` : null,
           fair !== null ? `DK ${pct(fair)} without the vig` : price !== null ? `breaks even at ${pct(implied(price))}` : null,
+          // Expected return on 1u at this price if our chance is right.
+          ours !== undefined && price !== null ? `edge ${perUnit(ours / implied(price) - 1)} per unit` : null,
           g.extra[m.id]?.median !== undefined && m.stat !== "rec" ? `our median ${m.model}` : `ours ${m.model}`,
           g.extra[m.id]?.min !== undefined ? `${g.extra[m.id].min} min` : null,
         ]

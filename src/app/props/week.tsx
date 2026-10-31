@@ -846,6 +846,7 @@ async function FirstTdWeek({ season }: { season: number }) {
               ["Kalshi cost (fee in)", k !== null ? `${Math.round(k * 100)}¢` : "no market"],
               ["DraftKings", d !== null ? `${am(d)} (breaks even at ${pct(implied(d))})` : g.dk ? "not listed" : "read the morning of game day"],
               ["FanDuel", fdPrice(g, p.name) !== null ? `${am(fdPrice(g, p.name)!)} (breaks even at ${pct(implied(fdPrice(g, p.name)!))})` : g.fd ? "not listed" : "read the morning of game day"],
+              ["Edge per unit", `${(p.p / c - 1) >= 0 ? "+" : ""}${((p.p / c - 1) * 100).toFixed(1)}% at the cheapest price`],
               [`${p.team} scores first`, pct(team.pFirst)],
               ["Touches, TDs (this season and last)", `${p.touches}, ${p.tds}`],
               ["No offensive TD first", pct(g.game.none)],

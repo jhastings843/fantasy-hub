@@ -10,6 +10,7 @@ import { bookOf, priceWithBook } from "@/lib/picks/shop";
 import { GameCell, pieces, StrategyRow, TierChip, drawdown, href, kickoffEt, line, n, pct, price, rec, units } from "./ui";
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
+import { GameStats } from "./game/GameStats";
 import s from "./picks.module.css";
 
 export type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
@@ -1001,11 +1002,6 @@ function EdgeCards({ g, r }: { g: BoardGame; r: PicksReport }) {
             : "Priced when a line is quoted and the game is in the rule or Tier 2."}
         </span>
       </div>
-      <div className={s.edgeCard}>
-        <span className={s.eyebrow}>Win chance</span>
-        <b className={s.closePick} style={{ textTransform: "none" }}>{g.p !== undefined ? `${(g.p * 100).toFixed(1)}%` : "·"}</b>
-        <span className={s.p}>{g.p !== undefined ? "An estimate from the tier's record so far, not a calibrated probability." : "Only rule and Tier 2 games carry one."}</span>
-      </div>
     </div>
   );
 }
@@ -1021,6 +1017,7 @@ function GameExpand({ g, r }: { g: BoardGame; r: PicksReport }) {
         </div>
         <div className={s.expandNums}>{st === "final" ? <FinishedDetails g={g} r={r} /> : <WhyList g={g} r={r} />}</div>
       </div>
+      <GameStats g={g} r={r} />
       <EdgeCards g={g} r={r} />
       <Link href={gameHref(r, g)} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
         Full breakdown: every step of the call ›
@@ -1096,6 +1093,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
         <MarketBlock g={g} r={r} />
       </div>
 
+      <GameStats g={g} r={r} />
       <EdgeCards g={g} r={r} />
 
       <div className={s.curveBox}>
