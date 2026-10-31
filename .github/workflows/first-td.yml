@@ -58,5 +58,5 @@ jobs:
           fstatus=$(curl -sS -o ourftd.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" --max-time 150 "$APP_URL/api/firsttd/ours")
           echo "our first TD model HTTP $fstatus"
-          jq -r '.report | "our first TD model week \(.week): saved \(.saved | length), graded \(.graded | length)", (.learning[]? | "learning: \(.)"), (.problems[]? | "problem: \(.)")' ourftd.json | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.report | "our first TD model week \(.week): saved \(.saved | length), graded \(.graded | length)", (.learning[]? | "learning: \(.)"), (.parlay // empty | "ATTD parlay: \(.)"), (.problems[]? | "problem: \(.)")' ourftd.json | tee -a "$GITHUB_STEP_SUMMARY"
           [ "$status" = "200" ] && [ "$pstatus" = "200" ] && [ "$lstatus" = "200" ] && [ "$ostatus" = "200" ] && [ "$fstatus" = "200" ]

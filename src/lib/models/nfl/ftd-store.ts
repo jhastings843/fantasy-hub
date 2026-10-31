@@ -8,7 +8,10 @@ import { nameKey } from "@/lib/props/grade";
 import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
-import { loadVenomPicks } from "./venom";
+import { loadVenomChances, loadVenomPicks } from "./venom";
+import { buildParlay, gradeParlay, pickLegs, type AttdParlay, type ParlayOutcome } from "./attd-parlay";
+import { etDate } from "@/lib/props/parse";
+import { push } from "@/lib/notify/pushover";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
 import { addTotals, ftdGame, impliedPoints, tdTotals, type FtdParams, type TdLine } from "./firsttd";
 import { nflverseRows } from "./store";
@@ -35,6 +38,8 @@ import { live, primeParams } from "@/lib/models/params-store";
 //   models:v1:nfl:{season}:tdprior      last season's TD totals per player
 //   ftd:v1:ours:{season}:w{week}        hash slug -> OurFtdStored
 //   ftd:v1:ours:{season}:weeks          set of weeks
+//   attd:v1:parlay:{season}:w{week}     the Sunday ATTD parlay of the day, frozen when built
+//   attd:v1:parlay:{season}:weeks       set of weeks with one
 
 const P = live("nfl-ftd", PARAMS as FtdParams);
 const AP = live("nfl-attd", ATTD_PARAMS as AttdParams);
@@ -92,6 +97,8 @@ export interface OurFtdReport {
   graded: string[];
   learning: string[];
   problems: string[];
+  /** What the Sunday ATTD parlay step did this run. */
+  parlay?: string;
 }
 
 export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
@@ -226,6 +233,13 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
     }
   }
 
+  if (report.week)
+    try {
+      report.parlay = await buildSundayParlay(season, report.week, now);
+    } catch (err) {
+      report.problems.push(`ATTD parlay: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
   try {
     const cands = ourFtdCandidates(await ftdGraded(season));
     for (const j of await reviewIfDue(OUR_SECTION.nflFirstTd, season, report.week ?? weeks.at(-1) ?? 0, FTD_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
@@ -277,4 +291,52 @@ export async function getAttdLearning(season: number): Promise<SectionView> {
   await primeParams();
   const [state, journal, graded, venom] = await Promise.all([loadSection(SECTIONS.nflAttd, season), loadJournal(SECTIONS.nflAttd, season), attdGraded(season), loadVenomPicks(season)]);
   return sectionView(ATTD_GATE, state, attdCandidates(graded, venom), journal);
+}
+
+// ------------------------------------------------- ATTD parlay of the day
+
+const PARLAY_KEY = (s: number, w: number) => `attd:v1:parlay:${s}:w${w}`;
+const PARLAY_WEEKS = (s: number) => `attd:v1:parlay:${s}:weeks`;
+const etWeekday = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(d);
+
+/**
+ * Sunday runs only (the 7:30am and 11am ET captures): build from today's games
+ * not yet started and Venom's week, freeze the first ticket that has 3+ legs,
+ * push it to the phone. Too few legs: nothing saved, the next run tries again.
+ */
+async function buildSundayParlay(season: number, week: number, now: Date): Promise<string> {
+  if (etWeekday(now) !== "Sun") return "not Sunday";
+  if (await redis.exists(PARLAY_KEY(season, week))) return "already built";
+  const venom = await loadVenomChances(season, week);
+  if (!venom.size) return `no Venom board for week ${week}`;
+  const today = etDate(now);
+  const games = Object.entries(await loadWeek(season, week))
+    .filter(([, g]) => g.attd && g.kickoff && etDate(new Date(g.kickoff)) === today && new Date(g.kickoff) > now)
+    .map(([slug, g]) => ({ slug, game: `${g.game.away} at ${g.game.home}`, kickoff: g.kickoff, rows: g.attd!.rows }));
+  const legs = pickLegs(games, venom);
+  const p = buildParlay(season, week, legs, now);
+  if (!p) return `${legs.length} leg${legs.length === 1 ? "" : "s"} qualify across ${games.length} games, need 3`;
+  if ((await redis.set(PARLAY_KEY(season, week), p, { nx: true })) !== "OK") return "already built";
+  await redis.sadd(PARLAY_WEEKS(season), String(week));
+  const am = (x: number) => (x > 0 ? `+${x}` : `${x}`);
+  await push({
+    title: `ATTD parlay ${am(p.price)} (${p.legs.length} legs)`,
+    message: `${p.legs.map((l) => `${l.name} ${l.team} ${am(l.price)}`).join("\n")}\nOur blended chance ${(p.chance * 100).toFixed(1)}%, EV ${p.ev >= 0 ? "+" : ""}${p.ev.toFixed(2)}u per 1u.`,
+    url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app"}/props?m=attd`,
+    urlTitle: "Anytime TD",
+  });
+  return `built ${p.legs.length} legs at ${am(p.price)}`;
+}
+
+/** Every saved parlay with its grade, newest first. */
+export async function loadAttdParlays(season: number): Promise<{ parlay: AttdParlay; outcome: ParlayOutcome }[]> {
+  const weeks = ((await redis.smembers(PARLAY_WEEKS(season)).catch(() => [])) ?? []).map(Number).sort((a, b) => b - a);
+  const out = await Promise.all(
+    weeks.map(async (w) => {
+      const [parlay, games] = await Promise.all([redis.get<AttdParlay>(PARLAY_KEY(season, w)), loadWeek(season, w)]);
+      if (!parlay) return null;
+      return { parlay, outcome: gradeParlay(parlay, Object.fromEntries(Object.entries(games).map(([slug, g]) => [slug, g.attdResult]))) };
+    }),
+  );
+  return out.filter((x) => x !== null);
 }

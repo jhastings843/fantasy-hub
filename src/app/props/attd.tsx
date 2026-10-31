@@ -2,7 +2,8 @@
 // Anytime and 2+ TD prices. Same layout as the other Props boards (week.tsx):
 // tracked edges, every game, graded games, the four numbers and the gate.
 // Paper only: edges are graded flat 1u until a learner slice clears its gate.
-import { getOurFtdView, attdGraded, getAttdLearning } from "@/lib/models/nfl/ftd-store";
+import { getOurFtdView, attdGraded, getAttdLearning, loadAttdParlays } from "@/lib/models/nfl/ftd-store";
+import { PARLAY_LEGS, type AttdParlay, type ParlayOutcome } from "@/lib/models/nfl/attd-parlay";
 import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/nfl/anytime";
 import { implied, payout } from "@/lib/props/parse";
 import { attdStaked } from "@/lib/models/sections";
@@ -33,6 +34,95 @@ function Explainer() {
         we said in both test sets, so an edge has to clear DraftKings&apos; break-even by {Math.round(ATTD_EDGE * 100)} points to count.
       </p>
     </Background>
+  );
+}
+
+
+type SavedParlay = { parlay: AttdParlay; outcome: ParlayOutcome };
+
+/** A ticket's legs: price, our chance, Venom's, the blend and DK's break-even. */
+function ParlayLegs({ p }: { p: AttdParlay }) {
+  return (
+    <div className={s.tw}>
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>Leg</th>
+            <th>DK</th>
+            <th>Ours</th>
+            <th>Venom</th>
+            <th>Blend / DK</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.legs.map((l) => (
+            <tr key={l.key}>
+              <td>
+                {`${l.name} ${l.team}`}
+                <br />
+                <span className={s.dim}>{l.game}</span>
+              </td>
+              <td className={s.num}>{am(l.price)}</td>
+              <td className={s.num}>{pct(l.ours)}</td>
+              <td className={s.num}>{pct(l.venom)}</td>
+              <td className={s.num}>{`${pct(l.chance)} / ${pct(implied(l.price))}`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const parlayLine = (p: AttdParlay) => `${p.legs.length} legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${u(p.ev)} per 1u`;
+
+/** Board: this Sunday's ticket, built at the Sunday morning capture. */
+async function ParlayToday({ season, week }: { season: number; week: number | null }) {
+  const all: SavedParlay[] = await loadAttdParlays(season).catch(() => []);
+  const cur = all.find((x) => x.parlay.week === week);
+  return (
+    <div className={s.pageFrame}>
+      <SecHead title="Parlay of the day" aside={`Sundays · ${PARLAY_LEGS.min} to ${PARLAY_LEGS.max} anytime legs where our model and Venom agree · paper, 1u`} />
+      {cur ? (
+        <>
+          <p className={s.thin}>{parlayLine(cur.parlay)}{cur.outcome.status !== "open" ? ` · ${cur.outcome.status === "won" ? "Won" : cur.outcome.status === "lost" ? "Lost" : "Void"} ${u(cur.outcome.net)}` : ""}</p>
+          <ParlayLegs p={cur.parlay} />
+        </>
+      ) : (
+        <p className={s.calm}>No ticket yet this week. It is built Sunday morning from that day&apos;s games once DraftKings has prices; if fewer than {PARLAY_LEGS.min} games have a leg both sides agree on, there is none that Sunday.</p>
+      )}
+    </div>
+  );
+}
+
+/** Results: the parlay's record and every ticket. */
+async function ParlayRecord({ season }: { season: number }) {
+  const all: SavedParlay[] = await loadAttdParlays(season).catch(() => []);
+  const done = all.filter((x): x is { parlay: AttdParlay; outcome: Extract<ParlayOutcome, { net: number }> } => x.outcome.status !== "open" && x.outcome.status !== "void");
+  const won = done.filter((x) => x.outcome.status === "won").length;
+  const net = done.reduce((a, x) => a + x.outcome.net, 0);
+  const expected = done.reduce((a, x) => a + x.parlay.chance, 0);
+  const rows: GameRowData[] = all.map(({ parlay: p, outcome: o }) => ({
+    key: `parlay|${p.week}`,
+    title: `Week ${p.week}`,
+    when: p.legs[0]?.kickoff,
+    final: o.status !== "open",
+    cells: [
+      ["Price", am(p.price)],
+      ["Legs", `${p.legs.length}`],
+      ["Blend", `${(p.chance * 100).toFixed(1)}%`],
+    ],
+    read: o.status === "open" ? ["Open", s.readTrack] : o.status === "won" ? [`Won ${u(o.net)}`, s.readW] : o.status === "lost" ? [`Lost ${u(o.net)}`, s.readL] : ["Void", s.readPass],
+    body: <ParlayLegs p={p} />,
+  }));
+  return (
+    <div className={s.pageFrame}>
+      <SecHead title="Parlay of the day" aside="Sundays since Nov 1, 2026 · 1u a ticket · judge it over a season, not a month" />
+      <div className={s.tiles}>
+        <Tile value={done.length ? u(net) : "·"} label={done.length ? `${won}-${done.length - won} · we expected ${expected.toFixed(2)} hits` : "first ticket pending"} />
+      </div>
+      {rows.length > 0 && <GameTable head={["Price", "Legs", "Blend"]} rows={rows} />}
+    </div>
   );
 }
 
@@ -181,6 +271,7 @@ export async function AttdWeek({ season }: { season: number }) {
   const anytime = summarizeAttd(graded).edges.bySide.anytime;
   return (
     <section className={s.section} aria-labelledby="attd-week">
+      <ParlayToday season={season} week={v.week} />
       <div className={s.pageFrame}>
         <SecHead id="attd-week" title="Tracked edges" aside={live.length ? `Bets live: ${live.join("; ")} · the rest tracked` : `Our chance beats DK's break-even by ${Math.round(ATTD_EDGE * 100)}+ points · no stakes`} />
         {edges.length > 0 ? (
@@ -224,6 +315,7 @@ export async function AttdResults({ season }: { season: number }) {
           <Tile value={p.n ? `${p.hits} of ${p.n}` : "·"} label={p.n ? `priced players scored · we said ${p.ours.toFixed(0)}, DK ${p.dk.toFixed(0)}` : "priced players scored"} />
         </div>
       </div>
+      <ParlayRecord season={season} />
       {graded.length > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Game by game" aside="Newest first · each anytime edge 1u at DK's price · open a game for every player" />

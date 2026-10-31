@@ -45,3 +45,9 @@ export async function loadVenomProps(season: number): Promise<VenomProps> {
   );
   return out;
 }
+
+/** His Anytime TD chance per picked player (name key -> p, 0-1) for one week; empty when the week was never uploaded. */
+export async function loadVenomChances(season: number, week: number): Promise<Map<string, number>> {
+  const rows = (await redis.get<{ name: string; p?: number }[]>(VENOM_KEY(season, week)).catch(() => null)) ?? [];
+  return new Map(rows.filter((r) => typeof r.p === "number").map((r) => [nameKey(r.name), r.p!]));
+}
