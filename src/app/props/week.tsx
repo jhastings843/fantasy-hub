@@ -650,7 +650,7 @@ export function FbTable({ b }: { b: FbBoard }) {
           {b.players.map((x) => {
             const hit = res?.player === x.id;
             return (
-              <tr key={x.id} className={hit ? s.rowHit : undefined}>
+              <tr key={x.id} className={hit ? s.rowHit : x.edge ? s.rowEdge : undefined}>
                 <td>{`${x.name} `}<span className={s.dim}>{x.team}</span>{hit && <b className={s.pos}> · first basket</b>}</td>
                 <td className={s.num}>{pct(x.p)}</td>
                 <td className={s.num}>{x.fair !== null ? pct(x.fair) : "·"}</td>

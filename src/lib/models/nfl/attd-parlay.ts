@@ -5,12 +5,17 @@
 //   1. Venom picked him (his top 5 for the game) and gives him a chance p.
 //   2. Our chance beats DraftKings' break-even (we lean the same way).
 //   3. The blend, (ours + Venom's) / 2, beats the break-even by ATTD_EDGE (5 pts).
-// Each game's best leg (largest blended gap) goes in, games ranked by that gap,
-// up to 5. Fewer than 3 qualifying games: no parlay that Sunday.
+// Each game's best leg (largest blended gap) makes the pool, games ranked by
+// that gap, up to 6. The page lets Jack pick 2 to 6 legs off the top of the
+// pool (Jack, 2026-11-01); only one ticket is tracked: the leg count the model
+// is most confident in, meaning the best long-run growth at our blended
+// chances (the Kelly growth rate, which weighs the chance of cashing against
+// the payout, so it neither always takes the fewest legs nor the most).
+// Fewer than 2 qualifying games: no parlay that Sunday.
 // One leg per game because legs in the same game move together. A void leg
 // (player sat) drops out and the ticket pays on the rest, as DK does.
 //
-//   buildParlay(legs with blends 0.58, 0.52, 0.48 at +100, +120, +140)
+//   ticket(legs with blends 0.58, 0.52, 0.48 at +100, +120, +140)
 //     -> price +956, chance 0.145, ev +0.53 a unit
 //
 // Pure. Stored and graded in attd-parlay-store.ts.
@@ -18,7 +23,7 @@
 import { ATTD_EDGE, type AttdResult, type AttdRow } from "./anytime";
 import { implied, payout } from "@/lib/props/parse";
 
-export const PARLAY_LEGS = { min: 3, max: 5 };
+export const PARLAY_LEGS = { min: 2, max: 6 };
 
 export interface ParlayLeg {
   slug: string;
@@ -48,6 +53,17 @@ export interface AttdParlay {
   chance: number;
   /** Expected profit per unit at the blended chances. */
   ev: number;
+  /** Every qualifying leg, best first; legs is its top slice. Missing on tickets built before Nov 1, 2026 pm. */
+  pool?: ParlayLeg[];
+}
+
+/** One ticket's numbers. growth: the Kelly growth rate at our chances (0 when no edge). */
+export interface Ticket {
+  legs: ParlayLeg[];
+  price: number;
+  chance: number;
+  ev: number;
+  growth: number;
 }
 
 export interface ParlayGame {
@@ -80,12 +96,32 @@ export function pickLegs(games: ParlayGame[], venom: Map<string, number>): Parla
   return best.sort((a, b) => b.gap - a.gap).slice(0, PARLAY_LEGS.max);
 }
 
-/** The ticket, or null under PARLAY_LEGS.min legs. */
-export function buildParlay(season: number, week: number, legs: ParlayLeg[], now: Date): AttdParlay | null {
-  if (legs.length < PARLAY_LEGS.min) return null;
+/** A ticket from these legs. */
+export function ticket(legs: ParlayLeg[]): Ticket {
   const dec = legs.reduce((a, l) => a * decimal(l.price), 1);
-  const chance = legs.reduce((a, l) => a * l.chance, 1);
-  return { season, week, builtAt: now.toISOString(), legs, price: american(dec), chance: r3(chance), ev: r3(chance * dec - 1) };
+  const p = legs.reduce((a, l) => a * l.chance, 1);
+  // Growth of a Kelly-sized bet: p ln(p d) + (1 - p) ln((1 - p) d / (d - 1)); no edge, no bet, 0.
+  const growth = p * dec > 1 && p < 1 ? p * Math.log(p * dec) + (1 - p) * Math.log(((1 - p) * dec) / (dec - 1)) : 0;
+  return { legs, price: american(dec), chance: r3(p), ev: r3(p * dec - 1), growth: Math.round(growth * 1e5) / 1e5 };
+}
+
+/** Every ticket the page offers: the pool's top 2, top 3, ... up to the whole pool. */
+export function tickets(pool: ParlayLeg[]): Ticket[] {
+  const out: Ticket[] = [];
+  for (let n = PARLAY_LEGS.min; n <= Math.min(pool.length, PARLAY_LEGS.max); n++) out.push(ticket(pool.slice(0, n)));
+  return out;
+}
+
+/** The leg count the model is most confident in: best growth, fewer legs on a tie. Null under PARLAY_LEGS.min legs. */
+export function bestTicket(pool: ParlayLeg[]): Ticket | null {
+  return tickets(pool).reduce<Ticket | null>((best, t) => (!best || t.growth > best.growth ? t : best), null);
+}
+
+/** The tracked ticket with its pool, or null under PARLAY_LEGS.min legs. */
+export function buildParlay(season: number, week: number, pool: ParlayLeg[], now: Date): AttdParlay | null {
+  const t = bestTicket(pool);
+  if (!t) return null;
+  return { season, week, builtAt: now.toISOString(), legs: t.legs, price: t.price, chance: t.chance, ev: t.ev, pool };
 }
 
 export type ParlayOutcome = { status: "open" } | { status: "won" | "lost" | "void"; net: number };

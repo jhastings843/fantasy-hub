@@ -104,6 +104,8 @@
 .pos { color: var(--pos); }
 /* A graded table row that hit (the first basket scorer): green wash across the row. */
 .rowHit td { background: color-mix(in srgb, var(--pos) 16%, transparent); }
+/* A row with an edge: a lighter green than a hit, so a winner still stands out (Jack, 2026-11-01). */
+.rowEdge td { background: color-mix(in srgb, var(--pos) 9%, transparent); }
 .neg { color: var(--neg); }
 .track { position: relative; height: 14px; background: var(--track); border-radius: 3px; }
 .ci { position: absolute; top: 0; bottom: 0; background: var(--ci); border-radius: 3px; }

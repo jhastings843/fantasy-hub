@@ -83,7 +83,7 @@ function SideTable({ t, saved, hitKey }: { t: FtdGame["teams"][number]; saved: S
             const cost = k?.ask ? kalshiCost(k.ask) : null;
             const edge = cost !== null ? p.p! - cost : null;
             return (
-              <tr key={p.key} className={hitKey === p.key ? s.ftdHit : ""}>
+              <tr key={p.key} className={hitKey === p.key ? s.ftdHit : edge !== null && edge > 0 ? s.rowEdge : ""}>
                 <td>
                   {p.name}
                   <span className={s.dim}>{` ${p.touches} tch · ${p.tds} TD`}</span>
@@ -210,7 +210,7 @@ function MostLikely({ games, now }: { games: StoredGame[]; now: number }) {
       </thead>
       <tbody>
         {xs.map(({ p, g, cost, edge }, i) => (
-          <tr key={`${g.game.slug}|${p.key}`}>
+          <tr key={`${g.game.slug}|${p.key}`} className={edge !== null && edge > 0 ? s.rowEdge : undefined}>
             <td className={`${s.num} ${s.dim}`}>{from + i + 1}</td>
             <td>
               {`${p.name} `}

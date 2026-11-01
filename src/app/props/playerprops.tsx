@@ -559,7 +559,7 @@ function NbaGameCard({ saved, v }: { saved: StoredProps; v: PropsView }) {
                   {g.markets.map((m) => {
                     const r = res.get(m.id);
                     return (
-                      <tr key={m.id}>
+                      <tr key={m.id} className={isPlay(m) ? s.rowEdge : undefined}>
                         <td>{m.player}</td>
                         <td>{statShort(m)}</td>
                         <td className={s.num}>{m.line}</td>

@@ -129,7 +129,7 @@ export function GameCard({ g }: { g: OurBoard }) {
                   {g.game.markets.map((m) => {
                     const r = res.get(m.id);
                     return (
-                      <tr key={m.id}>
+                      <tr key={m.id} className={m.side ? s.rowEdge : undefined}>
                         <td>{m.player}</td>
                         <td>{statShort(m)}</td>
                         <td className={s.num}>{m.line}</td>

@@ -9,7 +9,7 @@ import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learni
 import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { loadVenomChances, loadVenomPicks } from "./venom";
-import { buildParlay, gradeParlay, pickLegs, type AttdParlay, type ParlayOutcome } from "./attd-parlay";
+import { PARLAY_LEGS, buildParlay, gradeParlay, pickLegs, type AttdParlay, type ParlayOutcome } from "./attd-parlay";
 import { etDate } from "@/lib/props/parse";
 import { push } from "@/lib/notify/pushover";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
@@ -315,7 +315,7 @@ async function buildSundayParlay(season: number, week: number, now: Date): Promi
     .map(([slug, g]) => ({ slug, game: `${g.game.away} at ${g.game.home}`, kickoff: g.kickoff, rows: g.attd!.rows }));
   const legs = pickLegs(games, venom);
   const p = buildParlay(season, week, legs, now);
-  if (!p) return `${legs.length} leg${legs.length === 1 ? "" : "s"} qualify across ${games.length} games, need 3`;
+  if (!p) return `${legs.length} leg${legs.length === 1 ? "" : "s"} qualify across ${games.length} games, need ${PARLAY_LEGS.min}`;
   if ((await redis.set(PARLAY_KEY(season, week), p, { nx: true })) !== "OK") return "already built";
   await redis.sadd(PARLAY_WEEKS(season), String(week));
   const am = (x: number) => (x > 0 ? `+${x}` : `${x}`);

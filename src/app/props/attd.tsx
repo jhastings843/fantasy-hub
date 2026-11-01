@@ -3,7 +3,8 @@
 // tracked edges, every game, graded games, the four numbers and the gate.
 // Paper only: edges are graded flat 1u until a learner slice clears its gate.
 import { getOurFtdView, attdGraded, getAttdLearning, loadAttdParlays } from "@/lib/models/nfl/ftd-store";
-import { PARLAY_LEGS, type AttdParlay, type ParlayOutcome } from "@/lib/models/nfl/attd-parlay";
+import { PARLAY_LEGS, tickets, type AttdParlay, type ParlayOutcome } from "@/lib/models/nfl/attd-parlay";
+import { ParlayPicker } from "./ParlayPicker";
 import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/nfl/anytime";
 import { implied, payout } from "@/lib/props/parse";
 import { attdStaked } from "@/lib/models/sections";
@@ -74,7 +75,6 @@ function ParlayLegs({ p }: { p: AttdParlay }) {
   );
 }
 
-const parlayLine = (p: AttdParlay) => `${p.legs.length} legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${u(p.ev)} per 1u`;
 
 /** Board: this Sunday's ticket, built at the Sunday morning capture. */
 async function ParlayToday({ season, week }: { season: number; week: number | null }) {
@@ -82,12 +82,13 @@ async function ParlayToday({ season, week }: { season: number; week: number | nu
   const cur = all.find((x) => x.parlay.week === week);
   return (
     <div className={s.pageFrame}>
-      <SecHead title="Parlay of the day" aside={`Sundays · ${PARLAY_LEGS.min} to ${PARLAY_LEGS.max} anytime legs where our model and Venom agree · paper, 1u`} />
+      <SecHead title="Parlay of the day" aside={`Sundays · pick ${PARLAY_LEGS.min} to ${PARLAY_LEGS.max} anytime legs where our model and Venom agree · only the count the model is most confident in is tracked · paper, 1u`} />
       {cur ? (
-        <>
-          <p className={s.thin}>{parlayLine(cur.parlay)}{cur.outcome.status !== "open" ? ` · ${cur.outcome.status === "won" ? "Won" : cur.outcome.status === "lost" ? "Lost" : "Void"} ${u(cur.outcome.net)}` : ""}</p>
-          <ParlayLegs p={cur.parlay} />
-        </>
+        <ParlayPicker
+          tickets={tickets(cur.parlay.pool ?? cur.parlay.legs)}
+          tracked={cur.parlay.legs.length}
+          status={cur.outcome.status !== "open" ? ` · ${cur.outcome.status === "won" ? "Won" : cur.outcome.status === "lost" ? "Lost" : "Void"} ${u(cur.outcome.net)}` : " · tracked"}
+        />
       ) : (
         <p className={s.calm}>No ticket yet this week. It is built Sunday morning from that day&apos;s games once DraftKings has prices; if fewer than {PARLAY_LEGS.min} games have a leg both sides agree on, there is none that Sunday.</p>
       )}
@@ -187,7 +188,7 @@ function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: strin
             const e = attdEdges(r);
             const t = result?.[r.key];
             return (
-              <tr key={`${r.team}|${r.key}`}>
+              <tr key={`${r.team}|${r.key}`} className={e.length > 0 ? s.rowEdge : undefined}>
                 <td>
                   {`${r.name} `}
                   <span className={s.dim}>{r.team}</span>
