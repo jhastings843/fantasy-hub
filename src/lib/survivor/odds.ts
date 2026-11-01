@@ -33,6 +33,7 @@ interface EspnOdds {
 }
 
 interface EspnEvent {
+  id?: string;
   date: string;
   status?: { type?: { completed?: boolean } };
   competitions: Array<{
@@ -99,14 +100,48 @@ export function toGame(week: number, ev: EspnEvent): Game | null {
   };
 }
 
+const ESPN_SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary";
+
+type EspnSummary = {
+  pickcenter?: { spread?: number; homeTeamOdds?: { moneyLine?: number }; awayTeamOdds?: { moneyLine?: number } }[];
+  predictor?: { homeTeam?: { gameProjection?: string | number } };
+};
+
+/**
+ * A game the scoreboard left unpriced (a book pulled it over injury news),
+ * read from ESPN's game page instead: its own line, else ESPN's matchup
+ * predictor. Preseason ratings come last, and they can be badly off by
+ * midseason (Week 8 2026: they had 1-5 Miami 72% over 4-3 New England,
+ * a 7-point favourite).
+ */
+export function fromSummary(d: EspnSummary): { homeWinProb: number; probSource: Game["probSource"]; spread: number | null } | null {
+  for (const pc of d.pickcenter ?? []) {
+    const h = pc.homeTeamOdds?.moneyLine;
+    const a = pc.awayTeamOdds?.moneyLine;
+    if (typeof h === "number" && typeof a === "number" && h && a) return { homeWinProb: noVig(h, a), probSource: "moneyline", spread: pc.spread ?? null };
+    if (typeof pc.spread === "number") return { homeWinProb: spreadToWinProb(pc.spread), probSource: "spread", spread: pc.spread };
+  }
+  const proj = Number(d.predictor?.homeTeam?.gameProjection);
+  if (Number.isFinite(proj) && proj > 0 && proj < 100) return { homeWinProb: proj / 100, probSource: "predictor", spread: null };
+  return null;
+}
+
 async function fetchWeekOnce(season: number, week: number): Promise<Game[]> {
   const url = `${ESPN_SCOREBOARD}?week=${week}&seasontype=2&dates=${season}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`ESPN scoreboard week ${week}: ${res.status}`);
   const data = (await res.json()) as { events?: EspnEvent[] };
-  return (data.events ?? [])
-    .map((e) => toGame(week, e))
-    .filter((g): g is Game => g !== null);
+  const soon = Date.now() + 8 * 86_400_000;
+  return Promise.all(
+    (data.events ?? []).map(async (e) => {
+      const g = toGame(week, e);
+      // Only games about to be played: one extra call each, and only when unpriced.
+      if (!g || g.probSource !== "rating" || g.completed || !e.id || Date.parse(g.kickoff) > soon) return g;
+      const r = await fetch(`${ESPN_SUMMARY}?event=${e.id}`, { cache: "no-store" }).then((x) => (x.ok ? (x.json() as Promise<EspnSummary>) : null)).catch(() => null);
+      const got = r ? fromSummary(r) : null;
+      return got ? { ...g, homeWinProb: got.homeWinProb, probSource: got.probSource, homeSpread: got.spread ?? g.homeSpread } : g;
+    }),
+  ).then((gs) => gs.filter((g): g is Game => g !== null));
 }
 
 /** One retry, because a single blip should not cost a week of the schedule. */

@@ -159,7 +159,9 @@ function buildFlags(
       text:
         c.probSource === "spread"
           ? "No moneyline posted. Win probability is modelled from the spread."
-          : "Unpriced game. Win probability is a power-rating estimate, so treat it as soft.",
+          : c.probSource === "predictor"
+            ? "No line posted. Win probability is ESPN's matchup predictor, so treat it as soft."
+            : "Unpriced game. Win probability is a power-rating estimate, so treat it as soft.",
     });
   }
 

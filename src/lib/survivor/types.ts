@@ -19,7 +19,7 @@ export interface Game {
   /** No-vig win probability for the home side, 0-1. */
   homeWinProb: number;
   /** Where homeWinProb came from. Moneyline is the good case. */
-  probSource: "moneyline" | "spread" | "rating";
+  probSource: "moneyline" | "spread" | "predictor" | "rating";
   completed: boolean;
   homeScore: number | null;
   awayScore: number | null;
