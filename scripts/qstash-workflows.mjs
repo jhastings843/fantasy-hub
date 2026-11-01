@@ -52,6 +52,15 @@ export const SLOTS = [
   ['nba-props', '45 18 * * *'],
   ['nba-props', '45 19 * * *'],
   ['nba-props', '0 21 * * *'],
+  // Weekly jobs, at the Eastern times their workflow comments state (EDT intent).
+  ['jingles-week', '0 13 * * 2,3'],
+  ['jingles-week', '0 20 * * 2,3'],
+  ['jingles-week', '0 15 * * 4'],
+  ['waiver-research', '0 9 * * 2'],
+  ['waiver-research', '0 20 * * 2'],
+  ['picks-ui-check', '0 10 * * 3'],
+  // After the 11:00 UTC picks review.
+  ['model-refit', '0 8 * * 2'],
 ];
 
 const PREFIX = 'fh-wf-';
