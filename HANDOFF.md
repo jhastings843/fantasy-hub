@@ -1,3 +1,18 @@
+# Session 2026-10-31 (afternoon), all deployed
+- a6bc12f Late-add bets email (runLateAdds in picks/run.ts, lateOnly in update.ts). Verified: two "Late add" emails arrived Oct 31.
+- 1de7379 Props results edges-only; Money Props desk by-type breakdown (propsByType in models/money.ts).
+- 9f5c2dc Cover chance + edge per unit for every game: src/lib/picks/cover.ts (coverRead), GameStats.tsx (pop-up, board row, game page), NbaStats, props "edge X% per unit".
+- 720dd3d NBA game pop-up (picks/nba/NbaGame.tsx, /picks/nba/game + @modal route); Today cards link to football/NBA pop-ups.
+- 4b48e78 Model records block (picks/model-records.tsx) at top of every Learner log, expandable.
+- 7db7310 Today live football cards keep logos after kickoff (g.ref ?? g.lastRef).
+- 7be6085 Pop-up spread/total tables wrap on phones (preview.module.css, max-width 480px).
+
+Checked, no change needed:
+- NFL First TD 0-65 is real, not a grading bug. 15 graded games (weeks 7-8). The value slice only flags long shots (avg best price 3.3%), so 65 bets expect ~2.2 wins at market prices (0 wins ~12% likely). Every actual scorer was priced at or above our chance, so never flagged: our model rates favorites below the market. Watch calibration, not grading.
+- NFL totals refit: the Oct 28 run predates fit-nfl-totals in the workflow; first real run is Tue Nov 3 12:00 UTC.
+
+Open offers to Jack (unanswered): pickem skill should follow David on CFB splits instead of PEM (pem_breaks_tie 40-50-3); add prop-type records to prop rows.
+
 # ATTD parlay of the day (2026-10-31, deployed 267d543)
 Sundays only. src/lib/models/nfl/attd-parlay.ts (pure, tested) + buildSundayParlay/loadAttdParlays in ftd-store.ts, called from runOurFirstTd (first-td.yml Sunday 12:30 and 16:00 UTC captures). Leg = Venom top-5 pick with p (loadVenomChances) + our anytime > DK break-even + (ours+venom)/2 beats break-even by ATTD_EDGE; one per game, top 5 by gap, needs 3. Frozen at attd:v1:parlay:{season}:w{week} (set nx), Pushover push, graded 1u from attdResult. Jack OK'd showing legs publicly (Venom numbers shown). Paper only, not in learner or emails; if it ever goes out in an email, add to /records per the props rule.
 VERIFY Sun Nov 1: first-td run summary "ATTD parlay: ...", push arrived, Board shows ticket. If "N legs qualify, need 3" every run, the 5pt blended bar may be too strict for Venom's top 5 (his p sits near DK's).

@@ -5,20 +5,22 @@
   "status": "Systems review fully built and live, including money pages, NFL totals model and projected scores.",
   "status_detail": "Multi-league fantasy football tools. Every tool lives under /l/[leagueId] with leagues auto-discovered from Sleeper and format detected from settings.type (including type 3, which is Sleeper's undocumented guillotine code). Four live leagues: Dah Dynasty League (dynasty, in season), 2026 Half PPR (redraft, drafts Sep 7), Sunday Scaries #2 (redraft, full PPR, in season), and Dah Chopped League (guillotine, 16 teams, $1000 FAAB, still pre-draft). Guillotine leagues get a weekly FAAB advisor at /l/[id]/faab, /api/faab and a Tuesday email. Written playbooks with sources at /strategy. His rankings moved off Substack to the FantasyPros platform on 2026-09-17 and are read from there by week rather than by post, per scoring, so each league finally reads a list in its own scoring. SURVIVOR is a live recommendation engine at /survivor and /api/survivor: no-vig moneylines from ESPN, real public pick percentages from Yahoo, first-place equity scoring and a season-long Hungarian assignment for future value. TWO POOLS now, 500 entries and 30, tracked apart: separate burned teams, separate logged distributions, separate chalk factors, one shared data pull. Switcher on the page, ?pool=<id>|all on the API, one labelled card per pool in the Thursday email. Each pool carries a POSTURE, computed from expected entries alive at week 18, which breaks ties toward safety in a pool that will thin to one entry and toward leverage in one that will split. Week 1 live: 500 pool takes JAX, 30 pool takes LAC. A PULSE now keeps it current: /api/pulse called every fifteen minutes by GitHub Actions, tiered by the Eastern clock (live gameday, hourly, overnight), plus five scheduled emails through one shell and a Sunday 11:45 exception alarm that stays silent when nothing is wrong.",
   "next_steps": [
-    "Confirm Georgia Southern -6 arrived as the first late-add email today (Oct 31) and shows as issued on /today",
-    "Check Sun Nov 1 ATTD parlay: workflow summary line \"ATTD parlay: ...\", phone push, /props?m=attd",
-    "Check the first automatic Venom read Tue Nov 3 (phone alert, .venom-reader/reader.log)",
-    "When the David push fires: repoint DAVID_URL and add David agree/disagree slices to the NFL props learner",
-    "Check first real model-refit run Tue Nov 3 8am ET",
-    "Check college model first live runs and slices on /learning",
-    "Verify dynasty waiver research run",
-    "Money projects in their own sessions"
+    "Sun Nov 1: verify ATTD parlay run and push",
+    "Tue Nov 3: first NFL totals refit in model-refit run",
+    "Watch First TD model calibration (favorites underrated)",
+    "Decide: pickem follows David on CFB splits"
   ],
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
   "last_worked": "2026-10-31",
   "notes": [
+    "2026-10-31: First TD 0-65 checked: grading correct, value slice is all long shots (~2.2 wins expected); model rates favorites under market.",
+    "2026-10-31: Game pop-up spread/total tables wrap on phones so Edge stays on the card (7be6085).",
+    "2026-10-31: Today live football cards keep logos after kickoff (lastRef fallback, 7db7310).",
+    "2026-10-31: Expandable 'Model records' block at top of every learner log (NFL, college, NBA; spreads, totals, straight up) (4b48e78).",
+    "2026-10-31: NBA game pop-up (/picks/nba/game) with four boxes per market; every Today bet card opens its game pop-up (720dd3d).",
+    "2026-10-31: Money Props desk opens a by-type breakdown (1de7379). Cover chance + edge per unit now shown for every game (agree/split fallback records) on pop-up, board row, game page, NBA rows; edge per unit on prop rows (9f5c2dc).",
     "2026-10-31: Late-add bets email: plays that qualify after the 9am email go out on their own (pulse looks every 30 min, none within 1h of kickoff, late slots gsat2..9). Props results (our NFL/NBA) show edges only, lean tile and lean slice rows hidden (a6bc12f).",
     "2026-10-31: Anytime TD parlay of the day (Sundays, 3-5 legs, our model + Venom blended, 5pt edge, phone push, 1u record)",
     "2026-10-30: Venom v2: reader expands full prop boards; learner places players by percentile per board (strong/mild agree, against, receptions as rec_yds stand-in). Backfill W7-8: agree +8.3% n52, against -9.4% n103; the v1 Week 7 hint mostly came from the top-5 cutoff. Forward data decides.",
