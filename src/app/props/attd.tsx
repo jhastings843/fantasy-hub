@@ -39,7 +39,7 @@ function Explainer() {
 }
 
 
-type SavedParlay = { parlay: AttdParlay; outcome: ParlayOutcome };
+type SavedParlay = Awaited<ReturnType<typeof loadAttdParlays>>[number];
 
 /** A ticket's legs: price, our chance, Venom's, the blend and DK's break-even. */
 function ParlayLegs({ p }: { p: AttdParlay }) {
@@ -99,7 +99,7 @@ async function ParlayToday({ season, week }: { season: number; week: number | nu
 /** Results: the parlay's record and every ticket. */
 async function ParlayRecord({ season }: { season: number }) {
   const all: SavedParlay[] = await loadAttdParlays(season).catch(() => []);
-  const done = all.filter((x): x is { parlay: AttdParlay; outcome: Extract<ParlayOutcome, { net: number }> } => x.outcome.status !== "open" && x.outcome.status !== "void");
+  const done = all.filter((x): x is SavedParlay & { outcome: Extract<ParlayOutcome, { net: number }> } => x.outcome.status !== "open" && x.outcome.status !== "void");
   const won = done.filter((x) => x.outcome.status === "won").length;
   const net = done.reduce((a, x) => a + x.outcome.net, 0);
   const expected = done.reduce((a, x) => a + x.parlay.chance, 0);
@@ -123,7 +123,55 @@ async function ParlayRecord({ season }: { season: number }) {
         <Tile value={done.length ? u(net) : "·"} label={done.length ? `${won}-${done.length - won} · we expected ${expected.toFixed(2)} hits` : "first ticket pending"} />
       </div>
       {rows.length > 0 && <GameTable head={["Price", "Legs", "Blend"]} rows={rows} />}
+      <CountRecords all={all} />
     </div>
+  );
+}
+
+/** Shadow record: every leg count off the same Sunday pool, 1u each. The posted record above is the tracked count only. */
+function CountRecords({ all }: { all: SavedParlay[] }) {
+  const by = new Map<number, { n: number; w: number; l: number; open: number; net: number; expected: number }>();
+  for (const x of all)
+    for (const { ticket: t, outcome: o } of x.byCount) {
+      const n = t.legs.length;
+      const r = by.get(n) ?? { n, w: 0, l: 0, open: 0, net: 0, expected: 0 };
+      if (o.status === "open") r.open++;
+      else if (o.status !== "void") {
+        if (o.status === "won") r.w++;
+        else r.l++;
+        r.net += o.net;
+        r.expected += t.chance;
+      }
+      by.set(n, r);
+    }
+  const rows = [...by.values()].sort((a, b) => a.n - b.n);
+  if (!rows.length) return null;
+  return (
+    <>
+      <p className={s.thin}>Every leg count, tracked off the same legs for comparison only. The posted record is the tracked ticket above.</p>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>Legs</th>
+              <th>Record</th>
+              <th>Units</th>
+              <th>Expected hits</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.n}>
+                <td>{r.n}</td>
+                <td className={s.num}>{`${r.w}-${r.l}${r.open ? ` · ${r.open} open` : ""}`}</td>
+                <td className={`${s.num} ${r.net > 0 ? s.pos : r.net < 0 ? s.neg : ""}`}>{r.w + r.l ? u(r.net) : "·"}</td>
+                <td className={s.num}>{r.w + r.l ? r.expected.toFixed(2) : "·"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

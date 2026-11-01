@@ -9,7 +9,7 @@ import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learni
 import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { loadVenomChances, loadVenomPicks } from "./venom";
-import { PARLAY_LEGS, buildParlay, gradeParlay, pickLegs, type AttdParlay, type ParlayOutcome } from "./attd-parlay";
+import { PARLAY_LEGS, buildParlay, gradeParlay, pickLegs, tickets, type AttdParlay, type ParlayOutcome, type Ticket } from "./attd-parlay";
 import { etDate } from "@/lib/props/parse";
 import { push } from "@/lib/notify/pushover";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
@@ -328,14 +328,20 @@ async function buildSundayParlay(season: number, week: number, now: Date): Promi
   return `built ${p.legs.length} legs at ${am(p.price)}`;
 }
 
-/** Every saved parlay with its grade, newest first. */
-export async function loadAttdParlays(season: number): Promise<{ parlay: AttdParlay; outcome: ParlayOutcome }[]> {
+/**
+ * Every saved parlay with its grade, newest first. byCount grades every leg
+ * count off the same pool (2 to 6), a shadow record next to the posted one
+ * (Jack, 2026-11-01: "still track the 3, 4, and 5 but for posted record sake").
+ */
+export async function loadAttdParlays(season: number): Promise<{ parlay: AttdParlay; outcome: ParlayOutcome; byCount: { ticket: Ticket; outcome: ParlayOutcome }[] }[]> {
   const weeks = ((await redis.smembers(PARLAY_WEEKS(season)).catch(() => [])) ?? []).map(Number).sort((a, b) => b - a);
   const out = await Promise.all(
     weeks.map(async (w) => {
       const [parlay, games] = await Promise.all([redis.get<AttdParlay>(PARLAY_KEY(season, w)), loadWeek(season, w)]);
       if (!parlay) return null;
-      return { parlay, outcome: gradeParlay(parlay, Object.fromEntries(Object.entries(games).map(([slug, g]) => [slug, g.attdResult]))) };
+      const results = Object.fromEntries(Object.entries(games).map(([slug, g]) => [slug, g.attdResult]));
+      const byCount = tickets(parlay.pool ?? parlay.legs).map((t) => ({ ticket: t, outcome: gradeParlay({ ...parlay, legs: t.legs }, results) }));
+      return { parlay, outcome: gradeParlay(parlay, results), byCount };
     }),
   );
   return out.filter((x) => x !== null);
