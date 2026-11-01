@@ -598,3 +598,8 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Leans are ~70% under (NFL 525/215, NBA 1898/957); real outcomes went over only 45.7% (NFL) and 47.7% (NBA), so the tilt is partly right.
 - Edges vs 52.4% break-even (assumed -110): over edges NBA 212-238 (47.1%, p 0.025), NFL 39-44 (47.0%), both 251-282 (p 0.014). Under edges NBA 611-559 (52.2%), NFL 136-110 (55.3%), both 747-669 (52.8%). Over edges look like the leak; under edges are about break-even. NBA = 65 games (weeks 1-2), NFL = week 7 only.
 - Props edges are tracked only, so no money lost. The props learners can cut "over" slices on their own once the gate clears.
+
+## Game-time workflows on QStash (2026-11-01)
+- GitHub ran scheduled workflows 3-6 h late (odds-morning 8am slot ran 1:27-2:44pm ET Oct 29-31). Sun Nov 1 nothing had run by 9:12am; Claude dispatched odds-morning (41315038616) and first-td (41315076419) by hand. ATTD parlay w8 built 14:12Z (5 legs: Tinsley, A. Jones, B. Thomas Jr., McLaughlin, Gainwell).
+- `scripts/qstash-workflows.mjs`: 17 QStash schedules (Eastern, CRON_TZ) that POST GitHub workflow_dispatch for odds-morning, first-td, props-prekick, nba-props. Ids `fh-wf-*`, create is idempotent. GitHub crons stay as backstop. Needs QSTASH_URL/QSTASH_TOKEN (signal-bot .env) + GH_DISPATCH_TOKEN (fine-grained, this repo, Actions read/write) in .env.local.
+- Status: script committed, schedules NOT created until Jack adds GH_DISPATCH_TOKEN and runs `node scripts/qstash-workflows.mjs create --env .env.local --env ~/Projects/signal-bot/.env`.
