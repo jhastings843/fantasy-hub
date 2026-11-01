@@ -40,6 +40,8 @@
 .tbl tbody th { font-weight: 500; color: var(--ink2); }
 .tbl td:last-child, .tbl th:last-child { text-align: right; }
 .tbl td { padding-left: 8px; }
+/* Phone: team names in Line and Edge wrap instead of pushing Edge off the card. */
+@media (max-width: 480px) { .tbl td { white-space: normal; } }
 
 .chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px 10px; }
 
