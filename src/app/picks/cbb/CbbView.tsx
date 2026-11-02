@@ -6,6 +6,7 @@ import { GameCell, href, line, MARKETS, pieces, price, rec, units, whenEt, type 
 import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress } from "../board";
 import { CBB_SLICES } from "@/lib/models/cbb/learn";
 import { nbaHref } from "../nba/NbaView";
+import { scoresAt } from "@/lib/live/scores-at";
 import s from "../picks.module.css";
 import c from "./cbb.module.css";
 
@@ -624,6 +625,8 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
   const m = market;
   const [b, v] = await Promise.all([view === "week" ? getCbbBoard().catch(() => null) : Promise.resolve(null), view === "results" || view === "log" ? getCbbRecord().catch(() => null) : Promise.resolve(null)]);
   const season = b?.season ?? v?.season ?? 2026;
+  // The board reads ESPN on every load; Results and the log show finals as of the last tracking run.
+  const updated = b ? new Date().toISOString() : await scoresAt("cbb");
   const sportNav = (
     <nav className={s.chips} aria-label="Sport">
       <Link className={s.chip} href={href("nfl", m, view === "week" || view === "results" || view === "research" ? view : "week")}>
@@ -644,7 +647,7 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.pageFrame}>
-          <PageHead title="College hoops" sub="Every Division I game: our number against DraftKings', tracked from tip one." asof={`NCAAB ${season}-${String(season + 1).slice(2)}`} />
+          <PageHead title="College hoops" sub="Every Division I game: our number against DraftKings', tracked from tip one." asof={`NCAAB ${season}-${String(season + 1).slice(2)}`} updated={view === "research" ? null : updated} />
           <div className={s.controlBar}>
             {sportNav}
             <nav className={s.chips} aria-label="Market">

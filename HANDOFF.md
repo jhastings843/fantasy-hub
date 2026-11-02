@@ -1,3 +1,6 @@
+# 2026-11-02 evening: "Scores updated" stamp on every board (not yet committed)
+PageHead (src/app/picks/board.tsx) takes `updated` and shows "Scores updated 5:52 PM ET" under the season label (date added when not today). Sources: NFL/college = live ESPN read time when games are live, else the picks core build time (fresh.at); NBA and college hoops boards = ESPN read on page load; their Results/log = lib/live/scores-at.ts key scores:v1:at:{nba|cbb}, written by runNbaPicks and runCbb after each score read. College hoops Research shows no stamp.
+
 # Session 2026-11-02: college basketball model + bracket lab (deployed a4f5201 + learner follow-up)
 Learner: src/lib/models/cbb/learn.ts (21 slices, readOf/cbbCandidates/cbbWeek), CBB_MODEL_GATE in lib/learning/engine.ts, review runs inside runCbb once per ET slate. Slices registered 2026-11-02 15:40 ET; live records start there. backtest.json "slices" = same slices on 2025-26 at the opener (background only). Views: Results slice table (Live vs 2025-26), ?v=log Learner log.
 What exists:

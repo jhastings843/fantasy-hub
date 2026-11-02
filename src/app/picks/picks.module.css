@@ -676,6 +676,8 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .pageTitle { font-family: var(--font-barlow), "Arial Narrow", Impact, sans-serif; font-weight: 700; font-size: clamp(36px, 6vw, 56px); line-height: 1; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
 .pageSub { margin: 8px 0 0; color: var(--ink2); max-width: 64ch; font-size: 15.5px; }
 .pageAsof { font-family: var(--font-plex-mono), monospace; font-size: 12px; color: var(--mute); text-align: right; }
+.pageUpdated { margin-top: 3px; font-size: 11px; letter-spacing: .01em; opacity: .85; }
+.pageUpdated time { color: var(--ink); }
 .controlBar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .controlBar > .barSearch { margin-left: auto; min-width: 220px; flex: 0 1 320px; }
 .secHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; }

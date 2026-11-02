@@ -5,6 +5,7 @@ import { redis } from "@/lib/redis/client";
 import { nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard } from "./nba-store";
 import { parseNbaScoreboard } from "./nba";
+import { markScoresAt } from "@/lib/live/scores-at";
 import {
   allocateNbaDay,
   nbaBets,
@@ -158,6 +159,9 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
       report.problems.push(`ESPN ${day}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+
+  // Scores and finals read from ESPN this run.
+  if (board) await markScoresAt("nba", now);
 
   // 3. The learning review: register new research cuts, then the weekly review.
   try {

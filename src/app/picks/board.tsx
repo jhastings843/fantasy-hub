@@ -7,15 +7,34 @@ import type { JournalLine } from "@/lib/learning/engine";
 import { whenEt } from "./ui";
 import s from "./picks.module.css";
 
-/** The Ledger's page frame: a big mixed-case title, one line under it, and the as-of stamp on the right. */
-export function PageHead({ title, sub, asof }: { title: ReactNode; sub?: ReactNode; asof?: ReactNode }) {
+/** "4:12 PM ET" today, "Sun, Nov 1, 4:12 PM ET" on an earlier day (Eastern). */
+export function updatedLabel(iso: string, now = new Date()): string {
+  const day = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+  if (day(d) === day(now)) return `${time} ET`;
+  return `${d.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" })}, ${time} ET`;
+}
+
+/** The Ledger's page frame: a big mixed-case title, one line under it, and the as-of stamp (plus when scores were last read) on the right. */
+export function PageHead({ title, sub, asof, updated }: { title: ReactNode; sub?: ReactNode; asof?: ReactNode; updated?: string | null }) {
   return (
     <div className={s.pageHead}>
       <div>
         <h1 className={s.pageTitle}>{title}</h1>
         {sub && <p className={s.pageSub}>{sub}</p>}
       </div>
-      {asof && <div className={s.pageAsof}>{asof}</div>}
+      {(asof || updated) && (
+        <div className={s.pageAsof}>
+          {asof && <div>{asof}</div>}
+          {updated && (
+            <div className={s.pageUpdated}>
+              {"Scores updated "}
+              <time dateTime={updated}>{updatedLabel(updated)}</time>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

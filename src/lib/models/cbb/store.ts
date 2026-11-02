@@ -7,6 +7,7 @@ import { signalRecords, signalsOf, type CbbSnap, type SignalRecord, type Tracked
 import { CBB_SECTION, cbbCandidates, cbbWeek } from "./learn";
 import { CBB_MODEL_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
+import { markScoresAt } from "@/lib/live/scores-at";
 import PARAMS from "./params.json";
 import SEED from "./seed.json";
 
@@ -486,6 +487,8 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
     if (tried - saved - late > 0) notes.push(`${tried - saved - late} with no line yet`);
     if (tried < soon.length) notes.push(`${soon.length - tried} left for the next run`);
   }
+  // ESPN answered for at least one of the three days: scores and results are current as of this run.
+  if (all.length) await markScoresAt("cbb", now);
   return `cbb: ${finals} finals rated, T-Rank ${tr.by.size} teams${tr.at ? ` (${tr.at.slice(0, 16)})` : " (unavailable)"}, ${saved} saved${late ? `, ${late} too late` : ""}, ${gradedN} graded, ${closed} closes${learned}${notes.length ? ` (${notes.join("; ")})` : ""}`;
 }
 

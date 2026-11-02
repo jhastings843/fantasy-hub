@@ -11,6 +11,7 @@ import { drawdown, GameCell, href, line, pieces, LOG_VIEW, MARKETS, NBA_VIEWS, p
 import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow } from "../board";
 import { NbaGameModelCard } from "./game-model";
 import { NbaModelRecords } from "../model-records";
+import { scoresAt } from "@/lib/live/scores-at";
 import s from "../picks.module.css";
 import n from "./nba.module.css";
 
@@ -710,6 +711,8 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
   const m = market;
   const needBoard = view === "week" || view === "results";
   const [b, v] = await Promise.all([needBoard ? getNbaBoard().catch(() => null) : Promise.resolve(null), getNbaPicksView().catch(() => null)]);
+  // The board reads ESPN on every load; Results and the log show finals as of the last tracking run.
+  const updated = b ? new Date().toISOString() : await scoresAt("nba");
   const today = etDay(new Date());
   const sportNav = (
     <nav className={s.chips} aria-label="Sport">
@@ -759,7 +762,7 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.pageFrame}>
-          <PageHead title="NBA picks" sub="Tonight. Which model moves money here, and what each game reads." asof={`NBA ${v ? `${v.season}-${String(v.season + 1).slice(2)}` : "2026-27"}`} />
+          <PageHead title="NBA picks" sub="Tonight. Which model moves money here, and what each game reads." asof={`NBA ${v ? `${v.season}-${String(v.season + 1).slice(2)}` : "2026-27"}`} updated={updated} />
           <div className={s.controlBar}>
             {sportNav}
             <nav className={s.chips} aria-label="Market">

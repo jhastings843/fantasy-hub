@@ -54,6 +54,8 @@ export default async function PicksView({ league, market: asked, view }: { leagu
   // Live scores only when a game on the board is under way (ESPN, free); the page then refreshes every 10 minutes.
   const anyLive = r?.board.some((g) => g.basis === "started" && !g.final) ?? false;
   const live = anyLive && view === "week" ? await scoreboard(league).catch(() => []) : [];
+  // Live games read from ESPN just now; otherwise scores are as of the report's last build.
+  const readAt = new Date().toISOString();
   // Only this market's ideas, the same split the learner log uses (marketOf), so Totals never counts spread ideas.
   const testing = (review?.decisions ?? []).filter((d) => (d.id.startsWith(`${league}:`) || d.id.startsWith("both:")) && d.verdict === "retain" && marketOf(d.id) === market).length;
 
@@ -79,6 +81,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
             title={`${LEAGUE_NAME[league]} picks`}
             sub={`${r.week ? `Week ${r.week}. ` : ""}Which model moves money here, and what each game reads.`}
             asof={`${LEAGUE_NAME[league]} ${r.season}`}
+            updated={live.length ? readAt : (fresh?.at ?? r.generatedAt)}
           />
           <div className={s.controlBar}>
             {sportNav}
