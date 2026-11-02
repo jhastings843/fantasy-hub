@@ -222,7 +222,18 @@ const LINEUP: { [k in "pp" | "ftd" | "nba" | "fb"]: { product: string; model: st
   nba: { product: "NBA props", model: "Hobby Hub NBA prop model", role: "Points, rebounds, assists and threes", prices: "A player needs 3 games this season before an edge counts." },
   fb: { product: "First Basket", model: "Hobby Hub First Basket model", role: "Tip chance and each starter's share of first shots", prices: "DraftKings prices read the morning of the game." },
 };
-export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb" | "kotc" | "attd" | "lotto"; season: number }) {
+export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" | "fb" | "kotc" | "attd" | "lotto" | "kotez"; season: number }) {
+  if (tab === "kotez")
+    return (
+      <ModelLineup
+        title="Who decides King of the End Zone"
+        aside="Projections only. Nothing is staked."
+        models={[
+          { name: "Longest TD simulation", role: "Chance each player scores the game's longest TD", status: "projections", note: "Built on our Anytime TD model plus every TD's length since 2024. Not saved or graded yet." },
+          { name: "Backers estimate", role: "Share of the pool on each player", status: "input", note: "No pick data from DraftKings: set from each player's anytime price, squared. An estimate, not a count." },
+        ]}
+      />
+    );
   if (tab === "attd" || tab === "lotto") {
     const learning = await (tab === "attd" ? getAttdLearning(season) : getNbaSectionLearning(SECTIONS.nbaLotto, season)).catch(() => null);
     const live = learning?.entries.filter((e) => e.status === "active") ?? [];

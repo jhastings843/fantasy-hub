@@ -10,6 +10,7 @@ import { KotcLog, KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
 import { LottoLog, LottoResults, LottoToday } from "./lotto";
 import { AttdLog, AttdResults, AttdWeek } from "./attd";
+import { KotezWeek } from "./kotez";
 import { Background, PageHead, SecHead } from "../picks/board";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
@@ -21,19 +22,20 @@ import s from "../picks/picks.module.css";
 // (market, then view, both in the URL), no stakes: everything here is
 // tracked and graded until a slice earns its way into the system.
 
-export type PropsMarket = "pp" | "ftd" | "nba" | "fb" | "kotc" | "lotto" | "attd";
+export type PropsMarket = "pp" | "ftd" | "nba" | "fb" | "kotc" | "lotto" | "attd" | "kotez";
 /** Every market in one control, in the Ledger order, and each one's page title. */
 const ALL_MARKETS: { id: PropsMarket; label: string }[] = [
   { id: "pp", label: "NFL props" },
   { id: "ftd", label: "First TD" },
   { id: "attd", label: "Anytime TD" },
+  { id: "kotez", label: "King of the End Zone" },
   { id: "nba", label: "NBA props" },
   { id: "fb", label: "First Basket" },
   { id: "kotc", label: "King of the Court" },
   { id: "lotto", label: "Lottos" },
 ];
-const TITLE: { [k in PropsMarket]: string } = { pp: "NFL player props", ftd: "NFL First TD", nba: "NBA player props", fb: "NBA First Basket", kotc: "NBA King of the Court", lotto: "NBA lottos (paper)", attd: "NFL Anytime TD" };
-export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" || x === "lotto" || x === "attd" ? x : "pp");
+const TITLE: { [k in PropsMarket]: string } = { pp: "NFL player props", ftd: "NFL First TD", nba: "NBA player props", fb: "NBA First Basket", kotc: "NBA King of the Court", lotto: "NBA lottos (paper)", attd: "NFL Anytime TD", kotez: "NFL King of the End Zone" };
+export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" || x === "lotto" || x === "attd" || x === "kotez" ? x : "pp");
 
 function href(m: PropsMarket, v: View) {
   const q = new URLSearchParams();
@@ -89,8 +91,10 @@ export default async function PropsView({
         </header>
 
         {shown === "week" && <PropsLineup tab={market} season={season} />}
-        {shown === "week" && market !== "kotc" && market !== "lotto" && market !== "attd" && <PropTabWeek tab={market} season={season} />}
-        {shown === "log" && market !== "kotc" && market !== "lotto" && market !== "attd" && <PropsLog tab={market} season={season} />}
+        {shown === "week" && market !== "kotc" && market !== "lotto" && market !== "attd" && market !== "kotez" && <PropTabWeek tab={market} season={season} />}
+        {shown === "log" && market !== "kotc" && market !== "lotto" && market !== "attd" && market !== "kotez" && <PropsLog tab={market} season={season} />}
+        {market === "kotez" && shown === "week" && <KotezWeek season={season} />}
+        {market === "kotez" && shown !== "week" && <p className={s.calm}>King of the End Zone is projections only for now: no results or learner log until it is saved and graded.</p>}
         {market === "lotto" && shown === "week" && <LottoToday season={season} />}
         {market === "lotto" && shown === "results" && <LottoResults season={season} />}
         {market === "attd" && shown === "week" && <AttdWeek season={season} />}
