@@ -13,7 +13,7 @@ import { NIGHT_LEGS, PARLAY_LEGS, SLATE_LABEL, buildNightParlay, buildParlay, gr
 import { etDate } from "@/lib/props/parse";
 import { push } from "@/lib/notify/pushover";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
-import { addTotals, ftdGame, impliedPoints, tdTotals, type FtdParams, type TdLine } from "./firsttd";
+import { ftdGame, impliedPoints, tdTotals, type FtdParams, type TdLine } from "./firsttd";
 import { nflverseRows } from "./store";
 import { morningOddsReads } from "./odds-api-store";
 import PARAMS from "./ftd-params.json";
@@ -23,6 +23,7 @@ import { attdTeam, boxTds, gradeAttd, type AttdGraded, type AttdParams, type Att
 import { readTdScorers, type PropBetRow } from "../lines";
 import type { EspnBoxTeam } from "@/lib/props/grade";
 import { live, primeParams } from "@/lib/models/params-store";
+import { teamList } from "./team-list";
 
 // Our NFL First TD model, live. Each run, for every game this week not yet
 // started: each team's players from its last 3 games (nflverse) less anyone
@@ -160,17 +161,18 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
         for (const [t, T] of [[away, A], [home, H]] as const) {
           const r = await json<{ athletes?: { items?: { id?: string; fullName?: string; injuries?: { status?: string }[] }[] }[] }>(`${SITE}/teams/${t.id}/roster`);
           const out = new Set<string>();
+          const active = new Set<string>();
           for (const g of r.athletes ?? [])
             for (const a of g.items ?? []) {
               if (a.id && a.fullName) espnName.set(a.id, nameKey(a.fullName));
-              if (a.fullName && a.injuries?.some((i) => i.status === "Out" || i.status === "Injured Reserve")) out.add(nameKey(a.fullName));
+              if (!a.fullName) continue;
+              if (a.injuries?.some((i) => i.status === "Out" || i.status === "Injured Reserve")) out.add(nameKey(a.fullName));
+              else active.add(nameKey(a.fullName));
             }
-          const weeks = [...new Set(rows.filter((x) => x.team === T).map((x) => x.week))].sort((a, b) => a - b).slice(-3);
-          const ids = [...new Set(rows.filter((x) => x.team === T && weeks.includes(x.week)).map((x) => x.id))];
-          lists[T] = ids.flatMap((id) => {
-            const tot = addTotals(prior[id], cur.get(id));
-            return tot && !out.has(nameKey(tot.name)) ? [{ ...tot, team: T }] : [];
-          });
+          // Last 3 games plus players back from injury (team-list.ts).
+          const tl = teamList({ team: T, rows, prior, cur, active, out, nameKey });
+          lists[T] = tl.lines;
+          if (tl.returners.length) report.saved.push(`${T} back: ${tl.returners.join(", ")}`);
         }
         const pts = impliedPoints(line.total, line.margin);
         const when = new Date(e.date!).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
