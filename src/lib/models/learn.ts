@@ -110,13 +110,53 @@ export function venomLean(v: VenomProps, week: number, stat: Stat | null, player
   return null;
 }
 
+// David Sasser (davidsasser.com, NFL and NBA props; Jack, 2026-11-02): his
+// projection is saved with our pregame copy and his side graded at the same
+// DraftKings line and price as ours. Judged two ways, both on games after the
+// slices registered: as a check on our edges (agree / against), and on his own
+// (his side on every prop we price). Any of them can go live past PROPS_GATE.
+export const DAVID_PROP_SLICES: [string, string, string | undefined][] = [
+  ["david:agree", "Our edges David agrees with", "edge:all"],
+  ["david:against", "Our edges David is against", "edge:all"],
+  ["david:side", "David's side on every prop we price (DK's line and price)", undefined],
+  ["david:far", "David's side when he is 10%+ off the line", "david:side"],
+  ["david:both", "David's side when our lean agrees", "david:side"],
+];
+
+/** Every David bet in one of his slices. */
+export function davidSliceBets(list: GradedPropsGame[], id: string): SliceBet[] {
+  const out: SliceBet[] = [];
+  for (const x of list) {
+    const byId = new Map(x.game.markets.map((m) => [m.id, m]));
+    for (const g of x.result.markets) {
+      const m = byId.get(g.id);
+      const d = g.david;
+      if (!m || g.actual === null || !d) continue;
+      const proj = x.david?.[g.id];
+      const far = proj !== undefined && Math.abs(proj - m.line) / Math.max(m.line, 0.5) >= 0.1;
+      const bet =
+        id === "david:agree" ? (g.play && g.play.side === d.side ? g.play : null)
+        : id === "david:against" ? (g.play && g.play.side !== d.side ? g.play : null)
+        : id === "david:side" ? d
+        : id === "david:far" ? (far ? d : null)
+        : id === "david:both" ? (g.lean && g.lean.side === d.side ? d : null)
+        : null;
+      if (bet) out.push({ x, bet, marketId: m.id, line: m.line });
+    }
+  }
+  return out;
+}
+
 export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[], venom?: VenomProps): Candidate[] {
-  const base = ourPropSlices(stats).map(([id, label]) => ({
-    id,
-    label,
-    ...(id.endsWith(":all") ? {} : { parent: `${id.split(":")[0]}:all` }),
-    bets: ourSliceBets(graded, id).map(toBet),
-  }));
+  const base = [
+    ...ourPropSlices(stats).map(([id, label]) => ({
+      id,
+      label,
+      ...(id.endsWith(":all") ? {} : { parent: `${id.split(":")[0]}:all` }),
+      bets: ourSliceBets(graded, id).map(toBet),
+    })),
+    ...DAVID_PROP_SLICES.map(([id, label, parent]) => ({ id, label, ...(parent ? { parent } : {}), bets: davidSliceBets(graded, id).map(toBet) })),
+  ];
   if (!venom?.size) return base;
   const edges = ourSliceBets(graded, "edge:all").map((b) => {
     const m = b.x.game.markets.find((x) => x.id === b.marketId);

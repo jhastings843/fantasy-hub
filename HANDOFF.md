@@ -1,4 +1,9 @@
-# 2026-11-02 evening: "Scores updated" stamp on every board (not yet committed)
+# 2026-11-02 night: David on props, CFB/CBB rename, Sam CBB watcher (deployed)
+- David Sasser: davidsasser.com/nfl/props reads again (week 8, 440 props); new /nba board (lib/props/david-nba.ts, 620 props on Nov 2). Our NFL and NBA prop copies now save his projection per market (stored.david) and grade his side at the same DK line/price (gradeGame alts.david). Learner slices in lib/models/learn.ts DAVID_PROP_SLICES: david:agree, david:against (parent edge:all), david:side (his own record), david:far, david:both. They register at the next review of nfl-props-ours / nba-props-ours; only games after count. "Who decides" on NFL and NBA props shows a David row (app/props/top.tsx davidRow); gate text no longer says "50 of 30".
+- Tabs renamed CFB / CBB. lib/models/cbb/sam-watch.ts: pulse checks Sam's /cbb/ hourly, pushes once when it is no longer "coming soon"; then build his reader and add him beside ours on CBB like NBA.
+- John Harris: no college basketball output found; nothing to add.
+
+# 2026-11-02 evening: "Scores updated" stamp on every board
 PageHead (src/app/picks/board.tsx) takes `updated` and shows "Scores updated 5:52 PM ET" under the season label (date added when not today). Sources: NFL/college = live ESPN read time when games are live, else the picks core build time (fresh.at); NBA and college hoops boards = ESPN read on page load; their Results/log = lib/live/scores-at.ts key scores:v1:at:{nba|cbb}, written by runNbaPicks and runCbb after each score read. College hoops Research shows no stamp.
 
 # Session 2026-11-02: college basketball model + bracket lab (deployed a4f5201 + learner follow-up)

@@ -2,6 +2,7 @@ import "server-only";
 import { redis } from "@/lib/redis/client";
 import { etDate, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "@/lib/props/grade";
+import { davidNbaFor, fetchDavidNba, type DavidNbaSlate } from "@/lib/props/david-nba";
 import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import type { GradedPropsGame } from "@/lib/props/trends";
@@ -199,6 +200,13 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
   let ratings: Promise<GameRatings> | null = null;
   // Opponent defense by position (props.ts kOpp): what each team has allowed in this season's finished games.
   let allowed: ReturnType<typeof allowedTables> | null = null;
+  // David Sasser's NBA board, read once a run and only when a game is saved.
+  let davidRead: Promise<DavidNbaSlate | null> | null = null;
+  const davidSlate = () =>
+    (davidRead ??= fetchDavidNba().catch((e) => {
+      report.problems.push(`David's NBA board: ${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    }));
 
   for (const g of games.filter((x) => x.state === "pre" && x.tip && new Date(x.tip) > now && (!opts.only || opts.only.has(x.id)))) {
     const home = g.teams.find((t) => t.home);
@@ -311,6 +319,8 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
       if (!markets.length && !fb) continue;
       const week = nbaWeek(new Date(g.tip!), season);
       const old = (await loadWeek(season, week))[g.id];
+      // David's projection per market, kept pregame so his side can be graded at the same DK line and price.
+      const dv = davidNbaFor(await davidSlate(), g.id, markets);
       const stored: OurStoredProps = {
         ...old,
         game: ourGame({ season, week, event: g.id, away: away.abbr, home: home.abbr }, markets),
@@ -324,6 +334,7 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
         home: home.abbr,
         ...(fb ? { fb } : {}),
         kotc,
+        ...(Object.keys(dv).length ? { david: dv } : {}),
       };
       await redis.hset(K.week(season, week), { [g.id]: stored });
       await redis.sadd(K.weeks(season), String(week));
@@ -346,7 +357,7 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
         if (!sum.boxscore?.players?.length) throw new Error("no box score yet");
         const box = compactGame(id, sum);
         const fb = g.fb ? { ...g.fb, result: box ? firstBasketOf(box) : null } : undefined;
-        await redis.hset(K.week(season, wk), { [id]: { ...g, ...(fb ? { fb } : {}), result: gradeGame(g.game, sum.boxscore.players, {}, "nba"), gradedAt: now.toISOString() } });
+        await redis.hset(K.week(season, wk), { [id]: { ...g, ...(fb ? { fb } : {}), result: gradeGame(g.game, sum.boxscore.players, g.david ? { david: g.david } : {}, "nba"), gradedAt: now.toISOString() } });
         report.graded.push(id);
       } catch (e) {
         report.problems.push(`grade ${id}: ${e instanceof Error ? e.message : String(e)}`);
@@ -413,7 +424,7 @@ export async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, ...carded(g, g.result), first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, ...carded(g, g.result), first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}) }] : [])))
     .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? "") || a.slug.localeCompare(b.slug));
 }
 

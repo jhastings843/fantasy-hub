@@ -223,6 +223,13 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
         }
         const week = report.week!;
         const old = (await loadWeek(season, week))[e.id];
+        // David's projection per market, kept pregame so his side can be graded at the same DK line and price.
+        const dv = Object.fromEntries(
+          markets.flatMap((m) => {
+            const d = m.stat ? david?.props.find((x) => x.market === DAVID_MARKET[m.stat as NflStat] && nameKey(x.player) === nameKey(m.player)) : undefined;
+            return d ? [[m.id, d.projection] as const] : [];
+          }),
+        );
         const stored: OurNflStored = {
           ...old,
           game: { season, week, slug: e.id, away: A, home: H, breakEven: null, favorites: [], markets },
@@ -234,6 +241,7 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
           extra,
           away: A,
           home: H,
+          ...(Object.keys(dv).length ? { david: dv } : {}),
         };
         await redis.hset(NK.week(season, week), { [e.id]: stored });
         await redis.sadd(NK.weeks(season), String(week));
@@ -253,7 +261,7 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
         const sum = await json<{ header?: { competitions?: { status?: { type?: { completed?: boolean } } }[] }; boxscore?: { players?: EspnBoxTeam[] } }>(`${SITE}/summary?event=${id}`);
         if (!sum.header?.competitions?.[0]?.status?.type?.completed) continue;
         if (!sum.boxscore?.players?.length) throw new Error("no box score yet");
-        await redis.hset(NK.week(season, wk), { [id]: { ...g, result: gradeGame(g.game, sum.boxscore.players, {}, "nfl"), gradedAt: now.toISOString() } });
+        await redis.hset(NK.week(season, wk), { [id]: { ...g, result: gradeGame(g.game, sum.boxscore.players, g.david ? { david: g.david } : {}, "nfl"), gradedAt: now.toISOString() } });
         report.graded.push(id);
       } catch (err) {
         report.problems.push(`grade ${id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -291,7 +299,7 @@ export async function nflGradedList(season: number): Promise<GradedPropsGame[]> 
   const nums = ((await redis.smembers(NK.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}) }] : [])))
     .sort((a, b) => b.week - a.week || (b.kickoff ?? "").localeCompare(a.kickoff ?? ""));
 }
 
