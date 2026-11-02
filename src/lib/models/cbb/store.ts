@@ -514,11 +514,12 @@ export interface CbbBoard {
  * save when it has one (no per-game odds calls on a page load), else from a
  * live read for up to 40 games.
  */
-export async function getCbbBoard(now = new Date()): Promise<CbbBoard> {
+/** `back` adds that many earlier days (search keeps a team's last result until its next game is posted). */
+export async function getCbbBoard(now = new Date(), back = 0): Promise<CbbBoard> {
   const season = cbbSeason(now);
   const today = etYmd(now);
   const problems: string[] = [];
-  const days = [today, addDays(today, 1)];
+  const days = [...Array.from({ length: back }, (_, i) => addDays(today, i - back)), today, addDays(today, 1)];
   const [boards, teams, trackedRaw] = await Promise.all([
     Promise.all(days.map((d) => boardFor(d).catch((e) => (problems.push(`ESPN ${d}: ${e instanceof Error ? e.message : e}`), [] as CbbBoardGame[])))),
     espnTeams(),

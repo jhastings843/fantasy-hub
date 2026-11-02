@@ -279,7 +279,8 @@
     "2026-10-28: Money > Intraday tab (trade-bot intraday desk: breakouts, taken vs shadow filter check, rules, skills, tax) committed locally, not pushed or deployed.",
     "2026-10-28: Intraday tab pushed and deployed to production (Jack approved); live at /money?v=intraday, shows 'waiting for the first session'.",
     "2026-11-02: \"Scores updated\" stamp on every board header (NFL, college, NBA, college hoops); NBA and CBB runs save their score-read time.",
-    "2026-11-02: David tracked on our NFL and NBA prop learners (agree/against our edges, his own side); new NBA reader for davidsasser.com/nba; CFB/CBB rename; Sam CBB watcher; live scores wrap on phones."
+    "2026-11-02: David tracked on our NFL and NBA prop learners (agree/against our edges, his own side); new NBA reader for davidsasser.com/nba; CFB/CBB rename; Sam CBB watcher; live scores wrap on phones.",
+    "2026-11-02: header search covers NBA and CBB games and NBA players; a finished game drops once each team has a later game posted."
   ],
   "tags": [
     "personal",
