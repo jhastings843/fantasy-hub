@@ -45,4 +45,26 @@ total at the close, blend's side:
   edge 0-up: 1406-1452-0 (0.492), -173.82u, t -0.86
 2025-26 our margin RMSE, a side under 5 games: 13.9 (close 11.42), later 11.87 (close 11.24)
 raw average home margin (non-neutral, 2024-26): 9.03
+learner slices on 2025-26 at the opener (background only; with-move/vs-move need a later read, so they show nothing here):
+  cbb:lean: 2903-2841-0 (0.505), -201.91u, close moved toward 0.24
+  cbb:edge3: 614-556-0 (0.525), 2.18u, close moved toward 0.8
+  cbb:edge5: 151-102-0 (0.597), 35.27u, close moved toward 2.61
+  cbb:fade8: 11-37-0 (0.229), -27u, close moved toward -11.31
+  cbb:agree: 2520-2473-0 (0.505), -182.09u, close moved toward 0.26
+  cbb:split: 383-368-0 (0.51), -19.82u, close moved toward 0.1
+  cbb:home: 1684-1710-0 (0.496), -179.09u, close moved toward 0.16
+  cbb:away: 828-823-0 (0.502), -70.27u, close moved toward 0.05
+  cbb:neutral: 391-308-0 (0.559), 47.45u, close moved toward 1.07
+  cbb:fav: 1428-1498-0 (0.488), -199.82u, close moved toward 0.14
+  cbb:dog: 1475-1343-0 (0.523), -2.09u, close moved toward 0.34
+  cbb:conf: 1807-1850-0 (0.494), -207.27u, close moved toward 0.07
+  cbb:nonconf: 1096-991-0 (0.525), 5.36u, close moved toward 0.54
+  cbb:early: 914-817-0 (0.528), 13.91u, close moved toward 0.5
+  cbb:with-move: 0-0-0 (0), 0u, close moved toward null
+  cbb:vs-move: 0-0-0 (0), 0u, close moved toward null
+  cbb:total: 2879-2850-0 (0.503), -232.73u, close moved toward 0.16
+  cbb:total5: 547-532-0 (0.507), -34.73u, close moved toward 0.66
+  cbb:under: 1078-1036-0 (0.51), -56u, close moved toward 0.1
+  cbb:over: 1801-1814-0 (0.498), -176.73u, close moved toward 0.19
+  cbb:total-agree: 2044-2030-0 (0.502), -171.82u, close moved toward 0.14
 sigma 12.85, sigmaTotal 17.91, strong spread lean 2.94, strong total lean 5.08

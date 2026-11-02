@@ -20,6 +20,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { CbbRatings, phi, type CbbFinal, type CbbParams, type RatingParams } from "../src/lib/models/cbb/model";
 import { matchTorvik, type TorvikGame } from "../src/lib/models/cbb/torvik";
+import { betOf, CBB_SLICES, readOf, settle, type SliceBacktest } from "../src/lib/models/cbb/learn";
 
 const DIR = ".cache/cbb";
 const games = JSON.parse(readFileSync(`${DIR}/games.json`, "utf8")) as CbbFinal[];
@@ -273,6 +274,40 @@ const tgaps = fitPriced.filter((x) => x.g.line!.close.total !== null).map((x) =>
 const strong = r2(gaps[Math.floor(gaps.length * 0.7)] ?? 3);
 const strongTotal = r2(tgaps[Math.floor(tgaps.length * 0.7)] ?? 4);
 
+// ---- The learner's slices on 2025-26 (every game with an opener and T-Rank's line), graded at the opener
+// at -110, the way live games are graded at the first price saved; "move" is how far the close then went
+// toward the bet. Background evidence for the Results tab only: the live learner never sees these games.
+// Retrospective: the blend's two weights were fit on the games before Jan 15, and a projection can use
+// results from after the line opened.
+const sliceRows = withT.filter((x) => x.g.line && (x.g.line.open.spread !== null || x.g.line.open.total !== null));
+const slices: (SliceBacktest & { label: string })[] = CBB_SLICES.map(([id, label, , pick, keep]) => {
+  let w = 0;
+  let l = 0;
+  let p = 0;
+  let units = 0;
+  const moves: number[] = [];
+  for (const x of sliceRows) {
+    const ln = x.g.line!;
+    const t = trank.get(x.g.id)!;
+    const r = readOf({ spread: ln.open.spread, openSpread: null, total: ln.open.total, margin: bm(x), ourTotal: bt(x), parts: { ours: x.ours, trank: t }, conf: x.g.conf, neutral: x.g.neutral, tip: etDate(x.g.tip) });
+    if (!keep(r)) continue;
+    const b = betOf(pick, r);
+    if (!b) continue;
+    const line = b.market === "ats" ? ln.open.spread : ln.open.total;
+    if (line === null) continue;
+    const st = settle(b.market, b.side, line, -110, { home: x.g.homeScore, away: x.g.awayScore });
+    if (st.r > 0) w++;
+    else if (st.r < 0) l++;
+    else p++;
+    units += st.net;
+    const c = b.market === "ats" ? ln.close.spread : ln.close.total;
+    if (c !== null) moves.push(b.side === "home" ? line - c : b.side === "away" ? c - line : b.side === "over" ? c - line : line - c);
+  }
+  return { id, label, w, l, p, units: r2(units), move: moves.length ? r2(mean(moves)) : null };
+});
+say("learner slices on 2025-26 at the opener (background only; with-move/vs-move need a later read, so they show nothing here):");
+for (const x of slices) say(`  ${x.id}: ${x.w}-${x.l}-${x.p} (${r3(x.w / Math.max(1, x.w + x.l))}), ${x.units}u, close moved toward ${x.move}`);
+
 const params: CbbParams = {
   rating: { ...best },
   blend: { margin: { ours: wm, trank: r2(1 - wm) }, total: { ours: wt, trank: r2(1 - wt), b: biasT } },
@@ -286,7 +321,7 @@ say(`sigma ${sigma}, sigmaTotal ${sigmaTotal}, strong spread lean ${strong}, str
 writeFileSync("src/lib/models/cbb/params.json", JSON.stringify(params, null, 2) + "\n");
 writeFileSync(
   "src/lib/models/cbb/backtest.json",
-  JSON.stringify({ fitAt: new Date().toISOString().slice(0, 10), split: SPLIT, seasons: { ratings: "2024-25", blend: `2025-26 before ${SPLIT}`, judged: `2025-26 from ${SPLIT}` }, accuracy: acc, straightUp: { hit: suHit, games: su.length, brier: r3(brier), bins }, lines: ats, homeRaw }, null, 2) + "\n",
+  JSON.stringify({ fitAt: new Date().toISOString().slice(0, 10), split: SPLIT, seasons: { ratings: "2024-25", blend: `2025-26 before ${SPLIT}`, judged: `2025-26 from ${SPLIT}` }, accuracy: acc, straightUp: { hit: suHit, games: su.length, brier: r3(brier), bins }, lines: ats, homeRaw, slices }, null, 2) + "\n",
 );
 writeFileSync("research/fit-cbb.txt", log.join("\n") + "\n");
 

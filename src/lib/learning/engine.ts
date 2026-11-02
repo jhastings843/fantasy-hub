@@ -465,6 +465,29 @@ export const CFB_MODEL_GATE: Gate = {
   weeklyLossCap: 10,
 };
 
+/**
+ * Our college basketball model's slices (lib/models/cbb/learn.ts). A full
+ * slate is 50 to 150 priced games a night, so the sample bar is games, not
+ * weeks: 150 games over 3+ weeks, with the props t bar (2.33) since about 21
+ * slices plus the learner's combinations are checked at once. A refinement
+ * must beat its parent (paired t 1.645). One activation per review.
+ */
+export const CBB_MODEL_GATE: Gate = {
+  minGames: 150,
+  minWeeks: 3,
+  minBets: 150,
+  minWins: 0,
+  minT: 2.33,
+  minPairedT: 1.645,
+  maxNew: 1,
+  ddSd: 3,
+  ddSlack: 3,
+  moveMin: 50,
+  rollbackGames: 60,
+  rollbackT: 1.645,
+  weeklyLossCap: 15,
+};
+
 // ------------------------------------------------------------------- views
 
 export interface EntryView extends Omit<Entry, "status"> {

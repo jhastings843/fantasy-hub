@@ -166,3 +166,31 @@ describe("tracking", () => {
     expect(lean).toMatchObject({ games: 1, w: 1, l: 0, clv: 1.5, verdict: "collecting" });
   });
 });
+
+describe("learner slices", async () => {
+  const { readOf, cbbCandidates, cbbWeek, CBB_SLICES } = await import("./learn");
+  const base = { spread: -5, openSpread: -4, total: 140, margin: 8, ourTotal: 146, parts: { ours: { margin: 7, total: 144 }, trank: { margin: 8.5, total: 147 } }, conf: true, neutral: false, tip: "2026-11-20T23:00:00Z" };
+  it("reads side, edge, agreement, move and the early window", () => {
+    const r = readOf(base);
+    expect(r).toMatchObject({ side: "home", edge: 3, fav: true, agree: true, withMove: true, conf: true, early: true, total: { side: "over", edge: 6, agree: true } });
+    expect(readOf({ ...base, tip: "2027-01-20T23:00:00Z" }).early).toBe(false);
+    expect(readOf({ ...base, tip: "2026-12-20T23:00:00Z" }).early).toBe(false);
+  });
+  it("turns graded games into one bet per slice at the first price, live from opening night only", () => {
+    const g = {
+      event: "1", home: "A", away: "B", homeName: "A", awayName: "B", tip: "2026-11-20T23:00:00Z", neutral: false, conf: true,
+      first: { at: "2026-11-20T12:00:00Z", spread: -5, homePrice: -110, awayPrice: -110, total: 140, overPrice: -110, underPrice: -110, open: { spread: -4, total: 141 }, ours: { spread: -8, total: 146, homeWin: 0.75 }, parts: base.parts },
+      last: undefined as never,
+      close: { spread: -6, total: 142 },
+      final: { home: 80, away: 70 },
+    };
+    g.last = g.first as never;
+    const c = cbbCandidates([g], 2026);
+    expect(c.length).toBe(CBB_SLICES.length);
+    const lean = c.find((x) => x.id === "cbb:lean")!;
+    expect(lean.bets).toEqual([{ game: "1", key: "1|home", week: cbbWeek(g.tip, 2026), at: g.tip, net: 0.909, toward: 1 }]);
+    expect(c.find((x) => x.id === "cbb:edge5")!.bets).toEqual([]);
+    expect(c.find((x) => x.id === "cbb:total")!.bets[0]).toMatchObject({ key: "1|over", net: 0.909 });
+    expect(cbbWeek("2026-11-03T23:00:00Z", 2026)).toBe(1);
+  });
+});

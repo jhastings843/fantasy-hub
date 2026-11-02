@@ -1,11 +1,12 @@
-# Session 2026-11-02: college basketball model + bracket lab (built, verified, NOT yet committed)
+# Session 2026-11-02: college basketball model + bracket lab (deployed a4f5201 + learner follow-up)
+Learner: src/lib/models/cbb/learn.ts (21 slices, readOf/cbbCandidates/cbbWeek), CBB_MODEL_GATE in lib/learning/engine.ts, review runs inside runCbb once per ET slate. Slices registered 2026-11-02 15:40 ET; live records start there. backtest.json "slices" = same slices on 2025-26 at the opener (background only). Views: Results slice table (Live vs 2025-26), ?v=log Learner log.
 What exists:
 - src/lib/models/cbb/: model.ts (our offense/defense points ratings + T-Rank KenPom-style projection + blend), torvik.ts (Torvik file readers, name match to ESPN ids, 363 of 365 D1), lines.ts (ESPN core odds, "now" vs "close" readers), track.ts (signals lean/strong/big/agree/total/strongT/winner, CLV gate 200 games / 4 weeks / t 1.645), store.ts (runCbb pulse job, getCbbBoard, getCbbRecord, teamStrengths), field.ts (projected 68 -> First Four -> 64, S-curve), bracket.ts (exact advancement DP, public estimate, conditional public sampling, tie-aware pool math, one-SE pick rule, most-likely bracket DP).
 - Pages: /picks/cbb (Board, Results, Research by market) and /picks/cbb/bracket (pool / chasing perfection, pool size 10 to 10k, scoring, payout; worker).
 - Pulse: job "cbb" in src/lib/pulse/run.ts every pulse, self-claims 25 min, 18 s budget; saves our number for games within 36h of tip (first save = graded price, rejected if read after tip), grades finals, fetches the close separately until found.
 - Fit: scripts/cbb-history.mts (cache .cache/cbb), scripts/fit-cbb.mts -> params.json, backtest.json, seed.json, research/fit-cbb.txt. Judged on 2025-26 from Jan 15: blend margin RMSE 11.26 vs close 11.04; 50.8% ATS at the close; line moved our way +0.11 (t 3.9); 5+ edges 37-24 at the opener (retrospective); totals nothing; 68.8% winners.
 - Already ran runCbb once against prod Redis (114 games saved Nov 2).
-Next: commit + deploy; next season re-run both scripts (ratingsNow flags a stale seed and stops saving). Selection Sunday: real bracket + Yahoo/ESPN shares into field.ts (BracketTeam.publicPick).
+Next: next season re-run both scripts (ratingsNow flags a stale seed and stops saving). Selection Sunday: real bracket + Yahoo/ESPN shares into field.ts (BracketTeam.publicPick).
 Known: big-pool champion picks are near-ties; the page lists close calls. sigma 12.85 is fit on Nov-Jan games (leak-free), a bit wide for March.
 
 # Session 2026-10-31 (afternoon), all deployed

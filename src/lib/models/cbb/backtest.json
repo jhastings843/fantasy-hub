@@ -364,5 +364,196 @@
       }
     ]
   },
-  "homeRaw": 9.03
+  "homeRaw": 9.03,
+  "slices": [
+    {
+      "id": "cbb:lean",
+      "label": "Our side, any edge",
+      "w": 2903,
+      "l": 2841,
+      "p": 0,
+      "units": -201.91,
+      "move": 0.24
+    },
+    {
+      "id": "cbb:edge3",
+      "label": "Our side, 3+ pts off the line",
+      "w": 614,
+      "l": 556,
+      "p": 0,
+      "units": 2.18,
+      "move": 0.8
+    },
+    {
+      "id": "cbb:edge5",
+      "label": "Our side, 5+ pts off the line",
+      "w": 151,
+      "l": 102,
+      "p": 0,
+      "units": 35.27,
+      "move": 2.61
+    },
+    {
+      "id": "cbb:fade8",
+      "label": "Against our side when we're 8+ pts off (the market knows something)",
+      "w": 11,
+      "l": 37,
+      "p": 0,
+      "units": -27,
+      "move": -11.31
+    },
+    {
+      "id": "cbb:agree",
+      "label": "Our side when ours and T-Rank agree",
+      "w": 2520,
+      "l": 2473,
+      "p": 0,
+      "units": -182.09,
+      "move": 0.26
+    },
+    {
+      "id": "cbb:split",
+      "label": "Our side when ours and T-Rank split",
+      "w": 383,
+      "l": 368,
+      "p": 0,
+      "units": -19.82,
+      "move": 0.1
+    },
+    {
+      "id": "cbb:home",
+      "label": "Our side when it's the home team",
+      "w": 1684,
+      "l": 1710,
+      "p": 0,
+      "units": -179.09,
+      "move": 0.16
+    },
+    {
+      "id": "cbb:away",
+      "label": "Our side when it's the road team",
+      "w": 828,
+      "l": 823,
+      "p": 0,
+      "units": -70.27,
+      "move": 0.05
+    },
+    {
+      "id": "cbb:neutral",
+      "label": "Our side at a neutral site",
+      "w": 391,
+      "l": 308,
+      "p": 0,
+      "units": 47.45,
+      "move": 1.07
+    },
+    {
+      "id": "cbb:fav",
+      "label": "Our side when it's the favorite",
+      "w": 1428,
+      "l": 1498,
+      "p": 0,
+      "units": -199.82,
+      "move": 0.14
+    },
+    {
+      "id": "cbb:dog",
+      "label": "Our side when it's the underdog",
+      "w": 1475,
+      "l": 1343,
+      "p": 0,
+      "units": -2.09,
+      "move": 0.34
+    },
+    {
+      "id": "cbb:conf",
+      "label": "Our side in conference games",
+      "w": 1807,
+      "l": 1850,
+      "p": 0,
+      "units": -207.27,
+      "move": 0.07
+    },
+    {
+      "id": "cbb:nonconf",
+      "label": "Our side in non-conference games",
+      "w": 1096,
+      "l": 991,
+      "p": 0,
+      "units": 5.36,
+      "move": 0.54
+    },
+    {
+      "id": "cbb:early",
+      "label": "Our side before Dec 15",
+      "w": 914,
+      "l": 817,
+      "p": 0,
+      "units": 13.91,
+      "move": 0.5
+    },
+    {
+      "id": "cbb:with-move",
+      "label": "Our side when the line has moved our way since the open",
+      "w": 0,
+      "l": 0,
+      "p": 0,
+      "units": 0,
+      "move": null
+    },
+    {
+      "id": "cbb:vs-move",
+      "label": "Our side when the line has moved against us since the open",
+      "w": 0,
+      "l": 0,
+      "p": 0,
+      "units": 0,
+      "move": null
+    },
+    {
+      "id": "cbb:total",
+      "label": "Our side of the total, any edge",
+      "w": 2879,
+      "l": 2850,
+      "p": 0,
+      "units": -232.73,
+      "move": 0.16
+    },
+    {
+      "id": "cbb:total5",
+      "label": "Our side of the total, 5+ pts",
+      "w": 547,
+      "l": 532,
+      "p": 0,
+      "units": -34.73,
+      "move": 0.66
+    },
+    {
+      "id": "cbb:under",
+      "label": "The under when we're below the total",
+      "w": 1078,
+      "l": 1036,
+      "p": 0,
+      "units": -56,
+      "move": 0.1
+    },
+    {
+      "id": "cbb:over",
+      "label": "The over when we're above the total",
+      "w": 1801,
+      "l": 1814,
+      "p": 0,
+      "units": -176.73,
+      "move": 0.19
+    },
+    {
+      "id": "cbb:total-agree",
+      "label": "Our total when ours and T-Rank agree",
+      "w": 2044,
+      "l": 2030,
+      "p": 0,
+      "units": -171.82,
+      "move": 0.14
+    }
+  ]
 }

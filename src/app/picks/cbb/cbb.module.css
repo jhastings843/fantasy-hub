@@ -52,3 +52,26 @@
   font-weight: 600;
   border-color: var(--pos) !important;
 }
+
+/* Backtest column: background evidence, set back visually from the live record. */
+.btHead,
+.bt {
+  border-left: 1px solid var(--rule);
+}
+.bt {
+  opacity: 0.72;
+}
+.sub {
+  display: block;
+  font-size: 11.5px;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+.sliceName {
+  min-width: 9em;
+}
+/* A slice the learner has turned live. */
+.liveRow td:first-child {
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--pos);
+}

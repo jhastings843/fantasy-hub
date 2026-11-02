@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 export default async function CbbPicksPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const q = await searchParams;
   const v = parseView(q.v);
-  return <CbbView view={v === "log" ? "week" : v} market={parseMarket(q.m)} show={q.show === "all" ? "all" : "priced"} />;
+  return <CbbView view={v} market={parseMarket(q.m)} show={q.show === "all" ? "all" : "priced"} />;
 }

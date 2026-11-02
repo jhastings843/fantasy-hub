@@ -4,6 +4,9 @@ import { blend, CbbRatings, coverChance, overChance, trankLeague, trankProject, 
 import { readCbbLine, type CbbLine, type CbbOdds } from "./lines";
 import { matchTorvik, readTorvikTeams } from "./torvik";
 import { signalRecords, signalsOf, type CbbSnap, type SignalRecord, type TrackedCbbGame } from "./track";
+import { CBB_SECTION, cbbCandidates, cbbWeek } from "./learn";
+import { CBB_MODEL_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
+import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import PARAMS from "./params.json";
 import SEED from "./seed.json";
 
@@ -436,6 +439,14 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
     if (next !== t) graded[t.event] = next;
   });
   if (Object.keys(graded).length) await redis.hset(TRACK(season), graded);
+  Object.assign(tracked, graded);
+
+  // 1b. The learner: registers new slices, and once a slate (ET date) reviews them on graded games.
+  let learned = "";
+  if (left() > 6_000) {
+    const journal = await reviewIfDue(CBB_SECTION, season, cbbWeek(now.toISOString(), season), CBB_MODEL_GATE, cbbCandidates(Object.values(tracked), season), now).catch(() => []);
+    if (journal.length) learned = `, learner: ${journal.map((j) => j.text).join(" ").slice(0, 160)}`;
+  }
 
   // 2. Save.
   let saved = 0;
@@ -466,7 +477,7 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
         const snap = snapOf(readGame(g, r, tr, l), at.toISOString());
         if (!snap) return;
         const old = tracked[g.id];
-        write[g.id] = { ...old, event: g.id, home: g.home.id, away: g.away.id, homeName: g.home.short, awayName: g.away.short, tip: g.tip, neutral: g.neutral, first: old?.first ?? snap, last: snap };
+        write[g.id] = { ...old, event: g.id, home: g.home.id, away: g.away.id, homeName: g.home.short, awayName: g.away.short, tip: g.tip, neutral: g.neutral, conf: g.conf, first: old?.first ?? snap, last: snap };
         tracked[g.id] = write[g.id];
         saved++;
       });
@@ -475,7 +486,7 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
     if (tried - saved - late > 0) notes.push(`${tried - saved - late} with no line yet`);
     if (tried < soon.length) notes.push(`${soon.length - tried} left for the next run`);
   }
-  return `cbb: ${finals} finals rated, T-Rank ${tr.by.size} teams${tr.at ? ` (${tr.at.slice(0, 16)})` : " (unavailable)"}, ${saved} saved${late ? `, ${late} too late` : ""}, ${gradedN} graded, ${closed} closes${notes.length ? ` (${notes.join("; ")})` : ""}`;
+  return `cbb: ${finals} finals rated, T-Rank ${tr.by.size} teams${tr.at ? ` (${tr.at.slice(0, 16)})` : " (unavailable)"}, ${saved} saved${late ? `, ${late} too late` : ""}, ${gradedN} graded, ${closed} closes${learned}${notes.length ? ` (${notes.join("; ")})` : ""}`;
 }
 
 /* ----------------------------------------------------------------- views -- */
@@ -547,13 +558,16 @@ export interface CbbRecord {
   games: TrackedCbbGame[];
   records: SignalRecord[];
   strong: { strong: number; strongTotal: number };
+  /** The learner's slices, evidence since each registered, and its journal. */
+  section: SectionView;
 }
 
 export async function getCbbRecord(now = new Date()): Promise<CbbRecord> {
   const season = cbbSeason(now);
-  const games = Object.values((await redis.hgetall<{ [id: string]: TrackedCbbGame }>(TRACK(season))) ?? {}).sort((a, b) => b.tip.localeCompare(a.tip));
+  const [raw, state, journal] = await Promise.all([redis.hgetall<{ [id: string]: TrackedCbbGame }>(TRACK(season)), loadSection(CBB_SECTION, season), loadJournal(CBB_SECTION, season, 40)]);
+  const games = Object.values(raw ?? {}).sort((a, b) => b.tip.localeCompare(a.tip));
   const strong = { strong: P.strong, strongTotal: P.strongTotal };
-  return { season, games, records: signalRecords(games, strong), strong };
+  return { season, games, records: signalRecords(games, strong), strong, section: sectionView(CBB_MODEL_GATE, state, cbbCandidates(games, season), journal) };
 }
 
 export { signalsOf };

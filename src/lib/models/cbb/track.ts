@@ -59,6 +59,8 @@ export interface TrackedCbbGame {
   awayName: string;
   tip: string;
   neutral: boolean;
+  /** Conference game (saved from 2026-11-02 evening on; older rows leave it out). */
+  conf?: boolean;
   first: CbbSnap;
   last: CbbSnap;
   close?: { spread: number | null; total: number | null };

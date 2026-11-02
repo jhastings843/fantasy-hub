@@ -2,8 +2,9 @@ import Link from "next/link";
 import { getCbbBoard, getCbbRecord, CBB_PARAMS, type CbbBoard, type CbbBoardRow, type CbbRecord } from "@/lib/models/cbb/store";
 import { SIGNALS, signalsOf, graded, type SignalRecord } from "@/lib/models/cbb/track";
 import BACKTEST from "@/lib/models/cbb/backtest.json";
-import { GameCell, href, line, MARKETS, pieces, price, rec, units, type Market, type View } from "../ui";
-import { Background, Hero, PageHead, SecHead, Stats } from "../board";
+import { GameCell, href, line, MARKETS, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
+import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress } from "../board";
+import { CBB_SLICES } from "@/lib/models/cbb/learn";
 import { nbaHref } from "../nba/NbaView";
 import s from "../picks.module.css";
 import c from "./cbb.module.css";
@@ -25,7 +26,102 @@ const CBB_VIEWS: { id: View; label: string }[] = [
   { id: "week", label: "Board" },
   { id: "results", label: "Results" },
   { id: "research", label: "Research" },
+  { id: "log", label: "Learner log" },
 ];
+const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this week", "rolled-back": "Rolled back" } as const;
+/** Which slices belong to a market tab. */
+const sliceMarket = (id: string): Market => (CBB_SLICES.find((x) => x[0] === id)?.[3] === "total" ? "ou" : "ats");
+
+type SliceBt = { id: string; label: string; w: number; l: number; p: number; units: number; move: number | null };
+const BT_SLICES = ((BACKTEST as unknown as { slices?: SliceBt[] }).slices ?? []) as SliceBt[];
+
+/**
+ * Every learner slice in one market: the live record since it registered (starts at 0-0 on opening night,
+ * the only thing the gate reads) beside its 2025-26 backtest, which is background evidence and never counts.
+ */
+function SliceTable({ v, m }: { v: CbbRecord; m: Market }) {
+  const live = new Map(v.section.entries.map((e) => [e.id, e]));
+  const rows = CBB_SLICES.filter(([id]) => sliceMarket(id) === m);
+  const g = v.section.gate;
+  return (
+    <div className={s.section}>
+      <h3 className={s.h2}>Every slice the learner is testing</h3>
+      <p className={s.p}>
+        {`Live counts only games that tip after a slice registered, starting at 0-0 this season. A slice goes live at ${g.minGames}+ games over ${g.minWeeks}+ weeks with t ${g.minT}+ and must beat the broader slice it narrows; it rolls back if it then loses. The 2025-26 column is background: the same slice graded at the opening line, never counted toward the bar.`}
+      </p>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>Slice</th>
+              <th>Live</th>
+              <th className={c.btHead}>2025-26</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([id, label]) => {
+              const e = live.get(id);
+              const ev = e?.ev;
+              const bt = BT_SLICES.find((x) => x.id === id);
+              const n = bt ? bt.w + bt.l : 0;
+              return (
+                <tr key={id} className={e?.status === "active" ? c.liveRow : undefined}>
+                  <td className={c.sliceName}>
+                    {label}
+                    <small className={`${c.sub} ${e?.status === "active" ? s.pos : e?.status === "rolled-back" ? s.neg : s.dim}`}>{e ? STATUS[e.status] : "Registers soon"}</small>
+                  </td>
+                  <td className={`${s.num} ${s.nw}`}>
+                    {ev && ev.bets ? `${ev.wins}-${ev.bets - ev.wins}` : "0-0"}
+                    <small className={`${c.sub} ${ev && ev.bets ? cls(ev.units) : ""}`}>{ev && ev.bets ? `${units(ev.units)} · t ${ev.t.toFixed(2)}` : "new"}</small>
+                  </td>
+                  <td className={`${s.num} ${s.nw} ${c.bt}`}>
+                    {n ? `${bt!.w}-${bt!.l}` : "·"}
+                    {n > 0 && <small className={`${c.sub} ${bt!.w / n > 0.524 ? s.pos : bt!.units < 0 ? s.neg : ""}`}>{`${((bt!.w / n) * 100).toFixed(1)}% · ${units(bt!.units)}`}</small>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className={`${s.notice} ${s.dim}`}>2025-26 is retrospective: the model&apos;s number on a game could use results from after its line opened, and the blend&apos;s two weights were fit on that season&apos;s first half. Line-move slices need a later read, so they have no backtest.</p>
+    </div>
+  );
+}
+
+/** The learner's log: what registered, went live or rolled back, and each review's summary. */
+function LogView({ v, m }: { v: CbbRecord; m: Market }) {
+  const g = v.section.gate;
+  const entries = v.section.entries.filter((e) => sliceMarket(e.id) === (m === "su" ? "ats" : m));
+  return (
+    <section className={s.section} aria-labelledby="cbb-log">
+      <Hero
+        eyebrow={`College hoops ${m === "ou" ? "totals" : "spreads"} · what changed, and why`}
+        title={<span id="cbb-log">Learner log</span>}
+        sub={`The same learning cycle as football and NBA: each slice is a paper bet on games after it registered, reviewed once a night. It goes live at ${g.minGames}+ games over ${g.minWeeks}+ weeks with t ${g.minT}+ (and must beat the slice it narrows), at most ${g.maxNew} a review, and rolls back after ${g.rollbackGames}+ games if it loses at t ${g.rollbackT} or worse. It also proposes combinations of its strongest slices. ${v.section.lastReviewAt ? `Last review ${whenEt(v.section.lastReviewAt)}.` : "The first review runs after opening night's games are graded."}`}
+      />
+      <TrackingProgress
+        rows={entries.map((e) => ({
+          id: e.id,
+          label: e.label,
+          status: e.status === "active" || e.status === "paused" ? "live" : e.status === "rolled-back" ? "back" : "testing",
+          games: e.ev?.games ?? 0,
+          needGames: g.minGames,
+          weeks: e.ev?.weeks ?? 0,
+          needWeeks: g.minWeeks,
+          result: e.ev && e.ev.bets ? `${e.ev.units >= 0 ? "+" : "−"}${Math.abs(e.ev.units).toFixed(1)}u over ${e.ev.bets} bets, t ${e.ev.t.toFixed(2)} of ${g.minT}` : undefined,
+          note: e.ev && e.ev.bets ? undefined : "No graded games yet: only games after it registered count.",
+        }))}
+        sub={`Slices on our college hoops ${m === "ou" ? "totals" : "spreads"}, each a paper bet at the price we first saved.`}
+        empty="No slices registered yet. They register on the first pulse after this deploy."
+      />
+      <div className={s.section}>
+        <h3 className={s.h2}>Latest (spreads and totals)</h3>
+        <LearnerLog entries={v.section.journal.map((j) => engineEntry(j, "College hoops"))} empty="Nothing recorded yet. The first entries come when the slices register." />
+      </div>
+    </section>
+  );
+}
 
 export const cbbHref = (m: Market, v: View) => {
   const q = new URLSearchParams();
@@ -334,6 +430,8 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
         }
         sub={m === "su" ? "Our winner on every game at the saved moneyline, 1 unit each. Tracked only." : "Graded at the DraftKings number and price we first saved, 1 unit each. Closing-line value is how far the line moved toward our side by tip; it is the gate, since it settles faster than wins."}
       />
+      {m !== "su" && <SliceTable v={v} m={m} />}
+      {m === "su" && (
       <div className={s.tw}>
         <table className={s.table}>
           <thead>
@@ -362,7 +460,8 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
           </tbody>
         </table>
       </div>
-      <p className={`${s.notice} ${s.dim}`}>{`A signal earns a closer look at 200+ games over 4+ weeks with closing-line value above zero at t 1.645 or better. Until then it says collecting.`}</p>
+      )}
+      {m === "su" && <p className={`${s.notice} ${s.dim}`}>{`Straight up is tracked at the saved moneyline (games without one don't count). It earns a closer look at 200+ priced games over 4+ weeks in profit. Our winner picked 68.8% in the 2025-26 backtest.`}</p>}
       <div className={s.section}>
         <h3 className={s.h2}>Latest graded</h3>
         {!rows.length ? (
@@ -523,7 +622,7 @@ function ResearchView({ m }: { m: Market }) {
 
 export default async function CbbView({ view = "week", market = "ats", show = "priced" }: { view?: View; market?: Market; show?: "priced" | "all" }) {
   const m = market;
-  const [b, v] = await Promise.all([view === "week" ? getCbbBoard().catch(() => null) : Promise.resolve(null), view === "results" ? getCbbRecord().catch(() => null) : Promise.resolve(null)]);
+  const [b, v] = await Promise.all([view === "week" ? getCbbBoard().catch(() => null) : Promise.resolve(null), view === "results" || view === "log" ? getCbbRecord().catch(() => null) : Promise.resolve(null)]);
   const season = b?.season ?? v?.season ?? 2026;
   const sportNav = (
     <nav className={s.chips} aria-label="Sport">
@@ -573,6 +672,14 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
           ) : (
             <div className={s.error} role="alert">
               Couldn&apos;t load the college hoops record right now. Try again in a few minutes.
+            </div>
+          )
+        ) : view === "log" ? (
+          v ? (
+            <LogView v={v} m={m} />
+          ) : (
+            <div className={s.error} role="alert">
+              Couldn&apos;t load the learner right now. Try again in a few minutes.
             </div>
           )
         ) : view === "research" ? (
