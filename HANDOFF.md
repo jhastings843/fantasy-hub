@@ -3,6 +3,7 @@
 - Tabs renamed CFB / CBB. lib/models/cbb/sam-watch.ts: pulse checks Sam's /cbb/ hourly, pushes once when it is no longer "coming soon"; then build his reader and add him beside ours on CBB like NBA.
 - John Harris: no college basketball output found; nothing to add.
 - Search (/api/search): adds NBA games (getNbaBoard), CBB games (getCbbBoard(now, 3): 3 days back for last results) and NBA player props (getOurNbaView, with David's number). lib/search/sports.ts currentOnly: a finished game drops once every team in it has a later game; a player entry uses his team.
+- Breakdowns: /picks/cbb/game?id= (CbbGame.tsx; after tip it grades the first saved pregame read) and /props/player?l=&t=&n=[&g=] (lib/search/player.ts + PlayerPreview.tsx; live box-score totals while in play; NFL fills David from his board when our copy lacks it). Both open as @modal pop-ups. NFL/CFB/NBA games already had /picks/game and /picks/nba/game.
 
 # 2026-11-02 evening: "Scores updated" stamp on every board
 PageHead (src/app/picks/board.tsx) takes `updated` and shows "Scores updated 5:52 PM ET" under the season label (date added when not today). Sources: NFL/college = live ESPN read time when games are live, else the picks core build time (fresh.at); NBA and college hoops boards = ESPN read on page load; their Results/log = lib/live/scores-at.ts key scores:v1:at:{nba|cbb}, written by runNbaPicks and runCbb after each score read. College hoops Research shows no stamp.

@@ -514,8 +514,11 @@ export interface CbbBoard {
  * save when it has one (no per-game odds calls on a page load), else from a
  * live read for up to 40 games.
  */
-/** `back` adds that many earlier days (search keeps a team's last result until its next game is posted). */
-export async function getCbbBoard(now = new Date(), back = 0): Promise<CbbBoard> {
+/**
+ * `back` adds that many earlier days (search keeps a team's last result until its next game is posted).
+ * `only` limits the live line reads to one game (its pop-up).
+ */
+export async function getCbbBoard(now = new Date(), back = 0, only?: string): Promise<CbbBoard> {
   const season = cbbSeason(now);
   const today = etYmd(now);
   const problems: string[] = [];
@@ -535,7 +538,7 @@ export async function getCbbBoard(now = new Date(), back = 0): Promise<CbbBoard>
   // Lines: the pulse's save when it is under 45 minutes old (or the game has tipped), else a live read,
   // at most 40 of them, eight at a time, all inside four seconds.
   const fresh = (t: TrackedCbbGame | undefined) => !!t && now.getTime() - Date.parse(t.last.at) < 45 * 60_000;
-  const want = boards.flat().filter((g) => g.state === "pre" && !fresh(tracked[g.id])).slice(0, 40);
+  const want = boards.flat().filter((g) => (!only || g.id === only) && g.state === "pre" && !fresh(tracked[g.id])).slice(0, 40);
   const deadline = Date.now() + 4_000;
   const liveLines = new Map<string, CbbLine | null>();
   await pool(want, 8, async (g) => {

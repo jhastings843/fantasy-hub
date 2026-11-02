@@ -47,7 +47,7 @@ export async function GET() {
   const entries: SearchEntry[] = [
     ...(nfl?.value ? tag(picksSearchIndex(nfl.value), game("nfl"), "NFL picks") : []),
     ...(cfb?.value ? tag(picksSearchIndex(cfb.value), game("cfb"), "CFB picks") : []),
-    ...tag(propsSearchIndex(ov, pv, fv), "/props", "NFL props"),
+    ...tag(propsSearchIndex(ov, pv, fv), (e) => `/props/player?l=nfl&t=${e.key.split("|")[0]}&n=${encodeURIComponent(e.title)}`, "NFL props"),
     ...currentOnly([...nbaGamesIndex(nbaB), ...cbbGamesIndex(cbbB), ...nbaPropsIndex(nbaV, nbaNames)]).map(strip),
   ];
   return Response.json({ entries }, { headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" } });

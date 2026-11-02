@@ -124,7 +124,7 @@ function cbbGame(x: CbbBoardRow): Dated {
     terms: [g.away, g.home].flatMap((t) => [t.abbr, t.name, t.short]).join(" ").toLowerCase(),
     rank: g.state === "post" ? 2 : 1,
     rows,
-    href: "/picks/cbb",
+    href: `/picks/cbb/game?id=${g.id}`,
     subjects: [`cbb:${g.away.id}`, `cbb:${g.home.id}`],
     at: g.tip,
     done: g.state === "post",
@@ -182,7 +182,7 @@ export function nbaPropsIndex(v: OurNbaView | null, teamNames: Map<string, strin
         terms: [p.team, teamNames.get(p.team) ?? "", opp, teamNames.get(opp) ?? ""].join(" ").toLowerCase(),
         rank: done ? 2 : p.rank,
         rows: p.rows,
-        href: "/props?m=nba",
+        href: `/props/player?l=nba&t=${p.team}&n=${encodeURIComponent(p.name)}&g=${g.slug}`,
         // The team's next game posting retires this one, whether or not his props for it are up yet.
         subjects: [`nba:${p.team}`],
         at,
