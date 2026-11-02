@@ -663,7 +663,7 @@ export function AtsResults({ r }: { r: PicksReport }) {
   return (
     <section className={s.section} aria-labelledby="ats-results">
       <Hero
-        eyebrow={`${r.league === "nfl" ? "NFL" : "College"} ${r.season} · Spreads · every bet sent`}
+        eyebrow={`${r.league === "nfl" ? "NFL" : "CFB"} ${r.season} · Spreads · every bet sent`}
         title={
           <span id="ats-results">
             {ats.w + ats.l + ats.p ? (
@@ -747,7 +747,7 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
   return (
     <section className={s.section} aria-labelledby="ats-research">
       <Hero
-        eyebrow={`${r.league === "nfl" ? "NFL" : "College"} spreads · ${r.graded.length} games through Week ${Math.max(0, ...r.weeksCovered)}`}
+        eyebrow={`${r.league === "nfl" ? "NFL" : "CFB"} spreads · ${r.graded.length} games through Week ${Math.max(0, ...r.weeksCovered)}`}
         title={<span id="ats-research">What actually wins</span>}
         sub="Each idea's record if you had bet every game it covers at -110. The shaded band is its 90% likely range; the line is break-even. Each model is judged at its own site's line here."
       />
@@ -1072,7 +1072,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
     { k: "6. Stake and limits", v: st === "bet" || st === "early" || st === "sent" ? (st === "sent" ? `Sent: ${g.issued!.units}u at ${price(g.issued!.price)}.` : stakeWhy(g, r)) : st === "budget" ? `Worth ${g.want}u, but ${g.limited ?? "the limits leave no room"}.` : "No stake." },
     { k: "7. Timing", v: g.held && g.stake ? `Held as an early look until ${kickoffEt(g.held)} on game day.` : st === "sent" ? "Issued on game day." : "Every game locks at 9am ET on its own game day." },
   ];
-  const eyebrow = `${["bet", "sent", "early"].includes(st) ? "Best bet" : STATUS_TEXT[st]} · ${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` Week ${r.week}` : ""}`;
+  const eyebrow = `${["bet", "sent", "early"].includes(st) ? "Best bet" : STATUS_TEXT[st]} · ${r.league === "nfl" ? "NFL" : "CFB"}${r.week ? ` Week ${r.week}` : ""}`;
   return (
     <section className={s.section} aria-labelledby="game">
       <div className={s.hero}>

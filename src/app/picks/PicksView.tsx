@@ -46,7 +46,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
         NBA
       </Link>
       <Link className={s.chip} href="/picks/cbb">
-        College hoops
+        CBB
       </Link>
     </nav>
   );

@@ -56,7 +56,7 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
 
   return (
     <div className={`${s.page} ${p.root}`}>
-      <span className={s.eyebrow}>{`${r.league === "nfl" ? "NFL" : "College"}${r.week ? ` · Week ${r.week}` : ""} · ${f ? "Final" : g.basis === "started" ? "Started" : when}`}</span>
+      <span className={s.eyebrow}>{`${r.league === "nfl" ? "NFL" : "CFB"}${r.week ? ` · Week ${r.week}` : ""} · ${f ? "Final" : g.basis === "started" ? "Started" : when}`}</span>
 
       {/* Matchup */}
       <div className={p.match}>

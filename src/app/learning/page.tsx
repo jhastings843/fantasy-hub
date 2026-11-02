@@ -112,7 +112,7 @@ export default async function LearningPage() {
     {
       title: "Football picks",
       rows: (["nfl", "cfb"] as const).flatMap((l) => {
-        const L = l === "nfl" ? "NFL" : "College";
+        const L = l === "nfl" ? "NFL" : "CFB";
         const base = l === "nfl" ? "/picks" : "/picks/cfb";
         return [
           { name: `${L} spreads`, loop: PICKS, href: `${base}?v=research`, ...picksMarket(state, policy, l, "ats") },
@@ -134,7 +134,7 @@ export default async function LearningPage() {
       title: "Our college model",
       rows: [
         {
-          name: "College spreads and totals (our ratings model)",
+          name: "CFB spreads and totals (our ratings model)",
           loop: "Shared engine, college model gate: paper bets at -110 on its own slices (edge size, home or road, favorite or dog, conference, line move, totals) and the learner's combinations; 30+ games over 3+ weeks at t 2.33, must beat its parent, rollback. Judged as a source; nothing staked",
           href: "/picks/cfb?v=research",
           ...engineRow(cfbModel),
@@ -146,7 +146,7 @@ export default async function LearningPage() {
       rows: (["nfl", "cfb"] as const).map((l) => {
         const ds = (state?.decisions ?? []).filter((d) => d.id.startsWith(`${l}:mkt:`));
         return {
-          name: `${l === "nfl" ? "NFL" : "College"}: reverse line moves, public side, sharp money`,
+          name: `${l === "nfl" ? "NFL" : "CFB"}: reverse line moves, public side, sharp money`,
           loop: "Picks review: does skipping the rule bets each signal flags gain? Splits from Action Network's public feed, saved with every pregame snapshot since Oct 21. Report only: nothing changes a bet until Jack says so.",
           href: l === "nfl" ? "/picks?v=research" : "/picks/cfb?v=research",
           live: "Not used on any bet",

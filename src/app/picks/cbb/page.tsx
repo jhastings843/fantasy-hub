@@ -5,7 +5,7 @@ import { parseMarket, parseView } from "../ui";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "College Hoops Picks · Hobby Hub",
+  title: "CBB Picks · Hobby Hub",
   description: "College basketball spreads, totals and straight up: our blended rating (ours plus T-Rank) against DraftKings, tracked and graded every game.",
 };
 

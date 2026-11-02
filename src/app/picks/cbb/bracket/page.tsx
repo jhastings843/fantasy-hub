@@ -42,7 +42,7 @@ export default async function BracketPage({ searchParams }: { searchParams: Prom
       <div className={s.wrap}>
         <div style={{ display: "grid", gap: 10 }}>
           <Link href="/picks/cbb" className={b.crumb}>
-            <span aria-hidden>‹</span> College hoops board
+            <span aria-hidden>‹</span> CBB board
           </Link>
           <PageHead
             title="Bracket optimizer"

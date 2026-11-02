@@ -152,7 +152,7 @@ export function SuResults({ r, poolTrack }: { r: PicksReport; poolTrack?: PoolTr
   return (
     <section className={s.section} aria-labelledby="su-results">
       <Hero
-        eyebrow={`${r.league === "nfl" ? "NFL" : "College"} ${r.season} · Straight up`}
+        eyebrow={`${r.league === "nfl" ? "NFL" : "CFB"} ${r.season} · Straight up`}
         title={<span id="su-results">{total.w + total.l ? `${total.w}-${total.l} picking winners` : "No winners graded yet"}</span>}
         sub="Winners picked in the emails, as listed. Accuracy only: pick'em has no stake."
       />
@@ -452,7 +452,7 @@ export function TotalsResults({ r }: { r: PicksReport }) {
   return (
     <section className={s.section} aria-labelledby="ou-results">
       <Hero
-        eyebrow={`${r.league === "nfl" ? "NFL" : "College"} ${r.season} · Totals`}
+        eyebrow={`${r.league === "nfl" ? "NFL" : "CFB"} ${r.season} · Totals`}
         title={
           <span id="ou-results">
             {l.w + l.l + l.p ? (

@@ -31,7 +31,7 @@ export async function GET() {
   const game = (l: "nfl" | "cfb") => (e: SearchEntry) => `/picks/game?l=${l}&g=${encodeURIComponent(e.key)}`;
   const entries: SearchEntry[] = [
     ...(nfl?.value ? tag(picksSearchIndex(nfl.value), game("nfl"), "NFL picks") : []),
-    ...(cfb?.value ? tag(picksSearchIndex(cfb.value), game("cfb"), "College picks") : []),
+    ...(cfb?.value ? tag(picksSearchIndex(cfb.value), game("cfb"), "CFB picks") : []),
     ...tag(propsSearchIndex(ov, pv, fv), "/props", "NFL props"),
   ];
   return Response.json({ entries }, { headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" } });

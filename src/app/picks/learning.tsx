@@ -36,7 +36,7 @@ export const leagueOf = (t: string): League | "both" => {
   const n = /\bnfl:/.test(t), c = /\bcfb:/.test(t);
   return n === c ? "both" : n ? "nfl" : "cfb";
 };
-export const OTHER: { [l in League]: string } = { nfl: "College", cfb: "NFL" };
+export const OTHER: { [l in League]: string } = { nfl: "CFB", cfb: "NFL" };
 export async function LearningPanel({ league, market }: { league: League; market: Market }) {
   const [state, journal, ops, active] = await Promise.all([
     redisStore.state().catch(() => null),

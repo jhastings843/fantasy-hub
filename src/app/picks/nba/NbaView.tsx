@@ -720,13 +720,13 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
         NFL
       </Link>
       <Link className={s.chip} href={href("cfb", m, view)}>
-        College
+        CFB
       </Link>
       <Link className={s.chip} href={nbaHref(m, view)} aria-current="page">
         NBA
       </Link>
       <Link className={s.chip} href="/picks/cbb">
-        College hoops
+        CBB
       </Link>
     </nav>
   );

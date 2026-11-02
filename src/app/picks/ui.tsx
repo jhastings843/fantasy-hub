@@ -6,7 +6,7 @@ import { TeamLogo } from "@/components/TeamLogo";
 import { Fragment, type ReactNode } from "react";
 import s from "./picks.module.css";
 
-export const LEAGUE_NAME: { [k in League]: string } = { nfl: "NFL", cfb: "College" };
+export const LEAGUE_NAME: { [k in League]: string } = { nfl: "NFL", cfb: "CFB" };
 
 export type Market = "ats" | "su" | "ou";
 export type View = "week" | "results" | "research" | "log";

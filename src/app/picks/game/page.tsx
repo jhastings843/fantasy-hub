@@ -67,7 +67,7 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
     <main className={s.page}>
       <div className={s.wrap}>
         <Link href={href(league, "ats", "week")} className={s.linkA} style={{ fontSize: 14 }}>
-          {`‹ ${league === "nfl" ? "NFL" : "College"} picks`}
+          {`‹ ${league === "nfl" ? "NFL" : "CFB"} picks`}
         </Link>
         {r && g ? (
           <>

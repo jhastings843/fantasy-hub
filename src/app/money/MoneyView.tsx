@@ -1486,7 +1486,7 @@ function PicksPanel({ sp }: { sp: Sports }) {
     const rows = sp.picks.filter((p) => p.league === l);
     return { l, units: rows.reduce((a, r) => a + r.units, 0), w: rows.reduce((a, r) => a + r.w, 0), l_: rows.reduce((a, r) => a + r.l, 0), p: rows.reduce((a, r) => a + r.p, 0), n: rows.length };
   });
-  const name = { nfl: "NFL", cfb: "College" };
+  const name = { nfl: "NFL", cfb: "CFB" };
   return (
     <div className={m.panel}>
       <div className={m.panelHead}><h2 className={m.panelTitle}>Picks, all sports</h2><Link className={m.panelLink} href="/picks">Picks</Link></div>

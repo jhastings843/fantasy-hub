@@ -97,7 +97,7 @@ function LogView({ v, m }: { v: CbbRecord; m: Market }) {
   return (
     <section className={s.section} aria-labelledby="cbb-log">
       <Hero
-        eyebrow={`College hoops ${m === "ou" ? "totals" : "spreads"} · what changed, and why`}
+        eyebrow={`CBB ${m === "ou" ? "totals" : "spreads"} · what changed, and why`}
         title={<span id="cbb-log">Learner log</span>}
         sub={`The same learning cycle as football and NBA: each slice is a paper bet on games after it registered, reviewed once a night. It goes live at ${g.minGames}+ games over ${g.minWeeks}+ weeks with t ${g.minT}+ (and must beat the slice it narrows), at most ${g.maxNew} a review, and rolls back after ${g.rollbackGames}+ games if it loses at t ${g.rollbackT} or worse. It also proposes combinations of its strongest slices. ${v.section.lastReviewAt ? `Last review ${whenEt(v.section.lastReviewAt)}.` : "The first review runs after opening night's games are graded."}`}
       />
@@ -118,7 +118,7 @@ function LogView({ v, m }: { v: CbbRecord; m: Market }) {
       />
       <div className={s.section}>
         <h3 className={s.h2}>Latest (spreads and totals)</h3>
-        <LearnerLog entries={v.section.journal.map((j) => engineEntry(j, "College hoops"))} empty="Nothing recorded yet. The first entries come when the slices register." />
+        <LearnerLog entries={v.section.journal.map((j) => engineEntry(j, "CBB"))} empty="Nothing recorded yet. The first entries come when the slices register." />
       </div>
     </section>
   );
@@ -415,7 +415,7 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
   return (
     <section className={s.section} aria-labelledby="cbb-results">
       <Hero
-        eyebrow={`College hoops ${v.season}-${String(v.season + 1).slice(2)} · ${MARKET_NAME[m]} · every game we priced`}
+        eyebrow={`CBB ${v.season}-${String(v.season + 1).slice(2)} · ${MARKET_NAME[m]} · every game we priced`}
         title={
           <span id="cbb-results">
             {head && head.w + head.l ? (
@@ -633,13 +633,13 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
         NFL
       </Link>
       <Link className={s.chip} href={href("cfb", m, view)}>
-        College
+        CFB
       </Link>
       <Link className={s.chip} href={nbaHref(m, view)}>
         NBA
       </Link>
       <Link className={s.chip} href={cbbHref(m, view)} aria-current="page">
-        College hoops
+        CBB
       </Link>
     </nav>
   );
@@ -647,7 +647,7 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.pageFrame}>
-          <PageHead title="College hoops" sub="Every Division I game: our number against DraftKings', tracked from tip one." asof={`NCAAB ${season}-${String(season + 1).slice(2)}`} updated={view === "research" ? null : updated} />
+          <PageHead title="CBB" sub="Every Division I game: our number against DraftKings', tracked from tip one." asof={`NCAAB ${season}-${String(season + 1).slice(2)}`} updated={view === "research" ? null : updated} />
           <div className={s.controlBar}>
             {sportNav}
             <nav className={s.chips} aria-label="Market">
