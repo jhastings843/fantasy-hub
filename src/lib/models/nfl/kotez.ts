@@ -13,7 +13,7 @@
 //   3. The longest wins; a tie splits. No TD at all: nobody wins.
 // Value: our chance over the share of the pool backing him. That share is an
 // ESTIMATE (no data): proportional to DK's anytime break-even squared, so stars
-// draw more than their price alone says. value > 1 means more than his share.
+// draw more than their price alone says, with a 1.5% floor for long shots. value > 1 means more than his share.
 //
 // Pure, seeded.
 
@@ -26,6 +26,7 @@ const L = LEN as unknown as Len;
 export const KOTEZ_SIMS = 20000;
 const K_LEN = 6;
 const K_MIX = 2;
+export const KOTEZ_CROWD_FLOOR = 0.015;
 
 export interface KotezRow {
   key: string;
@@ -118,7 +119,10 @@ export function kotezGame(rows: AttdRow[], otherShare: number, sims = KOTEZ_SIMS
     }
     for (const i of who) if (i >= 0) wins[i] += 1 / who.length;
   }
-  const priced = rows.map((x) => (x.dk !== undefined ? implied(x.dk) ** 2 : 0));
+  // Every priced player draws some backers: a floor of KOTEZ_CROWD_FLOOR of the raw total, so a +3000 long shot isn't valued at 29x.
+  const raw = rows.map((x) => (x.dk !== undefined ? implied(x.dk) ** 2 : 0));
+  const rawTot = raw.reduce((a, b) => a + b, 0) || 1;
+  const priced = raw.map((x) => (x ? Math.max(x, KOTEZ_CROWD_FLOOR * rawTot) : 0));
   const tot = priced.reduce((a, b) => a + b, 0) || 1;
   const out: KotezRow[] = rows.map((x, i) => {
     const longest = Math.round((wins[i] / sims) * 1000) / 1000;

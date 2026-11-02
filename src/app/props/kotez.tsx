@@ -55,7 +55,7 @@ export async function KotezWeek({ season }: { season: number }) {
   const tv = await tvByEvent("nfl");
   const sims = games.map((g) => ({ g, k: kotezGame(g.attd!.rows, ATTD_PARAMS.other) }));
   const best = sims
-    .flatMap(({ g, k }) => k.rows.filter((r) => r.value !== undefined && r.value >= VALUE && r.longest >= 0.03).map((r) => ({ r, game: `${g.game.away} at ${g.game.home}` })))
+    .flatMap(({ g, k }) => k.rows.filter((r) => r.value !== undefined && r.value >= VALUE && r.longest >= 0.03 && r.dk !== undefined && implied(r.dk) >= 0.1).map((r) => ({ r, game: `${g.game.away} at ${g.game.home}` })))
     .sort((a, b) => b.r.value! - a.r.value!)
     .slice(0, 6);
   const rows: GameRowData[] = sims.map(({ g, k }) => {
@@ -78,7 +78,7 @@ export async function KotezWeek({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="kotez-week">
       <div className={s.pageFrame}>
-        <SecHead id="kotez-week" title="Best value" aside={`Our chance at the game's longest TD over the estimated share backing him · ${VALUE}x and up, 3%+ to win · projections only`} />
+        <SecHead id="kotez-week" title="Best value" aside={`Our chance at the game's longest TD over the estimated share backing him · ${VALUE}x and up, 3%+ to win, DK +900 or shorter · projections only`} />
         {best.length ? (
           <div className={s.tw}>
             <table className={s.table}>
