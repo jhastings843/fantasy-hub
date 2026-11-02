@@ -217,7 +217,7 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
               <span className={s.scoreLine}>{`Final ${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score}`}</span>
             ) : st === "started" ? (
               <>
-                <span className={s.gLive}>Live</span>
+                <span className={s.gLive}>Live</span>{" "}
                 {live && <span className={s.scoreLine}>{pieces(`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`)}</span>}
               </>
             ) : g.final ? (

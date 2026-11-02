@@ -362,7 +362,7 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
                 status={
                   live ? (
                     <>
-                      <span className={s.gLive}>Live</span>
+                      <span className={s.gLive}>Live</span>{" "}
                       {lg && <span className={s.scoreLine}>{`${lg.away.score + lg.home.score} so far · ${lg.detail}`}</span>}
                     </>
                   ) : lg?.state === "post" && !f ? (

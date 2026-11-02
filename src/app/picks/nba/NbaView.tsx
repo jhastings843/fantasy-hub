@@ -253,7 +253,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
           status={
             g.state === "in" ? (
               <>
-                <span className={s.gLive}>Live</span>
+                <span className={s.gLive}>Live</span>{" "}
                 <span className={s.scoreLine}>{pieces(`${score}${score ? " · " : ""}${g.detail}`)}</span>
               </>
             ) : g.state === "post" ? (

@@ -227,7 +227,7 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
   const status =
     g.state === "in" ? (
       <>
-        <span className={s.gLive}>Live</span>
+        <span className={s.gLive}>Live</span>{" "}
         <span className={s.scoreLine}>{pieces(`${score}${score ? " · " : ""}${g.detail}`)}</span>
       </>
     ) : g.state === "post" ? (
