@@ -29,7 +29,8 @@ export const PARLAY_LEGS = { min: 2, max: 6 };
  * Which slate a ticket covers. Sunday is the parlay of the day above; TNF and
  * MNF (Jack, 2026-11-02) each get their own 2-leg ticket off that night's
  * game(s), tracked apart. A night slate is usually one game, so its legs can
- * share a game, and the bar is lower: both our chance and the blend must beat
+ * share a game but not a team (Jack, 2026-11-02: two Seattle backs on one
+ * ticket split the same carries), and the bar is lower: both our chance and the blend must beat
  * DK's break-even, with no 5-point margin (one game rarely has two 5-point legs).
  * Priced as two singles multiplied; DK's same-game price can differ.
  */
@@ -69,6 +70,8 @@ export interface AttdParlay {
   pool?: ParlayLeg[];
   /** Missing on Sunday tickets built before Nov 2, 2026: those are "sun". */
   slate?: ParlaySlate;
+  /** Set when a ticket is thrown out before kickoff (why); it grades void and never counts. */
+  voided?: string;
 }
 
 /** One ticket's numbers. growth: the Kelly growth rate at our chances (0 when no edge). */
@@ -122,7 +125,9 @@ export function pickNightLegs(games: ParlayGame[], venom: Map<string, number>): 
       if (!(r.anytime > be) || !(chance > be)) continue;
       out.push({ slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(chance), gap: r3(chance - be) });
     }
-  return out.sort((a, b) => b.gap - a.gap);
+  out.sort((a, b) => b.gap - a.gap);
+  const teams = new Set<string>();
+  return out.filter((l) => !teams.has(l.team) && !!teams.add(l.team));
 }
 
 /** The night ticket: the pool's top NIGHT_LEGS legs, or null when fewer qualify. */
@@ -164,6 +169,7 @@ export type ParlayOutcome = { status: "open" } | { status: "won" | "lost" | "voi
 
 /** Grade at 1u. results: each game's AttdResult once graded. A miss settles it at once; a win waits for every leg. */
 export function gradeParlay(p: AttdParlay, results: { [slug: string]: AttdResult | undefined }): ParlayOutcome {
+  if (p.voided) return { status: "void", net: 0 };
   let dec = 1;
   let open = false;
   let live = 0;

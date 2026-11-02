@@ -61,7 +61,7 @@ describe("ATTD parlay of the day", () => {
   });
 
   it("night ticket: 2 legs, same game allowed, blend and ours above break-even, no 5-point bar", () => {
-    const g = game("chi_sea", [row("a", 0.55, 100), row("b", 0.5, 120), row("c", 0.4, 100), row("d", 0.6, 100), row("e", 0.46, 120)]);
+    const g = game("chi_sea", [row("a", 0.55, 100), { ...row("b", 0.5, 120), team: "CHI" }, row("c", 0.4, 100), row("d", 0.6, 100), row("e", 0.46, 120)]);
     // a blend .53 gap .03; b blend .48 gap .025; c ours under .5; d not Venom; e ours .46 > .455 but blend .45 under
     const venom = new Map([["a", 0.51], ["b", 0.46], ["c", 0.7], ["e", 0.44]]);
     const pool = pickNightLegs([g], venom);
@@ -71,5 +71,13 @@ describe("ATTD parlay of the day", () => {
     expect(p.legs).toHaveLength(2);
     expect(p.price).toBe(340); // 2 x 2.2 = 4.4 decimal
     expect(buildNightParlay(2026, 9, "mnf", pool.slice(0, 1), NOW)).toBeNull();
+    expect(gradeParlay({ ...p, voided: "test" }, { chi_sea: { a: 1, b: 1 } })).toEqual({ status: "void", net: 0 });
+  });
+
+  it("night ticket: one leg per team", () => {
+    const sea = (k: string, a: number, dk: number): AttdRow => ({ ...row(k, a, dk), team: "SEA" });
+    const g = game("chi_sea", [sea("w", 0.5, 350), sea("h", 0.3, 600), row("s", 0.55, 100)]);
+    const pool = pickNightLegs([g], new Map([["w", 0.46], ["h", 0.34], ["s", 0.52]]));
+    expect(pool.map((l) => l.key)).toEqual(["w", "s"]);
   });
 });

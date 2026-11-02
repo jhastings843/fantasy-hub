@@ -125,7 +125,7 @@ async function NightToday({ season, week }: { season: number; week: number | nul
       {cur.length ? (
         cur.map(({ parlay: p, outcome: o }) => (
           <div key={p.slate}>
-            <p className={s.thin}>{`${SLATE_LABEL[p.slate ?? "sun"]} · 2 legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${p.ev >= 0 ? "+" : "−"}${Math.abs(p.ev).toFixed(2)}u per 1u · ${outcomeText(o)}`}</p>
+            <p className={s.thin}>{`${SLATE_LABEL[p.slate ?? "sun"]} · 2 legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${p.ev >= 0 ? "+" : "−"}${Math.abs(p.ev).toFixed(2)}u per 1u · ${outcomeText(o)}${p.voided ? `: ${p.voided}` : ""}`}</p>
             <ParlayLegs p={p} />
           </div>
         ))
