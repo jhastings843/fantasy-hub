@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { american, bestTicket, ticket, buildParlay, gradeParlay, pickLegs, tickets, type ParlayGame, type ParlayLeg } from "./attd-parlay";
+import { american, bestTicket, ticket, buildParlay, buildNightParlay, gradeParlay, pickLegs, pickNightLegs, tickets, type ParlayGame, type ParlayLeg } from "./attd-parlay";
 import type { AttdRow } from "./anytime";
 
 const row = (key: string, anytime: number, dk?: number): AttdRow => ({ id: key, name: key.toUpperCase(), team: "KC", key, m: 0.5, anytime, two: 0.1, dk });
@@ -58,5 +58,18 @@ describe("ATTD parlay of the day", () => {
     expect(gradeParlay(p, { g1: { a: 0 } })).toEqual({ status: "lost", net: -1 });
     expect(gradeParlay(p, { g1: { a: 2 }, g2: { b: null }, g3: { c: 1 } })).toEqual({ status: "won", net: 3 });
     expect(gradeParlay(p, { g1: { a: null }, g2: { b: null }, g3: { c: null } })).toEqual({ status: "void", net: 0 });
+  });
+
+  it("night ticket: 2 legs, same game allowed, blend and ours above break-even, no 5-point bar", () => {
+    const g = game("chi_sea", [row("a", 0.55, 100), row("b", 0.5, 120), row("c", 0.4, 100), row("d", 0.6, 100), row("e", 0.46, 120)]);
+    // a blend .53 gap .03; b blend .48 gap .025; c ours under .5; d not Venom; e ours .46 > .455 but blend .45 under
+    const venom = new Map([["a", 0.51], ["b", 0.46], ["c", 0.7], ["e", 0.44]]);
+    const pool = pickNightLegs([g], venom);
+    expect(pool.map((l) => l.key)).toEqual(["a", "b"]);
+    const p = buildNightParlay(2026, 9, "mnf", pool, NOW)!;
+    expect(p.slate).toBe("mnf");
+    expect(p.legs).toHaveLength(2);
+    expect(p.price).toBe(340); // 2 x 2.2 = 4.4 decimal
+    expect(buildNightParlay(2026, 9, "mnf", pool.slice(0, 1), NOW)).toBeNull();
   });
 });

@@ -9,7 +9,7 @@ import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learni
 import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { loadVenomChances, loadVenomPicks } from "./venom";
-import { PARLAY_LEGS, buildParlay, gradeParlay, pickLegs, tickets, type AttdParlay, type ParlayOutcome, type Ticket } from "./attd-parlay";
+import { NIGHT_LEGS, PARLAY_LEGS, SLATE_LABEL, buildNightParlay, buildParlay, gradeParlay, pickLegs, pickNightLegs, tickets, type AttdParlay, type ParlayOutcome, type ParlaySlate, type Ticket } from "./attd-parlay";
 import { etDate } from "@/lib/props/parse";
 import { push } from "@/lib/notify/pushover";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
@@ -40,6 +40,8 @@ import { live, primeParams } from "@/lib/models/params-store";
 //   ftd:v1:ours:{season}:weeks          set of weeks
 //   attd:v1:parlay:{season}:w{week}     the Sunday ATTD parlay of the day, frozen when built
 //   attd:v1:parlay:{season}:weeks       set of weeks with one
+//   attd:v1:parlay:{season}:w{week}:{tnf|mnf}  the 2-leg TNF / MNF ticket, frozen when built
+//   attd:v1:parlay:{season}:nights      set of "{week}:{slate}" with one
 
 const P = live("nfl-ftd", PARAMS as FtdParams);
 const AP = live("nfl-attd", ATTD_PARAMS as AttdParams);
@@ -235,7 +237,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
 
   if (report.week)
     try {
-      report.parlay = await buildSundayParlay(season, report.week, now);
+      report.parlay = etWeekday(now) === "Sun" ? await buildSundayParlay(season, report.week, now) : await buildNightTicket(season, report.week, now);
     } catch (err) {
       report.problems.push(`ATTD parlay: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -326,6 +328,58 @@ async function buildSundayParlay(season: number, week: number, now: Date): Promi
     urlTitle: "Anytime TD",
   });
   return `built ${p.legs.length} legs at ${am(p.price)}`;
+}
+
+const NIGHT_KEY = (s: number, w: number, slate: ParlaySlate) => `attd:v1:parlay:${s}:w${w}:${slate}`;
+const NIGHTS = (s: number) => `attd:v1:parlay:${s}:nights`;
+
+/**
+ * Thursday and Monday runs (Jack, 2026-11-02): a 2-leg ticket off that night's
+ * games not yet started, from our model, Venom's chance and DK's price
+ * (pickNightLegs). Frozen at the first run with 2 legs, pushed to the phone.
+ */
+async function buildNightTicket(season: number, week: number, now: Date): Promise<string> {
+  const day = etWeekday(now);
+  const slate = day === "Thu" ? "tnf" : day === "Mon" ? "mnf" : null;
+  if (!slate) return "not a ticket day";
+  if (await redis.exists(NIGHT_KEY(season, week, slate))) return `${SLATE_LABEL[slate]} already built`;
+  const venom = await loadVenomChances(season, week);
+  if (!venom.size) return `no Venom board for week ${week}`;
+  const today = etDate(now);
+  const games = Object.entries(await loadWeek(season, week))
+    .filter(([, g]) => g.attd && g.kickoff && etDate(new Date(g.kickoff)) === today && new Date(g.kickoff) > now)
+    .map(([slug, g]) => ({ slug, game: `${g.game.away} at ${g.game.home}`, kickoff: g.kickoff, rows: g.attd!.rows }));
+  if (!games.length) return `no ${SLATE_LABEL[slate]} game still to start with prices`;
+  const pool = pickNightLegs(games, venom);
+  const p = buildNightParlay(season, week, slate, pool, now);
+  if (!p) return `${SLATE_LABEL[slate]}: ${pool.length} leg${pool.length === 1 ? "" : "s"} qualify, need ${NIGHT_LEGS}`;
+  if ((await redis.set(NIGHT_KEY(season, week, slate), p, { nx: true })) !== "OK") return `${SLATE_LABEL[slate]} already built`;
+  await redis.sadd(NIGHTS(season), `${week}:${slate}`);
+  const am = (x: number) => (x > 0 ? `+${x}` : `${x}`);
+  await push({
+    title: `${SLATE_LABEL[slate]} ATTD 2-leg ${am(p.price)}`,
+    message: `${p.legs.map((l) => `${l.name} ${l.team} ${am(l.price)}`).join("\n")}\nOur blended chance ${(p.chance * 100).toFixed(1)}%, EV ${p.ev >= 0 ? "+" : ""}${p.ev.toFixed(2)}u per 1u.`,
+    url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app"}/props?m=attd`,
+    urlTitle: "Anytime TD",
+  });
+  return `${SLATE_LABEL[slate]} built at ${am(p.price)}`;
+}
+
+/** Every saved TNF / MNF ticket with its grade, newest first. */
+export async function loadNightParlays(season: number): Promise<{ parlay: AttdParlay; outcome: ParlayOutcome }[]> {
+  const ids = ((await redis.smembers(NIGHTS(season)).catch(() => [])) ?? []).map((x) => {
+    const [w, slate] = String(x).split(":");
+    return { week: Number(w), slate: slate as ParlaySlate };
+  });
+  const out = await Promise.all(
+    ids.map(async ({ week, slate }) => {
+      const [parlay, games] = await Promise.all([redis.get<AttdParlay>(NIGHT_KEY(season, week, slate)), loadWeek(season, week)]);
+      if (!parlay) return null;
+      const results = Object.fromEntries(Object.entries(games).map(([slug, g]) => [slug, g.attdResult]));
+      return { parlay, outcome: gradeParlay(parlay, results) };
+    }),
+  );
+  return out.filter((x) => x !== null).sort((a, b) => b.parlay.week - a.parlay.week || (a.parlay.slate === "mnf" ? -1 : 1));
 }
 
 /**

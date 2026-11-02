@@ -196,6 +196,23 @@ function davidRow(entries: { id: string; label: string; status: string; ev?: { g
 }
 
 /**
+ * Venom Analytics on Anytime TD (Jack, 2026-11-02): an input, tracked and collecting at once.
+ * Input: his chance is half of every parlay leg's blend. Tracking: his top 5 per game are saved each week.
+ * Collecting: the learner's attd:venom / attd:novenom slices judge our edges with and without him.
+ */
+function venomRow(entries: { id: string; label: string; status: string; ev?: { games?: number } }[], need: number): ModelRow {
+  const mine = entries.filter((e) => e.id === "attd:venom" || e.id === "attd:novenom");
+  const live = mine.filter((e) => e.status === "active");
+  const games = mine.reduce((a, e) => Math.max(a, e.ev?.games ?? 0), 0);
+  return {
+    name: "Venom Analytics",
+    role: "Tracking · collecting · input: his top 5 anytime picks per game, each with his chance",
+    status: live.length ? "active" : "input",
+    note: `Input: his chance is half of every parlay leg's blend (Sunday, TNF and MNF tickets) and shows under our number on every player. Tracking: his picks are read each week and saved before kickoff. Collecting: ${live.length ? `live slices: ${live.map((e) => e.label).join(", ")}.` : `our edges he also picks, and ones he doesn't, are judged as learner slices (${games} game${games === 1 ? "" : "s"} graded; ${need}+ and a clear edge to go live). Nothing staked on him alone.`}`,
+  };
+}
+
+/**
  * Who decides a Props market: our own model only (Sam is never part of Props).
  * "Sets real stakes" only when a learner slice is live; otherwise its edges are tracked.
  */
@@ -228,6 +245,7 @@ export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" |
                 ? `${live.length} slice${live.length === 1 ? " is" : "s are"} live: ${live.map((e) => e.label).join(", ")}. ${prices}`
                 : `Edges are tracked only: no slice has cleared its gate (${gateText(best, learning.gate.minGames)}). ${prices}`,
           },
+          ...(tab === "attd" ? [venomRow(learning?.entries ?? [], learning?.gate.minGames ?? 30)] : []),
         ]}
       />
     );

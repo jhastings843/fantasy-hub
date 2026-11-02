@@ -25,6 +25,18 @@ import { implied, payout } from "@/lib/props/parse";
 
 export const PARLAY_LEGS = { min: 2, max: 6 };
 
+/**
+ * Which slate a ticket covers. Sunday is the parlay of the day above; TNF and
+ * MNF (Jack, 2026-11-02) each get their own 2-leg ticket off that night's
+ * game(s), tracked apart. A night slate is usually one game, so its legs can
+ * share a game, and the bar is lower: both our chance and the blend must beat
+ * DK's break-even, with no 5-point margin (one game rarely has two 5-point legs).
+ * Priced as two singles multiplied; DK's same-game price can differ.
+ */
+export type ParlaySlate = "sun" | "tnf" | "mnf";
+export const NIGHT_LEGS = 2;
+export const SLATE_LABEL: { [k in ParlaySlate]: string } = { sun: "Sunday", tnf: "TNF", mnf: "MNF" };
+
 export interface ParlayLeg {
   slug: string;
   game: string;
@@ -55,6 +67,8 @@ export interface AttdParlay {
   ev: number;
   /** Every qualifying leg, best first; legs is its top slice. Missing on tickets built before Nov 1, 2026 pm. */
   pool?: ParlayLeg[];
+  /** Missing on Sunday tickets built before Nov 2, 2026: those are "sun". */
+  slate?: ParlaySlate;
 }
 
 /** One ticket's numbers. growth: the Kelly growth rate at our chances (0 when no edge). */
@@ -94,6 +108,28 @@ export function pickLegs(games: ParlayGame[], venom: Map<string, number>): Parla
     if (top) best.push(top);
   }
   return best.sort((a, b) => b.gap - a.gap).slice(0, PARLAY_LEGS.max);
+}
+
+/** A night (TNF/MNF) pool: every Venom pick our model and the blend both put above DK's break-even, best blended gap first, any game. */
+export function pickNightLegs(games: ParlayGame[], venom: Map<string, number>): ParlayLeg[] {
+  const out: ParlayLeg[] = [];
+  for (const g of games)
+    for (const r of g.rows) {
+      const v = venom.get(r.key);
+      if (r.dk === undefined || v === undefined) continue;
+      const be = implied(r.dk);
+      const chance = (r.anytime + v) / 2;
+      if (!(r.anytime > be) || !(chance > be)) continue;
+      out.push({ slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(chance), gap: r3(chance - be) });
+    }
+  return out.sort((a, b) => b.gap - a.gap);
+}
+
+/** The night ticket: the pool's top NIGHT_LEGS legs, or null when fewer qualify. */
+export function buildNightParlay(season: number, week: number, slate: "tnf" | "mnf", pool: ParlayLeg[], now: Date): AttdParlay | null {
+  if (pool.length < NIGHT_LEGS) return null;
+  const t = ticket(pool.slice(0, NIGHT_LEGS));
+  return { season, week, builtAt: now.toISOString(), legs: t.legs, price: t.price, chance: t.chance, ev: t.ev, pool: t.legs, slate };
 }
 
 /** A ticket from these legs. */

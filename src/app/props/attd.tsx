@@ -2,8 +2,9 @@
 // Anytime and 2+ TD prices. Same layout as the other Props boards (week.tsx):
 // tracked edges, every game, graded games, the four numbers and the gate.
 // Paper only: edges are graded flat 1u until a learner slice clears its gate.
-import { getOurFtdView, attdGraded, getAttdLearning, loadAttdParlays } from "@/lib/models/nfl/ftd-store";
-import { PARLAY_LEGS, tickets, type AttdParlay, type ParlayOutcome } from "@/lib/models/nfl/attd-parlay";
+import { getOurFtdView, attdGraded, getAttdLearning, loadAttdParlays, loadNightParlays } from "@/lib/models/nfl/ftd-store";
+import { loadVenomChances } from "@/lib/models/nfl/venom";
+import { PARLAY_LEGS, SLATE_LABEL, tickets, type AttdParlay, type ParlayOutcome } from "@/lib/models/nfl/attd-parlay";
 import { ParlayPicker } from "./ParlayPicker";
 import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/nfl/anytime";
 import { implied, payout } from "@/lib/props/parse";
@@ -19,6 +20,17 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const TOP = 6;
+/** A chance as fair American odds (no vig): 0.42 -> +138, 0.6 -> -150. */
+export const fair = (p: number) => (p <= 0 || p >= 1 ? "·" : p >= 0.5 ? `${-Math.round((100 * p) / (1 - p))}` : `+${Math.round((100 * (1 - p)) / p)}`);
+/** Venom's line under one of our numbers: his chance and its fair odds, or "not in his top 5". */
+function VenomUnder({ p }: { p: number | undefined }) {
+  return (
+    <>
+      <br />
+      <span className={s.dim}>{p === undefined ? "Venom: not picked" : `Venom ${pct(p)} · ${fair(p)}`}</span>
+    </>
+  );
+}
 const nowMs = () => Date.now();
 
 function Explainer() {
@@ -65,7 +77,11 @@ function ParlayLegs({ p }: { p: AttdParlay }) {
               </td>
               <td className={s.num}>{am(l.price)}</td>
               <td className={s.num}>{pct(l.ours)}</td>
-              <td className={s.num}>{pct(l.venom)}</td>
+              <td className={s.num}>
+                {pct(l.venom)}
+                <br />
+                <span className={s.dim}>{fair(l.venom)}</span>
+              </td>
               <td className={s.num}>{`${pct(l.chance)} / ${pct(implied(l.price))}`}</td>
             </tr>
           ))}
@@ -92,6 +108,63 @@ async function ParlayToday({ season, week }: { season: number; week: number | nu
       ) : (
         <p className={s.calm}>No ticket yet this week. It is built Sunday morning from that day&apos;s games once DraftKings has prices; if fewer than {PARLAY_LEGS.min} games have a leg both sides agree on, there is none that Sunday.</p>
       )}
+    </div>
+  );
+}
+
+type SavedNight = Awaited<ReturnType<typeof loadNightParlays>>[number];
+const outcomeText = (o: ParlayOutcome) => (o.status === "open" ? "tracked" : o.status === "won" ? `Won ${u(o.net)}` : o.status === "lost" ? `Lost ${u(o.net)}` : "Void");
+
+/** Board: this week's TNF and MNF 2-leg tickets (Jack, 2026-11-02), tracked apart from Sunday's. */
+async function NightToday({ season, week }: { season: number; week: number | null }) {
+  const all: SavedNight[] = await loadNightParlays(season).catch(() => []);
+  const cur = all.filter((x) => x.parlay.week === week);
+  return (
+    <div className={s.pageFrame}>
+      <SecHead title="TNF and MNF 2-leg" aside="Thursday and Monday · 2 anytime legs off that night's game where our model, Venom and the blend all beat DK's break-even · same game allowed · paper, 1u, its own record" />
+      {cur.length ? (
+        cur.map(({ parlay: p, outcome: o }) => (
+          <div key={p.slate}>
+            <p className={s.thin}>{`${SLATE_LABEL[p.slate ?? "sun"]} · 2 legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${p.ev >= 0 ? "+" : "−"}${Math.abs(p.ev).toFixed(2)}u per 1u · ${outcomeText(o)}`}</p>
+            <ParlayLegs p={p} />
+          </div>
+        ))
+      ) : (
+        <p className={s.calm}>No night ticket yet this week. Each is built the day of the game (1:30pm ET run, again before kickoff) once DraftKings has anytime prices and Venom&apos;s board is in; under 2 qualifying legs, there is none that night.</p>
+      )}
+      <p className={s.thin}>Priced as two singles multiplied. DraftKings&apos; same-game price for the pair can be lower.</p>
+    </div>
+  );
+}
+
+/** Results: TNF and MNF records, each its own line. */
+async function NightRecord({ season }: { season: number }) {
+  const all: SavedNight[] = await loadNightParlays(season).catch(() => []);
+  const tile = (slate: "tnf" | "mnf") => {
+    const done = all.filter((x) => x.parlay.slate === slate && (x.outcome.status === "won" || x.outcome.status === "lost"));
+    const won = done.filter((x) => x.outcome.status === "won").length;
+    const net = done.reduce((a, x) => a + ("net" in x.outcome ? x.outcome.net : 0), 0);
+    const exp = done.reduce((a, x) => a + x.parlay.chance, 0);
+    return <Tile key={slate} value={done.length ? u(net) : "·"} label={done.length ? `${SLATE_LABEL[slate]} ${won}-${done.length - won} · we expected ${exp.toFixed(2)} hits` : `${SLATE_LABEL[slate]} · first ticket pending`} />;
+  };
+  const rows: GameRowData[] = all.map(({ parlay: p, outcome: o }) => ({
+    key: `night|${p.week}|${p.slate}`,
+    title: `Week ${p.week} ${SLATE_LABEL[p.slate ?? "sun"]}`,
+    when: p.legs[0]?.kickoff,
+    final: o.status !== "open",
+    cells: [
+      ["Price", am(p.price)],
+      ["Legs", `${p.legs.length}`],
+      ["Blend", `${(p.chance * 100).toFixed(1)}%`],
+    ],
+    read: o.status === "open" ? ["Open", s.readTrack] : o.status === "won" ? [`Won ${u(o.net)}`, s.readW] : o.status === "lost" ? [`Lost ${u(o.net)}`, s.readL] : ["Void", s.readPass],
+    body: <ParlayLegs p={p} />,
+  }));
+  return (
+    <div className={s.pageFrame}>
+      <SecHead title="TNF and MNF 2-leg" aside="Since Nov 2, 2026 · 1u a ticket · separate from Sunday's record" />
+      <div className={s.tiles}>{(["tnf", "mnf"] as const).map(tile)}</div>
+      {rows.length > 0 && <GameTable head={["Price", "Legs", "Blend"]} rows={rows} />}
     </div>
   );
 }
@@ -188,7 +261,7 @@ function edgeResult(r: AttdRow, t: number | null | undefined) {
 }
 
 /** Finished games, newest first: each game's anytime edges as a W-L record at 1u. */
-function gradedRowsOf(graded: Awaited<ReturnType<typeof attdGraded>>): GameRowData[] {
+function gradedRowsOf(graded: Awaited<ReturnType<typeof attdGraded>>, venom: Map<number, Map<string, number>>): GameRowData[] {
   return [...graded]
     .sort((a, b) => b.at.localeCompare(a.at))
     .map((g) => {
@@ -210,13 +283,14 @@ function gradedRowsOf(graded: Awaited<ReturnType<typeof attdGraded>>): GameRowDa
           ["Scored", `${scorers} of ${g.rows.length}`],
         ],
         read: !bets.length ? ["No edges", s.readPass] : [`${record} · ${u(units)}`, units > 0 ? s.readW : units < 0 ? s.readL : s.readPass],
-        body: <PlayerTable rows={g.rows} result={g.result} />,
+        body: <PlayerTable rows={g.rows} result={g.result} venom={venom.get(g.week)} />,
       };
     });
 }
 
 /** Every player on a board, ours against DK, as the game row's body. */
-function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: string]: number | null } }) {
+function PlayerTable({ rows, result, venom }: { rows: AttdRow[]; result?: { [key: string]: number | null }; venom?: Map<string, number> }) {
+  const v = venom?.size ? venom : null;
   return (
     <div className={s.tw}>
       <table className={s.table}>
@@ -242,7 +316,10 @@ function PlayerTable({ rows, result }: { rows: AttdRow[]; result?: { [key: strin
                   <span className={s.dim}>{r.team}</span>
                   {e.length > 0 && <b className={s.pos}>{` · edge ${e.map((x) => `${x.side === "two" ? "2+" : "ATTD"} +${Math.round(x.gap * 100)}`).join(", ")}`}</b>}
                 </td>
-                <td className={s.num}>{pct(r.anytime)}</td>
+                <td className={s.num}>
+                  {`${pct(r.anytime)} · ${fair(r.anytime)}`}
+                  {v && <VenomUnder p={v.get(r.key)} />}
+                </td>
                 <td className={s.num}>{r.dk !== undefined ? am(r.dk) : "·"}</td>
                 <td className={s.num}>{r.dk !== undefined ? pct(implied(r.dk)) : "·"}</td>
                 <td className={s.num}>{`${pct(r.two)} / ${r.dk2 !== undefined ? am(r.dk2) : "·"}`}</td>
@@ -267,6 +344,7 @@ export async function AttdWeek({ season }: { season: number }) {
   const [v, graded, learning] = await Promise.all([getOurFtdView(season).catch(() => null), attdGraded(season).catch(() => []), getAttdLearning(season).catch(() => null)]);
   if (!v || !learning) return <p className={s.calm}>The Anytime TD board couldn&apos;t be read just now.</p>;
   const now = nowMs();
+  const venom = v.week ? await loadVenomChances(season, v.week).catch(() => new Map<string, number>()) : new Map<string, number>();
   const open = v.board.filter((g) => g.attd && !g.attdResult).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
   const ahead = open.filter((g) => !g.kickoff || Date.parse(g.kickoff) > now);
   const edges: Edge[] = ahead
@@ -288,6 +366,7 @@ export async function AttdWeek({ season }: { season: number }) {
             more: [
               ["Expected TDs", r.m.toFixed(2)],
               ["Anytime ours / DK", `${pct(r.anytime)} / ${r.dk !== undefined ? am(r.dk) : "·"}`],
+              ["Venom", venom.size ? (venom.has(r.key) ? `${pct(venom.get(r.key)!)} · ${fair(venom.get(r.key)!)}` : "not picked") : "no board yet"],
               ["2+ ours / DK", `${pct(r.two)} / ${r.dk2 !== undefined ? am(r.dk2) : "·"}`],
             ],
           }),
@@ -314,13 +393,14 @@ export async function AttdWeek({ season }: { season: number }) {
         ["Edges", priced(g.attd!.rows) ? `${e.length}` : "no prices"],
       ],
       read: e.length ? [`${e.length} edge${e.length === 1 ? "" : "s"}`, s.readTrack] : ["No edge", s.readPass],
-      body: <PlayerTable rows={g.attd!.rows} />,
+      body: <PlayerTable rows={g.attd!.rows} venom={venom} />,
     };
   });
   const anytime = summarizeAttd(graded).edges.bySide.anytime;
   return (
     <section className={s.section} aria-labelledby="attd-week">
       <ParlayToday season={season} week={v.week} />
+      <NightToday season={season} week={v.week} />
       <div className={s.pageFrame}>
         <SecHead id="attd-week" title="Tracked edges" aside={live.length ? `Bets live: ${live.join("; ")} · the rest tracked` : `Our chance beats DK's break-even by ${Math.round(ATTD_EDGE * 100)}+ points · no stakes`} />
         {edges.length > 0 ? (
@@ -350,6 +430,7 @@ export async function AttdWeek({ season }: { season: number }) {
 export async function AttdResults({ season }: { season: number }) {
   const graded = await attdGraded(season).catch(() => null);
   if (!graded) return <p className={s.calm}>Anytime TD results couldn&apos;t be read just now.</p>;
+  const venomWeeks = new Map(await Promise.all([...new Set(graded.map((g) => g.week))].map(async (w) => [w, await loadVenomChances(season, w).catch(() => new Map<string, number>())] as const)));
   const sum = summarizeAttd(graded);
   const p = sum.priced;
   const e = sum.edges;
@@ -365,10 +446,11 @@ export async function AttdResults({ season }: { season: number }) {
         </div>
       </div>
       <ParlayRecord season={season} />
+      <NightRecord season={season} />
       {graded.length > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Game by game" aside="Newest first · each anytime edge 1u at DK's price · open a game for every player" />
-          <GameTable head={["Edges W-L", "Units", "Scored"]} rows={gradedRowsOf(graded)} />
+          <GameTable head={["Edges W-L", "Units", "Scored"]} rows={gradedRowsOf(graded, venomWeeks)} />
         </div>
       )}
       {p.n > 0 && (

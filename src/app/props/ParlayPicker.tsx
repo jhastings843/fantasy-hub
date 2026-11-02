@@ -8,6 +8,7 @@ import s from "../picks/picks.module.css";
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const be = (p: number) => (p > 0 ? 100 / (p + 100) : -p / (-p + 100));
+const fair = (p: number) => (p <= 0 || p >= 1 ? "·" : p >= 0.5 ? `${-Math.round((100 * p) / (1 - p))}` : `+${Math.round((100 * (1 - p)) / p)}`);
 const ev = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}u`;
 
 export function ParlayPicker({ tickets, tracked, status }: { tickets: Ticket[]; tracked: number; status?: string }) {
@@ -50,7 +51,11 @@ export function ParlayPicker({ tickets, tracked, status }: { tickets: Ticket[]; 
                 </td>
                 <td className={s.num}>{am(l.price)}</td>
                 <td className={s.num}>{pct(l.ours)}</td>
-                <td className={s.num}>{pct(l.venom)}</td>
+                <td className={s.num}>
+                  {pct(l.venom)}
+                  <br />
+                  <span className={s.dim}>{fair(l.venom)}</span>
+                </td>
                 <td className={s.num}>{`${pct(l.chance)} / ${pct(be(l.price))}`}</td>
               </tr>
             ))}
