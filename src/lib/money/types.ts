@@ -86,7 +86,7 @@ export interface PhilBet {
   slug: string | null;
   /** Missing before 2026-10-19 (Polymarket then). */
   venue?: "polymarket" | "kalshi";
-  /** Kalshi Phil only: market ticker, series, fee paid, whole contracts. */
+  /** Gus only: market ticker, series, fee paid, whole contracts. */
   ticker?: string | null;
   series?: string | null;
   fee?: number | null;
@@ -194,8 +194,10 @@ export interface MoneySnapshot {
   phil: Phil | null;
   /** Missing from snapshots posted before 2026-10-16. */
   kalshi?: Kalshi | null;
-  /** Kalshi Phil: a separate agent trading Kalshi on paper, same shape as Phil.
+  /** Gus: a separate agent trading Kalshi on paper, same shape as Phil.
    *  Never added to Phil's numbers. Missing before 2026-10-19. */
+  gus?: Phil | null;
+  /** Gus's key before the 2026-11-02 rename. Read only, through store.ts. */
   kalshiPhil?: Phil | null;
   /** The stock books' learn log, newest first. Missing before 2026-10-17. */
   learnLog?: LearnEntry[] | null;

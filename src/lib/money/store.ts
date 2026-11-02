@@ -117,15 +117,22 @@ export interface MoneyView {
   sports: SportsView | null;
 }
 
+/** Snapshots posted before the 2026-11-02 rename carry Gus as `kalshiPhil`. */
+function withGus(s: MoneySnapshot | null): MoneySnapshot | null {
+  if (!s || s.gus !== undefined || s.kalshiPhil === undefined) return s;
+  return { ...s, gus: s.kalshiPhil };
+}
+
 export async function getMoneyView(): Promise<MoneyView> {
   // Local checks only: MONEY_SNAPSHOT_FILE points at a snapshot JSON and the page
   // renders from it with no Redis reads or writes. Ignored in production.
   const file = process.env.NODE_ENV !== "production" ? process.env.MONEY_SNAPSHOT_FILE : undefined;
   if (file) {
-    const snapshot = JSON.parse(await readFile(file, "utf8")) as MoneySnapshot;
+    const snapshot = withGus(JSON.parse(await readFile(file, "utf8")) as MoneySnapshot);
     return { snapshot, bets: [], summary: summarize([]), problems: [], sports: null };
   }
-  const [snapshot, raw, sports] = await Promise.all([getSnapshot(), getBets(), getSportsView().catch(() => null)]);
+  const [posted, raw, sports] = await Promise.all([getSnapshot(), getBets(), getSportsView().catch(() => null)]);
+  const snapshot = withGus(posted);
   const { bets, problems } = await gradePending(raw);
   return { snapshot, bets, summary: summarize(bets), problems, sports };
 }

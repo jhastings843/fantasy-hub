@@ -67,7 +67,7 @@
     "2026-10-19: Whole site restyled to the Picks ledger look, dark always (src/app/ledger-look.css remaps Tailwind zinc/amber/emerald/rose + fonts; .dark class on <html>). Backup: git tag pre-ledger-look; undo = git revert 1ca630b.",
     "2026-10-19: Money > Phil: pilot tracks replaced by a learner log of Phil's retros (lessons, playbook changes, notes).",
     "2026-10-19: Added NBA section to Picks (/picks/nba): DraftKings slate from ESPN + Sam's NBA line when his board is live; unstaked, untracked for now.",
-    "2026-10-19: Money > Kalshi tab shows Kalshi Phil (same ledger view as Phil) above Phil's shadow check; Overview gets a Kalshi Phil tile and panel (72de2b3).",
+    "2026-10-19: Money > Kalshi tab shows Gus (same ledger view as Phil) above Phil's shadow check; Overview gets a Gus tile and panel (72de2b3).",
     "2026-10-19: Money > Books shows a live point and tag during market hours and a Latest grades panel; deployed.",
     "2026-10-18: Phil settled bets on the Money tab now collapse (closed by default, bet count in header).",
     "2026-10-18: First TD week view leads with the slate's most likely first TD scorers ranked by Sam's chance (Kalshi cost and value kept beside it); Research adds Kalshi bet slices by probability tier (top 2 per game, 12%+, 8-12%, 4-8%, under 4%, 8%+ with value).",

@@ -176,7 +176,7 @@ export function desks(v: View): Desk[] {
       href: "/money?v=intraday",
     });
   }
-  if (snap?.kalshiPhil && !snap.kalshiPhil.error) out.push(philDesk(snap.kalshiPhil, "kalshi", "Kalshi Phil", "Claude agent, Kalshi", "/money?v=kalshi"));
+  if (snap?.gus && !snap.gus.error) out.push(philDesk(snap.gus, "kalshi", "Gus", "Claude agent, Kalshi", "/money?v=kalshi"));
   if (sp) {
     const e = sp.props.reduce((a, x) => ({ u: a.u + x.edges, n: a.n + x.edgeBets }), { u: 0, n: 0 });
     out.push({
@@ -289,7 +289,7 @@ export function moneyLog(v: View): LogEntry[] {
   if (w) out.push({ at: w.generatedAt, kind: "test", title: `Weather desk trusts its own forecast ${Math.round(w.trust.w * 100)}%`, detail: `Blended with the market for the rest, re-fit from ${w.trust.days} settled days.` });
   for (const [p, who] of [
     [snap?.phil, "Phil"],
-    [snap?.kalshiPhil, "Kalshi Phil"],
+    [snap?.gus, "Gus"],
   ] as const) {
     for (const r of (p?.learner ?? []).slice(0, 3)) if (r.ts) out.push({ at: r.ts, kind: r.changes.length ? "new" : "test", title: `${who}: ${r.headline}`, detail: [...r.changes, ...r.lessons].slice(0, 2).join(" ") || undefined });
   }
