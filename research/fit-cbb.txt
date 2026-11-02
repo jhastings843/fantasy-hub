@@ -1,0 +1,48 @@
+finals: 18835 (2023-24 6243, 2024-25 6292, 2025-26 6300)
+torvik 2025: 6293 games, 6139 matched to ESPN; 90 Torvik names unmatched (mostly non-D1): N.M. Highlands, Southern-N.O., Columbia Int'l, Mississippi Col., Concordia-M'head, Trinity Baptist, Cleary, Colorado Col., Biblical Stud. (TX), La. Christian, New College (FL), Northwest (WA), Champion Chris., Cheyney, Washington Col., Western Colo., N.C. Wesleyan, North Central (MN), Mid-Atlantic Christ., Mid-Amer. Christian, VTSU Lyndon, Park (AZ), Old Westbury, Me.-Fort Kent, TAMU-San Antonio, Ky. Christian, Texas-Dallas, MUW, UHSP, Bethesda (CA), Miami Hamilton, Southwestern, Fredonia, Southwestern Texas, Concordia (MI), SUNY Poly, Bluefield Univ., Pratt, Mt. Marty, VTSU-Johnson
+torvik 2026: 6300 games, 6142 matched to ESPN; 95 Torvik names unmatched (mostly non-D1): Blue Mountain (MS), Western New Eng., Okla. Christian, Ky. Christian, VTSU-Johnson, TAMU-San Antonio, UC Clermont, Biblical Stud. (TX), N.M. Highlands, JWU Charlotte, Champion Chris., Non-DI, Thomas (ME), Colorado Col., Union Commonwealth, New College (FL), Southern Ark., Bethesda (CA), St. Joseph's (Brkln), Missouri Southern, East-West U., Dominican, Park (AZ), Southern Va., Bluefield Univ., Plattsburgh St., Wash. & Lee, MUW, CarolinaU, Mid-Atlantic Christ., IIT, UHSP, Calumet Col., Justice U., West Va. Wesleyan, Mt. St. Mary (NY), Lane, Northwestern Okla., Penn St.-New Kens., Cheyney
+pass 1: {"hfa":5.5,"hfaTotal":4,"k0":0.7,"kMin":0.06,"halfGames":6,"cap":80,"carry":1,"avg0":72} loss 328.304
+pass 2: {"hfa":4,"hfaTotal":2,"k0":0.7,"kMin":0.06,"halfGames":6,"cap":80,"carry":1,"avg0":72} loss 326.504
+pass 3: {"hfa":4,"hfaTotal":2,"k0":0.7,"kMin":0.06,"halfGames":6,"cap":80,"carry":1,"avg0":72} loss 326.504
+2024-25 (fit): our margin RMSE 13.4, total RMSE 17.14
+2025-26: 6300 finals, 6142 with T-Rank's line; blend fit on 3279 before 2026-01-15, judged on 2863 after
+blend: margin 0.25 ours / 0.75 T-Rank; total 0.55 ours / 0.45 T-Rank, bias 1.03
+judged margin RMSE: ours 11.42, T-Rank 11.32, blend 11.31 (priced 11.26) vs closing line 11.04
+judged total RMSE: ours 17.27, T-Rank 17.34, blend 17.22 (priced 17.23) vs closing total 16.74
+straight up: 1970/2863 (0.688) winners, Brier 0.199
+  favorite 0.5-0.6: 882 games, said 0.55, won 0.56
+  favorite 0.6-0.7: 785 games, said 0.651, won 0.625
+  favorite 0.7-0.8: 623 games, said 0.746, won 0.762
+  favorite 0.8-0.9: 396 games, said 0.843, won 0.869
+  favorite 0.9-1: 177 games, said 0.937, won 0.938
+spread at the open, blend's side:
+  edge 0-1: 591-542-0 (0.522), -4.73u, t 1.46, line moved our way 0.09 pts (t 2.12)
+  edge 1-2: 385-417-0 (0.48), -67u, t -1.13, line moved our way 0.06 pts (t 1.15)
+  edge 2-3: 243-251-0 (0.492), -30.09u, t -0.36, line moved our way 0.1 pts (t 1.69)
+  edge 3-5: 191-177-0 (0.519), -3.36u, t 0.73, line moved our way 0.14 pts (t 1.87)
+  edge 5-up: 37-24-0 (0.607), 9.64u, t 1.66, line moved our way 1.23 pts (t 2.03)
+  edge 0-up: 1447-1411-0 (0.506), -95.55u, t 0.67, line moved our way 0.11 pts (t 3.89)
+spread at the close, blend's side:
+  edge 0-1: 477-445-0 (0.517), -11.36u, t 1.05
+  edge 1-2: 372-387-0 (0.49), -48.82u, t -0.54
+  edge 2-3: 280-286-0 (0.495), -31.45u, t -0.25
+  edge 3-5: 258-234-0 (0.524), 0.55u, t 1.08
+  edge 5-up: 65-54-0 (0.546), 5.09u, t 1.01
+  edge 0-up: 1452-1406-0 (0.508), -86u, t 0.86
+total at the open, blend's side:
+  edge 0-1: 349-394-0 (0.47), -76.73u, t -1.65, line moved our way -0.05 pts (t -0.52)
+  edge 1-2: 327-348-0 (0.484), -50.73u, t -0.81, line moved our way -0.16 pts (t -1.72)
+  edge 2-3: 247-250-0 (0.497), -25.45u, t -0.13, line moved our way -0.11 pts (t -0.93)
+  edge 3-5: 311-313-0 (0.498), -30.27u, t -0.08, line moved our way 0.12 pts (t 1.28)
+  edge 5-up: 152-167-0 (0.476), -28.82u, t -0.84, line moved our way -0.15 pts (t -1)
+  edge 0-up: 1386-1472-0 (0.485), -212u, t -1.61, line moved our way -0.06 pts (t -1.31)
+total at the close, blend's side:
+  edge 0-1: 275-285-0 (0.491), -35u, t -0.42
+  edge 1-2: 262-262-0 (0.5), -23.82u, t 0
+  edge 2-3: 232-253-0 (0.478), -42.09u, t -0.95
+  edge 3-5: 335-344-0 (0.493), -39.45u, t -0.35
+  edge 5-up: 302-308-0 (0.495), -33.45u, t -0.24
+  edge 0-up: 1406-1452-0 (0.492), -173.82u, t -0.86
+2025-26 our margin RMSE, a side under 5 games: 13.9 (close 11.42), later 11.87 (close 11.24)
+raw average home margin (non-neutral, 2024-26): 9.03
+sigma 12.85, sigmaTotal 17.91, strong spread lean 2.94, strong total lean 5.08

@@ -722,6 +722,9 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
       <Link className={s.chip} href={nbaHref(m, view)} aria-current="page">
         NBA
       </Link>
+      <Link className={s.chip} href="/picks/cbb">
+        College hoops
+      </Link>
     </nav>
   );
   const all = v?.cuts.find((c) => c.id === `${m}:all`);

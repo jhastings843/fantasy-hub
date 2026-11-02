@@ -45,6 +45,9 @@ export default async function PicksView({ league, market: asked, view }: { leagu
       <Link className={s.chip} href="/picks/nba">
         NBA
       </Link>
+      <Link className={s.chip} href="/picks/cbb">
+        College hoops
+      </Link>
     </nav>
   );
   const [review, active] = await Promise.all([redisStore.state().catch(() => null), redisStore.active().catch(() => null)]);

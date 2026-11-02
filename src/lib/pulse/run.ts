@@ -1,5 +1,6 @@
 import "server-only";
 import { runNbaNews } from "@/lib/models/nba/news-store";
+import { runCbb } from "@/lib/models/cbb/store";
 import { recheckSam } from "@/lib/picks/nba-track-store";
 import { runSplitsAlerts } from "@/lib/picks/splits-alert";
 import { runPoolWatch } from "@/lib/picks/pool-watch";
@@ -530,7 +531,8 @@ export async function runPulse(
   // Sam's NBA reads ride along the same way: a cheap check most runs, a save only when one of today's games lacks his line.
   // The splits skip alert too: one policy read most runs; it only fetches splits when a live signal has a sent bet near kickoff.
   // The pick'em watch too: a push when the entry's pick flips on a game still to play.
-  const [jobs, news, sam, skips, pool] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now)), job("splits-skip", () => runSplitsAlerts(now)), job("pool-watch", () => runPoolWatch(now))]);
+  // College hoops too: our number saved for games within 36 hours of tip and finals graded, at most every 30 minutes (its own claim).
+  const [jobs, news, sam, skips, pool, cbb] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now)), job("splits-skip", () => runSplitsAlerts(now)), job("pool-watch", () => runPoolWatch(now)), job("cbb", () => runCbb(now))]);
 
   for (const id of tempo.dueJobs) {
     let left = DEADLINE_MS - (Date.now() - started);
@@ -570,7 +572,7 @@ export async function runPulse(
   // the difference between advice that is stale for fifteen minutes and
   // advice that is stale until lunch.
   if (claimed && jobs.every((j) => j.ok)) await recordTierRun(tier);
-  jobs.push(news, sam, skips, pool);
+  jobs.push(news, sam, skips, pool, cbb);
 
   const receipt: PulseReceipt = {
     at: new Date().toISOString(),

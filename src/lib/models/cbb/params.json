@@ -1,0 +1,30 @@
+{
+  "rating": {
+    "hfa": 4,
+    "hfaTotal": 2,
+    "k0": 0.7,
+    "kMin": 0.06,
+    "halfGames": 6,
+    "cap": 80,
+    "carry": 1,
+    "avg0": 72
+  },
+  "blend": {
+    "margin": {
+      "ours": 0.25,
+      "trank": 0.75
+    },
+    "total": {
+      "ours": 0.55,
+      "trank": 0.45,
+      "b": 1.03
+    }
+  },
+  "trank": {
+    "hfa": 4
+  },
+  "sigma": 12.85,
+  "sigmaTotal": 17.91,
+  "strong": 2.94,
+  "strongTotal": 5.08
+}

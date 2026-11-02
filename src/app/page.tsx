@@ -44,7 +44,7 @@ const OTHER_TOOLS = [
   {
     href: "/picks",
     title: "Model picks",
-    blurb: "Where two NFL and college models agree against the spread, plus straight-up winners.",
+    blurb: "Where two NFL and college models agree against the spread, plus NBA, college hoops and a March Madness bracket lab.",
     icon: Target,
   },
   {
