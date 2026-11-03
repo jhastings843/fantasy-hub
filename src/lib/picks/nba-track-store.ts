@@ -117,6 +117,8 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
     const hyps = await loadHyps(season);
     const rule = nbaRule(rows, "ats", hyps.filter((h) => h.status === "active").map((h) => h.id));
     const live = nbaGate(rule).live;
+    // Tier 2 stakes only once it passes the same checks on its own record, not on tier 1's (audit 2026-11-02).
+    const t2live = !!rule.tier2 && nbaGate({ ...rule, tier1: rule.tier2 }).live;
     // One push when the go-live gate flips on or off (remembered per season).
     await notifyNbaGate(season, live, rule.tier1);
     const open = all.filter((g) => new Date(g.tip) > now);
@@ -126,7 +128,7 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
         const b = nbaBets(g).find((x) => x.market === "ats");
         const tier = b ? tierOf(b, rule) : null;
         const rec = tier === 1 ? rule.tier1 : tier === 2 ? rule.tier2 : null;
-        const stake = live && b && rec ? nbaStake(rec, b.price) : null;
+        const stake = live && b && rec && (tier === 1 || t2live) ? nbaStake(rec, b.price) : null;
         return stake ? [{ id: g.id, stake, edge: b!.edge }] : [];
       });
       const room = nbaRoom(all, day, todays.map((g) => g.id));
