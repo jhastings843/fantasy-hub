@@ -268,6 +268,13 @@ export const nbaSeasonOf = (gameId: string): number | null => (/^\d{3}(\d{2})\d{
 export const nbaSeasonOfDate = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
 
 /** Eastern date (YYYY-MM-DD) of an instant. */
+/** "2026-11-01" plus n calendar days (no DST drift). */
+export function shiftDay(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 export function etDate(at: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
 }

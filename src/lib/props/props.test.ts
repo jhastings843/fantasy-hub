@@ -160,3 +160,12 @@ describe("ESPN projections and DraftKings lines", () => {
     expect(t.accuracy[0].espn).toBe(5.6);
   });
 });
+
+import { etDate as etD, shiftDay } from "./parse";
+describe("shiftDay", () => {
+  it("steps Eastern calendar days, even the night DST ends", () => {
+    const now = new Date("2026-11-02T04:30:00Z"); // Nov 1, 11:30pm EST
+    expect([-1, 0, 1].map((i) => shiftDay(etD(now), i))).toEqual(["2026-10-31", "2026-11-01", "2026-11-02"]);
+    expect(shiftDay("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});

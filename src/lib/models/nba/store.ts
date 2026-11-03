@@ -1,7 +1,7 @@
 import "server-only";
 import { isOut } from "@/lib/injuries/status";
 import { redis } from "@/lib/redis/client";
-import { etDate, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
+import { etDate, shiftDay, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "@/lib/props/grade";
 import { davidNbaFor, fetchDavidNba, type DavidNbaSlate } from "@/lib/props/david-nba";
 import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
@@ -95,13 +95,17 @@ export interface SbGame {
 
 export async function scoreboard(now: Date, from: number, to: number): Promise<SbGame[]> {
   const out: SbGame[] = [];
+  const seen = new Set<string>();
   for (let i = from; i <= to; i++) {
-    const d = etDate(new Date(now.getTime() + i * 86_400_000)).replace(/-/g, "");
+    // Step Eastern calendar days, not 24-hour blocks: around a DST change those can land on the same date twice.
+    const d = shiftDay(etDate(now), i).replace(/-/g, "");
     const data = await json<{
       events?: { id: string; date?: string; season?: { type?: number }; status?: { type?: { state?: string; completed?: boolean } }; competitions?: { competitors?: { homeAway?: string; team?: { id?: string; abbreviation?: string } }[] }[] }[];
     }>(`${SITE}/scoreboard?dates=${d}`);
     for (const e of data.events ?? []) {
       if (e.season?.type !== undefined && e.season.type !== 2) continue;
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
       out.push({
         id: e.id,
         tip: e.date,
@@ -187,7 +191,8 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
   const season = nbaSeasonOfDate(now);
   let games: SbGame[] = [];
   try {
-    games = await scoreboard(now, -1, 1);
+    // Two days back: a final ESPN posts late still gets folded in (audit 2026-11-02); already-ingested games are skipped.
+    games = await scoreboard(now, -2, 1);
   } catch (e) {
     report.problems.push(`ESPN NBA scoreboard: ${e instanceof Error ? e.message : String(e)}`);
   }
