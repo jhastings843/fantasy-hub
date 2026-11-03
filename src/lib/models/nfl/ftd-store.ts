@@ -20,6 +20,7 @@ import { morningOddsReads } from "./odds-api-store";
 import PARAMS from "./ftd-params.json";
 import ATTD_PARAMS from "./attd-params.json";
 import type { Books } from "./ftd-price";
+import { boxPlayed, rosterPlayed, type Played } from "./ftd-void";
 import { attdTeam, boxTds, gradeAttd, type AttdGraded, type AttdParams, type AttdResult, type AttdRow } from "./anytime";
 import { readTdScorers, type PropBetRow } from "../lines";
 import type { EspnBoxTeam } from "@/lib/props/grade";
@@ -74,12 +75,30 @@ export interface OurFtdStored {
   /** Our Anytime TD board with DraftKings' prices (from 2026-10-26). */
   attd?: { at: string; rows: AttdRow[] };
   attdResult?: AttdResult;
+  /** Who took the field, per team (ftd-void.ts): read at grading from 2026-11-02, backfilled for games graded before. Absent: every non-winner grades -1, as before. */
+  played?: Played;
 }
 
 async function json<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store", headers: UA, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`${new URL(url).host} answered ${res.status}`);
   return (await res.json()) as T;
+}
+
+const CORE = (ev: string) => `https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/${ev}/competitions/${ev}/competitors`;
+
+/** Who took the field: ESPN's game-day roster (didNotPlay false) plus every box-score name, per team. */
+async function participation(g: OurFtdStored, box: EspnBoxTeam[]): Promise<Played> {
+  const out: Played = {};
+  const add = (team: string, names: string[]) => (out[team] = [...new Set([...(out[team] ?? []), ...names])]);
+  const cs = await json<{ items?: { id?: string; homeAway?: string }[] }>(CORE(g.espnId));
+  for (const c of cs.items ?? []) {
+    if (!c.id || (c.homeAway !== "home" && c.homeAway !== "away")) continue;
+    const r = await json<{ entries?: { displayName?: string; didNotPlay?: boolean }[] }>(`${CORE(g.espnId)}/${c.id}/roster`);
+    add(c.homeAway === "home" ? g.game.home : g.game.away, rosterPlayed(r.entries ?? []));
+  }
+  for (const t of box) if (t.team?.abbreviation) add(samTeam(t.team.abbreviation), boxPlayed(t));
+  return out;
 }
 
 const nflSeasonOf = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 : d.getUTCFullYear());
@@ -228,12 +247,20 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
   const weeks = ((await redis.smembers(FK.weeks(season))) ?? []).map(Number).sort((a, b) => a - b);
   for (const wk of weeks) {
     for (const [slug, g] of Object.entries(await loadWeek(season, wk))) {
-      if ((g.result && (!g.attd || g.attdResult)) || !g.kickoff || new Date(g.kickoff) > now) continue;
+      if ((g.result && (!g.attd || g.attdResult) && g.played) || !g.kickoff || new Date(g.kickoff) > now) continue;
       try {
         const sum = await json<{ header?: { competitions?: { status?: { type?: { completed?: boolean } } }[] }; scoringPlays?: EspnScoringPlay[]; boxscore?: { players?: EspnBoxTeam[] } }>(`${SITE}/summary?event=${g.espnId}`);
         if (!sum.header?.competitions?.[0]?.status?.type?.completed) continue;
         const attdResult = g.attd && sum.boxscore?.players?.length ? gradeAttd(g.attd.rows, boxTds(sum.boxscore.players)) : g.attdResult;
-        await redis.hset(FK.week(season, wk), { [slug]: { ...g, result: g.result ?? grade(g.game, firstTouchdown(sum.scoringPlays ?? [])), ...(attdResult ? { attdResult } : {}), gradedAt: now.toISOString() } });
+        // Participation for voids (ftd-void.ts). A failed read leaves it unset (graded as before) and the next run tries again.
+        let played = g.played;
+        if (!played)
+          try {
+            played = await participation(g, sum.boxscore?.players ?? []);
+          } catch (err) {
+            report.problems.push(`participation ${slug}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        await redis.hset(FK.week(season, wk), { [slug]: { ...g, result: g.result ?? grade(g.game, firstTouchdown(sum.scoringPlays ?? [])), ...(attdResult ? { attdResult } : {}), ...(played ? { played } : {}), gradedAt: now.toISOString() } });
         report.graded.push(slug);
       } catch (err) {
         report.problems.push(`grade ${slug}: ${err instanceof Error ? err.message : String(err)}`);
@@ -269,11 +296,11 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
   return report;
 }
 
-export async function ftdGraded(season: number): Promise<(GradedGame & Books & { slug: string; week: number })[]> {
+export async function ftdGraded(season: number): Promise<(GradedGame & Books & { slug: string; week: number; played?: Played })[]> {
   const nums = ((await redis.smembers(FK.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ slug, week, game: g.game, result: g.result, kalshi: g.kalshi, dk: g.dk, fd: g.fd, kickoff: g.kickoff, capturedAt: g.capturedAt }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ slug, week, game: g.game, result: g.result, kalshi: g.kalshi, dk: g.dk, fd: g.fd, kickoff: g.kickoff, capturedAt: g.capturedAt, played: g.played }] : [])))
     .sort((a, b) => b.week - a.week || a.slug.localeCompare(b.slug));
 }
 
@@ -290,7 +317,7 @@ export interface OurFtdView {
   season: number;
   week: number | null;
   board: OurFtdStored[];
-  graded: (GradedGame & Books & { slug: string; week: number })[];
+  graded: (GradedGame & Books & { slug: string; week: number; played?: Played })[];
   learning: SectionView;
 }
 

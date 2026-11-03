@@ -5,6 +5,7 @@ import { nameKey } from "@/lib/props/grade";
 import { getOurFtdView, type OurFtdStored, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { bestBets, bestCost, ftdEdge } from "@/lib/models/nfl/ftd-price";
+import { appeared } from "@/lib/models/nfl/ftd-void";
 import { GameTable, type GameRowData } from "./week";
 import { SecHead } from "../picks/board";
 import { OUR_FTD_SLICES } from "@/lib/models/learn";
@@ -150,9 +151,10 @@ export async function OurFtdResults({ season }: { season: number }) {
             rows={[...v.graded]
               .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""))
               .map((x): GameRowData => {
-                // Every priced player who clears the edge rule (ftd-price.ts ftdEdge) at his best price.
+                // Every priced player who clears the edge rule (ftd-price.ts ftdEdge) at his best price; one who did not play is void (ftd-void.ts), as in bestBets.
                 const bets = pricedPlayers(x.game).flatMap((pl) => {
                   const c = bestCost(x, pl.name);
+                  if (appeared(x.played, pl.team, pl.name) === false) return [];
                   return c && c.cost < 1 && ftdEdge(pl.p, c.cost) ? [{ pl, c, win: x.result.key === pl.key, net: x.result.key === pl.key ? (1 - c.cost) / c.cost : -1 }] : [];
                 });
                 const won = bets.filter((b) => b.win).length;
