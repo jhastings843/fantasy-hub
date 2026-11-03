@@ -86,6 +86,16 @@ describe("projectNflGame", () => {
     expect(tg([gone], false)).toBeCloseTo(tg([], false), 9);
     expect(rest.length).toBeGreaterThanOrEqual(0);
   });
+  it("a returning receiver takes his share back from the rest, reversing the handoff", () => {
+    const back = players.find((p) => p.pos === "WR")!;
+    const others = players.filter((p) => p !== back);
+    const sh = { ...P, share: true };
+    const othersTgt = (ret: Set<string>) => projectNflGame(players, teams, "CHI", 3, s.base, sh, [], null, ret).filter((x) => x.id !== back.id).reduce((a, x) => a + x.tgt, 0);
+    expect(othersTgt(new Set([back.id]))).toBeLessThan(othersTgt(new Set()));
+    // Out, then back: the handoff and the give-back cancel for his teammates.
+    const handed = projectNflGame(others, teams, "CHI", 3, s.base, sh, [back]).reduce((a, x) => a + x.tgt, 0);
+    expect(handed).toBeGreaterThan(othersTgt(new Set()));
+  });
 });
 
 describe("ourNflMarkets (DK lines, NE at CHI 2026-10-22, no prices posted)", () => {

@@ -282,6 +282,8 @@ export function projectGame(
   p: NbaParams,
   absent: PlayerInput[] = [],
   league?: Allowed,
+  /** Ids back from injury (not in the team's last ROTATION_GAMES games). Teammates' minutes grew while they were out, so the rest shrink to keep the team at 240 (Jack, 2026-11-02). */
+  returning: Set<string> = new Set(),
 ): Projection[] {
   const spread = Math.abs(homeSpread ?? 0);
   const names = Object.keys(teams);
@@ -299,6 +301,12 @@ export function projectGame(
     if (p.normalize === "share" || p.normalize === "sharePos") {
       const gone = absent.filter((x) => x.team === team).map((x) => ({ min: projectMinutes(x, base, p), pos: x.pos }));
       if (gone.length) mins = shareMinutes(mins, mine.map((x) => x.pos), gone, p.normalize === "sharePos");
+    }
+    const back = mine.map((x) => returning.has(x.id));
+    if (back.some(Boolean)) {
+      const fixed = mins.reduce((a, m, i) => a + (back[i] ? m : 0), 0);
+      const rest = mins.reduce((a, m, i) => a + (back[i] ? 0 : m), 0);
+      if (fixed + rest > 240 && rest > 0) mins = mins.map((m, i) => (back[i] ? m : (m * Math.max(0, 240 - fixed)) / rest));
     }
     const pf = p.pace && pace[team] > 0 ? game / pace[team] : 1;
     const opp = names.length === 2 ? teams[names[0] === team ? names[1] : names[0]].allowed : undefined;

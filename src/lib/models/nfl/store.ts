@@ -185,18 +185,26 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
         }
         const players: NflPlayerInput[] = [];
         const absent: NflPlayerInput[] = [];
+        const returning = new Set<string>();
         const dkIds = new Set([...lines.values()].map((l) => l.athlete));
         for (const T of [A, H]) {
           const last = (run!.teams.get(T) ?? []).slice(-3);
-          const pool = new Set(last.flatMap((g) => g.ids));
+          const recent = new Set(last.flatMap((g) => g.ids));
+          const pool = new Set(recent);
           for (const [nid, eid] of espnOf) if (dkIds.has(eid) && names.get(eid)!.team === T) pool.add(nid);
+          // Back from injury (Jack, 2026-11-02): on ESPN's roster, not Out, last played for this team this season, but not in its last 3 games.
+          for (const [nid, eid] of espnOf) if (names.get(eid)!.team === T && !recent.has(nid) && !outKeys.has(`${T}|${nameKey(names.get(eid)!.name)}`)) pool.add(nid);
           for (const id of pool) {
             const p = run!.players.get(id);
             const eid = espnOf.get(id);
             if (!p || !eid || names.get(eid)?.team !== T) continue;
             const input = run!.player(id, T, p.pos, prior);
             const isOut = outKeys.has(`${T}|${nameKey(p.name)}`);
-            if (!isOut) players.push(input);
+            if (!isOut) {
+              players.push(input);
+              // Teammates give back his share only when DK also lists him (so a benched player isn't mistaken for a returner).
+              if (!recent.has(id) && input.games.length >= 2 && dkIds.has(eid)) returning.add(id);
+            }
             else if (last.length === 3 && last.every((g) => g.ids.includes(id))) absent.push(input);
           }
         }
@@ -205,7 +213,7 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
         const proj = new Map<string, NflProjection>();
         // A market only gets our number with real history: 2+ games this season or 4+ last season (as the fit judged).
         const informed = new Set(players.filter((x) => x.games.length >= 2 || (x.prior?.games ?? 0) >= 4).map((x) => x.id));
-        for (const x of projectNflGame(players, teams, H, margin, prior.base, P, absent, total)) {
+        for (const x of projectNflGame(players, teams, H, margin, prior.base, P, absent, total, returning)) {
           if (!informed.has(x.id)) continue;
           const eid = espnOf.get(x.id);
           if (eid) proj.set(eid, x);

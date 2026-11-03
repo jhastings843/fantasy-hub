@@ -121,6 +121,16 @@ const player = (id: string, team: string, ppm: number): PlayerInput => ({
 });
 
 describe("projectGame", () => {
+  it("a returning player's teammates shrink so the team stays at 240", () => {
+    const team = Array.from({ length: 9 }, (_, i) => player(String(i), "AAA", 0.5));
+    const tm = { AAA: { team: "AAA", poss: [] }, BBB: { team: "BBB", poss: [] } };
+    const total = (ret: Set<string>) => projectGame(team, tm, null, base, { ...P, normalize: "share" }, [], undefined, ret).reduce((a, x) => a + x.min, 0);
+    const before = total(new Set());
+    expect(before).toBeGreaterThan(240); // nine 32-minute players
+    expect(total(new Set(["0"]))).toBeCloseTo(240, 6);
+    const star = projectGame(team, tm, null, base, { ...P, normalize: "share" }, [], undefined, new Set(["0"])).find((x) => x.id === "0")!;
+    expect(star.min).toBeGreaterThan(30); // he keeps his own minutes
+  });
   it("projects from last season when there is nothing this season", () => {
     const [a] = projectGame([player("1", "AAA", 0.8)], { AAA: { team: "AAA", poss: [] }, BBB: { team: "BBB", poss: [] } }, null, base, { ...P, normalize: "none" });
     expect(a.min).toBeCloseTo(32 * P.minScale, 5);

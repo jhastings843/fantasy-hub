@@ -206,6 +206,8 @@ export function projectNflGame(
   p: NflParams,
   absent: NflPlayerInput[] = [],
   total: number | null = null,
+  /** Ids back from injury (not in the team's last 3 games). Their teammates' shares were picked up while they were gone, so they give it back (Jack, 2026-11-02). */
+  returning: Set<string> = new Set(),
 ): NflProjection[] {
   const out: NflProjection[] = [];
   for (const team of Object.keys(teams)) {
@@ -226,6 +228,14 @@ export function projectNflGame(
         const have = rates.reduce((a, r) => a + r[k], 0);
         if (lost > 0 && have > 0) rates.forEach((r) => (r[k] *= 1 + lost / have));
       }
+      // The reverse for players back: everyone else shrinks by the returner's share, the inverse of the handoff above.
+      const back = mine.map((x, i) => (returning.has(x.id) ? i : -1)).filter((i) => i >= 0);
+      if (back.length)
+        for (const k of ["tgtShare", "carShare", "attShare"] as const) {
+          const b = back.reduce((a, i) => a + rates[i][k], 0);
+          const have = rates.reduce((a, r, i) => a + (back.includes(i) ? 0 : r[k]), 0);
+          if (b > 0 && have > 0) rates.forEach((r, i) => !back.includes(i) && (r[k] *= Math.max(0, have - b) / have));
+        }
     }
     mine.forEach((pl, i) => {
       const r = rates[i];

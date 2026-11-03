@@ -247,6 +247,7 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
       };
       const dkIds = new Set([...lines.values()].map((l) => l.athlete));
       const inputs: PlayerInput[] = [];
+      const returning = new Set<string>();
       for (const t of [away, home]) {
         const mine = rosterIds.filter((id) => names.get(id)!.team === t.abbr);
         const rot = new Set(rotation(teams[t.abbr]));
@@ -258,7 +259,14 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
                 .sort((a, b) => b.m - a.m)
                 .slice(0, Math.round(prior.base.rotationSize ?? 10))
                 .map((x) => x.id);
-        for (const id of new Set([...chosen, ...mine.filter((id) => dkIds.has(id))])) inputs.push(input(id));
+        // Back from injury (Jack, 2026-11-02): rostered, not Out, last played for this team, 15+ minutes a game this season, missing from the rotation window.
+        const back = (teams[t.abbr]?.recent.length ?? 0) >= ROTATION_GAMES ? mine.filter((id) => {
+          const gs = entries[id]?.games ?? [];
+          return !rot.has(id) && gs.length >= 2 && gs.at(-1)?.team === t.abbr && gs.reduce((a, x) => a + x.min, 0) / gs.length >= 15;
+        }) : [];
+        // Teammates give minutes back only when DK lists him or the news feed says he's in, so a benched player isn't mistaken for a returner.
+        for (const id of back) if (dkIds.has(id) || opts.extraIn?.has(id)) returning.add(id);
+        for (const id of new Set([...chosen, ...mine.filter((id) => dkIds.has(id)), ...back])) inputs.push(input(id));
       }
       allowed ??= allowedTables(Object.values((await redis.hgetall<{ [id: string]: NbaGame }>(K.games(season))) ?? {}));
       const tIn = Object.fromEntries(
@@ -284,11 +292,11 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
       // last season. A rookie or a player back from a lost season would
       // otherwise get a bench player's guess and a fake edge.
       const informed = new Set(inputs.filter((x) => x.games.length >= MIN_GAMES_NOW || (x.prior?.games ?? 0) >= MIN_GAMES_PRIOR).map((x) => x.id));
-      const projected = projectGame(inputs, tIn, spread, prior.base, P, absent, allowed.league);
+      const projected = projectGame(inputs, tIn, spread, prior.base, P, absent, allowed.league, returning);
       const proj = new Map(projected.filter((x) => informed.has(x.id)).map((x) => [x.id, x]));
       // Our game model: each side's projected points tonight minus with its full rotation (the Out list's cost).
       try {
-        const full = projectGame([...inputs, ...absent], tIn, spread, prior.base, P, [], allowed.league);
+        const full = projectGame([...inputs, ...absent], tIn, spread, prior.base, P, [], allowed.league, returning);
         const pts = (ps: typeof projected, t: string) => ps.filter((x) => x.team === t).reduce((a, x) => a + x.mean.pts, 0);
         const avail = { home: pts(projected, home.abbr) - pts(full, home.abbr), away: pts(projected, away.abbr) - pts(full, away.abbr) };
         const outN = { home: absent.filter((x) => x.team === home.abbr).length, away: absent.filter((x) => x.team === away.abbr).length };
