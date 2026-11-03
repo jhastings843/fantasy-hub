@@ -129,8 +129,9 @@ export default async function PropsView({
         {market === "nba" && shown === "week" && <NbaNewsToday season={season} />}
         {market === "nba" && shown === "results" && (
           <>
-            <NbaNewsResults season={season} />
             <OurNbaResults season={season} />
+            {/* Injury news record last (Jack, 2026-11-03). */}
+            <NbaNewsResults season={season} />
           </>
         )}
         {market === "fb" && shown === "results" && <OurFirstBasketResults season={season} />}
