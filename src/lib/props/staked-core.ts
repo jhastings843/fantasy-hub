@@ -66,6 +66,30 @@ export interface StakedBet {
   stake: number;
   /** Page path that shows it. */
   href: string;
+  /**
+   * Where the fresh pre-lock quote for it is read (lib/props/fresh.ts), on
+   * sections whose edge can be re-judged at a new price: our NFL and NBA
+   * props and our Anytime TD. `stat` is the board's stat, or "anytime".
+   */
+  quote?: { event: string; home: string; away: string; stat: string };
+  /** The collector's own id (line-free: section, game, market, side), kept when limitProps renames it. */
+  src?: string;
+  /** The fresh pre-lock check (props only; NBA picks have none). */
+  check?: FreshCheck;
+}
+
+/**
+ * checked: re-judged at a fresh quote about an hour before lock and still a bet.
+ * pending: waiting for that read. gone: the edge isn't there at the fresh
+ * price. failed: no fresh quote (read failed, quota stop, not in the read).
+ * none: a section this check can't re-judge; pushed at the saved price.
+ */
+export interface FreshCheck {
+  state: "checked" | "pending" | "gone" | "failed" | "none";
+  /** When the fresh quote was read, ISO. */
+  at?: string;
+  /** Why a bet is not pushed: "edge gone at -150". */
+  note?: string;
 }
 
 export type LiveEntry = { id: string; label: string; status: ViewStatus; activatedAt?: string };
@@ -130,7 +154,8 @@ export function ourPropsStaked(input: { section: string; sectionName: string; sp
         const slices = liveKeeping(entries, b.kickoff!, (id) => sideFor(id) === side);
         if (!slices.length) continue;
         const at = playPrice(m, side);
-        out.push(propBet(input, b, m, side, at, slices));
+        const bet = propBet(input, b, m, side, at, slices);
+        out.push(b.espnId ? { ...bet, quote: { event: b.espnId, home: b.home ?? b.game.home, away: b.away ?? b.game.away, stat: m.stat } } : bet);
       }
     }
   }
@@ -293,7 +318,7 @@ export function samFtdStaked(input: { boards: { game: FtdGame; kickoff?: string;
 // --------------------------------------------------------------- Anytime TD
 
 /** Our Anytime TD at DraftKings (section nfl-attd-ours): attdStaked, the page's own test. */
-export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: string; attd?: { rows: AttdRow[] }; attdResult?: unknown }[]; entries: LiveEntry[]; now: Date; today: string; section: string }): StakedBet[] {
+export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: string; espnId?: string; attd?: { rows: AttdRow[] }; attdResult?: unknown }[]; entries: LiveEntry[]; now: Date; today: string; section: string }): StakedBet[] {
   if (!anyLive(input.entries)) return [];
   return input.boards.flatMap((g) => {
     if (!g.attd || g.attdResult || !openToday(g.kickoff, input.now, input.today)) return [];
@@ -318,6 +343,7 @@ export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: strin
           slice: slices.join("; ") || "Live Anytime TD slice",
           stake: 1,
           href: "/props?m=attd",
+          ...(g.espnId ? { quote: { event: g.espnId, home: g.game.home, away: g.game.away, stat: "anytime" } } : {}),
         },
       ];
     });
@@ -522,7 +548,7 @@ export function limitProps(bets: StakedBet[], prior: { id: string; game: string;
     const k = propId(b);
     const had = byProp.get(k);
     if (had) byProp.set(k, { ...had, slice: [...new Set([...had.slice.split("; "), ...b.slice.split("; ")])].join("; ") });
-    else byProp.set(k, { ...b, id: k });
+    else byProp.set(k, { ...b, id: k, src: b.src ?? b.id });
   }
   // Bets already staked earlier today count against the caps even once their game has started (they drop off later reads).
   const seen = new Set(prior.map((p) => p.id));
@@ -560,15 +586,39 @@ export const propId = (b: Pick<StakedBet, "sport" | "game" | "pick">) => `prop|$
 /** The minutes before lock inside which no new push goes out. */
 export const PUSH_CUTOFF_MS = 5 * 60 * 1000;
 
-/** Can this bet still be pushed (first seen as staked, lock more than 5 minutes off)? */
-export const pushable = (b: StakedBet, now: Date) => Date.parse(b.kickoff) - now.getTime() > PUSH_CUTOFF_MS;
+/**
+ * Can this bet be pushed: lock more than 5 minutes off, and, for a prop the
+ * fresh check covers, only once that check passed (fail closed: pending,
+ * gone and failed are never pushed).
+ */
+export const pushable = (b: StakedBet, now: Date) => Date.parse(b.kickoff) - now.getTime() > PUSH_CUTOFF_MS && (!b.check || b.check.state === "checked" || b.check.state === "none");
+
+const etTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).replace(" ", "").toLowerCase();
+
+/** The price as the push and the Today tab show it: "-115 DraftKings, checked 1:10pm". */
+export function checkedPrice(b: Pick<StakedBet, "priceText" | "check">): string {
+  const c = b.check;
+  if (c?.state === "checked" && c.at) return `${b.priceText}, checked ${etTime(c.at)}`;
+  if (c?.state === "none") return `${b.priceText}, this morning's price, not rechecked`;
+  return b.priceText;
+}
+
+/** The fresh check for a Today tab card: " · price checked 1:10pm", " · check pending", " · not a bet: edge gone at -150". */
+export function checkNote(b: Pick<StakedBet, "check">): string {
+  const c = b.check;
+  if (!c) return "";
+  if (c.state === "checked") return c.at ? ` · price checked ${etTime(c.at)}` : " · price checked";
+  if (c.state === "pending") return " · check pending";
+  if (c.state === "none") return " · price not rechecked";
+  return ` · not a bet: ${c.note ?? "no fresh price"}`;
+}
 
 /** The phone alert for one staked bet. Pure. */
 export function stakedPush(b: StakedBet, appUrl: string): { title: string; message: string; url: string; urlTitle: string } {
   const at = new Date(b.kickoff).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
   return {
     title: `${b.sectionName}: ${b.stake}u bet`,
-    message: `${b.pick} · ${b.stake}u (${b.priceText}) · ${b.game}, ${at} ET\n${b.slice}`,
+    message: `${b.pick} · ${b.stake}u (${checkedPrice(b)}) · ${b.game}, ${at} ET\n${b.slice}`,
     url: `${appUrl}${b.href}`,
     urlTitle: "Open",
   };
