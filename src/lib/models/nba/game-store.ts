@@ -6,7 +6,7 @@ import { readOpenClose, type CoreOdds } from "./game-lines";
 import { signalRecords, type GameSnap, type SignalRecord, type TrackedNbaGame } from "./game-track";
 import PARAMS from "./game-params.json";
 import SEED from "./game-seed.json";
-import { live, primeParams } from "@/lib/models/params-store";
+import { live, paramsVersion, primeParams } from "@/lib/models/params-store";
 
 // Our NBA game model, live (tracked only; see game-track.ts). The props run
 // (store.ts) calls `saveGameModel` for each game it builds a board for, with
@@ -76,6 +76,7 @@ export async function saveGameModel(
     res: r2(res),
     x: { spread: round(x.spread), total: round(x.total) },
     out,
+    params: paramsVersion("nba-game"),
   };
   // Real clock: a run that began just before tip must not save odds read after it (audit 2026-11-02).
   if (Date.now() >= Date.parse(g.tip)) return null;

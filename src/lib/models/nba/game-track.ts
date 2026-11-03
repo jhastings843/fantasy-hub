@@ -16,6 +16,7 @@
 // CLV above zero at t >= 1.645. Pure.
 
 import type { SpreadX, TotalX } from "./game";
+import type { ParamsStamp } from "@/lib/models/params-store";
 
 export const SIGNALS = [
   { id: "lean", label: "Our spread lean, any size", market: "spread" },
@@ -41,6 +42,8 @@ export interface GameSnap {
   x: { spread: SpreadX; total: TotalX };
   /** Players listed Out we counted, per side. */
   out?: { home: number; away: number };
+  /** Which game-model settings made this read (snaps saved from 2026-11-03 on). */
+  params?: ParamsStamp;
 }
 
 export interface TrackedNbaGame {

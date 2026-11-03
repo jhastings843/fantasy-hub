@@ -11,6 +11,7 @@ import { MIN_BETS, propTrends, SLICES, type GradedPropsGame, type PropTrends } f
 import { PROPS_SECTION, propCandidates } from "./learn";
 import { PROPS_GATE, activeIds, liveBets, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
+import type { ParamsStamp } from "@/lib/models/params-store";
 
 // The props tracker's memory, built like the first TD tracker: Sam keeps only
 // the current week online, so each game's props page is saved before kickoff
@@ -50,6 +51,8 @@ export interface StoredProps {
   espnId?: string;
   /** Set when the copy was read after kickoff (backfilled by hand). Shown, graded, never counted toward the system. */
   late?: string;
+  /** Which model settings made this copy, per model (params-store paramsVersion; copies saved from 2026-11-03 on). */
+  params?: { [model: string]: ParamsStamp };
   result?: GradedGame;
   gradedAt?: string;
 }

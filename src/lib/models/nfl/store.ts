@@ -18,7 +18,7 @@ import { fdProp, oddsPrice } from "./odds-api";
 import { morningOddsReads } from "./odds-api-store";
 import { projectNflGame, type NflParams, type NflPlayerInput, type NflProjection, type NflStat } from "./props";
 import PARAMS from "./params.json";
-import { live, primeParams } from "@/lib/models/params-store";
+import { live, paramsProblem, paramsVersion, primeParams } from "@/lib/models/params-store";
 
 // Our NFL props model, live. Each run:
 // 1. Reads this season's weekly player stats from nflverse (the release CSV,
@@ -96,6 +96,8 @@ interface SbEvent {
 export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
   await primeParams();
   const report: OurNflReport = { week: null, nflverseWeek: null, saved: [], graded: [], learning: [], problems: [] };
+  const pp = paramsProblem();
+  if (pp) report.problems.push(pp);
   const season = nflSeasonOf(now);
   let events: SbEvent[] = [];
   try {
@@ -251,6 +253,7 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
           away: A,
           home: H,
           ...(Object.keys(dv).length ? { david: dv } : {}),
+          params: { "nfl-props": paramsVersion("nfl-props") },
         };
         // Real clock, not the run's start: a run that began just before kickoff must not save what it read after (audit 2026-11-02).
         if (e.date && Date.now() >= Date.parse(e.date)) continue;

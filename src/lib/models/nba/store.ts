@@ -23,7 +23,7 @@ import { gradeGameModel, ratingsNow, saveGameModel } from "./game-store";
 import type { GameRatings } from "./game";
 import PARAMS from "./params.json";
 import FB_PARAMS from "./fb-params.json";
-import { live, primeParams } from "@/lib/models/params-store";
+import { live, paramsProblem, paramsVersion, primeParams } from "@/lib/models/params-store";
 
 // Our NBA props model, live. Each run:
 // 1. Ingests finished games it hasn't seen (ESPN summaries) into the season's
@@ -234,6 +234,8 @@ export async function readNbaLines(event: string): Promise<{ lines: [string, Liv
 export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): Promise<OurNbaReport> {
   await primeParams();
   const report: OurNbaReport = { ingested: [], saved: [], graded: [], learning: [], problems: [] };
+  const pp = paramsProblem();
+  if (pp) report.problems.push(pp);
   const season = nbaSeasonOfDate(now);
   let games: SbGame[] = [];
   try {
@@ -403,6 +405,7 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
         ...(fb ? { fb } : {}),
         kotc,
         ...(Object.keys(dv).length ? { david: dv } : {}),
+        params: { "nba-props": paramsVersion("nba-props"), ...(fb ? { "nba-fb": paramsVersion("nba-fb") } : {}) },
       };
       // Real clock, not the run's start: a run that began just before tip must not save what it read after (audit 2026-11-02).
       if (g.tip && Date.now() >= Date.parse(g.tip)) continue;

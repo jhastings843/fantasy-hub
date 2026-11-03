@@ -24,7 +24,7 @@ import { boxPlayed, rosterPlayed, type Played } from "./ftd-void";
 import { attdTeam, boxTds, gradeAttd, type AttdGraded, type AttdParams, type AttdResult, type AttdRow } from "./anytime";
 import { readTdScorers, type PropBetRow } from "../lines";
 import type { EspnBoxTeam } from "@/lib/props/grade";
-import { live, primeParams } from "@/lib/models/params-store";
+import { live, paramsProblem, paramsVersion, primeParams, type ParamsStamp } from "@/lib/models/params-store";
 import { teamList } from "./team-list";
 import { gradeKotez, saveKotez } from "./kotez-store";
 
@@ -77,6 +77,8 @@ export interface OurFtdStored {
   attdResult?: AttdResult;
   /** Who took the field, per team (ftd-void.ts): read at grading from 2026-11-02, backfilled for games graded before. Absent: every non-winner grades -1, as before. */
   played?: Played;
+  /** Which model settings made this copy, per model (params-store paramsVersion; copies saved from 2026-11-03 on). */
+  params?: { [model: string]: ParamsStamp };
 }
 
 async function json<T>(url: string): Promise<T> {
@@ -128,6 +130,8 @@ export interface OurFtdReport {
 export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
   await primeParams();
   const report: OurFtdReport = { week: null, saved: [], graded: [], learning: [], problems: [] };
+  const pp = paramsProblem();
+  if (pp) report.problems.push(pp);
   const season = nflSeasonOf(now);
   type Ev = { id: string; date?: string; status?: { type?: { state?: string } }; competitions?: { competitors?: { homeAway?: string; team?: { id?: string; abbreviation?: string } }[] }[] };
   let events: Ev[] = [];
@@ -234,7 +238,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
         // Real clock, not the run's start: a run that began just before kickoff must not save what it read after (audit 2026-11-02).
         if (e.date && Date.now() >= Date.parse(e.date)) continue;
         await redis.hset(FK.week(season, week), {
-          [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}), ...(dk ? { dk } : {}), ...(fd ? { fd } : {}), ...(attd ? { attd } : {}) } satisfies OurFtdStored,
+          [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}), ...(dk ? { dk } : {}), ...(fd ? { fd } : {}), ...(attd ? { attd } : {}), params: { "nfl-ftd": paramsVersion("nfl-ftd"), ...(attd ? { "nfl-attd": paramsVersion("nfl-attd") } : {}) } } satisfies OurFtdStored,
         });
         await redis.sadd(FK.weeks(season), String(week));
         report.saved.push(`${A}@${H} ${game.teams.reduce((a, t) => a + t.players.length, 0)} players${k ? ", Kalshi" : ""}`);
