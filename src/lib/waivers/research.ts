@@ -25,6 +25,11 @@ const MODEL = "claude-opus-5";
  * room to spare, about 12 cents a run at $10 per 1,000 searches.
  */
 export const SEARCH_USES = 12;
+/** The route's maxDuration is 300 s. Search stops by 210 s, extraction by 285 s. */
+export const SEARCH_BUDGET_MS = 210_000;
+export const TOTAL_BUDGET_MS = 285_000;
+/** A resume shorter than this rarely finishes a search turn. */
+const MIN_RESUME_MS = 45_000;
 
 /** Long enough that a Tuesday morning run still serves Wednesday's page. */
 const RESEARCH_TTL = 5 * 24 * 60 * 60;
@@ -107,7 +112,13 @@ export async function researchWaiverTargets(
   season: string,
   week: number,
 ): Promise<WaiverResearch> {
-  const client = new Anthropic({ timeout: 4 * 60 * 1000 });
+  // One clock for the whole run (2026-11-03: the Nov 3 redraft pass hit the
+  // function's 300-second ceiling and Vercel returned a bare 504). Each call
+  // gets what is left of the budget, and the SDK's own retries are off: a
+  // retried four-minute search call can never fit.
+  const started = Date.now();
+  const left = (until: number) => Math.max(5_000, until - (Date.now() - started));
+  const client = new Anthropic({ maxRetries: 0 });
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: researchPrompt(format, season, week) },
@@ -125,16 +136,27 @@ export async function researchWaiverTargets(
       "You are a fantasy football waiver wire analyst. You read this week's published waiver columns and community threads and report their consensus faithfully, with the disagreements kept visible. You never invent a player, a role change, or a bid.",
     tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
     messages,
-  });
+  }, { timeout: left(SEARCH_BUDGET_MS) });
+  // Resume a paused turn only while there is time for it. Past the budget,
+  // the paused turns' text is what gets extracted (it holds the columns
+  // already read), which beats losing the whole run.
   for (let resumes = 0; response.stop_reason === "pause_turn" && resumes < 4; resumes++) {
+    if (Date.now() - started > SEARCH_BUDGET_MS - MIN_RESUME_MS) break;
     messages.push({ role: "assistant", content: response.content });
-    response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 12000,
-      output_config: { effort: "medium" },
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
-      messages,
-    });
+    try {
+      response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 12000,
+        output_config: { effort: "medium" },
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
+        messages,
+      }, { timeout: left(SEARCH_BUDGET_MS) });
+    } catch (e) {
+      // A resume that runs out of time keeps what the earlier turns found.
+      if (!(e instanceof Anthropic.APIConnectionTimeoutError)) throw e;
+      response = { ...response, content: [], stop_reason: "pause_turn" };
+      break;
+    }
   }
   if (response.stop_reason === "refusal") {
     throw new Error("Waiver research was refused by the model");
@@ -164,7 +186,7 @@ export async function researchWaiverTargets(
       max_tokens: 8000,
       output_config: { effort: "low", format: zodOutputFormat(ResearchSchema) },
       messages: [{ role: "user", content: `${instruction}\n\n${prose}` }],
-    });
+    }, { timeout: left(TOTAL_BUDGET_MS) });
     return parsed.parsed_output;
   };
   let out = await extract(

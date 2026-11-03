@@ -20,7 +20,14 @@ export async function liveParams<T extends object>(model: ModelKey, defaults: T)
     console.log(`(no CRON_SECRET: scoring the JSON defaults as live for ${model})`);
     return defaults;
   }
-  const r = await fetch(`${APP}/api/model-params?model=${model}`, { headers: auth(), signal: AbortSignal.timeout(20_000) });
+  // One retry: the Nov 3 NBA refit died on a dropped connection (fetch
+  // failed, EPIPE) before the app answered, not on a bad answer.
+  const get = () => fetch(`${APP}/api/model-params?model=${model}`, { headers: auth(), signal: AbortSignal.timeout(20_000) });
+  const r = await get().catch(async (e) => {
+    console.log(`(GET model-params ${model} failed: ${e instanceof Error ? e.message : e}; retrying once in 5 s)`);
+    await new Promise((ok) => setTimeout(ok, 5_000));
+    return get();
+  });
   if (!r.ok) throw new Error(`GET model-params ${model}: HTTP ${r.status}`);
   const j = (await r.json()) as { stored: { params: Partial<T> } | null };
   return { ...defaults, ...(j.stored?.params ?? {}) };
