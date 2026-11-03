@@ -109,6 +109,16 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
         </span>
       </div>
 
+      {/* Who's newly out (NFL, display only: it doesn't change our numbers or any pick) */}
+      {g.ours?.injury && (g.ours.injury.home.length > 0 || g.ours.injury.away.length > 0) && (
+        <p className={p.note}>
+          {`${g.ours.injury.flagged ? "Key players out" : "Out"}: ${[
+            ...(g.ours.injury.away.length ? [`${name(g.away)} ${g.ours.injury.away.join(", ")}`] : []),
+            ...(g.ours.injury.home.length ? [`${name(g.home)} ${g.ours.injury.home.join(", ")}`] : []),
+          ].join(" · ")}. Shown only: in past seasons these games went no worse for our model, so nothing changes.`}
+        </p>
+      )}
+
       {/* Lines and edges */}
       <div className={p.grid}>
         <section className={p.card} aria-label="Spread">
