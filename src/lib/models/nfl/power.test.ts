@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PlayAgg, carryRatings, edges, packRatings, powerLine, powerMargin, ratingsByDay, solveRatings, splitCsvLine, unpackRatings, type PowerParams, type Rating, type TeamGame } from "./power";
-import { powerSignals, signalRecords, trackedGames } from "./spread-track";
+import { blendSignals, powerSignals, signalRecords, trackedGames } from "./spread-track";
 import type { ForecastSnapshot } from "@/lib/picks/forecasts";
 
 const tg = (game: string, gameday: string, team: string, opp: string, passEpa: number, rushEpa = 0, season = 2026): TeamGame => ({ game, season, gameday, team, opp, passEpa, passN: 40, rushEpa, rushN: 25 });
@@ -112,6 +112,16 @@ describe("play-by-play signals", () => {
     away: "LV",
     ref: { line, homePrice: -110, awayPrice: -105, kickoff: "2026-11-08T18:00:00Z", source: "test", fetchedAt: at },
     ours: { market: line, model: line - 0.1, ...(power !== undefined ? { power } : {}) },
+  });
+
+  it("blend: Sam, David and our line averaged, 1.5+ off; blend4 adds PEM; needs Sam, David and our line", () => {
+    const base = snap("2026-11-03T12:00:00Z", -3, -5); // our line 2 pts toward home
+    const withSD = { ...base, sam: { market: -3, model: -4 }, david: { market: -3, model: -4.5 } }; // avg -4.5, 1.5 off
+    expect(blendSignals(withSD)).toEqual([{ id: "blend", side: "home", price: -110 }]);
+    expect(blendSignals({ ...withSD, pem: { model: 1 } })).toEqual([{ id: "blend", side: "home", price: -110 }]); // avg -3.125: blend4 under 1.5
+    expect(blendSignals({ ...withSD, pem: { model: -7 } }).map((x) => x.id)).toEqual(["blend", "blend4"]);
+    expect(blendSignals(base)).toEqual([]);
+    expect(blendSignals({ ...withSD, david: { market: -3, model: -1 } })).toEqual([]); // avg -3.33, under 1.5
   });
 
   it("fires on the side our line likes, at 1.5+ and 3+", () => {

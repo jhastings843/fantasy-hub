@@ -20,6 +20,11 @@
 // line move toward it from our first read. Its first read is the first
 // snapshot that carried it, which can be later than the first one with our
 // model (games already on file when it shipped).
+// Two more from 2026-11-02 night (Jack: "use others as inputs"), a fixed,
+// unfitted blend, since ~75 games with Sam and David is too few to fit one:
+//   blend       the average of Sam's, David's and our play-by-play line, 1.5+ pts off the market
+//   blend4      the same with PEM's line added, on games PEM covers
+// Judged at the same first read as the play-by-play signals.
 // A signal earns a closer look at 30+ games over 4+ weeks with average CLV
 // above zero at t >= 1.645. Pure.
 
@@ -33,6 +38,8 @@ export const SIGNALS = [
   { id: "fade-cover", label: "Fade the bigger last cover (17.5+ apart)" },
   { id: "power", label: "Our play-by-play line, 1.5+ pts off" },
   { id: "power3", label: "Our play-by-play line, 3+ pts off" },
+  { id: "blend", label: "Sam, David and our line averaged, 1.5+ pts off" },
+  { id: "blend4", label: "Sam, David, PEM and our line averaged, 1.5+ pts off" },
 ] as const;
 export type SignalId = (typeof SIGNALS)[number]["id"];
 export const GATE = { games: 30, weeks: 4, t: 1.645 };
@@ -68,6 +75,23 @@ export function powerSignals(s: ForecastSnapshot): TrackedGame["signals"] {
   const price = (side === "home" ? s.ref.homePrice : s.ref.awayPrice) ?? null;
   const out: TrackedGame["signals"] = [{ id: "power", side, price }];
   if (Math.abs(d) >= POWER3) out.push({ id: "power3", side, price });
+  return out;
+}
+
+/** The fixed blends: Sam, David and our play-by-play line averaged (plus PEM for blend4), home spreads, against the market. */
+export function blendSignals(s: ForecastSnapshot): TrackedGame["signals"] {
+  const o = s.ours;
+  if (o?.power === undefined || !s.ref || !s.sam || !s.david) return [];
+  const out: TrackedGame["signals"] = [];
+  const add = (id: "blend" | "blend4", lines: number[]) => {
+    const d = o.market - lines.reduce((a, x) => a + x, 0) / lines.length;
+    if (Math.abs(d) < POWER) return;
+    const side = d > 0 ? "home" : "away";
+    out.push({ id, side, price: (side === "home" ? s.ref!.homePrice : s.ref!.awayPrice) ?? null });
+  };
+  const three = [s.sam.model, s.david.model, o.power];
+  add("blend", three);
+  if (s.pem) add("blend4", [...three, s.pem.model]);
   return out;
 }
 
@@ -115,7 +139,7 @@ export function trackedGames(snaps: ForecastSnapshot[], closes: ClosingLine[]): 
   const sigs = (k: string, s: ForecastSnapshot) => {
     const rest = signalsOf(s).filter((x) => x.id !== "power" && x.id !== "power3");
     const pw = firstPower.get(k);
-    return pw ? [...rest, ...powerSignals(pw).map((x) => ({ ...x, line: pw.ref!.line }))] : rest;
+    return pw ? [...rest, ...[...powerSignals(pw), ...blendSignals(pw)].map((x) => ({ ...x, line: pw.ref!.line }))] : rest;
   };
   return [...first.entries()].map(([k, s]) => {
     const c = close.get(k);
