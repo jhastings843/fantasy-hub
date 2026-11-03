@@ -33,7 +33,7 @@ for (const [w, h] of [[390, 844], [1280, 900]]) {
       };
     });
     const q = new URL(host + path).searchParams;
-    const want = [q.get("m") === "su" ? "Straight up" : q.get("m") === "ou" ? "Totals" : "Spreads", q.get("v") === "results" ? "Results" : q.get("v") === "research" ? "Research" : "This week"];
+    const want = [q.get("m") === "su" ? "Straight up" : q.get("m") === "ou" ? "Totals" : "Spreads", q.get("v") === "results" ? "Results" : q.get("v") === "research" ? "Research" : "Board"]; // the first view tab was renamed Board (Oct 2026)
     if (m.overflow) fails.push(`${w}px ${path}: horizontal page scroll`);
     if (w === 390 && !q.get("v") && (m.firstTop ?? 99999) > FIRST_PICK_MAX_MOBILE) fails.push(`${w}px ${path}: first pick at ${m.firstTop}px`);
     if (!want.every((x) => m.current.includes(x))) fails.push(`${w}px ${path}: current tabs ${m.current.join(",")}`);
