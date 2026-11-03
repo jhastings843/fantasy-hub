@@ -15,11 +15,11 @@ import {
 import { pemWeeks } from "./pem";
 import { clvTable } from "./closing";
 import { closingLines, currentLines } from "./closing-store";
-import { confirmed, issuedGames } from "./issued";
+import { type IssuedRecord, confirmed, issuedGames } from "./issued";
 import { loadIssued, loadIssuedStrict } from "./issued-store";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "./limits";
 import { pemCompare, researchRows } from "./research";
-import { TOTALS_EDGE, type TotalsSeen, totalsBacktest } from "./totals";
+import { TOTALS_EDGE, type TotalsBacktest, type TotalsSeen, totalsBacktest, totalsCutGames } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
 import { shopLines } from "./shop-store";
@@ -38,8 +38,8 @@ import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
 import { loadRuleFreeze, refreezeRule, saveRuleFreeze } from "./rule-freeze";
 import { priceShadow } from "./price-shadow";
-import { noteChosen } from "./chosen-store";
-import { applyForward } from "./forward";
+import { noteChosen, noteTotalsChosen } from "./chosen-store";
+import { applyForward, totalsForward } from "./forward";
 import { redisStore } from "./learning/store";
 import {
   type BoardGame,
@@ -425,7 +425,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     clvModels: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
     research: researchRows(j.graded, s.cuts, closes),
     pemCompare: league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null,
-    totalsBacktest: totalsBacktest(league, seen, points, sam, totalsMarket, key, totalsAllowed(policy, league)),
+    totalsBacktest: await totalsForwardChecked(league, season, week, totalsBacktest(league, seen, points, sam, totalsMarket, key, totalsAllowed(policy, league)), seen, points, issued),
     totalsEdge: TOTALS_EDGE[league],
     totalsArchived: seen.length,
     posted,
@@ -464,7 +464,33 @@ export async function getPicksCore(league: League) {
   }
   // A core cached before the forward check existed gets it on read.
   if (c && c.chosen === undefined) return { ...got, value: await forwardChecked(league, c, c.strategies, !!c.ruleSet) };
+  // Likewise the totals rule's check (without it the rule would only be tracked).
+  if (c && c.totalsBacktest.rule && !c.totalsBacktest.rule.forward) {
+    const [seen, issued] = await Promise.all([loadTotalsSeen(c.league, c.season).catch(() => null), loadIssued(c.league, c.season).catch(() => [])]);
+    if (!seen) return got;
+    const points = new Map(c.finals.map(([k, f]) => [k, f.home + f.away]));
+    return { ...got, value: { ...c, totalsBacktest: await totalsForwardChecked(c.league, c.season, c.week, c.totalsBacktest, seen, points, issued) } };
+  }
   return got;
+}
+
+/**
+ * The totals backtest with its rule forward-checked (forward.ts): this
+ * week's rule is recorded as chosen (first time only), then graded on its
+ * archive games from that week up to this one. Unreadable dates: tracked.
+ */
+async function totalsForwardChecked(
+  league: League,
+  season: number,
+  week: number | null,
+  tb: TotalsBacktest,
+  seen: TotalsSeen[],
+  points: Map<string, number>,
+  issued: IssuedRecord[],
+): Promise<TotalsBacktest> {
+  if (!tb.rule) return tb;
+  const chosen = await noteTotalsChosen(league, season, week, tb.rule.id, issued);
+  return { ...tb, rule: { ...tb.rule, forward: totalsForward(tb.rule.id, chosen, totalsCutGames(tb.rule, seen, points, key), week) } };
 }
 
 /** The core with `board` in force, its tiers forward-checked (forward.ts) on the weeks before this one. */

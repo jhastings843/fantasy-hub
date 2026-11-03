@@ -1,7 +1,7 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
 import type { StrategyBoard } from "./engine";
-import { type Chosen, type ChosenMap, backfillEntries } from "./forward";
+import { type Chosen, type ChosenMap, backfillEntries, totalsBackfillEntries } from "./forward";
 import type { IssuedRecord } from "./issued";
 import type { League } from "./parse";
 import { loadRuleFreeze } from "./rule-freeze";
@@ -27,10 +27,51 @@ export const GRANDFATHERED: { [season: number]: { [L in League]?: string } } = {
 export async function loadChosen(league: League, season: number): Promise<ChosenMap | null> {
   try {
     const h = ((await redis.hgetall<{ [id: string]: Chosen | string }>(KEY(league, season))) ?? {}) as { [id: string]: Chosen | string };
-    return Object.fromEntries(Object.entries(h).filter(([k, v]) => k !== DONE && typeof v === "object")) as ChosenMap;
+    return Object.fromEntries(Object.entries(h).filter(([k, v]) => k !== DONE && !k.startsWith(T) && typeof v === "object")) as ChosenMap;
   } catch {
     return null;
   }
+}
+
+// The totals rule (forward.ts, totals section): same hash, fields
+// "totals:<id>", its own one-time backfill from the issued records'
+// totalsRule. No totals rule was in force when the check went in
+// (2026-11-02, read from the live cores: NFL and college both had none; the
+// only one ever sent was college "t-agree" in Week 8, which lost its place
+// after), so nothing is grandfathered: any totals rule needs 10+ forward
+// games past break-even before it stakes.
+const T = "totals:";
+const T_DONE = `${T}_backfilled`;
+export const GRANDFATHERED_TOTALS: { [season: number]: { [L in League]?: string } } = { 2026: {} };
+
+/** Every recorded totals cut (ids without the prefix), or null when Redis can't be read (the rule then stays tracked). */
+export async function loadTotalsChosen(league: League, season: number): Promise<ChosenMap | null> {
+  try {
+    const h = ((await redis.hgetall<{ [id: string]: Chosen | string }>(KEY(league, season))) ?? {}) as { [id: string]: Chosen | string };
+    return Object.fromEntries(Object.entries(h).filter(([k, v]) => k.startsWith(T) && k !== T_DONE && typeof v === "object").map(([k, v]) => [k.slice(T.length), v])) as ChosenMap;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Records this build's totals rule as chosen this week (first time only),
+ * after the one-time backfill, and returns the totals map. Null when Redis
+ * fails, which keeps the totals rule tracked.
+ */
+export async function noteTotalsChosen(league: League, season: number, week: number | null, ruleId: string | null, issued: IssuedRecord[]): Promise<ChosenMap | null> {
+  try {
+    const k = KEY(league, season);
+    if (!(await redis.hexists(k, T_DONE))) {
+      const entries = totalsBackfillEntries(issued, { week, pinned: GRANDFATHERED_TOTALS[season]?.[league] ?? null }, new Date().toISOString());
+      await Promise.all(Object.entries(entries).map(([id, c]) => redis.hsetnx(k, `${T}${id}`, c)));
+      await redis.hset(k, { [T_DONE]: new Date().toISOString() });
+    }
+    if (ruleId && week) await redis.hsetnx(k, `${T}${ruleId}`, { week, at: new Date().toISOString(), tier: "t1", source: "board" } satisfies Chosen);
+  } catch {
+    return null;
+  }
+  return loadTotalsChosen(league, season);
 }
 
 async function backfill(league: League, season: number, week: number | null, issued: IssuedRecord[]): Promise<void> {

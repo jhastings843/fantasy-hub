@@ -3,6 +3,7 @@ import { marginBand, marginLabel, suPick } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
+import { totalsForwardNote, totalsHoldText } from "@/lib/picks/forward";
 import { TeamLogo } from "@/components/TeamLogo";
 import Link from "next/link";
 import { GameCell, href, kickoffEt, price, rec, units } from "./ui";
@@ -320,6 +321,7 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
     if (startedOf.has(`${g.away}@${g.home}`)) return { chip: ["In progress", s.readLive] };
     if (g.stake) return { chip: ["Totals · not sent", s.readPend], note: g.held ? `Locks ${kickoffEt(g.held)}` : `${g.stake}u at ${priceWithBook(price(g.price), g.ref, g.side)}` };
     if (g.tier === "t1") return { chip: ["Close call", s.readTrack], note: `Priced out at ${priceWithBook(price(g.price), g.ref, g.side)}` };
+    if (g.forwardHold) return { chip: [`${ou(g.side)} · tracked`, s.readTrack], note: totalsHoldText };
     if (g.tier === "lean") return { chip: [`Lean ${ou(g.side).toLowerCase()} · no stake`, s.readTrack] };
     if (g.tier === "split") return { chip: ["Split", s.readPass] };
     if (g.tier === "one") return { chip: ["One model", s.readPass] };
@@ -412,7 +414,7 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
       <SuSub
         text={
           t.backtest.rule
-            ? `Rule: ${t.backtest.rule.label.toLowerCase()} (${rec(t.backtest.rule.record)} in the archive).`
+            ? `Rule: ${t.backtest.rule.label.toLowerCase()} (${rec(t.backtest.rule.record)} in the archive).${totalsForwardNote(t.backtest.rule) ? ` ${totalsForwardNote(t.backtest.rule)}` : ""}`
             : `No totals cut has 10+ decided games and a winning rate yet, so nothing here is a bet. ${t.backtest.archived} archived games graded so far.`
         }
       />

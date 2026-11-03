@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getPicksReport, SOURCES, type PicksReport } from "@/lib/picks/report";
 import type { League } from "@/lib/picks/parse";
-import { forwardNote } from "@/lib/picks/forward";
+import { forwardNote, totalsForwardNote, totalsStakes } from "@/lib/picks/forward";
 import { tierStakes } from "@/lib/picks/engine";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "@/lib/picks/limits";
 import { getPoolShares, getPoolTrack } from "@/lib/picks/pool-store";
@@ -184,7 +184,7 @@ function lineup(r: PicksReport, market: Market, policy: PicksPolicy | null): Mod
   if (market === "ou")
     return [
       totalsRule
-        ? { name: `Totals rule: ${totalsRule.label}`, role: `Decides ${L} totals bets`, status: "active", note: `${totalsRule.record.w}-${totalsRule.record.l}${totalsRule.record.p ? `-${totalsRule.record.p}` : ""} on ${totalsRule.games} games. Bets issue with a saved price and a stake.` }
+        ? { name: `Totals rule: ${totalsRule.label}`, role: `Decides ${L} totals bets`, status: totalsStakes(totalsRule) ? "active" : "collecting", note: `${totalsRule.record.w}-${totalsRule.record.l}${totalsRule.record.p ? `-${totalsRule.record.p}` : ""} on ${totalsRule.games} games. ${totalsStakes(totalsRule) ? "Bets issue with a saved price and a stake." : "Its games are tracked with no stake until its forward check passes."}${totalsForwardNote(totalsRule) ? ` ${totalsForwardNote(totalsRule)}` : ""}` }
         : { name: "Totals", role: `${L} over/unders`, status: "collecting", note: "No totals cut clears the bar, so totals are tracked with no stake." },
       ...inputs,
       ...cfbModel("Projected total for every game", "Tracked from Week 9. Its overs and unders are graded with no stake until a review registers it as a source."),
@@ -201,7 +201,11 @@ function lineupAside(r: PicksReport, market: Market): string {
     const note = forwardNote(r.strategies);
     return `One rule sets stakes. Everything else is tracked.${note ? ` ${note}` : ""}`;
   }
-  if (market === "ou") return r.totals.backtest.rule ? "One rule sets stakes." : "Tracked only, no stakes.";
+  if (market === "ou") {
+    const t = r.totals.backtest.rule;
+    if (!t) return "Tracked only, no stakes.";
+    return `${totalsStakes(t) ? "One rule sets stakes." : "One rule, tracked until its forward check passes."} ${totalsForwardNote(t)}`.trim();
+  }
   return "No stakes in straight up.";
 }
 
@@ -239,7 +243,7 @@ function TopStats({ r, market, testing, logHref }: { r: PicksReport; market: Mar
       items={[
         { k: `${L} ${label.toLowerCase()}`, v: led.w + led.l + led.p ? units(led.units) : "0-0", sub: led.w + led.l + led.p ? `${rec(led)} at the price taken` : "no bets settled", tone: led.w + led.l ? (led.units >= 0 ? "up" : "down") : undefined },
         { k: "This week", v: wk && wk.w + wk.l + wk.p ? rec(wk) : "0-0", sub: finals },
-        { k: "Rule in force", v: rule ? rule.label : "None yet", sub: rule ? `${rec(rule.record)} since tracking${market === "ats" && !tierStakes(r.strategies.rule) ? ", tracked until its forward check passes" : ""}` : "nothing clears the bar", small: true },
+        { k: "Rule in force", v: rule ? rule.label : "None yet", sub: rule ? `${rec(rule.record)} since tracking${(market === "ats" ? !tierStakes(r.strategies.rule) : !totalsStakes(r.totals.backtest.rule)) ? ", tracked until its forward check passes" : ""}` : "nothing clears the bar", small: true },
         learner,
       ]}
     />

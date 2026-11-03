@@ -183,6 +183,8 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[], now = new Da
         reason:
           g.tier === "t1" && g.side === t.side
             ? `Price now ${g.price ?? "not quoted"}: no longer worth a bet`
+            : g.forwardHold
+              ? "The totals rule is tracked now: its forward check hasn't passed"
             : g.side && g.side !== t.side
               ? "Both models now lean the other way"
               : "No longer fits the totals rule at the current total",

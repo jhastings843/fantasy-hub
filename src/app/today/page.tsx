@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPicksReport, type PicksReport } from "@/lib/picks/report";
 import { getNbaBoard } from "@/lib/picks/nba-store";
-import { forwardNote } from "@/lib/picks/forward";
+import { forwardNote, totalsForwardNote, totalsStakes } from "@/lib/picks/forward";
 import { tierStakes } from "@/lib/picks/engine";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { nbaGameHref, readGame } from "../picks/nba/NbaView";
@@ -237,7 +237,7 @@ export default async function TodayPage() {
     ...reports.map((r): ModelRow => {
       const t = r.totals.backtest.rule;
       return t
-        ? { name: `${LEAGUE_NAME[r.league]} totals`, role: `Rule: ${t.label}`, status: "active", note: "Issues totals bets with a saved price and a stake." }
+        ? { name: `${LEAGUE_NAME[r.league]} totals`, role: `Rule: ${t.label}`, status: totalsStakes(t) ? "active" : "collecting", note: `${totalsStakes(t) ? "Issues totals bets with a saved price and a stake." : "Tracked with no stake until its forward check passes."}${totalsForwardNote(t) ? ` ${totalsForwardNote(t)}` : ""}` }
         : { name: `${LEAGUE_NAME[r.league]} totals`, role: "Both models agree", status: "collecting", note: "Tracked with no stake until a totals cut clears the bar." };
     }),
     nbaView

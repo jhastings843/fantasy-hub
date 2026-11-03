@@ -4,7 +4,7 @@ import type { UpdateDiff } from "./update";
 import type { JournalEntry } from "./learning/review";
 import type { Push } from "@/lib/notify/pushover";
 import { fmtUnits } from "./units";
-import { forwardNote } from "./forward";
+import { forwardNote, totalsForwardNote } from "./forward";
 import { priceWithBook } from "./shop";
 import type { StakedBet } from "@/lib/props/staked-core";
 
@@ -111,7 +111,7 @@ function totalsBlock(r: PicksReport, sel: EmailSelection): string {
     )
     .join("");
   return `<div style="padding-top:16px;">${label("Totals")}</div>
-${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.record)} in the archive.`)}
+${small(`Rule: ${t.backtest.rule.label.toLowerCase()}, ${rec(t.backtest.rule.record)} in the archive.${totalsForwardNote(t.backtest.rule) ? ` ${totalsForwardNote(t.backtest.rule)}` : ""}`)}
 ${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>` : small("No totals fit this week.")}`;
 }
 
