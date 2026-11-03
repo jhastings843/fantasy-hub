@@ -23,6 +23,7 @@ import {
   suPick,
   tally,
 } from "./engine";
+import type { ForwardCheck } from "./forward";
 import type { League } from "./parse";
 import type { PicksReport } from "./report";
 import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
@@ -98,6 +99,8 @@ export interface IssuedCut {
   test: CutTest | null;
   /** The evidence the cut was chosen on, as it stood at issue. */
   evidence: Record | null;
+  /** Its forward check at issue (forward.ts): whether the tier could stake, and its record since first chosen. */
+  forward?: ForwardCheck;
 }
 
 export interface IssuedRecord {
@@ -207,7 +210,7 @@ export function toIssued(
   meta: { issuedAt: string; emailId?: string; subject: string },
 ): IssuedRecord {
   const cut = (c: PicksReport["strategies"]["rule"]): IssuedCut | null =>
-    c ? { id: c.id, label: c.label, test: c.test, evidence: c.record } : null;
+    c ? { id: c.id, label: c.label, test: c.test, evidence: c.record, ...(c.forward ? { forward: c.forward } : {}) } : null;
   return {
     league: r.league,
     season: r.season,

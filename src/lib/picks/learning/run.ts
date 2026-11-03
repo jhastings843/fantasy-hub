@@ -3,6 +3,7 @@ import { harrisReview, harrisWeeks } from "../harris";
 import { dropPicksCore, getPicksCore, getQuotes } from "../report";
 import { activatedFor } from "../report-scope";
 import { strategies } from "../engine";
+import { applyForward } from "../forward";
 import { redis } from "@/lib/redis/client";
 import { loadForecasts } from "../forecasts";
 import { loadIssued } from "../issued-store";
@@ -53,7 +54,9 @@ async function gather(now: Date): Promise<ReviewInputs> {
             // activated cut is actually exercised by the replay.
             // On the same games the weekly rule is chosen on (weeks before this one).
             const prior = core.week ? core.graded.filter((g) => g.week < core.week!) : core.graded;
-            const replayCore = { ...core, strategies: strategies(league, prior, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" }) };
+            // With the same forward check the live board applies (forward.ts).
+            const rebuilt = strategies(league, prior, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" });
+            const replayCore = { ...core, strategies: applyForward(rebuilt, prior, core.chosen ?? null, core.week) };
             const r = compose({ core: replayCore, quotes, issued: recs, exposure: ex, policy });
             const stakes = [...r.board.map((g) => g.stake ?? 0), ...r.totals.board.map((g) => g.stake ?? 0)].filter((x) => x > 0);
             const unpriced = r.board.filter((g) => (g.stake ?? 0) > 0 && g.priceSource !== "quoted").length;

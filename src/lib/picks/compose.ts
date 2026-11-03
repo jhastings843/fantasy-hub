@@ -8,6 +8,7 @@
 // offered, and every stake is allocated against what has already been
 // issued.
 
+import type { ChosenMap } from "./forward";
 import { finishedResults } from "./finished";
 import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
@@ -64,7 +65,10 @@ export interface PicksCore {
   awaiting?: boolean;
   weeksCovered: number[];
   graded: GradedGame[];
+  /** Rule and Tier 2 carry their forward check (forward.ts). */
   strategies: StrategyBoard;
+  /** When each cut was first chosen (chosen-store.ts), for rebuilding the rule under another policy. Null: unreadable. */
+  chosen?: ChosenMap | null;
   su: { methods: SuRecord[]; bands: SuRecord[]; best: SuRecord | null };
   rows: CoreRow[];
   notes: string[];

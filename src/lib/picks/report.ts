@@ -38,6 +38,8 @@ import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
 import { loadRuleFreeze, refreezeRule, saveRuleFreeze } from "./rule-freeze";
 import { priceShadow } from "./price-shadow";
+import { noteChosen } from "./chosen-store";
+import { applyForward } from "./forward";
 import { redisStore } from "./learning/store";
 import {
   type BoardGame,
@@ -362,7 +364,11 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     betKeys,
     league === "cfb" ? { pem: sourceState(policy, "pem") === "veto" } : {},
   );
-  const s = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" });
+  const inForce = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" });
+  // The forward check (forward.ts): each tier stakes only on its record since
+  // it was first chosen, on the same settled weeks the rule is chosen on.
+  const chosen = await noteChosen(league, season, week, inForce, !!frozen, issued);
+  const s = applyForward(inForce, priorWeeks, chosen, week);
   // Straight up uses the method in force (policy.suInForce), which only the
   // strategy review changes, on games after registration; not this season's best record.
   const suAll = suRecords(league, j.graded);
@@ -409,6 +415,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     weeksCovered: [...new Set(j.graded.map((g) => g.week))].sort((a, b) => a - b),
     graded: j.graded,
     strategies: s,
+    chosen,
     su,
     rows,
     notes,
@@ -453,9 +460,19 @@ export async function getPicksCore(league: League) {
   const c = got.value;
   if (c && !c.ruleSet && c.week) {
     const f = await loadRuleFreeze(league, c.season, c.week);
-    if (f) return { ...got, value: { ...c, strategies: f.board, policyId: f.policyId, ruleSet: { at: f.reviewAt, throughWeek: f.throughWeek } } };
+    if (f) return { ...got, value: await forwardChecked(league, { ...c, policyId: f.policyId, ruleSet: { at: f.reviewAt, throughWeek: f.throughWeek } }, f.board, true) };
   }
+  // A core cached before the forward check existed gets it on read.
+  if (c && c.chosen === undefined) return { ...got, value: await forwardChecked(league, c, c.strategies, !!c.ruleSet) };
   return got;
+}
+
+/** The core with `board` in force, its tiers forward-checked (forward.ts) on the weeks before this one. */
+async function forwardChecked(league: League, c: PicksCore, board: StrategyBoard, frozen: boolean): Promise<PicksCore> {
+  const prior = c.week ? c.graded.filter((g) => g.week < c.week!) : c.graded;
+  const issued = await loadIssued(league, c.season).catch(() => []);
+  const chosen = await noteChosen(league, c.season, c.week, board, frozen, issued);
+  return { ...c, strategies: applyForward(board, prior, chosen, c.week), chosen };
 }
 
 /** This week's quotes: ten minutes fresh; `force` re-reads ESPN now. */

@@ -7,7 +7,8 @@ import { BASELINE_POLICY, FLAT_POLICY, envelopeViolations } from "./policy";
 import { compose, exposureFrom, heldCandidates, type PicksCore } from "./compose";
 import { gradeGame, strategies, suRecords, type GradedGame } from "./engine";
 import { diffUpdate, updateMatters } from "./update";
-import type { IssuedRecord } from "./issued";
+import { type IssuedRecord, selectForEmail, toIssued } from "./issued";
+import { type ChosenMap, applyForward } from "./forward";
 import { totalsCuts } from "./totals";
 import { replay, reproductionGaps, toDecision } from "./learning/replay";
 
@@ -36,6 +37,31 @@ const NOW = new Date("2026-10-13T21:30:00Z");
 const noExposure = { weekly: 0, outstanding: 0, perGame: new Map<string, number>() };
 const sumStakes = (r: ReturnType<typeof compose>) =>
   r.board.reduce((t, g) => t + (g.stake ?? 0), 0) + r.totals.board.reduce((t, g) => t + (g.stake ?? 0), 0);
+
+describe("forward check: a tier that hasn't passed stakes nowhere", () => {
+  const rows = Array.from({ length: 4 }, (_, i) => dogRow(i));
+  const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i)) };
+  const base = core(rows);
+  const run = (chosen: ChosenMap | null) => {
+    const c = { ...base, strategies: applyForward(base.strategies, graded, chosen, 6), chosen };
+    const r = compose({ core: c, quotes, issued: [], exposure: noExposure, now: NOW });
+    const sel = selectForEmail(r, 10, 10);
+    return { r, sel, rec: toIssued(r, sel, { issuedAt: "2026-10-13T22:00:00Z", subject: "t" }) };
+  };
+  it("a newly chosen rule with no forward games: no stake, no email play, no issued play", () => {
+    const { r, sel, rec } = run({});
+    expect(r.strategies.rule?.forward?.stake).toBe(false);
+    expect(r.board.every((g) => !g.stake && g.tier !== "t1" && g.tier !== "t2")).toBe(true);
+    expect(r.board.some((g) => g.forwardHold === "t1")).toBe(true);
+    expect(sel.plays).toHaveLength(0);
+    expect(sel.early).toHaveLength(0);
+    expect(rec.plays).toHaveLength(0);
+  });
+  it("the grandfathered rule still stakes while its forward sample builds", () => {
+    const { r } = run({ [base.strategies.rule!.id]: { week: 6, at: "", tier: "t1", grandfathered: true } });
+    expect(r.board.some((g) => (g.stake ?? 0) > 0)).toBe(true);
+  });
+});
 
 describe("protected envelope", () => {
   it("is pinned: an automated cycle cannot change these without this test failing", () => {
