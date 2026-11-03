@@ -51,9 +51,22 @@ export interface FbTables {
   open?: { att: number; made: number };
   /** Per team: tips it lost, and how many of those its opponent scored first. */
   teams?: { [team: string]: { lost: number; oppFirst: number } };
+  /** Event ids already folded in, the latest few hundred (tables saved from 2026-11-03 on). */
+  seen?: string[];
 }
 
 export const emptyTables = (): FbTables => ({ tips: {}, starts: {}, tipTeamFirst: { n: 0, first: 0 } });
+
+/** Event ids the First Basket tables remember (only recent finals are ever retried). */
+export const FB_SEEN_KEEP = 400;
+
+/** foldFb that skips a game the tables already hold, so a retried final is not counted twice. Returns false when skipped. */
+export function foldFbOnce(t: FbTables, g: NbaGame): boolean {
+  if (t.seen?.includes(g.id)) return false;
+  foldFb(t, g);
+  t.seen = [...(t.seen ?? []), g.id].slice(-FB_SEEN_KEEP);
+  return true;
+}
 
 /** Fold a final into the tables (in place). Needs the tip and the shots up to the first make. */
 export function foldFb(t: FbTables, g: NbaGame) {

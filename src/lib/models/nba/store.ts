@@ -12,10 +12,10 @@ import { readMilestones, readPropBets, type LiveLine, type PropBetRow } from "..
 import { OUR_SECTION, fbCandidates, ourPropCandidates, type FbGradedBoard } from "../learn";
 import { compactGame, type EspnNbaSummary, type NbaGame } from "./box";
 import { allowedTables } from "./allowed";
-import { ROTATION_GAMES, ingest, rotation, type PlayerEntry, type SeasonSummary, type TeamEntry } from "./history";
+import { ROTATION_GAMES, ingestOnce, rotation, type PlayerEntry, type SeasonSummary, type TeamEntry } from "./history";
 import { ourGame, ourMarkets, type OurMarketExtra } from "./market";
 import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } from "./props";
-import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFb, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
+import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFbOnce, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
 import { getKotcNights, runKotc, type KotcGameInput } from "./kotc-store";
 import { SECTIONS, kotcCandidates, lottoCandidates } from "../sections";
 import { rungsOf, tickets as lottoTickets } from "./lotto";
@@ -61,6 +61,8 @@ export const K = {
   players: (s: number) => `models:v1:nba:${s}:players`,
   teams: (s: number) => `models:v1:nba:${s}:teams`,
   ingested: (s: number) => `models:v1:nba:${s}:ingested`,
+  /** Held while one run folds finals in (SET NX EX). */
+  ingestLock: (s: number) => `models:v1:nba:${s}:ingest-lock`,
   games: (s: number) => `models:v1:nba:${s}:games`,
   week: (s: number, w: number) => `props:v1:ours:nba:${s}:w${w}`,
   weeks: (s: number) => `props:v1:ours:nba:${s}:weeks`,
@@ -118,41 +120,70 @@ export async function scoreboard(now: Date, from: number, to: number): Promise<S
   return out;
 }
 
-/** Fold finished games we haven't seen into the season's tables. */
+/** How long one ingest run may hold the lock; a crashed run frees it on its own. */
+export const INGEST_LOCK_SECONDS = 300;
+
+/**
+ * Fold finished games we haven't seen into the season's tables.
+ *
+ * Safe to retry and to run twice at once (audit 2026-11-03):
+ * - one run at a time: a short Redis lock (SET NX EX); a second run skips ingesting.
+ * - per game: player histories skip a game they already hold (same date and team),
+ *   the team and First Basket tables carry the event ids they hold and skip those.
+ * - the "ingested" marker is written LAST, after the team and First Basket tables
+ *   are saved, so a timeout part way leaves the game to the next run, which
+ *   completes it without counting anything twice.
+ */
 export async function ingestFinals(season: number, finals: string[], report: { problems: string[] }): Promise<string[]> {
   const seen = new Set(((await redis.smembers(K.ingested(season))) ?? []).map(String));
   const todo = finals.filter((id) => !seen.has(id));
   if (!todo.length) return [];
-  const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
-  const fb = (await redis.get<FbTables>(K.fb)) ?? emptyTables();
-  const done: string[] = [];
-  for (const id of todo) {
-    try {
-      const g = compactGame(id, await json<EspnNbaSummary>(`${SITE}/summary?event=${id}`));
-      if (!g) continue;
-      await foldGame(season, g, teams, fb);
-      done.push(id);
-    } catch (e) {
-      report.problems.push(`ingest ${id}: ${e instanceof Error ? e.message : String(e)}`);
-    }
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const got = await redis.set(K.ingestLock(season), token, { nx: true, ex: INGEST_LOCK_SECONDS });
+  if (got === null) {
+    report.problems.push("NBA ingest: another run holds the lock, finals left for the next run");
+    return [];
   }
-  await redis.set(K.teams(season), teams);
-  await redis.set(K.fb, fb);
-  return done;
+  try {
+    const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
+    const fb = (await redis.get<FbTables>(K.fb)) ?? emptyTables();
+    const done: string[] = [];
+    for (const id of todo) {
+      try {
+        const g = compactGame(id, await json<EspnNbaSummary>(`${SITE}/summary?event=${id}`));
+        if (!g) continue;
+        await foldGame(season, g, teams, fb);
+        done.push(id);
+      } catch (e) {
+        report.problems.push(`ingest ${id}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    if (!done.length) return [];
+    await redis.set(K.teams(season), teams);
+    await redis.set(K.fb, fb);
+    await redis.sadd(K.ingested(season), done[0], ...done.slice(1));
+    return done;
+  } finally {
+    if ((await redis.get<string>(K.ingestLock(season))) === token) await redis.del(K.ingestLock(season));
+  }
 }
 
-/** One game into the player table, the team table (caller saves it) and the game hash. */
+/**
+ * One game into the player table and the game hash (saved here), and into the
+ * team and First Basket tables (changed in place; the caller saves them, then
+ * marks the game ingested). Idempotent: a game already held is not added again.
+ */
 export async function foldGame(season: number, g: NbaGame, teams: { [t: string]: TeamEntry }, fb?: FbTables) {
-  if (fb) foldFb(fb, g);
+  if (fb) foldFbOnce(fb, g);
   const ids = g.players.map((l) => l.id);
   const got = ids.length ? await redis.hmget<{ [id: string]: PlayerEntry }>(K.players(season), ...ids) : null;
   const players: { [id: string]: PlayerEntry } = {};
   for (const id of ids) if (got?.[id]) players[id] = got[id];
-  ingest(players, teams, g);
-  await redis.hset(K.players(season), players);
+  const added = ingestOnce(players, teams, g);
+  const changed = Object.fromEntries(added.map((id) => [id, players[id]]));
+  if (added.length) await redis.hset(K.players(season), changed);
   // First Basket only needs the tip, the starters and the shots.
   await redis.hset(K.games(season), { [g.id]: { ...g, players: g.players.map((l) => ({ ...l, name: "" })) } });
-  await redis.sadd(K.ingested(season), g.id);
 }
 
 export interface OurNbaReport {

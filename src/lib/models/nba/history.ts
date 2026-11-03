@@ -115,6 +115,8 @@ export interface TeamEntry {
   poss: number[];
   /** Player ids who appeared, per game, the latest ROTATION_GAMES games. */
   recent: string[][];
+  /** Event ids already folded in, the latest SEEN_KEEP (entries saved from 2026-11-03 on). */
+  seen?: string[];
 }
 
 /** A team's rotation is everyone who played in its last few games. */
@@ -136,3 +138,31 @@ export function ingest(players: { [id: string]: PlayerEntry }, teams: { [team: s
 }
 
 export const rotation = (t: TeamEntry | undefined) => [...new Set((t?.recent ?? []).flat())];
+
+/** Event ids an aggregate remembers, so a retried game is not counted twice (only recent games are ever retried). */
+export const SEEN_KEEP = 60;
+
+/**
+ * Idempotent version of ingest for the live store: a player who already has a
+ * game on this date for this team keeps one copy, and a team whose entry
+ * already lists this event id is left alone. Safe to run on the same final
+ * twice (a retry after a timeout). Returns the player ids that got the game.
+ */
+export function ingestOnce(players: { [id: string]: PlayerEntry }, teams: { [team: string]: TeamEntry }, g: NbaGame): string[] {
+  for (const team of [g.home, g.away]) {
+    const t = (teams[team] ??= { poss: [], recent: [] });
+    if (t.seen?.includes(g.id)) continue;
+    if (g.poss[team] !== undefined) t.poss.push(g.poss[team]);
+    t.recent = [...t.recent, g.players.filter((l) => l.team === team).map((l) => l.id)].slice(-ROTATION_GAMES);
+    t.seen = [...(t.seen ?? []), g.id].slice(-SEEN_KEEP);
+  }
+  const added: string[] = [];
+  for (const l of g.players) {
+    const p = (players[l.id] ??= { name: l.name, pos: posOf(l.pos), games: [] });
+    p.name = l.name;
+    if (p.games.some((x) => x.date === g.date && x.team === l.team)) continue;
+    p.games.push({ date: g.date, team: l.team, min: l.min, starter: l.starter, pts: l.pts, reb: l.reb, ast: l.ast, threes: l.threes });
+    added.push(l.id);
+  }
+  return added;
+}

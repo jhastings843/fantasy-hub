@@ -21,6 +21,7 @@ export function fakeRedis() {
     async hset(k: string, f: Record<string, unknown>) { const h = hashes.get(k) ?? new Map(); Object.entries(f).forEach(([a, b]) => h.set(a, clone(b))); hashes.set(k, h); return Object.keys(f).length; },
     async hsetnx(k: string, f: string, v: unknown) { const h = hashes.get(k) ?? new Map(); if (h.has(f)) return 0; h.set(f, v); hashes.set(k, h); return 1; },
     async hget<T>(k: string, f: string): Promise<T | null> { return (clone(hashes.get(k)?.get(f)) as T) ?? null; },
+    async hmget<T>(k: string, ...f: string[]): Promise<T | null> { const h = hashes.get(k); if (!h) return null; const o: Record<string, unknown> = {}; for (const x of f) o[x] = h.has(x) ? clone(h.get(x)) : null; return o as T; },
     async hgetall<T>(k: string): Promise<T | null> { const h = hashes.get(k); return h ? (Object.fromEntries([...h].map(([a, b]) => [a, clone(b)])) as T) : null; },
     async hkeys(k: string) { return [...(hashes.get(k)?.keys() ?? [])]; },
     async rpush(k: string, ...v: unknown[]) { const l = lists.get(k) ?? []; l.push(...v.map(clone)); lists.set(k, l); return l.length; },

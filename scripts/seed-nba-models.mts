@@ -22,13 +22,16 @@ await redis.set(K.prior(season), summarize(load(season - 1)));
 console.log(`prior for ${season} saved from ${season - 1}`);
 const seen = new Set(((await redis.smembers(K.ingested(season))) ?? []).map(String));
 const teams = (await redis.get<{ [t: string]: TeamEntry }>(K.teams(season))) ?? {};
-let n = 0;
+const folded: string[] = [];
 for (const g of load(season)) {
   if (seen.has(g.id)) continue;
   await foldGame(season, g, teams);
-  n++;
+  folded.push(g.id);
 }
+const n = folded.length;
 await redis.set(K.teams(season), teams);
+// Marker last, after the team table is saved (foldGame no longer writes it).
+if (n) await redis.sadd(K.ingested(season), folded[0], ...folded.slice(1));
 console.log(`${n} games folded into ${season}`);
 // First Basket tables: rebuilt from every cached season (cumulative; finals after this are folded in by the live run).
 const fb = emptyTables();
