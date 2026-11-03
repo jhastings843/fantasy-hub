@@ -106,6 +106,13 @@ describe("attdStakedBets", () => {
     const bets = attdStakedBets({ boards: [g], entries: [entry("attd:value")], now, today, section: "nfl-attd-ours" });
     expect(bets.map((b) => b.player)).toEqual(["Josh Jacobs"]);
   });
+  it("a live Venom slice stakes his picks once his board is in, and names itself", () => {
+    const g = { game: { slug: "2026_09_DAL_GB", away: "DAL", home: "GB" } as never, kickoff: tip, attd: { rows: [{ id: "1", key: "jjacobs", name: "Josh Jacobs", team: "GB", m: 0.8, anytime: 0.55, two: 0.2, dk: -110 }, { id: "3", key: "tkraft", name: "Tucker Kraft", team: "GB", m: 0.4, anytime: 0.35, two: 0.05, dk: 200 }] } };
+    const es = [entry("attd:venom")];
+    expect(attdStakedBets({ boards: [g], entries: es, now, today, section: "nfl-attd-ours" })).toEqual([]);
+    const bets = attdStakedBets({ boards: [g], entries: es, now, today, section: "nfl-attd-ours", venom: new Set(["tkraft"]) });
+    expect(bets.map((b) => [b.player, b.slice])).toEqual([["Tucker Kraft", "Slice attd:venom"]]);
+  });
 });
 
 describe("lottoStaked", () => {

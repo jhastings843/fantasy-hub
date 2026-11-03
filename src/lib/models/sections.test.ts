@@ -85,6 +85,43 @@ describe("Live slices mark bets", () => {
     expect(ticketStaked([entry("lotto:value", "active", live)], "2026-10-28T23:00:00Z")).toBe(false);
   });
 
+  it("Anytime TD: a live Venom slice stakes, only when his board is in", () => {
+    const at = "2026-10-28T17:00:00Z";
+    const v = [entry("attd:venom", "active", live)];
+    expect(attdStaked(v, at, 0.5, 150, true)).toBe(true);
+    expect(attdStaked(v, at, 0.5, 150, false)).toBe(false);
+    expect(attdStaked(v, at, 0.5, 150)).toBe(false); // no board this week
+    expect(attdStaked(v, at, 0.3, 150, true)).toBe(false); // not a value bet
+    expect(attdStaked([entry("attd:novenom", "active", live)], at, 0.5, 150, false)).toBe(true);
+  });
+
+  it("Anytime TD: a live learner combination stakes what both halves keep", () => {
+    const at = "2026-10-28T17:00:00Z";
+    const g = [entry("gen:attd:edge5&attd:venom", "active", live)];
+    expect(attdStaked(g, at, 0.5, 150, true)).toBe(true); // 50% vs 40%, Venom picks him
+    expect(attdStaked(g, at, 0.42, 150, true)).toBe(false); // value, not 5 points
+    expect(attdStaked(g, at, 0.5, 150, false)).toBe(false);
+  });
+
+  it("staking and the learner use one membership test: every candidate bet is stakeable by its own slice", () => {
+    const row = (key: string, anytime: number, dk: number) => ({ id: key, name: key, team: "KC", key, m: 0, anytime, two: 0, dk });
+    const rows = [row("a", 0.5, 150), row("b", 0.3, 300), row("c", 0.42, 150), row("d", 0.2, 120)];
+    const at = "2026-10-28T17:00:00Z";
+    const picks = new Set(["a", "c"]);
+    const games = [{ slug: "g1", week: 8, at, rows, result: { a: 1, b: 0, c: 0, d: 1 } as Record<string, number | null> }];
+    for (const c of attdCandidates(games, new Map([[8, picks]]))) {
+      const kept = new Set(c.bets.map((b) => b.key!.split("|")[1]));
+      for (const r of rows) expect([c.id, r.key, attdStaked([entry(c.id, "active", live)], at, r.anytime, r.dk, picks.has(r.key))]).toEqual([c.id, r.key, kept.has(r.key)]);
+    }
+  });
+
+  it("Lottos: a live learner combination of two rung slices", () => {
+    const rung = { over: 800, ev: 0.2, stat: "reb", at: "2026-10-28T23:00:00Z" } as never;
+    expect(rungStaked([entry("gen:lotto:long&lotto:reb", "active", live)], rung)).toBe(true);
+    expect(rungStaked([entry("gen:lotto:long&lotto:pts", "active", live)], rung)).toBe(false);
+    expect(rungStaked([entry("gen:lotto:unknown&lotto:reb", "active", live)], rung)).toBe(false);
+  });
+
   it("King of the Court: the widest live top-N, 0 when none", () => {
     const es = [entry("kotc:top3", "active", live), entry("kotc:fav", "active", live), entry("kotc:top10", "collecting")];
     expect(kotcStakedTop(es, "2026-10-28T23:00:00Z")).toBe(3);

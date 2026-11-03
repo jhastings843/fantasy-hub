@@ -23,7 +23,7 @@ import { davidSide, davidSliceSide, samOn, type DavidGame, type DavidProp, type 
 import type { StoredProps } from "./store";
 import { systemHits, systemSide } from "./system";
 import { FB_SLICES, OUR_FTD_SLICES, VENOM_KEEP, davidFar, pickDavidSlice, pickOurSlice, venomLean, type FbGradedBoard, type VenomProps } from "@/lib/models/learn";
-import { ATTD_SLICES, attdStaked, kotcStakedTop, rungStaked, ticketStaked } from "@/lib/models/sections";
+import { ATTD_MEMBERS, LOTTO_MEMBERS, attdStaked, inSlice, kotcStakedTop, rungStaked, ticketStaked } from "@/lib/models/sections";
 import type { AttdRow } from "@/lib/models/nfl/anytime";
 import { bestCost, bookPrice, type Books } from "@/lib/models/nfl/ftd-price";
 import { pricedPlayers, type FtdGame } from "@/lib/firsttd/parse";
@@ -318,13 +318,16 @@ export function samFtdStaked(input: { boards: { game: FtdGame; kickoff?: string;
 // --------------------------------------------------------------- Anytime TD
 
 /** Our Anytime TD at DraftKings (section nfl-attd-ours): attdStaked, the page's own test. */
-export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: string; espnId?: string; attd?: { rows: AttdRow[] }; attdResult?: unknown }[]; entries: LiveEntry[]; now: Date; today: string; section: string }): StakedBet[] {
+export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: string; espnId?: string; attd?: { rows: AttdRow[] }; attdResult?: unknown }[]; entries: LiveEntry[]; now: Date; today: string; section: string; venom?: Set<string> }): StakedBet[] {
   if (!anyLive(input.entries)) return [];
   return input.boards.flatMap((g) => {
     if (!g.attd || g.attdResult || !openToday(g.kickoff, input.now, input.today)) return [];
     return g.attd.rows.flatMap((r): StakedBet[] => {
-      if (r.dk === undefined || !attdStaked(input.entries, g.kickoff, r.anytime, r.dk)) return [];
-      const slices = liveKeeping(input.entries, g.kickoff!, (id) => !!ATTD_SLICES.find(([x]) => x === id)?.[2](r.anytime, r.dk!));
+      // Venom's picks this week (by nameKey), undefined when his board isn't in: the Venom slices then keep nobody.
+      const venom = input.venom ? input.venom.has(r.key) : undefined;
+      if (r.dk === undefined || !attdStaked(input.entries, g.kickoff, r.anytime, r.dk, venom)) return [];
+      const play = { ours: r.anytime, price: r.dk, ...(venom !== undefined ? { venom } : {}) };
+      const slices = liveKeeping(input.entries, g.kickoff!, (id) => inSlice(ATTD_MEMBERS, id, play));
       return [
         {
           id: `${input.section}|${g.game.slug}|${r.key}`,
@@ -413,7 +416,7 @@ export function lottoStaked(input: { rungs: Rung[]; ticket: Ticket | null; entri
       priceText: `${am(r.over)} DraftKings`,
       book: "DraftKings",
       kickoff: r.at,
-      slice: input.entries.filter((e) => e.status === "active" && e.id !== "lotto:ticket").map((e) => e.label).join("; "),
+      slice: liveKeeping(input.entries, r.at, (id) => inSlice(LOTTO_MEMBERS, id, r)).join("; ") || "Live lotto slice",
       stake: 1,
       href: "/props?m=lotto",
     });

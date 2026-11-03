@@ -25,6 +25,12 @@ export async function loadVenomPicks(season: number): Promise<Map<number, Set<st
   return out;
 }
 
+/** One week of loadVenomPicks: his picks' name keys, or undefined when that week was never uploaded. */
+export async function loadVenomWeekPicks(season: number, week: number): Promise<Set<string> | undefined> {
+  const rows = (await redis.get<{ name: string }[]>(VENOM_KEY(season, week)).catch(() => null)) ?? [];
+  return rows.length ? new Set(rows.map((r) => nameKey(r.name))) : undefined;
+}
+
 export const VENOM_PROPS_KEY = (season: number, week: number) => `venom:v1:nfl:props:${season}:w${week}`;
 export const VENOM_PROPS_WEEKS = (season: number) => `venom:v1:nfl:props:${season}:weeks`;
 

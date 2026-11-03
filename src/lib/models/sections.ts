@@ -56,39 +56,52 @@ export const VENOM_SLICES: [string, string, boolean][] = [
   ["attd:novenom", "Our value bets Venom doesn't pick", false],
 ];
 
-/** Graded Anytime TD boards (with kickoff) into the engine's candidates. Players who didn't play are void and left out. */
-export function attdCandidates(games: (AttdGraded & { at: string })[], venom?: Map<number, Set<string>>): Candidate[] {
-  const venomSlices: Candidate[] = venom
-    ? VENOM_SLICES.map(([id, label, agrees]) => ({
-        id,
-        label,
-        parent: "attd:value",
-        bets: games.flatMap((g) => {
-          const picks = venom.get(g.week);
-          if (!picks) return [];
-          return g.rows.flatMap((r): Bet[] => {
-            const t = g.result[r.key];
-            if (r.dk === undefined || t === null || t === undefined || !(r.anytime > implied(r.dk)) || picks.has(r.key) !== agrees) return [];
-            return [{ game: g.slug, key: `${g.slug}|${r.key}`, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1) }];
-          });
-        }),
-      }))
-    : [];
-  return [...baseAttd(games), ...venomSlices];
+/**
+ * One Anytime TD play as every slice sees it: our chance, DK's price, and
+ * whether Venom picks him (undefined: no Venom board that week, so the Venom
+ * slices hold nothing, in the learner and in staking alike).
+ */
+export interface AttdPlay {
+  ours: number;
+  price: number;
+  venom?: boolean;
 }
 
-function baseAttd(games: (AttdGraded & { at: string })[]): Candidate[] {
-  return ATTD_SLICES.map(([id, label, keep]) => ({
+/** Every Anytime TD slice's membership test, by id: the learner's candidates and staking both read this. */
+export const ATTD_MEMBERS: Map<string, (x: AttdPlay) => boolean> = new Map([
+  ...ATTD_SLICES.map(([id, , keep]): [string, (x: AttdPlay) => boolean] => [id, (x) => keep(x.ours, x.price)]),
+  ...VENOM_SLICES.map(([id, , agrees]): [string, (x: AttdPlay) => boolean] => [id, (x) => x.venom !== undefined && x.ours > implied(x.price) && x.venom === agrees]),
+]);
+
+/**
+ * Is a play in slice `id`? Code slices by their test; the learner's own
+ * combinations (engine.ts expand: `gen:a&b`, the bets a shares with b) when
+ * it is in both. Unknown ids hold nothing. Pure.
+ */
+export function inSlice<T>(members: Map<string, (x: T) => boolean>, id: string, x: T): boolean {
+  if (id.startsWith("gen:")) {
+    const parts = id.slice(4).split("&");
+    return parts.length >= 2 && parts.every((p) => !p.startsWith("gen:") && inSlice(members, p, x));
+  }
+  return members.get(id)?.(x) ?? false;
+}
+
+/** Graded Anytime TD boards (with kickoff) into the engine's candidates. Players who didn't play are void and left out. */
+export function attdCandidates(games: (AttdGraded & { at: string })[], venom?: Map<number, Set<string>>): Candidate[] {
+  const ids = [...ATTD_SLICES.map(([id, label]) => [id, label]), ...(venom ? VENOM_SLICES.map(([id, label]) => [id, label]) : [])];
+  return ids.map(([id, label]) => ({
     id,
     label,
     ...(id === "attd:value" ? {} : { parent: "attd:value" }),
-    bets: games.flatMap((g) =>
-      g.rows.flatMap((r): Bet[] => {
+    bets: games.flatMap((g) => {
+      const picks = venom?.get(g.week);
+      return g.rows.flatMap((r): Bet[] => {
         const t = g.result[r.key];
-        if (r.dk === undefined || t === null || t === undefined || !keep(r.anytime, r.dk)) return [];
+        if (r.dk === undefined || t === null || t === undefined) return [];
+        if (!inSlice(ATTD_MEMBERS, id, { ours: r.anytime, price: r.dk, ...(picks ? { venom: picks.has(r.key) } : {}) })) return [];
         return [{ game: g.slug, key: `${g.slug}|${r.key}`, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1) }];
-      }),
-    ),
+      });
+    }),
   }));
 }
 
@@ -111,11 +124,11 @@ export const LOTTO_SLICES: [string, string, RungKeep][] = [
 /** Graded rungs (with kickoff) and nightly tickets into candidates. Season sets the week numbers. */
 export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number): Candidate[] {
   const graded = rungs.filter((r) => r.hit === true || r.hit === false);
-  const rungSlices = LOTTO_SLICES.map(([id, label, keep]): Candidate => ({
+  const rungSlices = LOTTO_SLICES.map(([id, label]): Candidate => ({
     id,
     label,
     ...(id === "lotto:value" ? {} : { parent: "lotto:value" }),
-    bets: graded.filter(keep).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1) })),
+    bets: graded.filter((r) => inSlice(LOTTO_MEMBERS, id, r)).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1) })),
   }));
   // The ticket at its real stake: one per night, so it needs the long gate's patience.
   const ticket: Candidate = {
@@ -185,17 +198,23 @@ type LiveEntry = Pick<Entry, "id" | "activatedAt"> & { status: ViewStatus };
 const liveFor = (entries: LiveEntry[], at: string | undefined) =>
   new Set(entries.filter((e) => e.status === "active" && e.activatedAt && at && Date.parse(at) >= Date.parse(e.activatedAt)).map((e) => e.id));
 
-/** Anytime TD: a live slice keeps this player at DK's price. */
-export function attdStaked(entries: LiveEntry[], kickoff: string | undefined, ours: number, price: number | undefined): boolean {
+/**
+ * Anytime TD: a live slice keeps this player at DK's price. Any slice that can
+ * go live can stake: the code's slices, the Venom slices (pass `venom`: is he
+ * in Venom's picks this week, undefined when no board) and the learner's own
+ * combinations, all through ATTD_MEMBERS, the learner's own test.
+ */
+export function attdStaked(entries: LiveEntry[], kickoff: string | undefined, ours: number, price: number | undefined, venom?: boolean): boolean {
   if (price === undefined) return false;
-  const live = liveFor(entries, kickoff);
-  return ATTD_SLICES.some(([id, , keep]) => live.has(id) && keep(ours, price));
+  return [...liveFor(entries, kickoff)].some((id) => inSlice(ATTD_MEMBERS, id, { ours, price, ...(venom !== undefined ? { venom } : {}) }));
 }
 
-/** Lottos: a live rung slice keeps this rung. */
+/** Every rung slice's membership test, by id (the ticket is not a rung slice). */
+export const LOTTO_MEMBERS: Map<string, (r: Pick<Rung, "over" | "ev" | "stat">) => boolean> = new Map(LOTTO_SLICES.map(([id, , keep]) => [id, (r) => keep(r as Rung)]));
+
+/** Lottos: a live rung slice, or a live combination of two, keeps this rung. */
 export function rungStaked(entries: LiveEntry[], r: Pick<Rung, "over" | "ev" | "stat" | "at">): boolean {
-  const live = liveFor(entries, r.at);
-  return LOTTO_SLICES.some(([id, , keep]) => live.has(id) && keep(r as Rung));
+  return [...liveFor(entries, r.at)].some((id) => inSlice(LOTTO_MEMBERS, id, r));
 }
 
 /** Lottos: the nightly ticket's slice is live for a night tipping at `at`. */

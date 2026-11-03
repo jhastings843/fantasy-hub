@@ -3,7 +3,7 @@
 // tracked edges, every game, graded games, the four numbers and the gate.
 // Paper only: edges are graded flat 1u until a learner slice clears its gate.
 import { getOurFtdView, attdGraded, getAttdLearning, loadAttdParlays, loadNightParlays } from "@/lib/models/nfl/ftd-store";
-import { loadVenomChances } from "@/lib/models/nfl/venom";
+import { loadVenomChances, loadVenomWeekPicks } from "@/lib/models/nfl/venom";
 import { PARLAY_LEGS, SLATE_LABEL, tickets, type AttdParlay, type ParlayOutcome } from "@/lib/models/nfl/attd-parlay";
 import { ParlayPicker } from "./ParlayPicker";
 import { ATTD_EDGE, attdEdges, summarizeAttd, type AttdRow } from "@/lib/models/nfl/anytime";
@@ -344,15 +344,19 @@ export async function AttdWeek({ season }: { season: number }) {
   const [v, graded, learning] = await Promise.all([getOurFtdView(season).catch(() => null), attdGraded(season).catch(() => []), getAttdLearning(season).catch(() => null)]);
   if (!v || !learning) return <p className={s.calm}>The Anytime TD board couldn&apos;t be read just now.</p>;
   const now = nowMs();
-  const venom = v.week ? await loadVenomChances(season, v.week).catch(() => new Map<string, number>()) : new Map<string, number>();
+  const [venom, venomPicks] = v.week
+    ? await Promise.all([loadVenomChances(season, v.week).catch(() => new Map<string, number>()), loadVenomWeekPicks(season, v.week).catch(() => undefined)])
+    : [new Map<string, number>(), undefined];
+  // Same test the staked bets use (staked-core attdStakedBets): a live Venom slice can stake once his board is in.
+  const staked = (kickoff: string | undefined, r: AttdRow) => attdStaked(learning.entries, kickoff, r.anytime, r.dk, venomPicks ? venomPicks.has(r.key) : undefined);
   const open = v.board.filter((g) => g.attd && !g.attdResult).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
   const ahead = open.filter((g) => !g.kickoff || Date.parse(g.kickoff) > now);
   const edges: Edge[] = ahead
     .flatMap((g) =>
       g.attd!.rows.flatMap((r) =>
-        withBet(r, attdStaked(learning.entries, g.kickoff, r.anytime, r.dk)).map(
+        withBet(r, staked(g.kickoff, r)).map(
           (x): Edge => ({
-            staked: x.side === "anytime" && attdStaked(learning.entries, g.kickoff, r.anytime, r.dk),
+            staked: x.side === "anytime" && staked(g.kickoff, r),
             key: `${g.game.slug}|${r.key}|${x.side}`,
             player: `${r.name} ${r.team}`,
             game: `${g.game.away} at ${g.game.home}`,
