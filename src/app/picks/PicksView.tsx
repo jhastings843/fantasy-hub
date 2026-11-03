@@ -113,19 +113,19 @@ export default async function PicksView({ league, market: asked, view }: { leagu
           <Warnings r={r} coreStale={fresh?.stale ?? false} />
           {view !== "week" && <TopStats r={r} market={market} testing={testing} logHref={href(league, market, "log")} />}
         </header>
-        {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
-
+        {/* The picks first on every board view (phone check: first pick within 900px); who decides, the pool entry and the records follow. */}
         {market === "ats" && view === "week" && <AtsWeek r={r} live={live} />}
         {market === "ats" && view === "results" && <AtsResults r={r} />}
         {market === "ats" && view === "research" && <AtsResearch r={r} panel={league === "cfb" ? <><HarrisCard /><CfbModelCard season={r.season} /></> : <OurSpreadCard season={r.season} />} />}
-        {market === "su" && view === "week" && league === "nfl" && <PoolCard />}
         {market === "su" && view === "week" && <SuWeek r={r} poolShares={poolShares} />}
+        {market === "su" && view === "week" && league === "nfl" && <PoolCard />}
         {market === "su" && view === "results" && <SuResults r={r} poolTrack={poolTrack} />}
         {market === "su" && view === "research" && <SuResearch r={r} />}
         {market === "ou" && view === "week" && <TotalsWeek r={r} live={live} />}
         {market === "ou" && view === "results" && <TotalsResults r={r} />}
         {market === "ou" && view === "research" && <TotalsResearch r={r} />}
         {view === "log" && <PicksLog league={league} market={market} />}
+        {view === "week" && <ModelLineup title={`Who decides ${LEAGUE_NAME[league]} ${MARKETS.find((m) => m.id === market)!.label.toLowerCase()}`} aside={lineupAside(r, market)} models={lineup(r, market, active)} />}
         {view === "week" && <TopStats r={r} market={market} testing={testing} logHref={href(league, market, "log")} />}
 
         <Background title="Budget and exposure">

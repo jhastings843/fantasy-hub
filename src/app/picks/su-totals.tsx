@@ -96,7 +96,7 @@ export function SuWeek({ r, poolShares, finishedOnly = false }: { r: PicksReport
     <section className={s.section} aria-labelledby="su-week">
       <SecHead id="su-week" title="Straight up" aside={upcoming.length ? "Who wins, surest first" : done.length ? "Every game played" : "No games on the board yet"} />
       <SuSub
-        text={`${r.league === "nfl" ? "For the Weekly payout pool use the entry above; this list is for a confidence pool. " : ""}Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l} this season)` : ""}. Pick'em only: no stake.`}
+        text={`${r.league === "nfl" ? "For the Weekly payout pool use the entry below this list; the list is for a confidence pool. " : ""}Follows ${r.su.best?.label.toLowerCase() ?? "the average of both models"}${r.su.best ? ` (${r.su.best.w}-${r.su.best.l} this season)` : ""}. Pick'em only: no stake.`}
       />
       {upcoming.length > 0 ? (
         <div className={s.section}>
@@ -135,11 +135,11 @@ export function SuWeek({ r, poolShares, finishedOnly = false }: { r: PicksReport
           <p className={s.thin}>1 is the surest: in a confidence pool give it the most points. The chip is the projected margin band, not a probability. Pick&apos;em only, never staked.</p>
         </div>
       ) : (
-        !done.length && <p className={s.calm}>No games on the board yet.</p>
+        !done.length && <p className={s.calm} data-first-pick>No games on the board yet.</p>
       )}
 
       {done.length > 0 && (
-        <p className={s.thin}>
+        <p className={s.thin} {...(upcoming.length ? {} : { "data-first-pick": "" })}>
           {`${done.length} final this week (picks ${doneW}-${done.length - doneW}): `}
           <Link href={href(r.league, "su", "results")} className={s.linkA}>see Results</Link>.
         </p>
@@ -334,7 +334,7 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
     return `${rs.filter((x) => x === "W").length}-${rs.filter((x) => x === "L").length}${rs.some((x) => x === "P") ? `-${rs.filter((x) => x === "P").length}` : ""}`;
   })();
   const table = (
-    <div className={s.gtable}>
+    <div className={s.gtable} data-first-pick>
       <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
         <span>Game</span>
         <span>Total</span>
@@ -420,8 +420,8 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
       />
       {boardRows.length > 0 ? (
         <div className={s.section}>
-          <ReadLegend />
           {table}
+          <ReadLegend />
           <p className={s.p}>
             {`Started games first, then the strongest reads. ${bets.length ? "" : "Tracked, not bet, until a totals cut earns a rule."}`}
             {done.length > 0 && (

@@ -533,8 +533,7 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
       {sub && <p className={s.p}>{sub}</p>}
       {open.length > 0 ? (
         <div className={s.section}>
-          <ReadLegend />
-          <div className={s.gtable}>
+          <div className={s.gtable} data-first-pick>
             <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
               <span>Game</span>
               <span>Market</span>
@@ -547,6 +546,7 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
               <LedgerRow key={`${g.away}@${g.home}`} g={g} r={r} live={findGame(live, r.league, g.away, g.home)} />
             ))}
           </div>
+          <ReadLegend />
           <p className={s.p}>
             {`Started games first, then by kickoff. Home spread throughout. Open a game for every reason.`}
             {finished.length > 0 && (
@@ -559,12 +559,12 @@ export function AtsWeek({ r, live = [] }: { r: PicksReport; live?: LiveGame[] })
           {near.length + best.length > 0 && <MarketKey pem={r.league === "cfb"} />}
         </div>
       ) : finished.length > 0 ? (
-        <p className={s.calm}>
+        <p className={s.calm} data-first-pick>
           {`Every game this week is final. `}
           <Link href={href(r.league, "ats", "results")} className={s.linkA}>See them game by game in Results</Link>.
         </p>
       ) : (
-        <p className={s.calm}>No games on the board yet.</p>
+        <p className={s.calm} data-first-pick>No games on the board yet.</p>
       )}
       <Background>
         <p className={s.p}>{ruleSetLine(r)}</p>
