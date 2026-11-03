@@ -16,7 +16,7 @@ import { getOurNflView } from "@/lib/models/nfl/store";
 import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { loadVenomProps } from "@/lib/models/nfl/venom";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
-import { attdStakedBets, fbStaked, kotcStaked, lottoStaked, nbaPicksStaked, ourFtdStaked, ourPropsStaked, samFtdStaked, systemStaked, tidy, type LiveEntry, type StakedBet } from "./staked-core";
+import { attdStakedBets, fbStaked, kotcStaked, lottoStaked, nbaPicksStaked, ourFtdStaked, ourPropsStaked, samFtdStaked, systemStaked, tidy, limitProps, type LiveEntry, type StakedBet } from "./staked-core";
 
 export type { StakedBet } from "./staked-core";
 
@@ -122,7 +122,8 @@ export async function stakedPropsToday(at = new Date(), opts: { since?: Date } =
         })
       : [],
   ]);
-  return { bets: tidy(parts.flat()), problems };
+  const { bets, cut } = limitProps(tidy(parts.flat()));
+  return { bets, problems: [...problems, ...cut.map((c) => `not staked: ${c}`)] };
 }
 
 /** NBA picks' staked tier bets today, not tipped (none unless the go-live gate is on). */

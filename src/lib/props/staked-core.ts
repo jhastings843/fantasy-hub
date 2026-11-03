@@ -498,6 +498,51 @@ export function tidy(bets: StakedBet[]): StakedBet[] {
     .sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.sectionName.localeCompare(b.sectionName) || a.pick.localeCompare(b.pick));
 }
 
+/**
+ * Limits on staked props before anything is emailed or pushed (audit 2026-11-02):
+ *   - no price saved, no bet: a 1u bet at an unknown price can't be judged;
+ *   - one bet per prop: two live sections on the same player, market, line and
+ *     side are one bet, listing both slices;
+ *   - at most PROPS_GAME_MAX per game (they move together) and PROPS_DAY_MAX_U
+ *     units a day, soonest first. Anything cut is reported, never silently lost.
+ *
+ *   limitProps([a, a', b], ...) -> [a (slices of a and a'), b]
+ */
+export const PROPS_GAME_MAX = 3;
+export const PROPS_DAY_MAX_U = 10;
+export function limitProps(bets: StakedBet[]): { bets: StakedBet[]; cut: string[] } {
+  const cut: string[] = [];
+  const byProp = new Map<string, StakedBet>();
+  for (const b of bets) {
+    if (b.priceText === "no price saved") {
+      cut.push(`${b.pick}: no price saved`);
+      continue;
+    }
+    const k = `${b.sport}|${b.game}|${b.pick}`;
+    const had = byProp.get(k);
+    if (had) byProp.set(k, { ...had, slice: [...new Set([...had.slice.split("; "), ...b.slice.split("; ")])].join("; ") });
+    else byProp.set(k, b);
+  }
+  const perGame = new Map<string, number>();
+  let units = 0;
+  const out: StakedBet[] = [];
+  for (const b of byProp.values()) {
+    const g = `${b.sport}|${b.game}`;
+    if ((perGame.get(g) ?? 0) >= PROPS_GAME_MAX) {
+      cut.push(`${b.pick}: ${PROPS_GAME_MAX} bets already on ${b.game}`);
+      continue;
+    }
+    if (units + b.stake > PROPS_DAY_MAX_U) {
+      cut.push(`${b.pick}: day limit ${PROPS_DAY_MAX_U}u reached`);
+      continue;
+    }
+    perGame.set(g, (perGame.get(g) ?? 0) + 1);
+    units += b.stake;
+    out.push(b);
+  }
+  return { bets: out, cut };
+}
+
 /** The minutes before lock inside which no new push goes out. */
 export const PUSH_CUTOFF_MS = 5 * 60 * 1000;
 

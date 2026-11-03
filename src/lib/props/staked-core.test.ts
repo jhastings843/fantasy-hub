@@ -147,3 +147,19 @@ describe("pushes", () => {
     expect(tidy([{ ...b, id: "2", kickoff: "2026-11-03T02:00:00Z" }, b, b]).map((x) => x.id)).toEqual(["x", "2"]);
   });
 });
+
+import { limitProps, PROPS_GAME_MAX } from "./staked-core";
+describe("limitProps", () => {
+  const bet = (pick: string, game = "DAL at GB", extra: object = {}) => ({ id: pick, section: "s", sectionName: "NFL props", sport: "NFL", game, pick, market: "rec yds", priceText: "-110 DraftKings", price: -110, kickoff: "2026-11-08T18:00:00Z", slice: "a", stake: 1, href: "/props", ...extra }) as never;
+  it("drops unpriced bets, merges the same prop from two sections, caps per game", () => {
+    const r = limitProps([bet("A over 50.5"), { ...(bet("A over 50.5") as object), id: "x", slice: "b" } as never, bet("B over 3.5", "DAL at GB", { priceText: "no price saved" }), bet("C"), bet("D"), bet("E")]);
+    expect(r.bets.map((b) => b.pick)).toEqual(["A over 50.5", "C", "D"]);
+    expect(r.bets[0].slice).toBe("a; b");
+    expect(r.cut).toHaveLength(2);
+    expect(PROPS_GAME_MAX).toBe(3);
+  });
+  it("stops at the day's unit limit", () => {
+    const many = Array.from({ length: 12 }, (_, i) => bet(`P${i}`, `G${i}`));
+    expect(limitProps(many).bets).toHaveLength(10);
+  });
+});
