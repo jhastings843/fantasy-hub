@@ -14,6 +14,7 @@ import { nameKey } from "@/lib/props/grade";
 import { kalshiCost, kalshiFor, type GradedGame } from "@/lib/firsttd/trends";
 import { pricedPlayers, type FtdGame, type FtdPlayer } from "@/lib/firsttd/parse";
 import type { KalshiGame } from "@/lib/firsttd/kalshi";
+import { appeared, type Played } from "./ftd-void";
 
 type BookPrices = { at: string; prices: { [nameKey: string]: number } };
 
@@ -66,9 +67,13 @@ export const ftdEdge = (p: number, cost: number) => cost >= FTD_EDGE.minCost && 
 
 type Keep = (p: FtdPlayer & { p: number }, cost: number, g: FtdGame) => boolean;
 
-/** Every bet a slice would make, one unit at the best price, graded. marketBets' counterpart for our model. */
+/**
+ * Every bet a slice would make, one unit at the best price, graded. marketBets' counterpart for our model.
+ * A player the game's participation record (ftd-void.ts) shows did not play is void, as at the books: left
+ * out, not a bet. Games graded without that record (played absent) count every non-winner -1, as before.
+ */
 export function bestBets(
-  list: (GradedGame & Books)[],
+  list: (GradedGame & Books & { played?: Played })[],
   keep: Keep,
 ): { game: FtdGame; player: string; kickoff?: string; cost: number; book: Book; win: boolean; net: number }[] {
   const out: { game: FtdGame; player: string; kickoff?: string; cost: number; book: Book; win: boolean; net: number }[] = [];
@@ -76,6 +81,7 @@ export function bestBets(
     for (const p of pricedPlayers(x.game)) {
       const b = bestCost(x, p.name);
       if (!b || b.cost >= 1 || !keep(p, b.cost, x.game)) continue;
+      if (appeared(x.played, p.team, p.name) === false) continue; // void
       const win = x.result.key === p.key;
       out.push({ game: x.game, player: p.key, kickoff: x.kickoff ?? x.capturedAt, cost: b.cost, book: b.book, win, net: win ? (1 - b.cost) / b.cost : -1 });
     }
