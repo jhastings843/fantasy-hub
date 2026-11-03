@@ -6,6 +6,7 @@ import { nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard } from "./nba-store";
 import { parseNbaScoreboard } from "./nba";
 import { markScoresAt } from "@/lib/live/scores-at";
+import { notifyNbaGate } from "@/lib/notify/golive";
 import {
   allocateNbaDay,
   nbaBets,
@@ -116,6 +117,8 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
     const hyps = await loadHyps(season);
     const rule = nbaRule(rows, "ats", hyps.filter((h) => h.status === "active").map((h) => h.id));
     const live = nbaGate(rule).live;
+    // One push when the go-live gate flips on or off (remembered per season).
+    await notifyNbaGate(season, live, rule.tier1);
     const open = all.filter((g) => new Date(g.tip) > now);
     for (const day of [...new Set(open.map((g) => g.day))].sort()) {
       const todays = open.filter((g) => g.day === day);

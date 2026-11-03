@@ -1,6 +1,7 @@
 import "server-only";
 import { redis } from "@/lib/redis/client";
 import { emptyState, expand, register, review, reviewDue, type Candidate, type Gate, type JournalLine, type SectionState } from "./engine";
+import { notifyJournal } from "@/lib/notify/golive";
 
 // Redis side of the shared learning engine. One state object and one
 // append-only journal per section and season; nothing else is written. Keys
@@ -40,5 +41,7 @@ export async function reviewIfDue(section: string, season: number, week: number,
   const { state, journal } = review(gate, prev, cands, now.toISOString(), week, slate);
   await redis.set(stateKey(section, season), state);
   if (journal.length) await redis.rpush(journalKey(section, season), ...journal.map((j) => JSON.stringify(j)));
+  // One push per slice that went live, paused or was rolled back (deduped in Redis; never throws).
+  if (journal.length) await notifyJournal(section, season, journal, state, expand(state, cands));
   return journal;
 }
