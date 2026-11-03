@@ -8,7 +8,7 @@ import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learn
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import type { StoredProps } from "@/lib/props/store";
-import { readMilestones, readPropBets, type PropBetRow } from "../lines";
+import { readMilestones, readPropBets, type LiveLine, type PropBetRow } from "../lines";
 import { OUR_SECTION, fbCandidates, ourPropCandidates, type FbGradedBoard } from "../learn";
 import { compactGame, type EspnNbaSummary, type NbaGame } from "./box";
 import { allowedTables } from "./allowed";
@@ -182,6 +182,21 @@ export interface RunOptions {
   /** Athlete ids to treat as Out, and as available, whatever the team roster page says (the injury feed can be ahead of it). */
   extraOut?: Set<string>;
   extraIn?: Set<string>;
+}
+
+/**
+ * One game's DraftKings props from ESPN's odds feed, as the board read them:
+ * main lines and the over-only ladders. Free. The fresh pre-lock check on
+ * staked NBA props (lib/props/fresh.ts) re-prices from it.
+ */
+export async function readNbaLines(event: string): Promise<{ lines: [string, LiveLine][]; alts: [string, { line: number; over: number }[][]][] }> {
+  const rows: PropBetRow[] = [];
+  for (let page = 1; page <= 4; page++) {
+    const d = await json<{ items?: PropBetRow[]; pageCount?: number }>(PROPS(event, page));
+    rows.push(...(d.items ?? []));
+    if (!d.pageCount || page >= d.pageCount) break;
+  }
+  return { lines: [...readPropBets(rows, "nba")], alts: [...readMilestones(rows)] };
 }
 
 /** Build tonight's boards, grade finals, review. Safe to call any time. */

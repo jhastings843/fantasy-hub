@@ -28,6 +28,9 @@ export interface OurMarketExtra {
   raw?: number;
   /** Projected minutes behind the number. */
   min: number;
+  /** Our projected mean and ESPN's athlete id, so the prop can be re-priced from a fresh read before lock (boards from 2026-11-02 on). */
+  mean?: number;
+  athlete?: string;
   /** Games this season behind it (missing on boards saved before 2026-10-21 evening). */
   games?: number;
   /** Set when an alternate line was nearer even money than the main line: the main line it replaced. */
@@ -176,6 +179,8 @@ export function ourMarkets(
       under: r3(ch.under),
       ...(ch.over !== raw.over ? { raw: r3(raw.over) } : {}),
       min: r1(pr.min),
+      mean: r3(mean),
+      athlete: l.athlete,
       ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}),
       ...(pick.alt ? { main: { line: l.current.line, over: l.current.over, under: l.current.under } } : {}),
       ...(longs.length ? { longs } : {}),

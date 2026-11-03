@@ -115,3 +115,27 @@ export async function morningOddsReads(
   }
   return { reads, note: notes.join("; ") };
 }
+
+/**
+ * The fresh pre-lock read for staked props (lib/props/fresh.ts): one event
+ * read of one game, only the markets asked for, the same books. Checks the
+ * monthly stop first. Never throws: a failure comes back as `why`, and the
+ * caller treats it as no confirmation (no push).
+ */
+export async function freshOddsRead(g: { home: string; away: string; kickoff: string }, markets: string[], now: Date): Promise<{ read: OddsRead } | { why: string }> {
+  const key = process.env.ODDS_API_KEY;
+  if (!key) return { why: "no ODDS_API_KEY" };
+  if (!markets.length) return { why: "no markets to read" };
+  try {
+    const { body, headers } = await get(`${BASE}/sports/${ODDS_SPORT}/events?apiKey=${key}`);
+    const usage = (await saveOddsUsage(headers, now.toISOString()).catch(() => null)) ?? (await loadOddsUsage(now));
+    if (usage && usage.used + markets.length > MONTHLY_STOP) return { why: `quota stop: ${usage.used} credits used this month (stop ${MONTHLY_STOP})` };
+    const e = matchEvent(body as OddsEvent[], g.home, g.away, g.kickoff);
+    if (!e) return { why: `no Odds API event for ${g.away}@${g.home}` };
+    const res = await get(`${BASE}/sports/${ODDS_SPORT}/events/${e.id}/odds?apiKey=${key}&bookmakers=${BOOKS.join(",")}&markets=${markets.join(",")}&oddsFormat=american`);
+    await saveOddsUsage(res.headers, now.toISOString()).catch(() => null);
+    return { read: { ...parseEventOdds(res.body, now.toISOString()), cost: num(res.headers, "x-requests-last") } };
+  } catch (err) {
+    return { why: `The Odds API: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}

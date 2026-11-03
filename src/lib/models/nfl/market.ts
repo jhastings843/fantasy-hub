@@ -25,6 +25,8 @@ export interface NflMarketExtra {
   under: number;
   /** Our median (yardage lines are priced from it, not the mean). */
   median: number;
+  /** Our projected mean, so the prop can be re-priced at a fresh line before lock (boards from 2026-11-02 on). */
+  mean?: number;
   /** Where the price came from. */
   price: "espn" | "odds-api" | "david" | "assumed";
   /** ESPN's DK line when the price came at a different line (the market's line is the priced one). */
@@ -82,7 +84,7 @@ export function ourNflMarkets(
       side,
       lean: ch.over > ch.under ? "over" : ch.under > ch.over ? "under" : null,
     });
-    extra[id] = { over: r3(ch.over), under: r3(ch.under), median: r1(median), price: source, ...(line !== espn ? { espnLine: espn } : {}) };
+    extra[id] = { over: r3(ch.over), under: r3(ch.under), median: r1(median), mean: r3(mean), price: source, ...(line !== espn ? { espnLine: espn } : {}) };
   }
   markets.sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1) || a.id.localeCompare(b.id));
   return { markets, extra };
