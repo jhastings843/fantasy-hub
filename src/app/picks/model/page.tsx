@@ -89,7 +89,7 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
             { k: `${L} spreads`, v: spreads.w + spreads.l + spreads.p ? units(spreads.units) : "0-0", sub: spreads.w + spreads.l + spreads.p ? `${rec(spreads)} as sent` : "no bets settled", tone: spreads.w + spreads.l ? (spreads.units >= 0 ? "up" : "down") : undefined },
             { k: `${L} totals`, v: totals.w + totals.l + totals.p ? units(totals.units) : "0-0", sub: totals.w + totals.l + totals.p ? `${rec(totals)} as sent` : "no bets settled", tone: totals.w + totals.l ? (totals.units >= 0 ? "up" : "down") : undefined },
             { k: `${L} straight up`, v: su.w + su.l ? `${su.w}-${su.l}` : "0-0", sub: "winners picked, no stakes" },
-            { k: "Vs the closing line", v: sentClv ? `${sentClv.avg > 0 ? "+" : ""}${sentClv.avg.toFixed(2)} pts` : "·", sub: sentClv ? `${sentClv.n} sent bets with a close` : "no closes yet", small: true },
+            { k: "Vs the closing line", v: sentClv ? `${sentClv.avg > 0 ? "+" : ""}${sentClv.avg.toFixed(2)} pts` : "·", sub: sentClv ? `${sentClv.n} sent bets with a close${sentClv.price ? `; price ${sentClv.price.avg > 0 ? "+" : ""}${(sentClv.price.avg * 100).toFixed(1)}% on ${sentClv.price.n}` : ""}` : "no closes yet", small: true },
           ]}
         />
         <section className={s.section} aria-labelledby="steps">

@@ -729,14 +729,17 @@ export function AtsResults({ r }: { r: PicksReport }) {
                   {m.note && <div className={s.thin}>{m.note}</div>}
                 </td>
                 <td className={s.num}>{m.n}</td>
-                <td className={`${s.num} ${m.avg > 0 ? s.pos : m.avg < 0 ? s.neg : ""}`}>{m.n ? `${m.avg > 0 ? "+" : ""}${m.avg.toFixed(2)}` : "·"}</td>
+                <td className={`${s.num} ${m.avg > 0 ? s.pos : m.avg < 0 ? s.neg : ""}`}>
+                  {m.n ? `${m.avg > 0 ? "+" : ""}${m.avg.toFixed(2)}` : "·"}
+                  {m.price && <div className={s.thin}>{`price ${m.price.avg > 0 ? "+" : ""}${(m.price.avg * 100).toFixed(1)}% (${m.price.n})`}</div>}
+                </td>
                 <td className={s.num}>{m.n ? `${m.beat} / ${m.worse}` : "·"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className={s.thin}>{`${r.clv.matched} of ${r.clv.games} backtest games have a closing line on file. "vs close" is points better (+) or worse than the closing spread.`}</p>
+      <p className={s.thin}>{`${r.clv.matched} of ${r.clv.games} backtest games have a closing line on file. "vs close" is points better (+) or worse than the closing spread. "price" is, on bets whose spread did not move, how much likelier the closing price made our side than the price we sent (count in brackets).`}</p>
     </section>
   );
 }

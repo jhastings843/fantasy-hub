@@ -18,7 +18,7 @@ describe("ESPN parsing", () => {
   });
 
   it("reads open and close off a finished game (PIT at CLE, Week 4)", () => {
-    expect(parseSummary(fx("espn-summary-nfl.json"))).toEqual({ open: 2.5, close: 2.5, totalOpen: 40.5, totalClose: 38.5 });
+    expect(parseSummary(fx("espn-summary-nfl.json"))).toEqual({ open: 2.5, close: 2.5, totalOpen: 40.5, totalClose: 38.5, closeHomePrice: 100, closeAwayPrice: -120 });
   });
 
   it("handles pick'em and an unpriced game", () => {

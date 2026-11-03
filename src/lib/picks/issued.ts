@@ -9,7 +9,7 @@
 // research history; only issued records feed "plays as sent".
 
 import type { ClosingLine } from "./closing";
-import { clvPoints } from "./closing";
+import { clvPoints, clvPrice } from "./closing";
 import {
   type BoardGame,
   type CutTest,
@@ -393,13 +393,36 @@ export function issuedClv(all: IssuedRecord[], closes: Map<string, ClosingLine>)
           : [];
       }),
     );
+  // Price-aware CLV: same spread at close, our price vs the closing price (closes saved before 2026-11-03 carry no price and are skipped).
+  const priced = (tier: "t1" | "t2") =>
+    records.flatMap((rec) =>
+      rec.plays.flatMap((p) => {
+        const c = closes.get(key({ week: rec.week, home: p.home, away: p.away }));
+        if (!p.shownInEmail || p.tier !== tier || !c) return [];
+        const v = clvPrice(p.side, p.homeLine, betPrices(p), c);
+        return v === null ? [] : [v];
+      }),
+    );
   const totals = records.flatMap((rec) =>
     (rec.totals ?? []).flatMap((p) => {
       const c = closes.get(key({ week: rec.week, home: p.home, away: p.away }))?.totalClose;
       return p.shownInEmail && c !== null && c !== undefined ? [clvTotal(p.side, p.line, c)] : [];
     }),
   );
-  return { t1: at("t1"), t2: at("t2"), totals };
+  return { t1: at("t1"), t2: at("t2"), totals, t1Price: priced("t1"), t2Price: priced("t2") };
+}
+
+/** The prices a play was sent at: its own price, plus the other side's from the quote it was judged at when that quote is at the same number. */
+export function betPrices(p: Pick<IssuedPlay, "side" | "homeLine" | "price" | "ref">): { home?: number; away?: number } {
+  const sameNumber = p.ref && p.ref.line === p.homeLine;
+  const fromRef = sameNumber ? { home: p.ref!.homePrice, away: p.ref!.awayPrice } : {};
+  const out: { home?: number; away?: number } = {};
+  const ours = p.price ?? fromRef[p.side];
+  const other = p.side === "home" ? "away" : "home";
+  if (ours !== undefined) out[p.side] = ours;
+  // The other side only from the same book's pair: a price shopped elsewhere makes a mixed pair, so then our side alone.
+  if (fromRef[other] !== undefined && fromRef[p.side] === ours) out[other] = fromRef[other];
+  return out;
 }
 
 /** Every game an issued record needs a final or a close for. */

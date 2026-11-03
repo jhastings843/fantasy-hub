@@ -29,6 +29,9 @@ export interface ClosingLine {
   close: number | null;
   totalOpen: number | null;
   totalClose: number | null;
+  /** DraftKings' closing price on each side of the spread (American). Closes saved from 2026-11-03 on; older ones lack it. */
+  closeHomePrice?: number;
+  closeAwayPrice?: number;
   /** ESPN's final score, so grading never depends on the two model sites alone. */
   final?: { home: number; away: number };
 }
@@ -160,7 +163,7 @@ interface Leg {
 }
 interface EspnSummary {
   pickcenter?: Array<{
-    pointSpread?: { home?: Leg };
+    pointSpread?: { home?: Leg; away?: Leg };
     total?: { over?: Leg };
     moneyline?: { home?: Leg; away?: Leg };
     homeTeamOdds?: { favorite?: boolean };
@@ -171,7 +174,7 @@ interface EspnSummary {
 /** Open and close from a game summary, or null when ESPN priced nothing. */
 export function parseSummary(
   data: EspnSummary,
-): Pick<ClosingLine, "open" | "close" | "totalOpen" | "totalClose"> | null {
+): Pick<ClosingLine, "open" | "close" | "totalOpen" | "totalClose" | "closeHomePrice" | "closeAwayPrice"> | null {
   const p = data.pickcenter?.[0];
   if (!p) return null;
   const s = p.pointSpread?.home;
@@ -180,11 +183,16 @@ export function parseSummary(
   const close = num(s?.close?.line);
   const flip = spreadFlipped(close, { mlHome: americanOf(p.moneyline?.home?.close?.odds), mlAway: americanOf(p.moneyline?.away?.close?.odds), homeFav: p.homeTeamOdds?.favorite, awayFav: p.awayTeamOdds?.favorite });
   const turn = (x: number | null) => (x === null || !flip ? x : -x || 0);
+  // The closing price on each side of the spread (read from the other leg when the feed had the sides turned).
+  const homePrice = americanOf((flip ? p.pointSpread?.away : p.pointSpread?.home)?.close?.odds);
+  const awayPrice = americanOf((flip ? p.pointSpread?.home : p.pointSpread?.away)?.close?.odds);
   const out = {
     open: turn(num(s?.open?.line)),
     close: turn(close),
     totalOpen: num(t?.open?.line),
     totalClose: num(t?.close?.line),
+    ...(homePrice !== undefined ? { closeHomePrice: homePrice } : {}),
+    ...(awayPrice !== undefined ? { closeAwayPrice: awayPrice } : {}),
   };
   return out.close === null && out.totalClose === null ? null : out;
 }
@@ -192,6 +200,42 @@ export function parseSummary(
 /** Points better (positive) or worse than the close, for a pick at a home-side line. */
 export function clvPoints(side: "home" | "away", homeLine: number, close: number): number {
   return side === "home" ? homeLine - close : close - homeLine;
+}
+
+/** Implied chance of an American price, vig included. */
+export const impliedOf = (american: number): number => (american < 0 ? -american / (-american + 100) : 100 / (american + 100));
+
+/**
+ * Price-aware CLV for a spread pick: the chance the closing market gives our
+ * side minus the chance our bet price implied, at the same number. Positive
+ * means the close priced our side as likelier than we paid for (a -110 bet
+ * that closed -140 at the same spread is about +6 points of chance, where
+ * point CLV reads 0).
+ *
+ * Both sides priced at bet and at close: no-vig chances. Only our side's price
+ * at one end: raw implied chances at both ends, so the vig mostly cancels.
+ * Null when the spread moved (point CLV covers that; a different number has a
+ * different chance and we do not convert between them), or a price is missing.
+ * Pure. Returns a fraction (0.06 = 6 points of chance).
+ */
+export function clvPrice(
+  side: "home" | "away",
+  homeLine: number,
+  bet: { home?: number; away?: number },
+  close: Pick<ClosingLine, "close" | "closeHomePrice" | "closeAwayPrice">,
+): number | null {
+  if (close.close === null || close.close === undefined || close.close !== homeLine) return null;
+  const other = side === "home" ? "away" : "home";
+  const at = (o: { home?: number; away?: number }) => {
+    const ours = o[side];
+    if (ours === undefined) return null;
+    const theirs = o[other];
+    return { raw: impliedOf(ours), fair: theirs === undefined ? null : impliedOf(ours) / (impliedOf(ours) + impliedOf(theirs)) };
+  };
+  const b = at(bet);
+  const c = at({ home: close.closeHomePrice, away: close.closeAwayPrice });
+  if (!b || !c) return null;
+  return b.fair !== null && c.fair !== null ? c.fair - b.fair : c.raw - b.raw;
 }
 
 export interface ClvRow {
@@ -206,6 +250,14 @@ export interface ClvRow {
   worse: number;
   /** Extra detail for display, such as the rule's name. */
   note?: string;
+  /** Price-aware CLV (clvPrice) on the picks whose spread did not move and whose prices are on file: picks, average chance gained. */
+  price?: { n: number; avg: number };
+}
+
+/** The price line for a ClvRow, or nothing when no pick has one. */
+export function priceSummary(values: number[]): { price?: { n: number; avg: number } } {
+  if (!values.length) return {};
+  return { price: { n: values.length, avg: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 1000) / 1000 } };
 }
 
 export function summarize(id: string, label: string, values: number[]): ClvRow {

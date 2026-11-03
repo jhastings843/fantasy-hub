@@ -12,7 +12,7 @@ import { type ChosenMap, totalsStakes } from "./forward";
 import { finishedResults } from "./finished";
 import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
-import { summarize, type ClvRow } from "./closing";
+import { priceSummary, summarize, type ClvRow } from "./closing";
 import { allocate, type Allocation, type Candidate, type Exposure } from "./allocate";
 import { BASELINE_POLICY, sourceState, type PicksPolicy } from "./policy";
 import { type IssuedRecord, type IssuedWeek, confirmed, gradeIssued, issuedClv } from "./issued";
@@ -308,8 +308,8 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     clv: {
       models: clvModels,
       plays: [
-        summarize("t1", "Tier 1 as sent", sent.t1),
-        summarize("t2", "Tier 2 as sent", sent.t2),
+        { ...summarize("t1", "Tier 1 as sent", sent.t1), ...priceSummary(sent.t1Price) },
+        { ...summarize("t2", "Tier 2 as sent", sent.t2), ...priceSummary(sent.t2Price) },
         summarize("ou", "Totals as sent (vs closing total)", sent.totals),
       ],
       games: core.graded.length,
