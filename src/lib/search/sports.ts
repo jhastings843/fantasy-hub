@@ -25,9 +25,11 @@ export interface Dated extends SearchEntry {
  * stays, so the last result is still findable between games.
  */
 export function currentOnly<T extends Dated>(entries: T[]): T[] {
-  const latest = new Map<string, string>();
-  for (const e of entries) for (const s of e.subjects) if ((latest.get(s) ?? "") < e.at) latest.set(s, e.at);
-  return entries.filter((e) => !e.done || e.subjects.some((s) => (latest.get(s) ?? "") <= e.at));
+  // Compared as times: feeds write "…T00:00Z" and "…T00:00:00Z" for the same moment.
+  const t = (iso: string) => Date.parse(iso) || 0;
+  const latest = new Map<string, number>();
+  for (const e of entries) for (const s of e.subjects) if ((latest.get(s) ?? 0) < t(e.at)) latest.set(s, t(e.at));
+  return entries.filter((e) => !e.done || e.subjects.some((s) => (latest.get(s) ?? 0) <= t(e.at)));
 }
 
 const ET = "America/New_York";
@@ -183,8 +185,10 @@ export function nbaPropsIndex(v: OurNbaView | null, teamNames: Map<string, strin
         rank: done ? 2 : p.rank,
         rows: p.rows,
         href: `/props/player?l=nba&t=${p.team}&n=${encodeURIComponent(p.name)}&g=${g.slug}`,
-        // The team's next game posting retires this one, whether or not his props for it are up yet.
-        subjects: [`nba:${p.team}`],
+        // Only his next saved props retire this one (Jack, 2026-11-03: NBA players vanished from
+        // search every morning, because tonight's game retired last night's props hours before
+        // tonight's were saved near tip).
+        subjects: [`nbap:${p.team}|${p.name.toLowerCase()}`],
         at,
         done,
       });

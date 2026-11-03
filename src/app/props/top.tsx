@@ -261,17 +261,33 @@ export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" |
       />
     );
   }
-  if (tab === "kotc")
+  if (tab === "kotc") {
+    // Rewritten 2026-11-03 (Jack asked why KOTC "has a staking section"): the crowd estimate
+    // is built, and the only thing that could ever stake is the tagged prop, through the learner.
+    const learning = await getNbaSectionLearning(SECTIONS.nbaKotc, season).catch(() => null);
+    const live = learning?.entries.filter((e) => e.status === "active") ?? [];
+    const best = learning?.entries.filter((e) => e.status === "collecting").reduce((a, e) => Math.max(a, e.ev?.games ?? 0), 0) ?? 0;
     return (
       <ModelLineup
         title="Who decides King of the Court"
-        aside="Projections only. Nothing is staked."
+        aside={live.length ? "A live slice marks the tagged props as bets." : "Nothing here carries a stake yet."}
         models={[
-          { name: "Slate simulation", role: "Chance to lead the slate in points + rebounds + assists", status: "projections", note: "Simulated slates, saved before the first tip and graded after the last final. No stakes." },
-          { name: "Crowd model", role: "Who else backs each player", status: "unavailable", note: "Not built, so the payout share can't be estimated. A chance to lead is not a price." },
+          { name: "Slate simulation", role: "Chance to lead the slate in points + rebounds + assists", status: "projections", note: "Simulated slates, saved before the first tip and graded after the last final. Picks who to tag; never a bet on its own." },
+          { name: "Crowd estimate", role: "Who else backs each player, so the bonus share", status: "input", note: "Backers fit from DraftKings' posted payouts, times each player's heat on DK Network's most-bet list (a guess). An estimate, not a count." },
+          {
+            name: "Tagged-prop learner",
+            role: "Is the prop we tag worth betting on its own?",
+            status: !learning ? "unavailable" : live.length ? "active" : "collecting",
+            note: !learning
+              ? "Couldn't read this learner just now."
+              : live.length
+                ? `Live: ${live.map((e) => e.label).join(", ")}. Those props are bets, sized by the staking table on Results.`
+                : `Entering means betting a player prop at -200 or longer. Four slices (our top 10, 5, 3, favorite) grade those tagged props at DK's price to see if they win money by themselves (${gateText(best, learning.gate.minGames)}). The staking table on Results only compares bet sizes on those paper bets; nothing is staked until a slice goes live.`,
+          },
         ]}
       />
     );
+  }
   const L = LINEUP[tab];
   const items = await loadProducts(tab === "nba" || tab === "fb" ? "nba" : "nfl", season);
   const p = items?.find((x) => x.name === L.product);

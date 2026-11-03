@@ -97,6 +97,8 @@ function ParlayLegs({ p }: { p: AttdParlay }) {
 async function ParlayToday({ season, week }: { season: number; week: number | null }) {
   const all: SavedParlay[] = await loadAttdParlays(season).catch(() => []);
   const cur = all.find((x) => x.parlay.week === week);
+  // Graded (or voided) tickets leave the Board; they live on Results (Jack, 2026-11-03).
+  if (cur && cur.outcome.status !== "open") return null;
   return (
     <div className={s.pageFrame}>
       <SecHead title="Parlay of the day" aside={`Sundays · pick ${PARLAY_LEGS.min} to ${PARLAY_LEGS.max} anytime legs where our model and Venom agree · only the count the model is most confident in is tracked · paper, 1u`} />
@@ -104,7 +106,7 @@ async function ParlayToday({ season, week }: { season: number; week: number | nu
         <ParlayPicker
           tickets={tickets(cur.parlay.pool ?? cur.parlay.legs)}
           tracked={cur.parlay.legs.length}
-          status={cur.outcome.status !== "open" ? ` · ${cur.outcome.status === "won" ? "Won" : cur.outcome.status === "lost" ? "Lost" : "Void"} ${u(cur.outcome.net)}` : " · tracked"}
+          status=" · tracked"
         />
       ) : (
         <p className={s.calm}>No ticket yet this week. It is built Sunday morning from that day&apos;s games once DraftKings has prices; if fewer than {PARLAY_LEGS.min} games have a leg both sides agree on, there is none that Sunday.</p>
@@ -119,7 +121,10 @@ const outcomeText = (o: ParlayOutcome) => (o.status === "open" ? "tracked" : o.s
 /** Board: this week's TNF and MNF 2-leg tickets (Jack, 2026-11-02), tracked apart from Sunday's. */
 async function NightToday({ season, week }: { season: number; week: number | null }) {
   const all: SavedNight[] = await loadNightParlays(season).catch(() => []);
-  const cur = all.filter((x) => x.parlay.week === week);
+  const week_ = all.filter((x) => x.parlay.week === week);
+  // Graded (or voided) tickets leave the Board; they live on Results (Jack, 2026-11-03).
+  const cur = week_.filter((x) => x.outcome.status === "open");
+  if (week_.length && !cur.length) return null;
   return (
     <div className={s.pageFrame}>
       <SecHead title="TNF and MNF 2-leg" aside="Thursday and Monday · 2 anytime legs off that night's game where our model, Venom and the blend all beat DK's break-even · same game allowed · paper, 1u, its own record" />

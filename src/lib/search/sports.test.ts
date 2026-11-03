@@ -25,4 +25,16 @@ describe("currentOnly", () => {
     ]).map((x) => x.key);
     expect(out).toEqual(["live", "tomorrow", "p-last"]);
   });
+  it("keeps last night's player props through the day, until his next props are saved", () => {
+    const morning = currentOnly([
+      e("tonight", ["nba:BOS", "nba:MIA"], "2026-11-03T23:30:00Z", false),
+      e("brown-last", ["nbap:BOS|jaylen brown"], "2026-11-03T00:00Z", true),
+    ]).map((x) => x.key);
+    expect(morning).toEqual(["tonight", "brown-last"]);
+    const evening = currentOnly([
+      e("brown-last", ["nbap:BOS|jaylen brown"], "2026-11-03T00:00Z", true),
+      e("brown-tonight", ["nbap:BOS|jaylen brown"], "2026-11-03T23:30:00Z", false),
+    ]).map((x) => x.key);
+    expect(evening).toEqual(["brown-tonight"]);
+  });
 });

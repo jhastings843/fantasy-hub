@@ -1,0 +1,59 @@
+/* Player prop page (Jack, 2026-11-03: "closer to David's player board"): one card per market,
+   big numbers across, a number line of where the line sits against his games, and an over/under strip. */
+
+.head { display: flex; align-items: center; gap: 14px; }
+.who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.name { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: clamp(26px, 6vw, 34px); line-height: 1; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.match { font-family: var(--font-plex-mono), monospace; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+
+.summary { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 999px; font-size: 13px; color: var(--ink2); background: var(--surface); }
+.pill b { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.card { background: var(--surface); border: 1px solid var(--rule); border-top: 3px solid var(--ink2); border-radius: 14px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cardEdge { border-top-color: var(--accent); }
+.cardTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.stat { font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 20px; line-height: 1; }
+.chip { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--rule); color: var(--mute); white-space: nowrap; }
+.chipEdge { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+
+.nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+@media (max-width: 480px) { .nums { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; } }
+.nums > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nums dt { font-family: var(--font-plex-mono), monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+.nums dd { margin: 0; font-family: var(--font-barlow), Impact, sans-serif; font-weight: 700; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.nums small { font-size: 11.5px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.up { color: var(--accent); }
+.down { color: var(--gold); }
+
+/* Number line: his recent games as dots, DraftKings' line as a tick, ours and David's as markers. */
+.track { position: relative; height: 54px; margin: 0 6px; }
+.axis { position: absolute; left: 0; right: 0; top: 22px; height: 2px; border-radius: 2px; background: var(--track); }
+.dot { position: absolute; top: 19px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; opacity: .75; }
+.dotOver { background: var(--accent); }
+.dotUnder { background: var(--gold); }
+.tick { position: absolute; top: 10px; width: 2px; height: 26px; margin-left: -1px; background: var(--ink); }
+.tickLabel { position: absolute; top: 0; transform: translateX(-50%); font-family: var(--font-plex-mono), monospace; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); white-space: nowrap; }
+.mark { position: absolute; top: 15px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; }
+.markOurs { background: var(--ink); border: 3px solid var(--surface); box-shadow: 0 0 0 1.5px var(--ink); }
+.markDavid { background: var(--surface); border: 2.5px solid var(--david, var(--ink2)); }
+.final { position: absolute; top: 16px; width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg); background: var(--pos); border: 2px solid var(--surface); }
+.markLabel { position: absolute; top: 36px; transform: translateX(-50%); font-family: var(--font-plex-mono), monospace; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--pos); white-space: nowrap; }
+.ends { display: flex; justify-content: space-between; margin: 0 6px; font-family: var(--font-plex-mono), monospace; font-size: 10px; color: var(--mute); font-variant-numeric: tabular-nums; }
+
+/* Over/under strip, oldest to newest. */
+.strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.stripText { font-size: 13px; color: var(--ink2); }
+.stripText b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.boxes { display: flex; gap: 4px; }
+.box { width: 14px; height: 14px; border-radius: 3px; }
+.boxOver { background: var(--accent); }
+.boxUnder { background: var(--gold); }
+.boxNone { border: 1.5px solid var(--rule); }
+
+.result { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13.5px; color: var(--ink2); }
+.result b { font-family: var(--font-barlow), Impact, sans-serif; font-size: 22px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.note { margin: 0; font-size: 12.5px; color: var(--mute); line-height: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--mute); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.key { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }

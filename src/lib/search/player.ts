@@ -12,6 +12,7 @@ import { davidSide, DAVID_LABEL } from "@/lib/props/david";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { nbaSeasonOfDate, type PropMarket } from "@/lib/props/parse";
 import { playerKey } from "@/app/props/search";
+import type { GradedPropsGame } from "@/lib/props/trends";
 import { boxStats, nameKey, nbaBoxStats, settle, type EspnBoxTeam, type Outcome } from "@/lib/props/grade";
 
 export interface PlayerMarket {
@@ -35,7 +36,23 @@ export interface PlayerMarket {
   live: number | null;
   /** ESPN's stat key, for the live read. */
   key: string;
+  /** His earlier saved games in this market, oldest first (up to HISTORY_GAMES): that day's line and what he did. */
+  history: PastGame[];
 }
+
+/** One earlier game in a market: DraftKings' line that day, what he did, and how our side on it graded. */
+export interface PastGame {
+  at: string | null;
+  opp: string;
+  home: boolean;
+  line: number;
+  /** Null: saved but he didn't play. */
+  actual: number | null;
+  /** Our edge's grade that day (null when we had no edge). */
+  ours: Outcome | null;
+}
+
+export const HISTORY_GAMES = 10;
 
 export interface PlayerView {
   league: "nfl" | "nba";
@@ -57,9 +74,24 @@ const NBA_STAT: { [k: string]: string } = { pts: "Points", reb: "Rebounds", ast:
 const NFL_STAT: { [k: string]: string } = { pass_yds: "Passing yards", rush_yds: "Rushing yards", rec_yds: "Receiving yards", rec: "Receptions" };
 const NFL_FROM_DAVID: { [k: string]: string } = { passing_yards: "pass_yds", rushing_yards: "rush_yds", receiving_yards: "rec_yds", receptions: "rec" };
 
-type Saved = { espnId?: string; game: { markets: PropMarket[]; home?: string; away?: string }; extra: { [id: string]: { over: number; under: number; median?: number } }; result?: { markets: { id: string; actual: number | null; play: { outcome: Outcome } | null; lean: { outcome: Outcome } | null; david?: { outcome: Outcome } | null }[] }; kickoff?: string; david?: { [id: string]: number }; home: string; away: string };
+type Saved = { espnId?: string; game: { markets: PropMarket[]; home?: string; away?: string; slug?: string }; extra: { [id: string]: { over: number; under: number; median?: number } }; result?: { markets: { id: string; actual: number | null; play: { outcome: Outcome } | null; lean: { outcome: Outcome } | null; david?: { outcome: Outcome } | null }[] }; kickoff?: string; david?: { [id: string]: number }; home: string; away: string };
 
-function marketsOf(saved: Saved, pick: (m: PropMarket) => boolean, label: { [k: string]: string }): PlayerMarket[] {
+/** His earlier graded games in one market (by stat), oldest first, leaving out the game on show. */
+export function historyOf(graded: Pick<GradedPropsGame, "slug" | "game" | "result" | "kickoff">[], pick: (m: PropMarket) => boolean, stat: string, team: string, skip?: string): PastGame[] {
+  const out: PastGame[] = [];
+  for (const g of graded) {
+    if (skip && g.slug === skip) continue;
+    const m = g.game.markets.find((x) => x.stat === stat && pick(x));
+    if (!m) continue;
+    const r = g.result.markets.find((x) => x.id === m.id);
+    if (!r) continue;
+    const home = team === g.game.home;
+    out.push({ at: g.kickoff ?? null, opp: home ? g.game.away : g.game.home, home, line: m.line, actual: r.actual, ours: r.play?.outcome ?? null });
+  }
+  return out.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "")).slice(-HISTORY_GAMES);
+}
+
+function marketsOf(saved: Saved, pick: (m: PropMarket) => boolean, label: { [k: string]: string }, graded: GradedPropsGame[] = [], team = ""): PlayerMarket[] {
   return saved.game.markets.filter((m) => m.stat && label[m.stat] && pick(m)).map((m) => {
     const x = saved.extra[m.id];
     const g = saved.result?.markets.find((r) => r.id === m.id);
@@ -82,6 +114,7 @@ function marketsOf(saved: Saved, pick: (m: PropMarket) => boolean, label: { [k: 
       davidResult: g?.david?.outcome ?? null,
       live: null,
       key: m.stat!,
+      history: historyOf(graded, pick, m.stat!, team, saved.game.slug),
     };
   });
 }
@@ -118,7 +151,7 @@ export async function loadPlayer(league: "nfl" | "nba", team: string, name: stri
     const is = (m: PropMarket) => m.team === T && m.player.toLowerCase() === key;
     const saved = pickGame((v?.board ?? []) as unknown as Saved[], (s) => s.game.markets.some(is), game);
     if (!saved) return null;
-    const ms = marketsOf(saved, is, NBA_STAT);
+    const ms = marketsOf(saved, is, NBA_STAT, v?.graded ?? [], T);
     return liveFill({ league, name: saved.game.markets.find(is)!.player, team: T, opp: T === saved.home ? saved.away : saved.home, home: T === saved.home, kickoff: saved.kickoff ?? null, final: !!saved.result, markets: ms, davidOnly: [], ftd: null, clock: null }, saved.espnId, now);
   }
   const season = now.getUTCMonth() < 7 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
@@ -126,7 +159,7 @@ export async function loadPlayer(league: "nfl" | "nba", team: string, name: stri
   const pk = playerKey(T, name);
   const is = (m: PropMarket) => playerKey(m.team, m.player) === pk;
   const saved = pickGame((ov?.board ?? []) as unknown as Saved[], (s) => s.game.markets.some(is), game);
-  const markets = saved ? marketsOf(saved, is, NFL_STAT) : [];
+  const markets = saved ? marketsOf(saved, is, NFL_STAT, ov?.graded ?? [], T) : [];
   const priced = new Set(markets.map((m) => m.stat));
   let home = saved?.home ?? "";
   let away = saved?.away ?? "";
