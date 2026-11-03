@@ -10,6 +10,7 @@
 // Lines are written from the home side, like the rest of Picks: negative
 // means the home team is favored.
 import { decode } from "./parse";
+import { spreadFlipped } from "./orient";
 
 export type NbaTeam = { abbr: string; name: string; short: string };
 
@@ -70,6 +71,9 @@ export function nbaOdds(o: any): Pick<NbaGame, "line" | "total" | "ml"> {
   const mh = odds(o?.moneyline?.home?.close?.odds);
   const ma = odds(o?.moneyline?.away?.close?.odds);
   if (mh !== undefined || ma !== undefined) g.ml = { home: mh, away: ma };
+  // The spread must agree with the moneyline (or the favorite flag) on who is favored (lib/picks/orient.ts).
+  if (g.line && spreadFlipped(g.line.home, { mlHome: mh, mlAway: ma, homeFav: o?.homeTeamOdds?.favorite, awayFav: o?.awayTeamOdds?.favorite }))
+    g.line = { home: -g.line.home || 0, homePrice: g.line.awayPrice, awayPrice: g.line.homePrice };
   return g;
 }
 

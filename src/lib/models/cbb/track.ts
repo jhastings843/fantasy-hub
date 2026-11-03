@@ -67,6 +67,44 @@ export interface TrackedCbbGame {
   final?: { home: number; away: number };
 }
 
+/** A snapshot seen from the other side: home spreads and margins change sign, home and away prices swap. */
+export function flipSnap(x: CbbSnap): CbbSnap {
+  const neg = (v: number | null) => (v === null ? null : -v || 0);
+  return {
+    ...x,
+    spread: neg(x.spread),
+    homePrice: x.awayPrice,
+    awayPrice: x.homePrice,
+    mlHome: x.mlAway,
+    mlAway: x.mlHome,
+    open: { spread: neg(x.open.spread), total: x.open.total },
+    ours: { spread: -x.ours.spread || 0, total: x.ours.total, homeWin: Math.round((1 - x.ours.homeWin) * 1000) / 1000 },
+    parts: { ours: { margin: -x.parts.ours.margin || 0, total: x.parts.ours.total }, trank: x.parts.trank ? { margin: -x.parts.trank.margin || 0, total: x.parts.trank.total } : null },
+  };
+}
+
+/**
+ * A tracked game turned to match the scoreboard's home team. On neutral floors
+ * ESPN sometimes changes which team it calls home after we save (2026-11-02:
+ * Purdue-Gonzaga saved with Purdue home, then listed with Gonzaga home), so a
+ * saved game is always lined up by team id before it meets a scoreboard row:
+ * shown, graded or saved again. Unchanged when it already matches.
+ */
+export function orientTracked(t: TrackedCbbGame, homeId: string): TrackedCbbGame {
+  if (t.home === homeId || t.away !== homeId) return t;
+  return {
+    ...t,
+    home: t.away,
+    away: t.home,
+    homeName: t.awayName,
+    awayName: t.homeName,
+    first: flipSnap(t.first),
+    last: flipSnap(t.last),
+    ...(t.close ? { close: { spread: t.close.spread === null ? null : -t.close.spread || 0, total: t.close.total } } : {}),
+    ...(t.final ? { final: { home: t.final.away, away: t.final.home } } : {}),
+  };
+}
+
 export interface Strong {
   strong: number;
   strongTotal: number;

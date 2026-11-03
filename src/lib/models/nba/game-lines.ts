@@ -3,12 +3,23 @@
 // One item per provider; each carries open, close and current numbers, the
 // spread per side as an American-style string ("-5.5", "+1.5", "PK"). Pure.
 
+import { americanOf, spreadFlipped } from "@/lib/picks/orient";
+
 export interface CoreOddsItem {
   provider?: { name?: string };
-  homeTeamOdds?: { open?: { pointSpread?: { american?: string } }; close?: { pointSpread?: { american?: string } }; current?: { pointSpread?: { american?: string } } };
+  homeTeamOdds?: CoreSide;
+  awayTeamOdds?: CoreSide;
   open?: { total?: { american?: string } };
   close?: { total?: { american?: string } };
   current?: { total?: { american?: string } };
+}
+type Leg = { pointSpread?: { american?: string }; moneyLine?: { american?: string } };
+interface CoreSide {
+  open?: Leg;
+  close?: Leg;
+  current?: Leg;
+  moneyLine?: number;
+  favorite?: boolean;
 }
 export interface CoreOdds {
   items?: CoreOddsItem[];
@@ -45,6 +56,13 @@ export function readOpenClose(d: CoreOdds): OpenClose | null {
     const close = { spread: num(h?.close?.pointSpread?.american) ?? num(h?.current?.pointSpread?.american), total: num(it.close?.total?.american) ?? num(it.current?.total?.american) };
     const open = { spread: num(h?.open?.pointSpread?.american), total: num(it.open?.total?.american) };
     if (close.spread === null && open.spread === null) continue;
+    // The spread must agree with the moneyline (or the favorite flag) on who is favored (lib/picks/orient.ts).
+    const a = it.awayTeamOdds;
+    const ml = (x?: CoreSide) => americanOf(x?.close?.moneyLine?.american) ?? americanOf(x?.current?.moneyLine?.american) ?? americanOf(x?.moneyLine);
+    if (spreadFlipped(close.spread ?? open.spread, { mlHome: ml(h), mlAway: ml(a), homeFav: h?.favorite, awayFav: a?.favorite })) {
+      const turn = (x: number | null) => (x === null ? x : -x || 0);
+      return { provider: it.provider?.name ?? "", open: { ...open, spread: turn(open.spread) }, close: { ...close, spread: turn(close.spread) } };
+    }
     return { provider: it.provider?.name ?? "", open, close };
   }
   return null;

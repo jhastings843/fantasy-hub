@@ -4,11 +4,14 @@
 // prices, now and at the open, from the best pregame book. Pure.
 
 import { num } from "@/lib/models/nba/game-lines";
+import { spreadFlipped } from "@/lib/picks/orient";
 
 interface Price {
   american?: string;
 }
 interface Side {
+  /** The team this side is, as a link ending in its ESPN id (".../teams/2250?lang=en"). */
+  team?: { $ref?: string };
   moneyLine?: number;
   spreadOdds?: number;
   open?: { pointSpread?: Price; spread?: Price; moneyLine?: Price };
@@ -43,7 +46,32 @@ export interface CbbLine {
   mlHome?: number;
   mlAway?: number;
   open: { spread: number | null; total: number | null };
+  /** Set when the feed's sides had to be turned around to match the scoreboard's home team. */
+  fixed?: "team" | "moneyline";
 }
+
+/** ESPN team id at the end of a side's team link. */
+export const teamIdOf = (x?: { $ref?: string }) => x?.$ref?.match(/\/teams\/(\d+)/)?.[1];
+
+/**
+ * Turn a line around: the home spread and its open change sign, the spread
+ * prices and moneylines swap sides. Totals don't depend on who is home.
+ */
+export function flipLine(l: CbbLine, why: CbbLine["fixed"]): CbbLine {
+  return {
+    ...l,
+    spread: l.spread === null ? null : -l.spread || 0,
+    homePrice: l.awayPrice,
+    awayPrice: l.homePrice,
+    mlHome: l.mlAway,
+    mlAway: l.mlHome,
+    open: { spread: l.open.spread === null ? null : -l.open.spread || 0, total: l.open.total },
+    fixed: why,
+  };
+}
+
+/** True when a home spread disagrees with the moneyline about who is favored (lib/picks/orient.ts). */
+export const spreadAgainstMoneyline = (spread: number | null, mlHome?: number, mlAway?: number) => spreadFlipped(spread, { mlHome, mlAway });
 
 const ORDER = ["DraftKings", "ESPN BET", "FanDuel"];
 
@@ -76,24 +104,29 @@ const firstNum = (...xs: (string | number | undefined)[]) => {
  * reads close then current (for grading). Each field falls back on its own,
  * so a `current` block holding only a moneyline never hides the spread.
  */
-export function readCbbLine(d: CbbOdds, at: "now" | "close" = "now"): CbbLine | null {
+export function readCbbLine(d: CbbOdds, at: "now" | "close" = "now", homeId?: string): CbbLine | null {
   const items = (d.items ?? []).filter((it) => !/live/i.test(it.provider?.name ?? ""));
   const rank = (it: CbbOddsItem) => {
     const i = ORDER.indexOf(it.provider?.name ?? "");
     return i < 0 ? ORDER.length : i;
   };
   for (const it of [...items].sort((a, b) => rank(a) - rank(b))) {
-    const h = it.homeTeamOdds;
-    const a = it.awayTeamOdds;
+    // On neutral floors ESPN's odds feed can call the other team "home" than its
+    // scoreboard does (2026-11-02 Purdue-Gonzaga: DK's GONZ -5.5 read as GONZ +5.5).
+    // Each side names its team, so orient by team id, never by the word "home".
+    const swap = !!homeId && teamIdOf(it.awayTeamOdds?.team) === homeId && teamIdOf(it.homeTeamOdds?.team) !== homeId;
+    const h = swap ? it.awayTeamOdds : it.homeTeamOdds;
+    const a = swap ? it.homeTeamOdds : it.awayTeamOdds;
     const pair = <T,>(cur: T | undefined, cl: T | undefined): [T | undefined, T | undefined] => (at === "now" ? [cur, cl] : [cl, cur]);
     const [h1, h2] = pair(h?.current, h?.close);
     const [a1, a2] = pair(a?.current, a?.close);
     const [t1, t2] = pair(it.current, it.close);
     // The top-level numbers are ESPN's current ones: last resort when reading the close.
-    const spread = firstNum(h1?.pointSpread?.american, h2?.pointSpread?.american, it.spread);
+    const top = typeof it.spread === "number" && swap ? -it.spread : it.spread;
+    const spread = firstNum(h1?.pointSpread?.american, h2?.pointSpread?.american, top);
     const total = firstNum(t1?.total?.american, t2?.total?.american, it.overUnder);
     if (spread === null && total === null) continue;
-    return {
+    const line: CbbLine = {
       provider: it.provider?.name ?? "",
       spread,
       homePrice: firstPrice(h1?.spread, h2?.spread, h?.spreadOdds),
@@ -104,7 +137,10 @@ export function readCbbLine(d: CbbOdds, at: "now" | "close" = "now"): CbbLine | 
       mlHome: firstPrice(h1?.moneyLine, h2?.moneyLine, h?.moneyLine),
       mlAway: firstPrice(a1?.moneyLine, a2?.moneyLine, a?.moneyLine),
       open: { spread: num(h?.open?.pointSpread?.american), total: num(it.open?.total?.american) },
+      ...(swap ? { fixed: "team" as const } : {}),
     };
+    // Second check, for a feed that names no teams: the spread must agree with the moneyline on who is favored.
+    return spreadAgainstMoneyline(line.spread, line.mlHome, line.mlAway) ? flipLine(line, "moneyline") : line;
   }
   return null;
 }

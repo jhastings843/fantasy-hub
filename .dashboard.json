@@ -287,7 +287,8 @@
     "2026-11-02: \"Scores updated\" stamp on every board header (NFL, college, NBA, college hoops); NBA and CBB runs save their score-read time.",
     "2026-11-02: David tracked on our NFL and NBA prop learners (agree/against our edges, his own side); new NBA reader for davidsasser.com/nba; CFB/CBB rename; Sam CBB watcher; live scores wrap on phones.",
     "2026-11-02: header search covers NBA and CBB games and NBA players; a finished game drops once each team has a later game posted.",
-    "2026-11-02: every search result opens a breakdown pop-up: CBB game page (/picks/cbb/game) and player props page (/props/player, NFL and NBA, live totals in play)."
+    "2026-11-02: every search result opens a breakdown pop-up: CBB game page (/picks/cbb/game) and player props page (/props/player, NFL and NBA, live totals in play).",
+    "2026-11-02: flipped-line fix. CBB lines oriented by ESPN team id, saved games lined up with the scoreboard home before shown/graded/saved (orientTracked), and lib/picks/orient.ts moneyline/favorite check on every NFL, CFB, NBA and CBB spread reader."
   ],
   "tags": [
     "personal",

@@ -13,6 +13,7 @@
 
 import { teamKey, type League } from "./parse";
 import { key, type GradedGame, type RefLine } from "./engine";
+import { americanOf, spreadFlipped } from "./orient";
 
 /** The home-side line a PEM split pick is graded at: the line of the model PEM sided with. */
 export function pemSplitLine(g: GradedGame): number {
@@ -68,6 +69,9 @@ interface EspnScoreboard {
         provider?: { name?: string };
         pointSpread?: { home?: Leg; away?: Leg };
         total?: { over?: Leg; under?: Leg };
+        moneyline?: { home?: Leg; away?: Leg };
+        homeTeamOdds?: { favorite?: boolean };
+        awayTeamOdds?: { favorite?: boolean };
       }>;
     }>;
   }>;
@@ -95,14 +99,16 @@ export function parseCurrentOdds(
       const n = Number(String(leg?.close?.odds ?? "").replace("+", ""));
       return Number.isFinite(n) && n !== 0 ? n : undefined;
     };
+    // The spread must agree with the moneyline (or the favorite flag) on who is favored; else it was read from the wrong side.
+    const flip = spreadFlipped(o.spread, { mlHome: americanOf(o.moneyline?.home?.close?.odds), mlAway: americanOf(o.moneyline?.away?.close?.odds), homeFav: o.homeTeamOdds?.favorite, awayFav: o.awayTeamOdds?.favorite });
     const prices = {
-      homePrice: price(o.pointSpread?.home),
-      awayPrice: price(o.pointSpread?.away),
+      homePrice: price(flip ? o.pointSpread?.away : o.pointSpread?.home),
+      awayPrice: price(flip ? o.pointSpread?.home : o.pointSpread?.away),
       overPrice: price(o.total?.over),
       underPrice: price(o.total?.under),
     };
     out.set(key({ week, home: ref.home, away: ref.away }), {
-      line: o.spread,
+      line: flip ? -o.spread || 0 : o.spread,
       ...(typeof o.overUnder === "number" ? { total: o.overUnder } : {}),
       ...Object.fromEntries(Object.entries(prices).filter(([, v]) => v !== undefined)),
       ...(e.date ? { kickoff: e.date } : {}),
@@ -156,6 +162,9 @@ interface EspnSummary {
   pickcenter?: Array<{
     pointSpread?: { home?: Leg };
     total?: { over?: Leg };
+    moneyline?: { home?: Leg; away?: Leg };
+    homeTeamOdds?: { favorite?: boolean };
+    awayTeamOdds?: { favorite?: boolean };
   }>;
 }
 
@@ -167,9 +176,13 @@ export function parseSummary(
   if (!p) return null;
   const s = p.pointSpread?.home;
   const t = p.total?.over;
+  // Same check as the current line: a close that puts the favorite on the wrong side was read from the wrong side.
+  const close = num(s?.close?.line);
+  const flip = spreadFlipped(close, { mlHome: americanOf(p.moneyline?.home?.close?.odds), mlAway: americanOf(p.moneyline?.away?.close?.odds), homeFav: p.homeTeamOdds?.favorite, awayFav: p.awayTeamOdds?.favorite });
+  const turn = (x: number | null) => (x === null || !flip ? x : -x || 0);
   const out = {
-    open: num(s?.open?.line),
-    close: num(s?.close?.line),
+    open: turn(num(s?.open?.line)),
+    close: turn(close),
     totalOpen: num(t?.open?.line),
     totalClose: num(t?.close?.line),
   };

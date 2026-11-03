@@ -1,3 +1,9 @@
+# 2026-11-02 late: flipped spreads (Purdue-Gonzaga CBB; UConn CFB the week before)
+- Cause (CBB): on neutral floors ESPN's scoreboard and odds feed can disagree on which team is "home", and the scoreboard itself switched (Purdue home at save, Gonzaga home by tip). The board laid a saved Purdue-home line over a Gonzaga-home row: GONZ +5.5 instead of -5.5.
+- Fixes: readCbbLine(d, at, homeId) orients by each side's team id (lines.ts, flag fixed: "team"); track.ts orientTracked/flipSnap line a saved game up with the scoreboard row before it is shown, graded (score swapped) or saved again. lib/picks/orient.ts spreadFlipped: every spread reader (closing.ts current + summary closes, picks/nba.ts nbaOdds, nba/game-lines.ts) turns a spread around when it puts the moneyline/flagged favorite on the wrong side (|spread| >= 1). Tests: cbb/lines-orient.test.ts (real Gonzaga payload fixture), picks/orient.test.ts.
+- Prod data: scan of all 119 saved CBB games found none stored flipped (backup in the session scratchpad). UConn at Air Force could not be reconstructed (week rolled off, ESPN dropped its odds); football joins games by exact team match, so the new favorite check is the guard there.
+- Rule for any new line reader: orient by team id when the feed names teams, and run spreadFlipped before storing.
+
 # 2026-11-02 late: ATTD Venom/night tickets, returners, King of the End Zone (deployed 406c57a+)
 - Who decides Anytime TD lists Venom (status input; note says tracking, collecting, input). Venom % and fair odds show under our number in every player table, edge card and parlay leg.
 - TNF/MNF 2-leg tickets: attd-parlay.ts pickNightLegs/buildNightParlay (Venom pick, ours and blend above DK break-even, no 5pt bar, one leg per team, same game ok). Built Thu/Mon by runOurFirstTd (daily 18:30 UTC run), Redis attd:v1:parlay:{s}:w{w}:{tnf|mnf} + :nights set, pushed. `voided` field grades void. Week 8 MNF voided (Wilson+Holani, SEA returners missed).

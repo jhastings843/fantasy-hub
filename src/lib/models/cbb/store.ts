@@ -3,7 +3,7 @@ import { redis } from "@/lib/redis/client";
 import { blend, CbbRatings, coverChance, overChance, trankLeague, trankProject, type CbbFinal, type CbbParams, type Projection, type TrankTeam } from "./model";
 import { readCbbLine, type CbbLine, type CbbOdds } from "./lines";
 import { matchTorvik, readTorvikTeams } from "./torvik";
-import { signalRecords, signalsOf, type CbbSnap, type SignalRecord, type TrackedCbbGame } from "./track";
+import { orientTracked, signalRecords, signalsOf, type CbbSnap, type SignalRecord, type TrackedCbbGame } from "./track";
 import { CBB_SECTION, cbbCandidates, cbbWeek } from "./learn";
 import { CBB_MODEL_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
@@ -328,8 +328,9 @@ function readGame(g: CbbBoardGame, r: CbbRatings, tr: Awaited<ReturnType<typeof 
   };
 }
 
-async function lineFor(id: string, at: "now" | "close" = "now", ms = 6_000): Promise<CbbLine | null> {
-  return readCbbLine(await getJson<CbbOdds>(ODDS(id), ms), at);
+/** A game's lines, oriented to the scoreboard's home team (`homeId`). */
+async function lineFor(id: string, homeId: string, at: "now" | "close" = "now", ms = 6_000): Promise<CbbLine | null> {
+  return readCbbLine(await getJson<CbbOdds>(ODDS(id), ms), at, homeId);
 }
 
 /** Map with at most n in flight. */
@@ -426,12 +427,14 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
         g = (await boardFor(etYmd(new Date(t.tip))).catch(() => [] as CbbBoardGame[])).find((x) => x.id === t.event);
       }
       if (g?.state === "post" && g.score) {
-        next = { ...next, final: g.score };
+        // The score in the saved game's orientation (the scoreboard may have changed which team it calls home).
+        const sc = g.home.id === t.home ? g.score : { home: g.score.away, away: g.score.home };
+        next = { ...next, final: sc };
         gradedN++;
       }
     }
     if (next.final && !next.close) {
-      const l = await lineFor(t.event, "close").catch(() => null);
+      const l = await lineFor(t.event, t.home, "close").catch(() => null);
       if (l && (l.spread !== null || l.total !== null)) {
         next = { ...next, close: { spread: l.spread, total: l.total } };
         closed++;
@@ -466,7 +469,7 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
     for (let i = 0; i < soon.length && left() > 4_000; i += 16) {
       const batch = soon.slice(i, i + 16);
       tried += batch.length;
-      const lines = await pool(batch, 8, (g) => lineFor(g.id).then((l) => ({ l, at: new Date() })).catch(() => ({ l: null, at: new Date() })));
+      const lines = await pool(batch, 8, (g) => lineFor(g.id, g.home.id).then((l) => ({ l, at: new Date() })).catch(() => ({ l: null, at: new Date() })));
       const write: { [id: string]: TrackedCbbGame } = {};
       batch.forEach((g, j) => {
         const { l, at } = lines[j];
@@ -477,7 +480,8 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
         }
         const snap = snapOf(readGame(g, r, tr, l), at.toISOString());
         if (!snap) return;
-        const old = tracked[g.id];
+        // An older save lined up with this scoreboard row first, so first and last never mix orientations.
+        const old = tracked[g.id] ? orientTracked(tracked[g.id], g.home.id) : undefined;
         write[g.id] = { ...old, event: g.id, home: g.home.id, away: g.away.id, homeName: g.home.short, awayName: g.away.short, tip: g.tip, neutral: g.neutral, conf: g.conf, first: old?.first ?? snap, last: snap };
         tracked[g.id] = write[g.id];
         saved++;
@@ -544,12 +548,13 @@ export async function getCbbBoard(now = new Date(), back = 0, only?: string): Pr
   await pool(want, 8, async (g) => {
     const ms = deadline - Date.now();
     if (ms < 500) return;
-    liveLines.set(g.id, await lineFor(g.id, "now", ms).catch(() => null));
+    liveLines.set(g.id, await lineFor(g.id, g.home.id, "now", ms).catch(() => null));
   });
   const out: CbbBoard["days"] = [];
   for (let i = 0; i < days.length; i++) {
     const rows: CbbBoardRow[] = boards[i].map((g) => {
-      const saved = tracked[g.id];
+      // Lined up with this row's home team before its line or record is used.
+      const saved = tracked[g.id] ? orientTracked(tracked[g.id], g.home.id) : undefined;
       const line = (g.state === "pre" ? liveLines.get(g.id) : undefined) ?? (saved ? lineOfSnap(saved.last) : null);
       return { g, read: readGame(g, r, tr, line), saved };
     });
