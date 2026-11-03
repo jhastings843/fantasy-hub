@@ -542,9 +542,10 @@ export function liveBets(s: SectionState, base: Candidate[]): Bet[] {
       ? (byId.get(e.id)?.bets ?? []).filter((b) => {
           if (b.at < e.activatedAt! || (e.endedAt && b.at >= e.endedAt)) return false;
           if ((e.pauses ?? []).some((p) => b.week === p.week && b.at >= p.at)) return false;
-          const k = b.key ?? `${b.game}|${b.at}|${b.net}`;
-          if (seen.has(k)) return false;
-          seen.add(k);
+          // Only bets with an identity can be matched across slices; unkeyed ones always count (two different -1u bets in one game look alike).
+          if (!b.key) return true;
+          if (seen.has(b.key)) return false;
+          seen.add(b.key);
           return true;
         })
       : [],

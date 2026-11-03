@@ -81,7 +81,11 @@ export function gradeBet(b: MoneyBet, g: FinalGame): { outcome: Outcome; actual:
     if (!b.side || b.line === undefined || !b.player || !b.stat || !g.box) return null;
     const row = g.box.get(nameKey(b.player));
     // Not in the box score: he didn't play, and a book voids it. A thin or empty box (a partial feed) settles on a later read instead (audit 2026-11-02).
-    if (!row) return g.box.size >= MIN_BOX_ROWS ? { outcome: "void", actual: `${b.player} not in the box score` } : null;
+    if (!row) {
+      // Complete enough to call a DNP: enough players actually recorded this stat (every row carries zeros, so zeros prove nothing).
+      const withStat = [...g.box.values()].filter((r) => (r[b.stat!] ?? 0) > 0).length;
+      return withStat >= (MIN_STAT_ROWS[b.stat!] ?? 4) ? { outcome: "void", actual: `${b.player} not in the box score` } : null;
+    }
     const v = row[b.stat];
     // In the box score but the stat didn't come through: settle on a later read.
     if (!Number.isFinite(v)) return null;
@@ -90,8 +94,8 @@ export function gradeBet(b: MoneyBet, g: FinalGame): { outcome: Outcome; actual:
   return null;
 }
 
-/** Fewer player rows than this and the box score is treated as incomplete. */
-export const MIN_BOX_ROWS = 16;
+/** Fewer players with a nonzero value of the bet's stat than this and the box score is treated as incomplete (one game, both teams). */
+export const MIN_STAT_ROWS: { [stat: string]: number } = { pass_yds: 2, rush_yds: 4, rec_yds: 6, rec: 6 };
 
 export interface BetSummary {
   bets: number;

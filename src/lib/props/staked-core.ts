@@ -510,7 +510,7 @@ export function tidy(bets: StakedBet[]): StakedBet[] {
  */
 export const PROPS_GAME_MAX = 3;
 export const PROPS_DAY_MAX_U = 10;
-export function limitProps(bets: StakedBet[]): { bets: StakedBet[]; cut: string[] } {
+export function limitProps(bets: StakedBet[], prior: { id: string; game: string; stake: number }[] = []): { bets: StakedBet[]; cut: string[] } {
   const cut: string[] = [];
   const byProp = new Map<string, StakedBet>();
   for (const b of bets) {
@@ -518,15 +518,26 @@ export function limitProps(bets: StakedBet[]): { bets: StakedBet[]; cut: string[
       cut.push(`${b.pick}: no price saved`);
       continue;
     }
-    const k = `${b.sport}|${b.game}|${b.pick}`;
+    // One identity per prop whichever section found it, so a push or email can never repeat under another section's id.
+    const k = propId(b);
     const had = byProp.get(k);
     if (had) byProp.set(k, { ...had, slice: [...new Set([...had.slice.split("; "), ...b.slice.split("; ")])].join("; ") });
-    else byProp.set(k, b);
+    else byProp.set(k, { ...b, id: k });
   }
+  // Bets already staked earlier today count against the caps even once their game has started (they drop off later reads).
+  const seen = new Set(prior.map((p) => p.id));
   const perGame = new Map<string, number>();
   let units = 0;
+  for (const p of prior) {
+    perGame.set(p.game, (perGame.get(p.game) ?? 0) + 1);
+    units += p.stake;
+  }
   const out: StakedBet[] = [];
   for (const b of byProp.values()) {
+    if (seen.has(b.id)) {
+      out.push(b);
+      continue;
+    }
     const g = `${b.sport}|${b.game}`;
     if ((perGame.get(g) ?? 0) >= PROPS_GAME_MAX) {
       cut.push(`${b.pick}: ${PROPS_GAME_MAX} bets already on ${b.game}`);
@@ -542,6 +553,9 @@ export function limitProps(bets: StakedBet[]): { bets: StakedBet[]; cut: string[
   }
   return { bets: out, cut };
 }
+
+/** One prop's identity across sections: sport, game and the pick in words (player, side, line, stat). */
+export const propId = (b: Pick<StakedBet, "sport" | "game" | "pick">) => `prop|${b.sport}|${b.game}|${b.pick}`;
 
 /** The minutes before lock inside which no new push goes out. */
 export const PUSH_CUTOFF_MS = 5 * 60 * 1000;

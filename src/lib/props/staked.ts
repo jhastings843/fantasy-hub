@@ -1,4 +1,5 @@
 import "server-only";
+import { redis } from "@/lib/redis/client";
 import { loadSection } from "@/lib/learning/store";
 import type { SectionState } from "@/lib/learning/engine";
 import { etDate, nbaSeasonOfDate } from "./parse";
@@ -122,7 +123,22 @@ export async function stakedPropsToday(at = new Date(), opts: { since?: Date } =
         })
       : [],
   ]);
-  const { bets, cut } = limitProps(tidy(parts.flat()));
+  // Today's staked props so far (remembered past kickoff), so the per-game and per-day caps hold across reads.
+  const dayKey = `staked:v1:props-day:${today}`;
+  const prior = ((await redis.smembers(dayKey).catch(() => [])) ?? []).flatMap((x) => {
+    try {
+      return [JSON.parse(String(x)) as { id: string; game: string; stake: number }];
+    } catch {
+      return [];
+    }
+  });
+  const { bets, cut } = limitProps(tidy(parts.flat()), prior);
+  const fresh = bets.filter((b) => !prior.some((p) => p.id === b.id));
+  if (fresh.length) {
+    const [first, ...more] = fresh.map((b) => JSON.stringify({ id: b.id, game: `${b.sport}|${b.game}`, stake: b.stake }));
+    await redis.sadd(dayKey, first, ...more).catch(() => 0);
+    await redis.expire(dayKey, 3 * 86400).catch(() => 0);
+  }
   return { bets, problems: [...problems, ...cut.map((c) => `not staked: ${c}`)] };
 }
 

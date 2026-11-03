@@ -163,3 +163,12 @@ describe("limitProps", () => {
     expect(limitProps(many).bets).toHaveLength(10);
   });
 });
+
+describe("limitProps across reads", () => {
+  const bet = (pick: string, game = "DAL at GB") => ({ id: pick, section: "s", sectionName: "NFL props", sport: "NFL", game, pick, market: "rec yds", priceText: "-110 DraftKings", price: -110, kickoff: "2026-11-08T18:00:00Z", slice: "a", stake: 1, href: "/props" }) as never;
+  it("counts bets staked earlier today against the caps, keeps ones already staked", () => {
+    const prior = Array.from({ length: 10 }, (_, i) => ({ id: `prop|NFL|G${i}|X${i}`, game: `NFL|G${i}`, stake: 1 }));
+    expect(limitProps([bet("new one", "G20")], prior).bets).toHaveLength(0);
+    expect(limitProps([bet("X0", "G0")], prior).bets.map((b) => b.id)).toEqual(["prop|NFL|G0|X0"]);
+  });
+});

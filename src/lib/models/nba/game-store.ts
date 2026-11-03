@@ -77,6 +77,8 @@ export async function saveGameModel(
     x: { spread: round(x.spread), total: round(x.total) },
     out,
   };
+  // Real clock: a run that began just before tip must not save odds read after it (audit 2026-11-02).
+  if (Date.now() >= Date.parse(g.tip)) return null;
   const old = await redis.hget<TrackedNbaGame>(KEY(season), g.event);
   const row: TrackedNbaGame = { ...old, event: g.event, home: g.home, away: g.away, tip: g.tip, first: old?.first ?? snap, last: snap };
   await redis.hset(KEY(season), { [g.event]: row });

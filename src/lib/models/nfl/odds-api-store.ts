@@ -33,7 +33,10 @@ export interface OddsUsage {
 }
 
 const num = (h: Headers, k: string) => {
-  const v = Number(h.get(k));
+  // An absent header is unknown, not zero (Number(null) is 0, which would erase a real count).
+  const raw = h.get(k);
+  if (raw === null || raw.trim() === "") return undefined;
+  const v = Number(raw);
   return Number.isFinite(v) ? v : undefined;
 };
 
