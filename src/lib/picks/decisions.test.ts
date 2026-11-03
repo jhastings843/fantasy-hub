@@ -196,7 +196,7 @@ describe("issued totals", () => {
       strategies: { rule: null, second: null },
       su: { best: null },
       totals: {
-        backtest: { rule: { id: "t-over", label: "Both agree on the over", test: { side: "over" }, record: { w: 9, l: 2, p: 0 } } },
+        backtest: { rule: { id: "t-over", label: "Both agree on the over", test: { side: "over" }, record: { w: 9, l: 2, p: 0 }, forward: { stake: true } } },
         board: [
           { home: "H", away: "A", sam: 49, david: 48, ref: { total: 45, source: "DraftKings via ESPN", fetchedAt: "t" }, tier: "t1", play: "Over 45", side: "over", line: 45, read: { minEdge: 3 }, stake: 1, price: -110 },
           { home: "H2", away: "A2", sam: 49, david: 48, ref: { total: 45, source: "s", fetchedAt: "t" }, tier: "lean", play: "Over 45", side: "over", line: 45 },

@@ -63,6 +63,44 @@ describe("forward check: a tier that hasn't passed stakes nowhere", () => {
   });
 });
 
+const PASSING = { stake: true, n: 12, w: 9, l: 3, since: 3, grandfathered: false, reason: "Forward check passed: 9-3 since Week 3." };
+
+describe("forward check: a totals rule that hasn't passed never reaches the email or the issued record", () => {
+  const rows = Array.from({ length: 4 }, (_, i) => dogRow(i));
+  // Sunday games, read at 9:25am ET Sunday: released, so a passing rule's totals go out.
+  const quotes = { fetchedAt: "2026-10-18T13:25:00Z", lines: rows.map((_, i) => quote(i, { kickoff: SUN, fetchedAt: "2026-10-18T13:25:00Z" })) };
+  // Fires on every game (both models over 44.5); a strong archive record either way.
+  const rule = { ...totalsCuts("nfl")[1], record: { w: 30, l: 10, p: 0, pct: 0.75, units: 0, lo: 0.6, hi: 0.85 }, games: 40, weeks: [3, 4, 5] };
+  const run = (forward?: typeof PASSING) => {
+    const c = core(rows, { totalsBacktest: { ...core([]).totalsBacktest, rule: { ...rule, ...(forward ? { forward } : {}) } } });
+    const r = compose({ core: c, quotes, issued: [], exposure: noExposure, now: new Date("2026-10-18T13:30:00Z") });
+    const sel = selectForEmail(r, 10, 10);
+    return { r, sel, rec: toIssued(r, sel, { issuedAt: "2026-10-18T13:30:00Z", subject: "t" }) };
+  };
+  const failing = { ...PASSING, stake: false, n: 5, w: 5, l: 0, reason: "Forward check: 5 of 10 games since chosen (5-0), tracked until then." };
+
+  it("failing: every game tracked, no stake, nothing selected or issued, the reason recorded", () => {
+    const { r, sel, rec } = run(failing);
+    expect(r.totals.board.every((g) => !g.stake && g.tier !== "t1")).toBe(true);
+    expect(r.totals.board.every((g) => g.forwardHold)).toBe(true);
+    expect(sel.totals).toHaveLength(0);
+    expect(rec.totals).toHaveLength(0);
+    expect(rec.totalsRule?.forward).toMatchObject({ stake: false });
+    expect(heldCandidates("nfl", r).filter((x) => x.id.startsWith("rival:ou"))).toHaveLength(0);
+  });
+  it("no check attached (fail closed): the same", () => {
+    const { r, rec } = run();
+    expect(r.totals.board.some((g) => (g.stake ?? 0) > 0)).toBe(false);
+    expect(rec.totals).toHaveLength(0);
+  });
+  it("passing: the rule's totals stake and are sent", () => {
+    const { r, rec } = run(PASSING);
+    expect(r.totals.board.some((g) => (g.stake ?? 0) > 0)).toBe(true);
+    expect(rec.totals!.length).toBeGreaterThan(0);
+    expect(rec.totalsRule?.forward?.stake).toBe(true);
+  });
+});
+
 describe("protected envelope", () => {
   it("is pinned: an automated cycle cannot change these without this test failing", () => {
     expect(ENVELOPE).toEqual({ MIN_STAKE: 1, MAX_STAKE: 5, PER_GAME_CAP: 5, WEEKLY_CAP: 30, OUTSTANDING_CAP: 30, MAX_KELLY_SCALE: 0.25, MIN_PRIOR_GAMES: 100, PARLAY_MAX: 1 });
@@ -179,7 +217,7 @@ describe("finding 2: one allocation for spreads, totals and earlier sends", () =
   const rows = Array.from({ length: 12 }, (_, i) => dogRow(i));
   const quotes = { fetchedAt: "2026-10-13T21:00:00Z", lines: rows.map((_, i) => quote(i)) };
   // A totals rule that fires on every game (both models over 44.5).
-  const overRule = { ...totalsCuts("nfl")[1], record: { w: 30, l: 10, p: 0, pct: 0.75, units: 0, lo: 0.6, hi: 0.85 }, games: 40, weeks: [3, 4, 5] };
+  const overRule = { ...totalsCuts("nfl")[1], record: { w: 30, l: 10, p: 0, pct: 0.75, units: 0, lo: 0.6, hi: 0.85 }, games: 40, weeks: [3, 4, 5], forward: PASSING };
   const c = core(rows, { totalsBacktest: { ...core([]).totalsBacktest, rule: overRule } });
 
   it("spreads and totals together stay inside the weekly cap", () => {

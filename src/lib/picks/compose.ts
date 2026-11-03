@@ -8,7 +8,7 @@
 // offered, and every stake is allocated against what has already been
 // issued.
 
-import type { ChosenMap } from "./forward";
+import { type ChosenMap, totalsStakes } from "./forward";
 import { finishedResults } from "./finished";
 import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
@@ -204,6 +204,9 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
     })),
     tb.rule,
   ).map((g) => {
+    // The totals rule's forward check (forward.ts): until it passes, its games
+    // are tracked, never sized, so nothing downstream can stake or send them.
+    if (g.tier === "t1" && !totalsStakes(tb.rule)) return { ...g, tier: "lean" as const, forwardHold: true };
     if (g.tier !== "t1" || !tb.rule || !g.side || !g.ref) return g;
     const quoted = g.side === "over" ? g.ref.overPrice : g.ref.underPrice;
     if (quoted === undefined) return { ...g, p: shrunk(tb.rule.record.w, tb.rule.record.l, policy.staking.priorGames), eligible: false, priceSource: "missing" as const, want: 0 };

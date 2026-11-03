@@ -23,7 +23,7 @@ import {
   suPick,
   tally,
 } from "./engine";
-import type { ForwardCheck } from "./forward";
+import { type ForwardCheck, totalsStakes } from "./forward";
 import type { League } from "./parse";
 import type { PicksReport } from "./report";
 import { type OU, type TotalsBoardGame, type TotalsTest, clvTotal, gradeTotal } from "./totals";
@@ -140,7 +140,8 @@ export interface IssuedRecord {
   totals?: IssuedTotal[];
   /** Two-leg parlays sent with the card (Tuesday only). */
   parlays?: IssuedParlay[];
-  totalsRule?: { id: string; label: string; test: TotalsTest; evidence: Record } | null;
+  /** `forward`: the totals rule's forward check at issue (forward.ts); its totals stake only when it passed. */
+  totalsRule?: { id: string; label: string; test: TotalsTest; evidence: Record; forward?: ForwardCheck } | null;
   /** Anything the record cannot vouch for. */
   unverified: string[];
 }
@@ -185,8 +186,9 @@ export function selectForEmail(r: PicksReport, playLimit: number, suLimit: numbe
       return p ? [{ g, ...p, band: marginLabel(r.league, marginBand(r.league, p.margin)) }] : [];
     })
     .sort((x, y) => y.margin - x.margin);
-  const totals = (r.totals?.board ?? [])
-    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref && !!g.stake && !g.held)
+  // A totals rule without a passing forward check sends nothing (compose already tracks its games).
+  const totals = (totalsStakes(r.totals?.backtest.rule) ? (r.totals?.board ?? []) : [])
+    .filter((g) => g.tier === "t1" && g.side && g.line !== undefined && g.ref && !!g.stake && !g.held && !g.forwardHold)
     .sort((a, b) => (b.read?.minEdge ?? 0) - (a.read?.minEdge ?? 0));
   return {
     league: r.league,
@@ -265,7 +267,13 @@ export function toIssued(
       kickoff: g.ref!.kickoff,
     })),
     totalsRule: r.totals?.backtest.rule
-      ? { id: r.totals.backtest.rule.id, label: r.totals.backtest.rule.label, test: r.totals.backtest.rule.test, evidence: r.totals.backtest.rule.record }
+      ? {
+          id: r.totals.backtest.rule.id,
+          label: r.totals.backtest.rule.label,
+          test: r.totals.backtest.rule.test,
+          evidence: r.totals.backtest.rule.record,
+          ...(r.totals.backtest.rule.forward ? { forward: r.totals.backtest.rule.forward } : {}),
+        }
       : null,
     unverified: [],
   };

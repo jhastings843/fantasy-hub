@@ -29,6 +29,7 @@
 
 import type { League } from "./parse";
 import { BREAK_EVEN, MIN_SAMPLE, type Record, type Result, decided, tally } from "./engine";
+import type { ForwardCheck } from "./forward";
 
 export type OU = "over" | "under";
 
@@ -134,6 +135,24 @@ export interface TotalsCutResult extends TotalsCut {
   record: Record;
   games: number;
   weeks: number[];
+  /** The rule only: its record since first chosen, and whether that lets it stake (forward.ts). None: tracked. */
+  forward?: ForwardCheck;
+}
+
+/** Each graded archive game a cut bets, by week, with its result (the forward check's input). */
+export function totalsCutGames(
+  cut: TotalsCut,
+  seen: TotalsSeen[],
+  finals: Map<string, number>,
+  keyOf: (g: { week: number; home: string; away: string }) => string,
+): { week: number; result: Result }[] {
+  return seen.flatMap((g) => {
+    const pts = finals.get(keyOf(g));
+    if (pts === undefined) return [];
+    const r = readTotal(g.line, g.sam, g.david, g.ours);
+    const side = totalsMatches(r, cut.test) ? sideFor(r, cut.test) : undefined;
+    return side ? [{ week: g.week, result: gradeTotal(pts, g.line, side) }] : [];
+  });
 }
 
 export interface TotalsBacktest {
@@ -254,6 +273,8 @@ export interface TotalsBoardGame {
   limited?: string;
   /** Held until this time (ISO): an early look, not yet a bet (hold.ts). */
   held?: string;
+  /** Fits the totals rule, but the rule's forward check hasn't passed (forward.ts): tracked, no stake. */
+  forwardHold?: boolean;
 }
 
 export interface TotalsRef {
