@@ -177,25 +177,23 @@ export function desks(v: View): Desk[] {
     });
   }
   if (snap?.gus && !snap.gus.error) out.push(philDesk(snap.gus, "kalshi", "Gus", "Claude agent, Kalshi", "/money?v=kalshi"));
-  if (sp) {
-    const e = sp.props.reduce((a, x) => ({ u: a.u + x.edges, n: a.n + x.edgeBets }), { u: 0, n: 0 });
+  // Props join only once something is staked (Jack, 2026-11-02: "tracked records shouldn't show up until we are putting stakes down").
+  // Staked = bets from learner slices that went live (models/money.ts "system"); tracked edges stay on the Props pages.
+  const staked = sp ? sp.props.reduce((a, x) => ({ u: a.u + x.system, n: a.n + x.systemBets }), { u: 0, n: 0 }) : { u: 0, n: 0 };
+  if (sp && staked.n) {
     out.push({
       id: "props",
       money: "units",
       name: "Props",
-      what: "Our four models' edges, tracked, no stake",
-      result: units(e.u),
-      rec: `${e.n} graded`,
-      tone: toneOf(e.u),
-      ours: units(e.u),
+      what: "Staked prop bets from our models",
+      result: units(staked.u),
+      rec: `${staked.n} graded`,
+      tone: toneOf(staked.u),
+      ours: units(staked.u),
       yard: "Break-even 0u",
-      read: e.n ? "Tracked only" : "First grades pending",
-      readTone: "neutral",
+      read: staked.u >= 0 ? "Up" : "Down",
+      readTone: staked.u >= 0 ? "good" : "bad",
       href: "/props?v=results",
-      // Worst first: the list is there to show where the loss comes from.
-      breakdown: [...(sp.propTypes ?? [])]
-        .sort((a, b) => a.units - b.units)
-        .map((t) => ({ label: t.label, result: units(t.units), rec: `${t.w}-${t.l}${t.p ? `-${t.p}` : ""} · ${t.bets} edges`, tone: toneOf(t.units) })),
     });
   }
   return out;

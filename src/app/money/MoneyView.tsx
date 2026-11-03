@@ -1509,22 +1509,12 @@ function PicksPanel({ sp }: { sp: Sports }) {
 
 function PropsPanel({ sp }: { sp: Sports }) {
   const sys = sp.props.reduce((a, w) => a + w.system, 0);
-  const edges = sp.props.reduce((a, w) => a + w.edges, 0);
   const nSys = sp.props.reduce((a, w) => a + w.systemBets, 0);
-  const nEdges = sp.props.reduce((a, w) => a + w.edgeBets, 0);
   return (
     <div className={m.panel}>
       <div className={m.panelHead}><h2 className={m.panelTitle}>Props</h2><Link className={m.panelLink} href="/props">Props</Link></div>
       <LineChart
-        series={
-          // The system line leads once it has bets; until then it would be a flat zero.
-          nSys
-            ? [
-                { label: "System bets", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.system }))), tone: "auto" },
-                { label: "Every model edge", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.edges }))) },
-              ]
-            : [{ label: "Every model edge", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.edges }))), tone: "auto" }]
-        }
+        series={[{ label: "Staked prop bets", points: cumulative(sp.props.map((w) => ({ at: w.at, v: w.system }))), tone: "auto" }]}
         baseline={0}
         format={units}
         height={230}
@@ -1533,9 +1523,7 @@ function PropsPanel({ sp }: { sp: Sports }) {
         ariaLabel="Net units on prop bets by week: the system's bets and every edge our models flagged"
       />
       <span className={m.sub}>
-        {`Every edge our four models flagged (NBA props, First Basket, NFL props, First TD): ${units(Math.round(edges * 100) / 100)} on ${nEdges}. ${
-          nSys ? `The system's bets: ${units(Math.round(sys * 100) / 100)} on ${nSys}.` : "No system bets settled yet."
-        } 1 unit risked per bet, at the saved price.`}
+        {`Staked prop bets from our models' live slices: ${units(Math.round(sys * 100) / 100)} on ${nSys}. 1 unit risked per bet, at the saved price. Tracked edges are on the Props pages.`}
       </span>
     </div>
   );
@@ -1597,7 +1585,8 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
           </div>
         )}
         {v.sports && <PicksPanel sp={v.sports} />}
-        {v.sports && <PropsPanel sp={v.sports} />}
+        {/* Staked props only (Jack, 2026-11-02); tracked edges live on the Props pages. */}
+        {v.sports && v.sports.props.some((w) => w.systemBets > 0) && <PropsPanel sp={v.sports} />}
         {wx && (
           <div className={m.panel}>
             <div className={m.panelHead}><h2 className={m.panelTitle}>Weather desk</h2><Link className={m.panelLink} href={href("weather")}>Bets and board</Link></div>
