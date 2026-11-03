@@ -94,6 +94,10 @@ function asSaved(g: NbaBoardGame, t: NbaTracked | undefined): NbaBoardGame {
 const ruleOf = (v: NbaPicksView, m: Market): NbaRule | null => (m === "ats" ? v.ats : m === "ou" ? v.ou : null);
 
 /** One game's read in one market: the saved copy once tipped, Sam's bet, the rule's tier and any stake. */
+/** A collecting research cut that trails its parent as surely as a winner must lead (Jack, 2026-11-03). Never bet; it returns once t recovers. */
+const nbaRetired = (h: { status: string; cmp: { n: number; weeks: number; t: number | null } }) =>
+  h.status === "collecting" && h.cmp.n >= CRITERIA.MIN_OPPORTUNITIES && h.cmp.weeks >= CRITERIA.MIN_WEEKS && h.cmp.t !== null && h.cmp.t <= -CRITERIA.MIN_T;
+
 export function readMarket(raw: NbaBoardGame, v: NbaPicksView | null, m: Market) {
   const saved = v?.games.find((x) => x.id === raw.id);
   const g = asSaved(raw, saved);
@@ -607,22 +611,22 @@ function NbaResearch({ v, m }: { v: NbaPicksView; m: Market }) {
                 </tr>
               </thead>
               <tbody>
-                {hyps.map((h) => (
-                  <tr key={h.id}>
+                {[...hyps].sort((a, b) => Number(nbaRetired(a)) - Number(nbaRetired(b))).map((h) => (
+                  <tr key={h.id} style={nbaRetired(h) ? { opacity: 0.6 } : undefined}>
                     <td>{h.label}</td>
                     <td>{h.parentLabel}</td>
                     <td className={s.num}>{`${h.cmp.n} / ${CRITERIA.MIN_OPPORTUNITIES}`}</td>
                     <td className={s.num}>{`${h.cmp.weeks} / ${CRITERIA.MIN_WEEKS}`}</td>
                     <td className={`${s.num} ${cls(h.cmp.mean)}`}>{h.cmp.n ? `${h.cmp.mean > 0 ? "+" : ""}${h.cmp.mean.toFixed(2)}` : "–"}</td>
                     <td className={s.num}>{h.cmp.t ?? "–"}</td>
-                    <td className={h.status === "active" ? s.pos : h.status === "rolled-back" ? s.neg : s.dim}>{h.status === "active" ? "in the rule" : h.status === "rolled-back" ? "rolled back" : "collecting"}</td>
+                    <td className={h.status === "active" ? s.pos : h.status === "rolled-back" ? s.neg : s.dim}>{h.status === "active" ? "in the rule" : h.status === "rolled-back" ? "rolled back" : nbaRetired(h) ? "retired" : "collecting"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <p className={`${s.notice} ${s.dim}`}>
-            {`Games first seen after each was registered. Same bar as football's review: ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and t ${CRITERIA.MIN_T}+ to go in, at most one per market a week; rolled back when it trails its parent on ${CRITERIA.ROLLBACK_MIN_OPPORTUNITIES}+ games with t at or under -${CRITERIA.MIN_T}.`}
+            {`Games first seen after each was registered. Same bar as football's review: ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and t ${CRITERIA.MIN_T}+ to go in, at most one per market a week; retired (listed last) while it trails its parent just as surely, back to collecting once it doesn't; rolled back when it trails its parent on ${CRITERIA.ROLLBACK_MIN_OPPORTUNITIES}+ games with t at or under -${CRITERIA.MIN_T}.`}
           </p>
         </details>
       )}

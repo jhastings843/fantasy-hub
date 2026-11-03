@@ -58,9 +58,25 @@ describe("review", () => {
     const r1 = review(G, emptyState("t"), [good, bad], T0, 7);
     expect(r1.journal[0]).toMatchObject({ kind: "registered" });
     expect(r1.state.entries.good.status).toBe("active");
-    expect(r1.state.entries.bad.status).toBe("collecting");
+    // Losing every game over its games and weeks: retired (2026-11-03), not left collecting.
+    expect(r1.state.entries.bad.status).toBe("retired");
     expect(reviewDue(r1.state, 7)).toBe(false);
     expect(reviewDue(r1.state, 8)).toBe(true);
+  });
+
+  it("retires a slice that loses as surely as a live one must win, and brings it back at even", () => {
+    const loser: Candidate = { id: "l", label: "Loser", bets: bets(8, (i) => -1 - (i % 2) * 0.3) };
+    const meh: Candidate = { id: "m", label: "Meh", bets: bets(8, (i) => (i % 2 ? 1 : -1.2)) };
+    const r1 = review(G, emptyState("t"), [loser, meh], T0, 7);
+    expect(r1.state.entries.l.status).toBe("retired");
+    expect(r1.state.entries.l.reason).toMatch(/lost over 8 games/);
+    expect(r1.state.entries.m.status).toBe("collecting");
+    expect(r1.journal.some((j) => j.kind === "retired" && j.id === "l")).toBe(true);
+    // It keeps being graded: winners afterwards bring it back to even, and it collects again.
+    const back: Candidate = { ...loser, bets: [...loser.bets, ...bets(12, (i) => 1.2 + (i % 2) * 0.2, 9)] };
+    const r2 = review(G, r1.state, [back, meh], at(30), 8);
+    expect(r2.state.entries.l.status).not.toBe("retired");
+    expect(r2.state.entries.l.endedAt).toBeUndefined();
   });
 
   it("caps activations at maxNew, strongest first", () => {

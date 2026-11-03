@@ -3,7 +3,7 @@
 - Search: nbaPropsIndex subjects are now per player (nbap:TEAM|name); currentOnly compares Date.parse. Before, tonight's game retired last night's props every morning, so NBA players were never searchable until near tip.
 - attd.tsx: ParlayToday/NightToday return null once the week's tickets are graded or void.
 - top.tsx KOTC lineup: slate sim, crowd estimate (input), tagged-prop learner (collecting).
-- Learner logs (c311b73+): Check.have/need in learning/engine.ts, hasNeeds() in props/learning.tsx renders 'now (needs X)'; picks log.tsx plainWhy() rewrites 'not better on matched games'. Props engine never drops a losing collecting slice (picks learner rejects at t <= -1.645); offered Jack a drop rule.
+- Learner logs (c311b73+): Check.have/need in learning/engine.ts, hasNeeds() in props/learning.tsx renders 'now (needs X)'; picks log.tsx plainWhy() rewrites 'not better on matched games'. Retire rule (Jack chose 'retire, keep visible'): engine status 'retired' when collecting with games+weeks met and t <= -minT; still graded, back to collecting at t >= 0; journal kind 'retired'. TrackingProgress shows retired rows in a collapsed <details> (picks.module.css .retired); football picks log lists rejected ideas there; NBA picks research cuts show 'retired' (display, stateless). Nov 3: nothing qualifies (worst NBA props 'Model lean, every prop' t -1.93).
 - Nothing went live after Week 8 (0 active across every section). David NFL props: his plays 198-173 +4.9u (53.4%, z 0.37 vs -110 break-even), his every-prop record -12.7u; our edges 354-322 -9.3u. David learner slices started Nov 2 (1 game).
 
 # 2026-11-03: prop staking schemes (branch worktree-agent-aee5627a93400a22d, NOT merged or deployed)

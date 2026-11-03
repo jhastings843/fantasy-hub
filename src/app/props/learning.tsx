@@ -36,13 +36,13 @@ export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
     return {
       id: `${prefix}${e.id}`,
       label: `${prefix}${e.label}`,
-      status: live ? "live" : e.status === "rolled-back" ? "back" : "testing",
+      status: live ? "live" : e.status === "rolled-back" ? "back" : e.status === "retired" ? "retired" : "testing",
       games: ev?.games ?? 0,
       needGames: g.minGames,
       weeks: ev?.weeks ?? 0,
       needWeeks: g.minWeeks,
       result: live || e.status === "rolled-back" ? rec : ev && ev.bets ? `${u(ev.units)} over ${ev.bets} bet${ev.bets === 1 ? "" : "s"}` : undefined,
-      note: paused ? `Paused for the rest of week ${e.pausedWeek}: past its ${g.weeklyLossCap}u weekly loss cap` : live ? undefined : e.status === "rolled-back" ? e.reason : still,
+      note: paused ? `Paused for the rest of week ${e.pausedWeek}: past its ${g.weeklyLossCap}u weekly loss cap` : live ? undefined : e.status === "rolled-back" ? e.reason : e.status === "retired" ? `retired week ${e.endedWeek}` : still,
     };
   });
 }

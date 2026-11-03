@@ -23,6 +23,7 @@
   ],
   "last_worked": "2026-11-03",
   "notes": [
+    "2026-11-03: Learner logs say 'now (needs X)'; slices that lose at the go-live confidence retire into a collapsed list, still graded, back at even. None qualify yet.",
     "2026-11-03: Player prop page redesigned like David's Prop Board (cards, number line, over/under strip, our record on him); NBA players stay in search until their next props save; graded ATTD tickets leave the Board; KOTC Who decides rewritten (b66adf5). Nothing moved to live after Week 8: 0 active slices anywhere.",
     "2026-11-03: Prop staking schemes tracked beside flat (to win 1u, quarter Kelly, shrunk Kelly, by edge) on every Results page with a saved chance; switch rule (200 bets, 4 weeks, paired t 1.645 on log-growth) stores the scheme per section and sizes live bets. Branch not merged. Backtest: no switch yet.",
     "2026-11-03: Audit round 2: NBA ingest locked + idempotent (marker last), params version stamped on boards with degraded-load problems, price-aware CLV on unchanged spreads (new closes only), Venom ATTD and lotto combos can stake (shared slice membership), KOTEZ payouts parsed from DK Network (DK paid column).",

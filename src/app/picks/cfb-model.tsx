@@ -10,7 +10,7 @@ import s from "./picks.module.css";
 const sp = (x: number) => (x === 0 ? "PK" : x > 0 ? `+${x}` : `${x}`);
 const signed = (x: number, d = 1) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(d)}`;
 const pct = (x: number) => `${Math.round(x * 100)}%`;
-const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this week", "rolled-back": "Rolled back" } as const;
+const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this week", "rolled-back": "Rolled back", retired: "Retired" } as const;
 
 export async function CfbModelCard({ season }: { season: number }) {
   const v = await getCfbModelView(season).catch(() => null);

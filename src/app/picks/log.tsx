@@ -79,7 +79,6 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
       {rep && <ModelRecords league={league} market={market} report={rep} />}
       <TrackingProgress
         rows={ideas
-          .filter((d) => d.verdict !== "reject")
           .map((d) => {
             // Reviews before 2026-10-22 saved only the sentence ("10 of 30 settled matched games, 1 of 3 weeks"; "n=12" on report-only ideas).
             const n = d.n ?? Number(/(\d+) of \d+ settled/.exec(d.why)?.[1] ?? /n=(\d+)/.exec(d.why)?.[1] ?? 0);
@@ -89,7 +88,8 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
               id: d.id,
               label: d.id.startsWith("both:") ? `${d.label} (shared with ${OTHER[league]})` : d.label,
               // "promote" means it passed; only the idea the review actually switched in is live (one per review, and validation can still refuse it).
-              status: (state?.activations ? state.activations.some((x) => x.hypothesis === d.id) : d.id === state?.activatedFrom) ? ("live" as const) : d.verdict === "report" ? ("report" as const) : ("testing" as const),
+              // Rejected ideas (lost at the same t a winner needs) list as retired, collapsed; a later review can bring one back.
+              status: (state?.activations ? state.activations.some((x) => x.hypothesis === d.id) : d.id === state?.activatedFrom) ? ("live" as const) : d.verdict === "report" ? ("report" as const) : d.verdict === "reject" ? ("retired" as const) : ("testing" as const),
               games: n,
               needGames: CRITERIA.MIN_OPPORTUNITIES,
               weeks: wk,

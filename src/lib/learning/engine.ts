@@ -72,7 +72,8 @@ export interface Gate {
   weeklyLossCap: number;
 }
 
-export type Status = "collecting" | "active" | "rolled-back";
+/** "retired": a collecting slice that lost at the go-live confidence, the other way (Jack, 2026-11-03). Still graded; returns to collecting if it climbs back to even. */
+export type Status = "collecting" | "active" | "rolled-back" | "retired";
 /** What views show: a live slice past its weekly loss cap reads "paused" (stored status stays "active"). */
 export type ViewStatus = Status | "paused";
 
@@ -176,7 +177,7 @@ function proposeCombos(gate: Gate, s: SectionState, base: Candidate[], ev: Map<s
 export interface JournalLine {
   at: string;
   week: number;
-  kind: "registered" | "activated" | "rolled back" | "review" | "staking";
+  kind: "registered" | "activated" | "rolled back" | "review" | "staking" | "retired";
   id?: string;
   text: string;
 }
@@ -359,6 +360,25 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     }
   }
 
+  // Retire a collecting slice that has its games and weeks and loses as surely as a live one must win
+  // (t at or below minus the go-live bar). It keeps being graded and comes back once it is back to even.
+  let retired = 0;
+  for (const e of Object.values(entries)) {
+    const x = ev.get(e.id);
+    if (!x) continue;
+    if (e.status === "collecting" && x.games >= gate.minGames && x.weeks >= gate.minWeeks && x.t <= -gate.minT) {
+      Object.assign(e, { status: "retired", endedAt: now, endedWeek: week, reason: `lost over ${x.games} games, ${x.weeks} weeks: ${x.units}u, t ${x.t}` });
+      journal.push({ at: now, week, kind: "retired", id: e.id, text: `Retired ${e.label}: ${e.reason}. Still graded; it comes back if it climbs to even.` });
+      retired++;
+    } else if (e.status === "retired" && x.t >= 0) {
+      e.status = "collecting";
+      delete e.endedAt;
+      delete e.endedWeek;
+      delete e.reason;
+      journal.push({ at: now, week, kind: "registered", id: e.id, text: `Brought back ${e.label}: back to even (${x.units}u, t ${x.t}), collecting again.` });
+    }
+  }
+
   const activeIds = new Set(Object.values(entries).filter((e) => e.status === "active").map((e) => e.id));
   const ready = Object.values(entries)
     .filter((e) => e.status === "collecting" && ev.get(e.id)?.ready && !(e.parent && activeIds.has(e.parent)))
@@ -377,7 +397,7 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     at: now,
     week,
     kind: "review",
-    text: `Reviewed ${Object.keys(entries).length} slices: ${Object.values(entries).filter((e) => e.status === "active").length} active, ${collecting.length} collecting${ready.length ? `, ${ready.length} activated` : ""}${rolled ? `, ${rolled} rolled back` : ""}.${
+    text: `Reviewed ${Object.keys(entries).length} slices: ${Object.values(entries).filter((e) => e.status === "active").length} active, ${collecting.length} collecting${ready.length ? `, ${ready.length} activated` : ""}${rolled ? `, ${rolled} rolled back` : ""}${retired ? `, ${retired} retired` : ""}.${
       best ? ` Closest: ${entries[best.id].label} (${best.checks.filter((c) => !c.pass).map((c) => c.note).join("; ") || "ready"}).` : " No games since registration yet."
     }`,
   });

@@ -29,7 +29,7 @@ const CBB_VIEWS: { id: View; label: string }[] = [
   { id: "research", label: "Research" },
   { id: "log", label: "Learner log" },
 ];
-const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this week", "rolled-back": "Rolled back" } as const;
+const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this week", "rolled-back": "Rolled back", retired: "Retired" } as const;
 /** Which slices belong to a market tab. */
 const sliceMarket = (id: string): Market => (CBB_SLICES.find((x) => x[0] === id)?.[3] === "total" ? "ou" : "ats");
 

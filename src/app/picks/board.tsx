@@ -382,7 +382,8 @@ export function CutRanges({ title, aside, rows, open }: { title: string; aside?:
 export interface TrackRow {
   id: string;
   label: string;
-  status: "testing" | "live" | "back" | "report";
+  /** "retired": lost as surely as a live one must win; listed apart, collapsed (Jack, 2026-11-03). */
+  status: "testing" | "live" | "back" | "report" | "retired";
   games: number;
   needGames: number;
   /** Omitted when the store hasn't recorded weeks yet. */
@@ -394,7 +395,7 @@ export interface TrackRow {
   note?: string;
 }
 
-const TRACK_KIND: { [k in TrackRow["status"]]: [string, string] } = { testing: ["Testing", ""], live: ["Live", s.kLive], back: ["Rolled back", s.kBack], report: ["Report only", ""] };
+const TRACK_KIND: { [k in TrackRow["status"]]: [string, string] } = { testing: ["Testing", ""], live: ["Live", s.kLive], back: ["Rolled back", s.kBack], report: ["Report only", ""], retired: ["Retired", s.kBack] };
 
 function TrackBar({ label, have, need }: { label: string; have: number; need: number }) {
   const pct = need > 0 ? Math.min(1, have / need) : 1;
@@ -413,30 +414,32 @@ function TrackBar({ label, have, need }: { label: string; have: number; need: nu
 export function TrackingProgress({ rows, sub, empty }: { rows: TrackRow[]; sub: string; empty: string }) {
   const frac = (r: TrackRow) => Math.min(1, r.games / Math.max(1, r.needGames)) + (r.weeks !== undefined ? Math.min(1, r.weeks / Math.max(1, r.needWeeks)) : 0);
   const order: TrackRow["status"][] = ["live", "testing", "report", "back"];
-  const sorted = [...rows].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || frac(b) - frac(a) || a.label.localeCompare(b.label));
+  const sorted = [...rows].filter((r) => r.status !== "retired").sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || frac(b) - frac(a) || a.label.localeCompare(b.label));
+  const retired = rows.filter((r) => r.status === "retired").sort((a, b) => a.label.localeCompare(b.label));
   const testing = rows.filter((r) => r.status === "testing").length;
+  const row = (r: TrackRow) => (
+    <li key={r.id} className={s.tkRow}>
+      <div className={s.tkHead}>
+        <b>{r.label}</b>
+        <span className={`${s.logKind} ${TRACK_KIND[r.status][1]}`}>{TRACK_KIND[r.status][0]}</span>
+      </div>
+      <TrackBar label="Games" have={r.games} need={r.needGames} />
+      {r.weeks !== undefined && <TrackBar label="Weeks" have={r.weeks} need={r.needWeeks} />}
+      {(r.result || r.note) && <p className={s.tkNote}>{[r.result, r.note].filter(Boolean).join(" · ")}</p>}
+    </li>
+  );
   return (
     <div className={s.section}>
       <div className={s.sectionHead}>
         <h3 className={s.h2}>Tracking in the background</h3>
         <p className={s.p}>{`${testing ? `${testing} ${testing === 1 ? "model" : "models"} collecting games, none of it bet. ` : ""}${sub}`}</p>
       </div>
-      {sorted.length ? (
-        <ul className={s.tkList}>
-          {sorted.map((r) => (
-            <li key={r.id} className={s.tkRow}>
-              <div className={s.tkHead}>
-                <b>{r.label}</b>
-                <span className={`${s.logKind} ${TRACK_KIND[r.status][1]}`}>{TRACK_KIND[r.status][0]}</span>
-              </div>
-              <TrackBar label="Games" have={r.games} need={r.needGames} />
-              {r.weeks !== undefined && <TrackBar label="Weeks" have={r.weeks} need={r.needWeeks} />}
-              {(r.result || r.note) && <p className={s.tkNote}>{[r.result, r.note].filter(Boolean).join(" · ")}</p>}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={s.calm}>{empty}</p>
+      {sorted.length ? <ul className={s.tkList}>{sorted.map(row)}</ul> : <p className={s.calm}>{empty}</p>}
+      {retired.length > 0 && (
+        <details className={s.retired}>
+          <summary>{`Retired (${retired.length}): lost as surely as a live one must win. Still graded; one comes back if it climbs to even.`}</summary>
+          <ul className={s.tkList}>{retired.map(row)}</ul>
+        </details>
       )}
     </div>
   );
@@ -471,6 +474,6 @@ export function LearnerLog({ entries, empty }: { entries: LogEntry[]; empty: str
 
 /** A shared-engine journal line as a log entry (props, first TD, first basket). */
 export function engineEntry(j: JournalLine, section: string): LogEntry {
-  const kind: LogEntry["kind"] = j.kind === "activated" ? "live" : j.kind === "rolled back" ? "back" : j.kind === "registered" ? "new" : "test";
+  const kind: LogEntry["kind"] = j.kind === "activated" ? "live" : j.kind === "rolled back" || j.kind === "retired" ? "back" : j.kind === "registered" ? "new" : "test";
   return { at: j.at, kind, title: `${section}: ${j.text}` };
 }
