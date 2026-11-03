@@ -7,6 +7,8 @@ import type { BoardGame } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import { TeamLogo } from "@/components/TeamLogo";
 import { GameStats } from "./GameStats";
+import { FootballOurStats } from "./FootballOurStats";
+import { NflGameProps } from "./GameProps";
 import { MarketLine } from "../board";
 import { picksSearchIndex } from "../search";
 import { gameHref, statusOf, suWhy } from "../ats";
@@ -191,6 +193,10 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
       {/* The numbers behind the spread call */}
       <GameStats g={g} r={r} />
       {g.su && <p className={p.note}>{suWhy(g, name)}</p>}
+
+      {/* Our own model, every market, in the same boxes */}
+      <FootballOurStats g={g} r={r} />
+      {r.league === "nfl" && <NflGameProps season={r.season} home={g.home} away={g.away} />}
 
       {/* A plain link, so it loads the full page rather than reopening this window. */}
       <a href={gameHref(r, g)} className={p.more}>

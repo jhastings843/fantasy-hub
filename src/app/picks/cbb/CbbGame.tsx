@@ -4,7 +4,10 @@
 // numbers behind them. Before tip it reads today's line; once the game starts
 // it shows the read we saved before tip, so the result grades what we said
 // then and not a read that already knows the score (Jack, 2026-11-02).
-import { CBB_PARAMS, type CbbBoardRow } from "@/lib/models/cbb/store";
+import { cache, type ReactNode } from "react";
+import { CBB_PARAMS, getCbbRecord, type CbbBoardRow } from "@/lib/models/cbb/store";
+import { ourBoxes } from "@/lib/picks/our-boxes";
+import { OurStats } from "../game/OurStats";
 import { coverChance, overChance } from "@/lib/models/cbb/model";
 import { TeamLogo } from "@/components/TeamLogo";
 import { line, price } from "../ui";
@@ -78,10 +81,27 @@ export function readOfRow(x: CbbBoardRow): Read {
   };
 }
 
+/** Our tracked CBB records, read once per request for all three markets. */
+const records = cache(() => getCbbRecord().then((x) => x.records).catch(() => null));
+
+/**
+ * The same side, priced off its tracked record instead of the model's own
+ * chance: cover chance is the record pulled toward 50% (an estimate), edge per
+ * unit at the posted price (-110 when none; straight up only at a moneyline).
+ */
+async function CbbRecordRow({ id, side, edge, word, price, label }: { id: "lean" | "total" | "winner"; side: string | null; edge: string; word: string; price?: number; label: string }) {
+  if (!side) return null;
+  const all = await records();
+  if (!all) return <OurStats row={null} missing="Couldn't load our CBB record just now." />;
+  const rec = all.find((x) => x.id === id) ?? null;
+  const b = ourBoxes({ record: rec, price, assume: id !== "winner" });
+  return <OurStats caption="By our record" row={{ side, edge, word, b, label, record: rec }} missing="" />;
+}
+
 type Result = { text: string; tone: "W" | "L" | "P" } | null;
 const resultBox = (r: Result, pending: string) => (r ? <dd className={`${s.num} ${r.tone === "W" ? s.pos : r.tone === "L" ? s.neg : ""}`}>{r.text}</dd> : <dd className={s.num}>{pending}</dd>);
 
-function Market({ name, side, edge, chance, chanceWord, result, pending, note }: { name: string; side: string; edge: string; chance: string; chanceWord: string; result: Result; pending: string; note?: string }) {
+function Market({ name, side, edge, chance, chanceWord, result, pending, note, children }: { name: string; side: string; edge: string; chance: string; chanceWord: string; result: Result; pending: string; note?: string; children?: ReactNode }) {
   return (
     <section aria-label={name}>
       <h3 className={p.h3}>{name}</h3>
@@ -106,6 +126,7 @@ function Market({ name, side, edge, chance, chanceWord, result, pending, note }:
         </dl>
         {note && <p className={p.statNote}>{note}</p>}
       </div>
+      {children && <div style={{ marginTop: 12 }}>{children}</div>}
     </section>
   );
 }
@@ -192,7 +213,9 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
         result={sRes}
         pending={sSide ? pending : "·"}
         note={r.spread !== null ? `DraftKings ${g.home.short} ${line(r.spread)}${r.openSpread !== null && r.openSpread !== r.spread ? ` (opened ${line(r.openSpread)})` : ""}; ours ${g.home.short} ${line(r.ours.spread)}.${scoreLine ? ` ${scoreLine}.` : ""}` : undefined}
-      />
+      >
+        <CbbRecordRow id="lean" side={sSide} edge={sEdge !== null ? `${Math.abs(sEdge).toFixed(1)} pts` : "·"} word="Cover chance" price={sHome ? r.homePrice : r.awayPrice} label="Our CBB model, every spread" />
+      </Market>
       <Market
         name="Total"
         side={tSide ?? (r.total === null ? "No line" : "None")}
@@ -202,7 +225,9 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
         result={tRes}
         pending={tSide ? (pts !== null ? `${pts} so far` : pending) : "·"}
         note={r.total !== null ? `DraftKings ${r.total}${r.openTotal !== null && r.openTotal !== r.total ? ` (opened ${r.openTotal})` : ""}; ours ${r.ours.total}.` : undefined}
-      />
+      >
+        <CbbRecordRow id="total" side={tSide} edge={tEdge !== null ? `${Math.abs(tEdge).toFixed(1)} pts` : "·"} word="Cover chance" price={over ? r.overPrice : r.underPrice} label="Our CBB model, every total" />
+      </Market>
       <Market
         name="Straight up"
         side={lean(homeFav, g.home.short, g.away.short)}
@@ -212,7 +237,9 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
         result={uRes}
         pending={pending}
         note={r.mlHome !== undefined || r.mlAway !== undefined ? `Moneyline ${g.away.abbr} ${price(r.mlAway)} · ${g.home.abbr} ${price(r.mlHome)}.` : undefined}
-      />
+      >
+        <CbbRecordRow id="winner" side={`${lean(homeFav, g.home.short, g.away.short)} to win`} edge={`by ${Math.abs(r.ours.spread).toFixed(1)}`} word="Win chance" price={homeFav ? r.mlHome : r.mlAway} label="Our CBB model, every winner" />
+      </Market>
 
       <section aria-label="Behind the number">
         <h3 className={p.h3}>Behind the number</h3>
