@@ -14,20 +14,35 @@ export const DRY = process.argv.includes("--dry");
 const APP = process.env.APP_URL ?? "https://fantasy-hub-tan.vercel.app";
 const auth = () => ({ authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` });
 
+/**
+ * A call to the app with two retries on a network failure (not on an HTTP
+ * error). The NBA refit failed twice on Nov 3, 2026 with "fetch failed"
+ * (EPIPE): the fit grinds the CPU for minutes after an earlier fetch, the app
+ * closes the idle kept-alive socket, and the next request is written into the
+ * dead socket. A retry opens a new one. Storing is safe to repeat: the route
+ * sets the same params and enforces the same 2 SE bar.
+ */
+async function appFetch(label: string, go: () => Promise<Response>): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await go();
+    } catch (e) {
+      if (attempt >= 3) throw e;
+      console.log(`(${label} failed: ${e instanceof Error ? e.message : e}; retry ${attempt} of 2 in 5 s)`);
+      await new Promise((ok) => setTimeout(ok, 5_000));
+    }
+  }
+}
+
 /** The settings the site runs on now: JSON defaults with the stored refit over them, field by field (as live() does). */
 export async function liveParams<T extends object>(model: ModelKey, defaults: T): Promise<T> {
   if (!process.env.CRON_SECRET) {
     console.log(`(no CRON_SECRET: scoring the JSON defaults as live for ${model})`);
     return defaults;
   }
-  // One retry: the Nov 3 NBA refit died on a dropped connection (fetch
-  // failed, EPIPE) before the app answered, not on a bad answer.
-  const get = () => fetch(`${APP}/api/model-params?model=${model}`, { headers: auth(), signal: AbortSignal.timeout(20_000) });
-  const r = await get().catch(async (e) => {
-    console.log(`(GET model-params ${model} failed: ${e instanceof Error ? e.message : e}; retrying once in 5 s)`);
-    await new Promise((ok) => setTimeout(ok, 5_000));
-    return get();
-  });
+  const r = await appFetch(`GET model-params ${model}`, () =>
+    fetch(`${APP}/api/model-params?model=${model}`, { headers: auth(), signal: AbortSignal.timeout(20_000) }),
+  );
   if (!r.ok) throw new Error(`GET model-params ${model}: HTTP ${r.status}`);
   const j = (await r.json()) as { stored: { params: Partial<T> } | null };
   return { ...defaults, ...(j.stored?.params ?? {}) };
@@ -78,12 +93,14 @@ export async function submit<T extends object>(model: ModelKey, defaults: T, par
     console.log("dry run: not stored");
     return false;
   }
-  const r = await fetch(`${APP}/api/model-params`, {
-    method: "POST",
-    headers: { ...auth(), "content-type": "application/json" },
-    body: JSON.stringify({ model, params: pick(defaults, params), evidence: ev }),
-    signal: AbortSignal.timeout(20_000),
-  });
+  const r = await appFetch(`POST model-params ${model}`, () =>
+    fetch(`${APP}/api/model-params`, {
+      method: "POST",
+      headers: { ...auth(), "content-type": "application/json" },
+      body: JSON.stringify({ model, params: pick(defaults, params), evidence: ev }),
+      signal: AbortSignal.timeout(20_000),
+    }),
+  );
   const j = await r.text();
   await out(`- ${line}: ${r.ok ? "STORED" : `refused (${r.status} ${j})`}`);
   if (!r.ok) throw new Error(`POST model-params ${model}: ${r.status} ${j}`);
