@@ -80,8 +80,8 @@ export function gradeBet(b: MoneyBet, g: FinalGame): { outcome: Outcome; actual:
   if (b.market === "prop") {
     if (!b.side || b.line === undefined || !b.player || !b.stat || !g.box) return null;
     const row = g.box.get(nameKey(b.player));
-    // Not in the box score: he didn't play, and a book voids it.
-    if (!row) return { outcome: "void", actual: `${b.player} not in the box score` };
+    // Not in the box score: he didn't play, and a book voids it. A thin or empty box (a partial feed) settles on a later read instead (audit 2026-11-02).
+    if (!row) return g.box.size >= MIN_BOX_ROWS ? { outcome: "void", actual: `${b.player} not in the box score` } : null;
     const v = row[b.stat];
     // In the box score but the stat didn't come through: settle on a later read.
     if (!Number.isFinite(v)) return null;
@@ -89,6 +89,9 @@ export function gradeBet(b: MoneyBet, g: FinalGame): { outcome: Outcome; actual:
   }
   return null;
 }
+
+/** Fewer player rows than this and the box score is treated as incomplete. */
+export const MIN_BOX_ROWS = 16;
 
 export interface BetSummary {
   bets: number;

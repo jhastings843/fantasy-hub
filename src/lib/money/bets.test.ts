@@ -20,8 +20,12 @@ describe("gradeBet", () => {
     const r = gradeBet(bet({ market: "prop", player: "Jaxon Smith-Njigba", stat: "rec_yds", side: "over", line: 92.5 }), game);
     expect(r).toEqual({ outcome: "W", actual: "101 receiving yards" });
   });
-  it("a player not in the box score is void", () =>
-    expect(gradeBet(bet({ market: "prop", player: "RJ Harvey", stat: "rec_yds", side: "over", line: 21.5 }), game)?.outcome).toBe("void"));
+  it("a player not in a full box score is void; a thin box (partial feed) waits for a later read", () => {
+    const full = new Map([...box, ...Array.from({ length: 20 }, (_, i) => [`player${i}`, { pass_yds: 0, rush_yds: 0, rec_yds: 0, rec: 0 }] as const)]);
+    const p = bet({ market: "prop", player: "RJ Harvey", stat: "rec_yds", side: "over", line: 21.5 });
+    expect(gradeBet(p, { ...game, box: full })?.outcome).toBe("void");
+    expect(gradeBet(p, game)).toBeNull();
+  });
   it("waits for a final", () => expect(gradeBet(bet({ market: "spread", team: "SEA", line: -2.5 }), { ...game, final: false })).toBeNull());
   it("can't read a team that isn't in the game", () => expect(gradeBet(bet({ market: "moneyline", team: "KC" }), game)).toBeNull());
 });
