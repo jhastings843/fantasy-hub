@@ -5,6 +5,7 @@ import { runCbb } from "@/lib/models/cbb/store";
 import { recheckSam } from "@/lib/picks/nba-track-store";
 import { runSplitsAlerts } from "@/lib/picks/splits-alert";
 import { runPoolWatch } from "@/lib/picks/pool-watch";
+import { runStakedPushes } from "@/lib/notify/staked";
 import { redis } from "@/lib/redis/client";
 import { buildReports, SEASON } from "@/lib/survivor/report";
 import { revalidateGames } from "@/lib/survivor/odds";
@@ -533,7 +534,8 @@ export async function runPulse(
   // The splits skip alert too: one policy read most runs; it only fetches splits when a live signal has a sent bet near kickoff.
   // The pick'em watch too: a push when the entry's pick flips on a game still to play.
   // College hoops too: our number saved for games within 36 hours of tip and finals graded, at most every 30 minutes (its own claim).
-  const [jobs, news, sam, skips, pool, cbb, samCbb] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now)), job("splits-skip", () => runSplitsAlerts(now)), job("pool-watch", () => runPoolWatch(now)), job("cbb", () => runCbb(now)), job("sam-cbb-watch", () => runSamCbbWatch(now))]);
+  // Staked props and NBA bets too: each pushed once, before lock (notify/staked.ts).
+  const [jobs, news, sam, skips, pool, cbb, samCbb, staked] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now)), job("splits-skip", () => runSplitsAlerts(now)), job("pool-watch", () => runPoolWatch(now)), job("cbb", () => runCbb(now)), job("sam-cbb-watch", () => runSamCbbWatch(now)), job("staked-push", () => runStakedPushes(now))]);
 
   for (const id of tempo.dueJobs) {
     let left = DEADLINE_MS - (Date.now() - started);
@@ -573,7 +575,7 @@ export async function runPulse(
   // the difference between advice that is stale for fifteen minutes and
   // advice that is stale until lunch.
   if (claimed && jobs.every((j) => j.ok)) await recordTierRun(tier);
-  jobs.push(news, sam, skips, pool, cbb, samCbb);
+  jobs.push(news, sam, skips, pool, cbb, samCbb, staked);
 
   const receipt: PulseReceipt = {
     at: new Date().toISOString(),
