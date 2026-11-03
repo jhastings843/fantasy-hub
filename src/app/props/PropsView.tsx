@@ -10,7 +10,7 @@ import { KotcLog, KotcResults, KotcWeek } from "./kotc";
 import { NbaNewsResults, NbaNewsToday } from "./news";
 import { LottoLog, LottoResults, LottoToday } from "./lotto";
 import { AttdLog, AttdResults, AttdWeek } from "./attd";
-import { KotezWeek } from "./kotez";
+import { KotezResults, KotezWeek } from "./kotez";
 import { Background, PageHead, SecHead } from "../picks/board";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
@@ -94,7 +94,8 @@ export default async function PropsView({
         {shown === "week" && market !== "kotc" && market !== "lotto" && market !== "attd" && market !== "kotez" && <PropTabWeek tab={market} season={season} />}
         {shown === "log" && market !== "kotc" && market !== "lotto" && market !== "attd" && market !== "kotez" && <PropsLog tab={market} season={season} />}
         {market === "kotez" && shown === "week" && <KotezWeek season={season} />}
-        {market === "kotez" && shown !== "week" && <p className={s.calm}>King of the End Zone is projections only for now: no results or learner log until it is saved and graded.</p>}
+        {market === "kotez" && shown === "results" && <KotezResults season={season} />}
+        {market === "kotez" && shown === "log" && <p className={s.calm}>No learner yet for King of the End Zone: one promo game a week is too few to judge slices. Results shows every graded game.</p>}
         {market === "lotto" && shown === "week" && <LottoToday season={season} />}
         {market === "lotto" && shown === "results" && <LottoResults season={season} />}
         {market === "attd" && shown === "week" && <AttdWeek season={season} />}

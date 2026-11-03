@@ -24,6 +24,7 @@ import { readTdScorers, type PropBetRow } from "../lines";
 import type { EspnBoxTeam } from "@/lib/props/grade";
 import { live, primeParams } from "@/lib/models/params-store";
 import { teamList } from "./team-list";
+import { gradeKotez, saveKotez } from "./kotez-store";
 
 // Our NFL First TD model, live. Each run, for every game this week not yet
 // started: each team's players from its last 3 games (nflverse) less anyone
@@ -236,6 +237,16 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
       }
     }
   }
+
+  if (report.week)
+    try {
+      const wk = report.week;
+      const cands = Object.entries(await loadWeek(season, wk)).flatMap(([slug, g]) => (g.attd && g.kickoff ? [{ slug, away: g.game.away, home: g.game.home, kickoff: g.kickoff, espnId: g.espnId, rows: g.attd.rows }] : []));
+      report.learning.push(await saveKotez(season, wk, cands, now));
+      report.learning.push(...(await gradeKotez(season, now)));
+    } catch (err) {
+      report.problems.push(`KOTEZ: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
   if (report.week)
     try {

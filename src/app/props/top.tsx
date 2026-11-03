@@ -229,7 +229,7 @@ export async function PropsLineup({ tab, season }: { tab: "pp" | "ftd" | "nba" |
         title="Who decides King of the End Zone"
         aside="Projections only. Nothing is staked."
         models={[
-          { name: "Longest TD simulation", role: "Chance each player scores the game's longest TD", status: "projections", note: "Built on our Anytime TD model plus every TD's length since 2024. Not saved or graded yet." },
+          { name: "Longest TD simulation", role: "Chance each player scores the game's longest TD", status: "projections", note: "Built on our Anytime TD model plus every TD's length since 2024. Saved and graded on the one promo game a week (DK Network names it; else the Monday game). Nothing staked." },
           { name: "Backers estimate", role: "Share of the pool on each player", status: "input", note: "No pick data from DraftKings: set from each player's anytime price, squared. An estimate, not a count." },
         ]}
       />

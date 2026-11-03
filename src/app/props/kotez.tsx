@@ -8,6 +8,9 @@ import { implied } from "@/lib/props/parse";
 import { Background, SecHead } from "../picks/board";
 import { GameTable, type GameRowData } from "./week";
 import { tvByEvent } from "@/lib/live/espn";
+import { loadKotez } from "@/lib/models/nfl/kotez-store";
+import { nameKey } from "@/lib/props/grade";
+import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
 
 const pct = (x: number) => `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
@@ -52,7 +55,8 @@ export async function KotezWeek({ season }: { season: number }) {
   if (!v) return <p className={s.calm}>The board couldn&apos;t be read just now.</p>;
   const now = nowMs();
   const games = v.board.filter((g) => g.attd && !g.attdResult && (!g.kickoff || Date.parse(g.kickoff) > now)).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
-  const tv = await tvByEvent("nfl");
+  const [tv, saved] = await Promise.all([tvByEvent("nfl"), loadKotez(season).catch(() => [])]);
+  const promo = saved.find((x) => x.week === v.week);
   const sims = games.map((g) => ({ g, k: kotezGame(g.attd!.rows, ATTD_PARAMS.other) }));
   const best = sims
     .flatMap(({ g, k }) => k.rows.filter((r) => r.value !== undefined && r.value >= VALUE && r.longest >= 0.03 && r.dk !== undefined && implied(r.dk) >= 0.1).map((r) => ({ r, game: `${g.game.away} at ${g.game.home}` })))
@@ -78,6 +82,7 @@ export async function KotezWeek({ season }: { season: number }) {
   return (
     <section className={s.section} aria-labelledby="kotez-week">
       <div className={s.pageFrame}>
+        <p className={s.thin}>{promo ? `This week's promo game: ${promo.game} (${promo.source === "dknetwork" ? "named by DK Network" : "the Monday game; DK Network hadn't named one"}). Tracked and graded; the other games are a view.` : "This week's promo game isn't known yet: it is saved on its game day, from DK Network or else the Monday game."}</p>
         <SecHead id="kotez-week" title="Best value" aside={`Our chance at the game's longest TD over the estimated share backing him · ${VALUE}x and up, 3%+ to win, DK +900 or shorter · projections only`} />
         {best.length ? (
           <div className={s.tw}>
@@ -126,6 +131,50 @@ export async function KotezWeek({ season }: { season: number }) {
           than their price says. Value is our chance over that share: 1.5x means about 1.5 times his slice of the pool. Not yet graded: treat it as a guide.
         </p>
       </Background>
+    </section>
+  );
+}
+
+/** Results: each promo game, frozen at kickoff, graded on the longest TD. */
+export async function KotezResults({ season }: { season: number }) {
+  const all = await loadKotez(season).catch(() => null);
+  if (!all) return <p className={s.calm}>King of the End Zone results couldn&apos;t be read just now.</p>;
+  const done = all.filter((x) => x.gradedAt);
+  const ourOn = (x: (typeof all)[number]) =>
+    x.result ? x.result.winners.reduce((a, w) => a + (w.dst ? 0 : (x.rows.find((r) => nameKey(r.name) === nameKey(w.name))?.longest ?? 0)), 0) : 0;
+  const pickOf = (x: (typeof all)[number]) => [...x.rows].filter((r) => r.value !== undefined && r.value >= VALUE && r.longest >= 0.03).sort((a, b) => b.value! - a.value!)[0];
+  const hits = done.filter((x) => {
+    const p = pickOf(x);
+    return p && x.result?.winners.some((w) => nameKey(w.name) === nameKey(p.name));
+  }).length;
+  const avg = done.length ? done.reduce((a, x) => a + ourOn(x), 0) / done.length : 0;
+  const rows: GameRowData[] = all.map((x) => {
+    const p = pickOf(x);
+    const won = x.result?.winners.map((w) => (w.dst ? `${w.team} D/ST (${w.name})` : w.name)).join(", ");
+    return {
+      key: `${x.week}|${x.slug}`,
+      title: `Week ${x.week} · ${x.game}`,
+      when: x.kickoff,
+      final: !!x.gradedAt,
+      cells: [
+        ["Longest TD", x.gradedAt ? (x.result ? `${won} ${x.result.yards} yd` : "no TD") : "·"],
+        ["We gave him", x.gradedAt && x.result ? pct(ourOn(x)) : "·"],
+        ["Our value pick", p ? `${p.name} ${p.value!.toFixed(2)}x` : "none"],
+      ],
+      read: !x.gradedAt ? ["Open", s.readTrack] : p && x.result?.winners.some((w) => nameKey(w.name) === nameKey(p.name)) ? ["Pick won", s.readW] : ["Pick missed", s.readPass],
+      body: <Table rows={x.rows} />,
+    };
+  });
+  return (
+    <section className={s.section} aria-labelledby="kotez-results">
+      <div className={s.pageFrame}>
+        <SecHead id="kotez-results" title="Promo games" aside="One game a week, the one DraftKings runs it on · our board frozen at kickoff · since Nov 2, 2026" />
+        <div className={s.tiles}>
+          <Tile value={done.length ? `${hits} of ${done.length}` : "·"} label={done.length ? "our top value pick took the crown" : "first promo game pending"} />
+          <Tile value={done.length ? pct(avg) : "·"} label="average chance we gave the winner" />
+        </div>
+        {rows.length ? <GameTable head={["Longest TD", "We gave him", "Our value pick"]} rows={rows} /> : <p className={s.calm}>No promo game saved yet. The next one is saved on its game day once DraftKings names it (or the Monday game if it doesn&apos;t).</p>}
+      </div>
     </section>
   );
 }

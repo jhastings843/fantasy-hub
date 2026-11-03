@@ -131,3 +131,58 @@ export function kotezGame(rows: AttdRow[], otherShare: number, sims = KOTEZ_SIMS
   });
   return { rows: out.sort((a, b) => b.longest - a.longest), noTd: Math.round((none / sims) * 1000) / 1000 };
 }
+
+// ------------------------------------------------- grading
+
+import type { EspnScoringPlay } from "@/lib/firsttd/grade";
+
+export interface KotezResult {
+  yards: number;
+  /** Everyone who shares the crown: scorer name and team; dst true for a return or defensive TD (DK also pays that team's D/ST). */
+  winners: { name: string; team: string; dst: boolean }[];
+}
+
+/** The longest TD from a finished game's ESPN scoring plays; null when there was no TD. Passing TDs credit the receiver (the first name in the text). */
+export function longestTd(plays: EspnScoringPlay[]): KotezResult | null {
+  let best: KotezResult | null = null;
+  for (const p of plays) {
+    if (p.scoringType?.name !== "touchdown") continue;
+    const m = (p.text ?? "").match(/^(.+?)\s+(\d+)\s+(?:Yd|Yard|Yds)\b/i);
+    if (!m) continue;
+    const yards = Number(m[2]);
+    const type = p.type?.text ?? "";
+    const w = { name: m[1].trim(), team: p.team?.abbreviation ?? "", dst: !/^(Passing|Rushing) Touchdown$/i.test(type) };
+    if (!best || yards > best.yards) best = { yards, winners: [w] };
+    else if (yards === best.yards && !best.winners.some((x) => x.name === w.name)) best.winners.push(w);
+  }
+  return best;
+}
+
+// ------------------------------------------------- which game is the promo
+
+import { teamByAbbr } from "@/lib/survivor/teams";
+
+export type PromoSource = "dknetwork" | "monday";
+const nick = (abbr: string) => teamByAbbr(abbr === "LA" ? "LAR" : abbr)?.name?.toLowerCase();
+const etDay = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(new Date(iso));
+
+export interface KotezCandidate {
+  slug: string;
+  away: string;
+  home: string;
+  kickoff: string;
+  espnId: string;
+  rows: AttdRow[];
+}
+
+/** The promo game among this week's games, or null. Pure apart from the titles passed in. */
+export function pickPromo(games: KotezCandidate[], titles: string[]): { g: KotezCandidate; source: PromoSource } | null {
+  for (const g of games) {
+    const a = nick(g.away);
+    const h = nick(g.home);
+    if (a && h && titles.some((t) => t.includes(a) && t.includes(h))) return { g, source: "dknetwork" };
+  }
+  const mon = games.filter((g) => etDay(g.kickoff) === "Mon");
+  return mon.length === 1 ? { g: mon[0], source: "monday" } : null;
+}
+

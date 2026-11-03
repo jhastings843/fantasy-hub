@@ -22,3 +22,26 @@ describe("King of the End Zone", () => {
     expect(b.value!).toBeGreaterThan(a.value!);
   });
 });
+
+import { longestTd } from "./kotez";
+describe("longestTd", () => {
+  it("credits the receiver, flags returns, splits ties, null with no TD", () => {
+    const td = (text: string, type: string, team = "SEA") => ({ text, type: { text: type }, scoringType: { name: "touchdown" }, team: { abbreviation: team } });
+    expect(longestTd([td("Will Shipley 2 Yd Rush", "Rushing Touchdown"), td("Parker Washington 51 Yd pass from Trevor Lawrence (Cam Little Kick)", "Passing Touchdown", "JAX")])).toEqual({ yards: 51, winners: [{ name: "Parker Washington", team: "JAX", dst: false }] });
+    expect(longestTd([td("Devon Witherspoon 60 Yd Interception Return", "Interception Return Touchdown")])!.winners[0].dst).toBe(true);
+    expect(longestTd([td("A B 20 Yd Rush", "Rushing Touchdown"), td("C D 20 Yd pass from E F", "Passing Touchdown")])!.winners).toHaveLength(2);
+    expect(longestTd([{ text: "X 40 Yd Field Goal", scoringType: { name: "field-goal" } }])).toBeNull();
+  });
+});
+
+import { pickPromo } from "./kotez";
+describe("pickPromo", () => {
+  const g = (slug: string, away: string, home: string, kickoff: string) => ({ slug, away, home, kickoff, espnId: slug, rows: [] });
+  const games = [g("thu", "BUF", "DET", "2026-11-06T01:15:00Z"), g("sun", "KC", "LA", "2026-11-09T01:20:00Z"), g("mon", "CHI", "SEA", "2026-11-03T01:15:00Z")];
+  it("takes the game DK Network names, else the only Monday game", () => {
+    expect(pickPromo(games, ["bills vs. lions thursday night football game"])).toMatchObject({ g: { slug: "thu" }, source: "dknetwork" });
+    expect(pickPromo(games, ["chiefs vs. rams sunday"])!.g.slug).toBe("sun");
+    expect(pickPromo(games, [])).toMatchObject({ g: { slug: "mon" }, source: "monday" });
+    expect(pickPromo(games.slice(0, 2), [])).toBeNull();
+  });
+});
