@@ -673,3 +673,5 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 ## 2026-11-03: learner count rule
 - Picks learner slices (NFL, college, NBA) count every game that kicks off (NBA: tips) after the slice registered. Before, they counted only games first logged after it, so a slice added midweek skipped that weekend. See `after()`/`startOf()` in src/lib/picks/learning/model.ts and compareCut in nba-track.ts. Unchanged: the post-activation rollback window (review.ts) and stake-policy replays still use bet/sighting times.
 - The method in force shows an "In force" tag with no progress bars. Report-only rows have no bars either (board.tsx TrackingProgress).
+- Health check 2026-11-03: all 14 learner states reviewed today, journals current. /learning now lists the CBB model.
+- Waiver research: GitHub secrets ANTHROPIC_API_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN set from .env.local (same app), so the workflow takes the runner path. Forced redraft run 41692386467 passed (about 5 min). Its list replaced the morning's cached one (20 targets, was 25).
