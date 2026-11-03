@@ -9,6 +9,8 @@ import { PROPS_SECTION } from "@/lib/props/learn";
 import { OUR_SECTION } from "@/lib/models/learn";
 import { SECTIONS } from "@/lib/models/sections";
 import { CFB_SECTION } from "@/lib/models/cfb/track";
+import { CBB_SECTION } from "@/lib/models/cbb/learn";
+import { cbbSeason } from "@/lib/models/cbb/store";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionState } from "@/lib/learning/engine";
 import type { ReviewState } from "@/lib/picks/learning/review";
@@ -83,7 +85,7 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
   const nbaSeason = nbaSeasonOfDate(new Date());
-  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel] = await Promise.all([
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
@@ -96,6 +98,7 @@ export default async function LearningPage() {
     loadSection(SECTIONS.nbaLotto, nbaSeason),
     loadSection(SECTIONS.nbaKotc, nbaSeason),
     loadSection(CFB_SECTION, season),
+    loadSection(CBB_SECTION, cbbSeason(new Date())),
   ]);
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
@@ -131,13 +134,19 @@ export default async function LearningPage() {
       })),
     },
     {
-      title: "Our college model",
+      title: "Our college models",
       rows: [
         {
           name: "CFB spreads and totals (our ratings model)",
           loop: "Shared engine, college model gate: paper bets at -110 on its own slices (edge size, home or road, favorite or dog, conference, line move, totals) and the learner's combinations; 30+ games over 3+ weeks at t 2.33, must beat its parent, rollback. Judged as a source; nothing staked",
           href: "/picks/cfb?v=research",
           ...engineRow(cfbModel),
+        },
+        {
+          name: "CBB spreads and totals (our blended rating)",
+          loop: "Shared engine, college hoops gate: paper bets at the saved price on its own slices and the learner's combinations; 150+ games and 150+ bets over 3+ weeks at t 2.33, must beat its parent, rollback. Nothing staked; every slice started 0-0 on opening night (Nov 3)",
+          href: "/picks/cbb?v=log",
+          ...engineRow(cbbModel),
         },
       ],
     },
