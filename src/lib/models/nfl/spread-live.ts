@@ -8,6 +8,8 @@ import { nflPoints, nflProjection, nflTotal, type NflTotalsParams } from "./tota
 import { live, primeParams } from "@/lib/models/params-store";
 import { injuryRead, type InjuryRead } from "./injuries";
 import { nflTeamsOut } from "./injuries-live";
+import { edges, powerLine } from "./power";
+import { POWER, powerRatings } from "./power-live";
 
 // Our NFL spread model, live (tracked only, Jack 2026-10-21: forward-test
 // it at early-week prices). For this week's games at the reference line
@@ -23,6 +25,10 @@ import { nflTeamsOut } from "./injuries-live";
 // instead a game where a team is newly missing its starting QB or 15%+ of its
 // targets and carries is flagged for display only (Jack, 2026-11-02: in the
 // backtest those games did no worse). If the inputs can't be read, no flag.
+//
+// Our line from play by play (2026-11-02): `power`, the home spread from
+// opponent-adjusted EPA ratings (power.ts), built without any market number.
+// Shown as "our line" and tracked on its own; it does not move `model`.
 
 const P = live("nfl-spread", PARAMS as SpreadParams);
 const T = live("nfl-totals", TOTALS as NflTotalsParams);
@@ -46,7 +52,14 @@ async function games(): Promise<SpreadGame[]> {
  * total and home win chance (NFL from 2026-10-28; college from its own model,
  * lib/models/cfb, which has no features).
  */
-export type OurLine = ModelLine & { x?: Features; total?: number; homeWin?: number; injury?: InjuryRead };
+export type OurLine = ModelLine & {
+  x?: Features;
+  total?: number;
+  homeWin?: number;
+  injury?: InjuryRead;
+  /** Our line from play by play (power.ts): home spread, negative = home favored. No market input. NFL from 2026-11-02. */
+  power?: number;
+};
 
 /** Our line per game, keyed `${home}|${away}`. `line` is the home spread (negative = home favored). */
 export async function ourSpreadLines(season: number, want: { home: string; away: string; line: number }[]): Promise<Map<string, OurLine>> {
@@ -55,7 +68,7 @@ export async function ourSpreadLines(season: number, want: { home: string; away:
   const r = new Ratings(P.rating);
   for (const g of [...all].sort((a, b) => a.gameday.localeCompare(b.gameday) || a.id.localeCompare(b.id))) if (g.homeScore !== null) r.add(g);
   const pts = nflPoints(all, T);
-  const outs = await nflTeamsOut(season, all, want.flatMap((w) => [w.home, w.away])).catch(() => null);
+  const [outs, power] = await Promise.all([nflTeamsOut(season, all, want.flatMap((w) => [w.home, w.away])).catch(() => null), powerRatings(season).catch(() => null)]);
   const out = new Map<string, OurLine>();
   for (const w of want) {
     const g = all.find((x) => x.season === season && x.home === w.home && x.away === w.away && x.homeScore === null);
@@ -69,7 +82,9 @@ export async function ourSpreadLines(season: number, want: { home: string; away:
     const h = outs?.get(w.home);
     const a = outs?.get(w.away);
     const injury = h && a ? injuryRead(h, a) : undefined;
-    out.set(`${w.home}|${w.away}`, { market: w.line, model, x: { gap: r2(x.gap), move: r2(x.move), cover: r2(x.cover), rest: x.rest, qb: x.qb }, total: proj.total, homeWin: proj.homeWin, ...(injury ? { injury } : {}) });
+    const e = power ? edges(power, w.home, w.away) : null;
+    const pl = e ? powerLine({ ...e, rest: x.rest, qb: x.qb, neutral: g.neutral }, POWER) : undefined;
+    out.set(`${w.home}|${w.away}`, { market: w.line, model, x: { gap: r2(x.gap), move: r2(x.move), cover: r2(x.cover), rest: x.rest, qb: x.qb }, total: proj.total, homeWin: proj.homeWin, ...(injury ? { injury } : {}), ...(pl !== undefined ? { power: pl } : {}) });
   }
   return out;
 }

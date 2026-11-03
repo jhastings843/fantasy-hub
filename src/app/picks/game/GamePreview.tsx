@@ -42,6 +42,7 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
     { who: "David", v: g.david?.model, cls: s.cDavid },
     ...(r.league === "cfb" ? [{ who: "PEM", v: g.pem?.model }] : []),
     { who: "Our model", v: g.ours?.spread },
+    { who: "Our line (play by play)", v: g.ours?.power },
   ];
   const totalRows: { who: string; v?: number; cls?: string }[] = [
     { who: "Sam", v: tot?.sam ?? g.samTotal, cls: s.cSam },

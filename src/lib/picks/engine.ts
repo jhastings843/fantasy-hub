@@ -565,6 +565,8 @@ export interface OursRead {
   homeWin?: number;
   /** NFL players newly out on each side and whether it's a big loss (starting QB or 15%+ of usage). Display only (models/nfl/injuries.ts). */
   injury?: { home: string[]; away: string[]; flagged: boolean };
+  /** Our line from play by play (models/nfl/power.ts), home spread, no market input. NFL only. */
+  power?: number;
 }
 
 export interface BoardGame {
