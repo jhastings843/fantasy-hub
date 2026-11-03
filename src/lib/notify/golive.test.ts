@@ -49,7 +49,7 @@ describe("alertFor", () => {
   it("names the section and the record, no em dashes", () => {
     const p = alertFor("nba-props-ours", activated, { w: 34, l: 21, units: 9.42 }, "Unders 2+ pts")!;
     expect(p.title).toBe("Now live: NBA props");
-    expect(p.message).toBe("NBA props: Unders 2+ pts is now live (34-21, +9.4u). Its bets carry 1u from now on.");
+    expect(p.message).toBe("NBA props: Unders 2+ pts is now live (34-21, +9.4u). Its bets are sized by the section's staking scheme (flat 1u unless it has switched).");
     expect(p.message).not.toMatch(/—/);
   });
   it("pauses and drops carry the journal text", () => {

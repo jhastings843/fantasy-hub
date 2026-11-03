@@ -58,7 +58,7 @@ export function alertFor(section: string, j: JournalLine, rec?: { w: number; l: 
   const name = sectionName(section);
   const what = label ?? j.id!;
   if (kind === "live")
-    return { title: `Now live: ${name}`, message: `${name}: ${what} is now live${rec ? ` (${rec.w}-${rec.l}, ${signed(rec.units)})` : ""}. Its bets carry 1u from now on.` };
+    return { title: `Now live: ${name}`, message: `${name}: ${what} is now live${rec ? ` (${rec.w}-${rec.l}, ${signed(rec.units)})` : ""}. Its bets are sized by the section's staking scheme (flat 1u unless it has switched).` };
   if (kind === "stake") return { title: `Stake change: ${name}`, message: `${name}: ${j.text}` };
   if (kind === "paused") return { title: `Paused: ${name}`, message: `${name}: ${j.text}` };
   return { title: `Dropped: ${name}`, message: `${name}: ${j.text} No more stakes on it.` };
