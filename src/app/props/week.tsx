@@ -34,7 +34,7 @@ export type PropTab = "pp" | "ftd" | "nba" | "fb";
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
-const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes", pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
+export const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes", pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
 const DAVID_MARKET: { [k: string]: DavidMarket } = { pass_yds: "passing_yards", rush_yds: "rushing_yards", rec_yds: "receiving_yards", rec: "receptions" };
 const sideWord = (x: "over" | "under") => (x === "over" ? "Over" : "Under");
 const TOP = 6;

@@ -2,6 +2,7 @@
 // the top of the Learner log (Jack, 2026-10-31: "a place I can see our models
 // records on the learner page for each model... make it expandable").
 // Records come from the same stores the Research cards read.
+import { cache } from "react";
 import type { League } from "@/lib/picks/parse";
 import type { PicksReport } from "@/lib/picks/report";
 import type { NbaPicksView } from "@/lib/picks/nba-track-store";
@@ -19,13 +20,27 @@ const row = (label: string, r: R | null | undefined, be: number | undefined = BR
   r && r.w + r.l + (r.p ?? 0) > 0 ? [{ label, w: r.w, l: r.l, p: r.p, units: r.units, be }] : [];
 
 /** Our NFL spread model, every game at the first price we had (ours.tsx's "Our lean, any size"). */
-async function ourNflSpread(season: number): Promise<R | null> {
+export async function ourNflSpread(season: number): Promise<R | null> {
   const snaps = await loadForecasts("nfl", season).catch(() => []);
   const pre = trackedGames(snaps, []);
   if (!pre.length) return null;
   const { closes } = await closingLines("nfl", season, pre).catch(() => ({ closes: new Map() }));
   return signalRecords(trackedGames(snaps, [...closes.values()])).find((x) => x.id === "lean") ?? null;
 }
+
+/**
+ * Our own model's record per market, for the game pop-ups' "Our side" boxes.
+ * Same sources as the rows below; cached per request so several boxes share one read.
+ */
+export const ourFootballRecords = cache(async (league: League, season: number, r: Pick<PicksReport, "totals" | "su">) => {
+  const spread = league === "nfl" ? await ourNflSpread(season).catch(() => null) : ((await getCfbModelView(season).catch(() => null))?.record ?? null);
+  const total = r.totals.backtest.cuts.find((c) => c.id === "t-ours")?.record ?? null;
+  const su = r.su.methods.find((m) => m.id === "ours") ?? null;
+  return { spread, total, su };
+});
+
+/** Our NBA game model's saved games and records (tracked only), cached per request. */
+export const ourNbaGameModel = cache((season: number) => getNbaGameModelView(season).catch(() => null));
 
 async function footballRows(league: League, market: Market, r: PicksReport): Promise<CutRow[]> {
   const st = r.strategies;
@@ -63,7 +78,7 @@ export async function ModelRecords({ league, market, report }: { league: League;
 export async function NbaModelRecords({ v, market }: { v: NbaPicksView; market: Market }) {
   const cut = (id: string) => v.cuts.find((c) => c.id === id);
   const rule = market === "ats" ? v.ats : market === "ou" ? v.ou : null;
-  const ours = market === "su" ? null : await getNbaGameModelView(v.season).catch(() => null);
+  const ours = market === "su" ? null : await ourNbaGameModel(v.season);
   const mine = ours?.records.find((x) => x.id === (market === "ats" ? "lean" : "total"));
   const rows: CutRow[] = [
     ...(rule ? row(rule.tier1 ? `Tier 1: ${rule.tier1.label}` : "Tier 1", rule.tier1) : []),

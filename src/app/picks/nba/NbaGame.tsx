@@ -1,12 +1,16 @@
 // One NBA game at a glance, the football pop-up's shape (GamePreview.tsx):
 // matchup with logos, then every market's four boxes (Sam's side, edge,
-// cover chance, edge per unit) and the lines behind them. Opened from a board
+// cover chance, edge per unit) with our model's four under them, our prop
+// edges in the game, and the lines behind them. Opened from a board
 // row or a Today card (Jack, 2026-10-31).
 import type { NbaBoardGame } from "@/lib/picks/nba-store";
 import type { NbaPicksView } from "@/lib/picks/nba-track-store";
 import { TeamLogo } from "@/components/TeamLogo";
 import type { Market } from "../ui";
 import { NbaStats, NbaWhy, readMarket } from "./NbaView";
+import { NbaOurStats } from "./NbaOurStats";
+import { NbaGameProps } from "../game/GameProps";
+import { nbaSeasonOfDate } from "@/lib/props/parse";
 import s from "../picks.module.css";
 import p from "../game/preview.module.css";
 
@@ -23,6 +27,7 @@ export function NbaGamePreview({ raw, v }: { raw: NbaBoardGame; v: NbaPicksView 
   const tip = new Date(g.tip).toLocaleString("en-US", { timeZone: ET, weekday: "short", hour: "numeric", minute: "2-digit" });
   const staked = reads.find((x) => x.r.stake);
   const sc = g.score;
+  const season = v?.season ?? nbaSeasonOfDate(new Date());
   return (
     <div className={`${s.page} ${p.root}`}>
       <span className={s.eyebrow}>{`NBA · ${g.state === "post" ? "Final" : g.state === "in" ? `Live · ${g.detail}` : `${tip}${g.tv ? ` · ${g.tv}` : ""}`}`}</span>
@@ -45,9 +50,11 @@ export function NbaGamePreview({ raw, v }: { raw: NbaBoardGame; v: NbaPicksView 
       {reads.map(({ m, name, r }) => (
         <section key={m} aria-label={name}>
           <h3 className={p.h3}>{name}</h3>
-          {r.bet ? <NbaStats x={r} m={m} /> : <p className={p.note} style={{ margin: 0 }}>{g.read ? "No side from Sam here." : "No read from Sam yet."}</p>}
+          {r.bet ? <NbaStats x={r} m={m} /> : <p className={p.note} style={{ margin: "0 0 12px" }}>{g.read ? "No side from Sam here." : "No read from Sam yet."}</p>}
+          <NbaOurStats g={g} m={m} season={season} />
         </section>
       ))}
+      <NbaGameProps id={raw.id} />
       <section aria-label="Lines">
         <h3 className={p.h3}>Lines</h3>
         <NbaWhy g={g} />
