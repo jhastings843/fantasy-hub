@@ -9,11 +9,12 @@ import { STAT_LABEL, etDate, type League, type PropMarket, type Side } from "@/l
 import { isPlay, nameKey } from "@/lib/props/grade";
 import { getPropsView, type PropsView, type StoredProps } from "@/lib/props/store";
 import { getNbaPropsView } from "@/lib/props/nba-props";
-import { MIN_BETS, matches, rwSide, type GradedPropsGame, type PropSlice, type Verdict } from "@/lib/props/trends";
-import { DAVID_LABEL, DAVID_PLAY_EDGE, DAVID_URL, agreeEdge, davidEdge, davidSide, davidSliceSide, isDavidPlay, isDavidSlice, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
+import { MIN_BETS, rwSide, type PropSlice, type Verdict } from "@/lib/props/trends";
+import { DAVID_LABEL, DAVID_PLAY_EDGE, DAVID_URL, agreeEdge, davidEdge, davidSide, isDavidPlay, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
 import { boardWeek } from "@/lib/picks/finished";
 import { LearningBlock } from "./learning";
+import { davidHits, systemHits } from "@/lib/props/system";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
 
@@ -48,38 +49,8 @@ function Empty({ league = "nfl", graded = false }: { league?: League; graded?: b
   );
 }
 
-/** Slice ids an unsettled market's play or lean falls in, among the active system slices. */
-export function systemHits(m: PropMarket, saved: StoredProps, active: string[], all: GradedPropsGame[]): string[] {
-  const rw = saved.rw?.[m.id];
-  const espn = saved.espn?.[m.id];
-  const david = saved.david?.[m.id];
-  const dk = saved.dk?.[m.id];
-  const pseudo = (side: Side | null) =>
-    side
-      ? { week: 0, slug: saved.game.slug, m, g: { id: m.id, actual: null, play: null, lean: null }, bet: { side, line: m.line, price: 0, book: "", outcome: "P" as const, net: 0, breakEven: 0 }, rw, espn, david, dk }
-      : null;
-  return active.filter((id) => {
-    if (isDavidSlice(id)) return false;
-    const side = id.startsWith("play:")
-      ? isPlay(m)
-        ? m.side
-        : null
-      : id.startsWith("rw:")
-        ? rwSide(m, rw)
-        : id.startsWith("espn:")
-          ? rwSide(m, espn)
-          : id.startsWith("david:")
-            ? rwSide(m, david)
-            : m.lean;
-    const row = pseudo(side);
-    // Favorites need the week's own game; pass it as the only list entry.
-    return !!row && matches(id, row, [{ week: 0, slug: saved.game.slug, game: saved.game, result: { markets: [], void: 0 } }, ...all]);
-  });
-}
-
-/** Active system slices a David prop falls in. */
-const davidHits = (p: DavidProp, samProj: number | undefined, active: string[]) =>
-  active.filter((id) => isDavidSlice(id) && davidSliceSide(id, p, samProj) !== null);
+// Moved to lib/props/system.ts so Today, the bets email and pushes mark the same bets.
+export { systemHits } from "@/lib/props/system";
 
 function PlayRow({ m, saved, hits }: { m: PropMarket; saved: StoredProps; hits: string[] }) {
   const w = m.books.find((b) => b.win);

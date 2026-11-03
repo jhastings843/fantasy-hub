@@ -4,7 +4,7 @@
 // of these slices clears the section's gate on games after it registered.
 
 import type { Bet, Candidate } from "@/lib/learning/engine";
-import { STAT_LABEL, type Stat } from "@/lib/props/parse";
+import { STAT_LABEL, type PropMarket, type Side, type Stat } from "@/lib/props/parse";
 import { nameKey, type GradedBet } from "@/lib/props/grade";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import { marketBets, type GradedGame as FtdGradedGame } from "@/lib/firsttd/trends";
@@ -42,23 +42,32 @@ export function ourPropSlices(stats: Stat[]): [string, string][] {
   ];
 }
 
+/**
+ * The bet an edge or lean slice takes on one market, or null. Shared by the
+ * graded record (ourSliceBets) and today's staked bets (lib/props/staked.ts),
+ * so a bet is a bet by the same rule in both. Pure.
+ *
+ *   pickOurSlice("edge:under", m, { play: { side: "under" }, lean: { side: "under" } }) -> the play
+ */
+export function pickOurSlice<T extends { side: Side }>(id: string, m: Pick<PropMarket, "stat" | "gap">, b: { play: T | null; lean: T | null }): T | null {
+  const [group, key] = id.split(":");
+  const bet = group === "edge" ? b.play : group === "lean" ? b.lean : null;
+  if (!bet) return null;
+  const band = BANDS.find((x) => x[0] === id);
+  const keep = key === "all" || key === m.stat || key === bet.side || (band !== undefined && m.gap !== null && m.gap >= band[2] && m.gap < band[3]);
+  return keep ? bet : null;
+}
+
 /** Every graded bet in one slice. */
 export function ourSliceBets(list: GradedPropsGame[], id: string): { x: GradedPropsGame; bet: GradedBet; marketId: string; line: number }[] {
-  const [group, key] = id.split(":");
   const out: { x: GradedPropsGame; bet: GradedBet; marketId: string; line: number }[] = [];
   for (const x of list) {
     const byId = new Map(x.game.markets.map((m) => [m.id, m]));
     for (const g of x.result.markets) {
       const m = byId.get(g.id);
-      const bet = group === "edge" ? g.play : g.lean;
-      if (!m || g.actual === null || !bet) continue;
-      const band = BANDS.find((b) => b[0] === id);
-      const keep =
-        key === "all" ||
-        key === m.stat ||
-        key === bet.side ||
-        (band !== undefined && m.gap !== null && m.gap >= band[2] && m.gap < band[3]);
-      if (keep) out.push({ x, bet, marketId: m.id, line: m.line });
+      if (!m || g.actual === null) continue;
+      const bet = pickOurSlice(id, m, g);
+      if (bet) out.push({ x, bet, marketId: m.id, line: m.line });
     }
   }
   return out;
@@ -123,6 +132,21 @@ export const DAVID_PROP_SLICES: [string, string, string | undefined][] = [
   ["david:both", "David's side when our lean agrees", "david:side"],
 ];
 
+/** David is 10%+ off the line. */
+export const davidFar = (proj: number | undefined, line: number) => proj !== undefined && Math.abs(proj - line) / Math.max(line, 0.5) >= 0.1;
+
+/** The bet one of David's slices takes on a market, or null. Shared with today's staked bets. Pure. */
+export function pickDavidSlice<T extends { side: Side }>(id: string, b: { play: T | null; lean: T | null; david?: T | null }, far: boolean): T | null {
+  const d = b.david;
+  if (!d) return null;
+  return id === "david:agree" ? (b.play && b.play.side === d.side ? b.play : null)
+    : id === "david:against" ? (b.play && b.play.side !== d.side ? b.play : null)
+    : id === "david:side" ? d
+    : id === "david:far" ? (far ? d : null)
+    : id === "david:both" ? (b.lean && b.lean.side === d.side ? d : null)
+    : null;
+}
+
 /** Every David bet in one of his slices. */
 export function davidSliceBets(list: GradedPropsGame[], id: string): SliceBet[] {
   const out: SliceBet[] = [];
@@ -130,17 +154,8 @@ export function davidSliceBets(list: GradedPropsGame[], id: string): SliceBet[] 
     const byId = new Map(x.game.markets.map((m) => [m.id, m]));
     for (const g of x.result.markets) {
       const m = byId.get(g.id);
-      const d = g.david;
-      if (!m || g.actual === null || !d) continue;
-      const proj = x.david?.[g.id];
-      const far = proj !== undefined && Math.abs(proj - m.line) / Math.max(m.line, 0.5) >= 0.1;
-      const bet =
-        id === "david:agree" ? (g.play && g.play.side === d.side ? g.play : null)
-        : id === "david:against" ? (g.play && g.play.side !== d.side ? g.play : null)
-        : id === "david:side" ? d
-        : id === "david:far" ? (far ? d : null)
-        : id === "david:both" ? (g.lean && g.lean.side === d.side ? d : null)
-        : null;
+      if (!m || g.actual === null || !g.david) continue;
+      const bet = pickDavidSlice(id, g, davidFar(x.david?.[g.id], m.line));
       if (bet) out.push({ x, bet, marketId: m.id, line: m.line });
     }
   }
@@ -163,16 +178,18 @@ export function ourPropCandidates(graded: GradedPropsGame[], stats: Stat[], veno
     const lean = m ? venomLean(venom, b.x.week, m.stat, m.player) : null;
     return { b, recYds: m?.stat === "rec_yds", agree: lean ? lean.side === b.bet.side : null, strong: !!lean?.strong };
   });
-  const keep: { [id: string]: (e: (typeof edges)[number]) => boolean } = {
-    "venom:agree": (e) => !e.recYds && e.agree === true,
-    "venom:against": (e) => !e.recYds && e.agree === false,
-    "venom:agree-strong": (e) => !e.recYds && e.agree === true && e.strong,
-    "venom:agree-mild": (e) => !e.recYds && e.agree === true && !e.strong,
-    "venom:recyds-agree": (e) => e.recYds && e.agree === true,
-    "venom:recyds-against": (e) => e.recYds && e.agree === false,
-  };
-  return [...base, ...VENOM_PROP_SLICES.map(([id, label, parent]) => ({ id, label, parent, bets: edges.filter(keep[id]).map(({ b }) => toBet(b)) }))];
+  return [...base, ...VENOM_PROP_SLICES.map(([id, label, parent]) => ({ id, label, parent, bets: edges.filter((e) => VENOM_KEEP[id](e)).map(({ b }) => toBet(b)) }))];
 }
+
+/** Which of our edges each Venom slice keeps, by his lean against our side. Shared with today's staked bets. */
+export const VENOM_KEEP: { [id: string]: (e: { recYds: boolean; agree: boolean | null; strong: boolean }) => boolean } = {
+  "venom:agree": (e) => !e.recYds && e.agree === true,
+  "venom:against": (e) => !e.recYds && e.agree === false,
+  "venom:agree-strong": (e) => !e.recYds && e.agree === true && e.strong,
+  "venom:agree-mild": (e) => !e.recYds && e.agree === true && !e.strong,
+  "venom:recyds-agree": (e) => e.recYds && e.agree === true,
+  "venom:recyds-against": (e) => e.recYds && e.agree === false,
+};
 
 /** Won, lost, pushed and units over a set of graded bets. */
 export function record(bets: { bet: GradedBet }[]): { w: number; l: number; p: number; units: number } {
