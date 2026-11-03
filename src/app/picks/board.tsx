@@ -383,7 +383,7 @@ export interface TrackRow {
   id: string;
   label: string;
   /** "retired": lost as surely as a live one must win; listed apart, collapsed (Jack, 2026-11-03). */
-  status: "testing" | "live" | "back" | "report" | "retired";
+  status: "testing" | "live" | "back" | "report" | "retired" | "inforce";
   games: number;
   needGames: number;
   /** Omitted when the store hasn't recorded weeks yet. */
@@ -395,7 +395,7 @@ export interface TrackRow {
   note?: string;
 }
 
-const TRACK_KIND: { [k in TrackRow["status"]]: [string, string] } = { testing: ["Testing", ""], live: ["Live", s.kLive], back: ["Rolled back", s.kBack], report: ["Report only", ""], retired: ["Retired", s.kBack] };
+const TRACK_KIND: { [k in TrackRow["status"]]: [string, string] } = { testing: ["Testing", ""], live: ["Live", s.kLive], back: ["Rolled back", s.kBack], report: ["Report only", ""], retired: ["Retired", s.kBack], inforce: ["In force", s.kLive] };
 
 function TrackBar({ label, have, need }: { label: string; have: number; need: number }) {
   const pct = need > 0 ? Math.min(1, have / need) : 1;
@@ -413,7 +413,7 @@ function TrackBar({ label, have, need }: { label: string; have: number; need: nu
 /** "Tracking in the background": every model or slice still being measured, with progress bars toward its gate. */
 export function TrackingProgress({ rows, sub, empty }: { rows: TrackRow[]; sub: string; empty: string }) {
   const frac = (r: TrackRow) => Math.min(1, r.games / Math.max(1, r.needGames)) + (r.weeks !== undefined ? Math.min(1, r.weeks / Math.max(1, r.needWeeks)) : 0);
-  const order: TrackRow["status"][] = ["live", "testing", "report", "back"];
+  const order: TrackRow["status"][] = ["inforce", "live", "testing", "report", "back"];
   const sorted = [...rows].filter((r) => r.status !== "retired").sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || frac(b) - frac(a) || a.label.localeCompare(b.label));
   const retired = rows.filter((r) => r.status === "retired").sort((a, b) => a.label.localeCompare(b.label));
   const testing = rows.filter((r) => r.status === "testing").length;
@@ -423,8 +423,13 @@ export function TrackingProgress({ rows, sub, empty }: { rows: TrackRow[]; sub: 
         <b>{r.label}</b>
         <span className={`${s.logKind} ${TRACK_KIND[r.status][1]}`}>{TRACK_KIND[r.status][0]}</span>
       </div>
-      <TrackBar label="Games" have={r.games} need={r.needGames} />
-      {r.weeks !== undefined && <TrackBar label="Weeks" have={r.weeks} need={r.needWeeks} />}
+      {/* The baseline and report-only rows have no gate to fill, so no progress bars. */}
+      {r.status !== "inforce" && r.status !== "report" && (
+        <>
+          <TrackBar label="Games" have={r.games} need={r.needGames} />
+          {r.weeks !== undefined && <TrackBar label="Weeks" have={r.weeks} need={r.needWeeks} />}
+        </>
+      )}
       {(r.result || r.note) && <p className={s.tkNote}>{[r.result, r.note].filter(Boolean).join(" · ")}</p>}
     </li>
   );

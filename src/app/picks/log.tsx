@@ -84,18 +84,19 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
             const n = d.n ?? Number(/(\d+) of \d+ settled/.exec(d.why)?.[1] ?? /n=(\d+)/.exec(d.why)?.[1] ?? 0);
             const wk = d.weeks ?? (/(\d+) of \d+ weeks?/.exec(d.why) ? Number(/(\d+) of \d+ weeks?/.exec(d.why)![1]) : undefined);
             const counted = /^insufficient evidence: [^;]*$/.test(d.why);
+            const inForce = d.why === "this is the method in force";
             return {
               id: d.id,
               label: d.id.startsWith("both:") ? `${d.label} (shared with ${OTHER[league]})` : d.label,
               // "promote" means it passed; only the idea the review actually switched in is live (one per review, and validation can still refuse it).
               // Rejected ideas (lost at the same t a winner needs) list as retired, collapsed; a later review can bring one back.
-              status: (state?.activations ? state.activations.some((x) => x.hypothesis === d.id) : d.id === state?.activatedFrom) ? ("live" as const) : d.verdict === "report" ? ("report" as const) : d.verdict === "reject" ? ("retired" as const) : ("testing" as const),
+              status: inForce ? ("inforce" as const) : (state?.activations ? state.activations.some((x) => x.hypothesis === d.id) : d.id === state?.activatedFrom) ? ("live" as const) : d.verdict === "report" ? ("report" as const) : d.verdict === "reject" ? ("retired" as const) : ("testing" as const),
               games: n,
               needGames: CRITERIA.MIN_OPPORTUNITIES,
               weeks: wk,
               needWeeks: CRITERIA.MIN_WEEKS,
               result: d.t !== undefined ? `t ${d.t.toFixed(2)} of ${CRITERIA.MIN_T}` : undefined,
-              note: counted ? undefined : plainWhy(d.why, AGAINST_SHORT[market]),
+              note: inForce ? "The baseline: every other way of picking winners is measured against this one." : counted ? undefined : plainWhy(d.why, AGAINST_SHORT[market]),
             };
           })}
         sub={`${MARKET_NAME[market]} ideas, measured against the rule in force on games after each registered. Counts update at each review, the morning after every slate.`}
