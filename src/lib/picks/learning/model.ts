@@ -394,8 +394,20 @@ export function compareSizing(pairs: SizingPair[]): Comparison {
   };
 }
 
-/** Only games first seen after the hypothesis was registered count toward it. */
-export const after = (h: Hypothesis, opps: Opportunity[]) => opps.filter((o) => o.first.at >= h.registeredAt);
+/**
+ * When a game stops being unknown: its kickoff (from the saved line), or the
+ * first time we saw it when no kickoff was saved.
+ */
+export const startOf = (o: Opportunity): number => Date.parse(o.last.ref?.kickoff ?? o.first.ref?.kickoff ?? o.first.at);
+
+/**
+ * Only games that kick off after the hypothesis was registered count toward it
+ * (Jack, 2026-11-03). No result was known when it registered, so the sample is
+ * still forward-only, and an idea added midweek no longer skips that weekend
+ * because the games were already on the board. Before this it was games first
+ * seen after registration.
+ */
+export const after = (h: Hypothesis, opps: Opportunity[], since = h.registeredAt) => opps.filter((o) => startOf(o) >= Date.parse(since));
 
 export interface IssuedBet {
   league: League;
@@ -626,7 +638,7 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       const t = x.ruleTest.cfb;
       if (!t) return { id: h.id, note: "no rule in force" };
       const since = [h.registeredAt, x.active.sourcesChangedAt?.[d.source] ?? ""].sort().at(-1)!;
-      const own = x.opps.filter((o) => o.league === "cfb" && o.first.at >= since);
+      const own = after(h, x.opps, since).filter((o) => o.league === "cfb");
       return { id: h.id, comparison: compare(sourcePairs(d.source, t, own, x.harris)), note: `${d.source} is ${sourceState(x.active, d.source)}; challenger = skip its disagreements` };
     }
     case "market": {

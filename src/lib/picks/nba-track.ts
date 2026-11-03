@@ -400,9 +400,10 @@ export interface NbaComparison {
 }
 
 /**
- * Challenger (research cut) vs its parent, paired per game on games first
- * seen after `since`: each game's difference is the challenger's net (0 when
- * it passes) minus the parent's.
+ * Challenger (research cut) vs its parent, paired per game on games that tip
+ * after `since` (Jack, 2026-11-03; was games first seen after it): each
+ * game's difference is the challenger's net (0 when it passes) minus the
+ * parent's.
  */
 export function compareCut(rows: NbaRow[], cutId: string, since: string): NbaComparison {
   const cut = NBA_CUT.get(cutId)!;
@@ -410,7 +411,7 @@ export function compareCut(rows: NbaRow[], cutId: string, since: string): NbaCom
   const d: number[] = [];
   const weeks = new Set<number>();
   for (const r of rows) {
-    if (r.bet.market !== cut.market || r.game.first.at < since) continue;
+    if (r.bet.market !== cut.market || Date.parse(r.game.tip || r.game.first.at) < Date.parse(since)) continue;
     const pBets = parent.test(r.bet);
     const cBets = cut.test(r.bet);
     if (!pBets && !cBets) continue;
