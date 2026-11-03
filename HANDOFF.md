@@ -1,3 +1,10 @@
+# 2026-11-03: audit fixes round 2 (branch audit-fixes-2, NOT merged or deployed)
+- NBA ingest (nba/store.ts ingestFinals): lock models:v1:nba:{s}:ingest-lock (SET NX EX 300); players skip a game they hold (date+team), team and First Basket tables carry `seen` event ids; ingested marker written last. Seed script marks after saving teams.
+- params-store: paramsVersion(model) = { hash (sha1 of settings in use), source live/default/stale, degraded? }, paramsProblem() pushed into NFL props, NBA props and First TD run problems. Stamped as `params` on NFL/NBA props boards, FTD boards, NBA game model snaps.
+- Football CLV: closes now keep closeHomePrice/closeAwayPrice (closes saved before this lack them); clvPrice = no-vig chance at close minus at bet, same spread only; ClvRow.price shown as "price +x% (n)".
+- Staking: sections.ts ATTD_MEMBERS/LOTTO_MEMBERS + inSlice (handles gen:a&b) shared by learner candidates and attdStaked/rungStaked; Venom slices stake with this week's Venom picks (loadVenomWeekPicks).
+- KOTEZ payouts: kotez-payout.ts parser (fixtures test/fixtures/models/kotez), gradeKotez saves `payout` for 7 days after kickoff once the DK Network post has a $ amount; Results "DK paid" column, our share vs DK count in the open row.
+
 # 2026-11-02/03: audit and money guards (all deployed, main b1d7382+)
 Start here. Earlier sections below are history.
 - Real-money guards: football spread tiers and totals rule need a forward check (src/lib/picks/forward.ts, chosen-store.ts: 10+ games after first chosen, above break-even; NFL road-dog and CFB near-vegas grandfathered; fail closed). Pick cards never resend after a game starts (issue-send.ts startedBefore).
