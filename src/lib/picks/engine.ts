@@ -11,6 +11,7 @@
 //   because a bettor gets one line, and assuming the better one flatters
 //   every result.
 
+import type { ForwardCheck } from "./forward";
 import type { GradedRow, ModelLine } from "./parse";
 
 /** Break-even at -110. */
@@ -366,6 +367,8 @@ export interface CutResult extends Cut {
   weeks: number[];
   /** A research cut the strategy review activated as a rule candidate (policy.atsCandidates). */
   activated?: boolean;
+  /** Rule and Tier 2 only: its record since it was first chosen, and whether that lets it stake (forward.ts). */
+  forward?: ForwardCheck;
 }
 
 /** Tier 2: judged only on the games it adds outside Tier 1. */
@@ -578,6 +581,8 @@ export interface BoardGame {
   tier: Tier;
   /** A rule bet skipped because a veto source (PEM, Harris) disagreed. */
   vetoedBy?: "PEM" | "Harris";
+  /** Fits this tier, but the tier failed its forward check (forward.ts): tracked, no stake. */
+  forwardHold?: "t1" | "t2";
   /** "TB +8.5", or each model's side on a split. */
   play: string;
   /**
@@ -656,6 +661,27 @@ function withoutPem(t: CutTest): CutTest {
   return rest;
 }
 
+/** A tier stakes unless its forward check says no. A board with no check attached (tests, old caches) stakes as before. */
+export const tierStakes = (c: { forward?: ForwardCheck } | null | undefined): boolean => !!c && c.forward?.stake !== false;
+
+/**
+ * A game in a tier that failed its forward check: still shown with the read,
+ * but tracked like any other game, so no stake, email row or issued play can
+ * come from it. Its games never fall through to the other tier (Tier 2 is
+ * judged only on games outside the rule).
+ */
+function holdForward(g: BoardGame, s: StrategyBoard): BoardGame {
+  const tier = g.tier === "wait" ? g.waitFor : g.tier === "t1" || g.tier === "t2" ? g.tier : undefined;
+  if (!tier || tierStakes(tier === "t1" ? s.rule : s.second)) return g;
+  const r = g.read;
+  if (!r || !r.agree || !r.side) {
+    const team = (side: "home" | "away") => (side === "home" ? g.home : g.away);
+    const play = r ? `Sam: ${team(r.samSide)} · David: ${team(r.davidSide)}` : g.play;
+    return { ...g, tier: "split", play, side: undefined, homeLine: undefined, pemPick: undefined, missing: undefined, waitFor: undefined, forwardHold: tier };
+  }
+  return { ...g, tier: r.dog ? "pass" : "fav", missing: undefined, waitFor: undefined, forwardHold: tier };
+}
+
 export function tierBoard(
   league: "nfl" | "cfb",
   rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; lastRef?: RefLine; started?: boolean; ours?: OursRead }[],
@@ -664,7 +690,7 @@ export function tierBoard(
   /** Sources the strategy review made vetoes (policy source "veto"): a rule bet one disagrees with is skipped. */
   veto: { pem?: boolean; harris?: boolean } = {},
 ): BoardGame[] {
-  return rows.map((row) => {
+  return rows.map((row): BoardGame => {
     // A game that has kicked off is never actionable, whatever the cache says.
     const basis: BoardGame["basis"] = row.started ? "started" : row.ref ? "reference" : "source";
     // The line the models are judged at: the live quote, or for a started game its last one.
@@ -724,7 +750,7 @@ export function tierBoard(
     if (s.second && matches(r, s.second.test)) return { ...base, tier: "t2" };
     if (waiting(s.second)) return { ...wait("t2", play), side: r.side, homeLine };
     return { ...base, tier: r.dog ? "pass" : "fav" };
-  });
+  }).map((g) => holdForward(g, s));
 }
 
 // --------------------------------------------------------------- straight up
