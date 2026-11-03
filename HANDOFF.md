@@ -1,3 +1,10 @@
+# 2026-11-03 late morning: props page fixes (deployed b66adf5)
+- /props/player: PlayerPreview.tsx + player.module.css. lib/search/player.ts adds PlayerMarket.history (historyOf: graded copies, last 10, that day's line, actual, our edge grade).
+- Search: nbaPropsIndex subjects are now per player (nbap:TEAM|name); currentOnly compares Date.parse. Before, tonight's game retired last night's props every morning, so NBA players were never searchable until near tip.
+- attd.tsx: ParlayToday/NightToday return null once the week's tickets are graded or void.
+- top.tsx KOTC lineup: slate sim, crowd estimate (input), tagged-prop learner (collecting).
+- Nothing went live after Week 8 (0 active across every section). David NFL props: his plays 198-173 +4.9u (53.4%, z 0.37 vs -110 break-even), his every-prop record -12.7u; our edges 354-322 -9.3u. David learner slices started Nov 2 (1 game).
+
 # 2026-11-03: prop staking schemes (branch worktree-agent-aee5627a93400a22d, NOT merged or deployed)
 - src/lib/props/staking.ts (pure): schemes flat, towin (risk to win 1u, cap 3u), kelly25 (quarter Kelly, 1u = 1%, 0.25u steps, 0.25u to 3u), kelly25shrunk (p halfway to break-even first), edge (1u at the bar, +0.5u per 3 pts, cap 3u). schemeStats: bets, units, risked, ROI, drawdown, log-growth. Switch rule SWITCH_RULE 200 bets, 4 weeks, paired t 1.645 on per-bet log-growth vs flat; back to flat once its log-growth falls below flat's.
 - Bet (learning/engine.ts) carries optional p (our saved chance) and price. Filled for our NFL/NBA props (GradedPropsGame.chance from board extra), First TD (ours and Sam's, Kalshi cost converted to American), Anytime TD, First Basket, lotto rungs, King of the Court. Not for Sam/David system sections (no win chance stored).
