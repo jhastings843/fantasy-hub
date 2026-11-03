@@ -26,6 +26,21 @@ export type SchemeId = "flat" | "towin" | "kelly25" | "kelly25shrunk" | "edge";
 
 export const SCHEME_IDS: SchemeId[] = ["flat", "towin", "kelly25", "kelly25shrunk", "edge"];
 
+/**
+ * "To win 1u" is left out of long-odds sections (Jack, 2026-11-03): First TD,
+ * Anytime TD, First Basket, lottos, King of the Court. Judged from the bets:
+ * a section whose median price is +200 or longer.
+ *
+ *   schemesFor([+650, +900, +1200]) -> flat, kelly25, kelly25shrunk, edge
+ *   schemesFor([-110, -115, +105])  -> all five
+ */
+export const LONG_ODDS = 200;
+export function schemesFor(bets: { price?: number }[]): SchemeId[] {
+  const prices = bets.map((b) => b.price).filter((x): x is number => typeof x === "number" && Number.isFinite(x)).sort((a, b) => a - b);
+  const median = prices.length ? prices[Math.floor(prices.length / 2)] : 0;
+  return median >= LONG_ODDS ? SCHEME_IDS.filter((x) => x !== "towin") : SCHEME_IDS;
+}
+
 /** How each scheme reads on a page (label) and next to a stake ("2u, quarter Kelly"). */
 export const SCHEME: { [k in SchemeId]: { label: string; note: string; how: string } } = {
   flat: { label: "Flat 1u", note: "flat", how: "1u on every bet" },
@@ -186,9 +201,11 @@ export interface StakeChoice {
  * scheme: it stays while its log-growth is still above flat's, else flat.
  */
 export function decideScheme(bets: Bet[], current: SchemeId, edgeBar = 0): { scheme: SchemeId; changed: boolean; why: string; tests: SwitchTest[] } {
-  const tests = SCHEME_IDS.filter((x) => x !== "flat").map((x) => switchTest(bets, x, edgeBar));
+  const tests = schemesFor(bets).filter((x) => x !== "flat").map((x) => switchTest(bets, x, edgeBar));
   if (current !== "flat") {
-    const t = tests.find((x) => x.scheme === current)!;
+    const t = tests.find((x) => x.scheme === current);
+    // A scheme no longer allowed for the section (to win 1u on long odds) goes back to flat.
+    if (!t) return { scheme: "flat", changed: true, why: `${SCHEME[current].label} isn't used on long-odds sections, so stakes go back to flat 1u`, tests };
     if (t.diff > 0) return { scheme: current, changed: false, why: `${SCHEME[current].label} still beats flat (log-growth ${t.diff >= 0 ? "+" : ""}${t.diff}, t ${t.t}, ${t.bets} bets)`, tests };
     return { scheme: "flat", changed: true, why: `${SCHEME[current].label} fell below flat on log-growth (${t.diff}, t ${t.t}, ${t.bets} bets), so stakes go back to flat 1u`, tests };
   }
@@ -230,11 +247,11 @@ export function stakingTable(base: { id: string; label: string; bets: Bet[] }, i
   return {
     base: base.id,
     baseLabel: base.label,
-    rows: SCHEME_IDS.map((x) => schemeStats(base.bets, x, edgeBar)),
+    rows: schemesFor(base.bets).map((x) => schemeStats(base.bets, x, edgeBar)),
     missing: base.bets.filter((b) => !sizable(b)).length,
     inUse,
     ...(since ? { since } : {}),
-    tests: SCHEME_IDS.filter((x) => x !== "flat").map((x) => switchTest(base.bets, x, edgeBar)),
+    tests: schemesFor(base.bets).filter((x) => x !== "flat").map((x) => switchTest(base.bets, x, edgeBar)),
   };
 }
 

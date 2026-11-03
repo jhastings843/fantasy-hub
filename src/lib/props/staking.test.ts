@@ -211,3 +211,14 @@ describe("chanceOf", () => {
     expect(chanceOf(undefined)).toEqual({});
   });
 });
+
+import { schemesFor, stakingTable } from "./staking";
+describe("to win 1u stays off long-odds sections", () => {
+  it("drops it when the median price is +200 or longer, keeps it near even money", () => {
+    expect(schemesFor([{ price: 650 }, { price: 900 }, { price: 1200 }])).not.toContain("towin");
+    expect(schemesFor([{ price: -110 }, { price: -115 }, { price: 105 }])).toContain("towin");
+    const long = { id: "x", label: "x", bets: [{ game: "g", week: 7, at: "2026-10-20T17:00:00Z", net: -1, p: 0.12, price: 700 }] as Bet[] };
+    expect(stakingTable(long).rows.map((r) => r.scheme)).not.toContain("towin");
+    expect(decideScheme(long.bets, "towin").scheme).toBe("flat");
+  });
+});
