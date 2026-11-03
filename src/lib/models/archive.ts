@@ -92,7 +92,11 @@ export async function schedule(now: Date): Promise<{ games: ScheduledGame[]; pro
 async function propBets(l: LinesLeague, ev: string): Promise<PropBetRow[]> {
   const rows: PropBetRow[] = [];
   for (let page = 1; page <= 4; page++) {
-    const d = await json<{ items?: PropBetRow[]; pageCount?: number }>(PROPS(l, ev, page));
+    // ESPN answers 404 until DraftKings posts the game's props (seen the day before a slate, 2026-11-03): nothing to read yet, not a problem.
+    const d = await json<{ items?: PropBetRow[]; pageCount?: number }>(PROPS(l, ev, page)).catch((e) => {
+      if (page === 1 && /answered 404/.test(String(e))) return { items: [], pageCount: 0 };
+      throw e;
+    });
     rows.push(...(d.items ?? []));
     if (!d.pageCount || page >= d.pageCount) break;
   }

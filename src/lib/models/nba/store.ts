@@ -270,7 +270,11 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
     try {
       const rows: PropBetRow[] = [];
       for (let page = 1; page <= 4; page++) {
-        const d = await json<{ items?: PropBetRow[]; pageCount?: number }>(PROPS(g.id, page));
+        // ESPN answers 404 until DraftKings posts the game's props (the day before a slate, 2026-11-03): skipped like an unposted game.
+        const d = await json<{ items?: PropBetRow[]; pageCount?: number }>(PROPS(g.id, page)).catch((e) => {
+          if (page === 1 && /answered 404/.test(String(e))) return { items: [], pageCount: 0 };
+          throw e;
+        });
         rows.push(...(d.items ?? []));
         if (!d.pageCount || page >= d.pageCount) break;
       }
