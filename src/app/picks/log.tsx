@@ -37,6 +37,20 @@ const mentions = (m: Market, t: string) => (m === "ou" ? /total|over|under/i.tes
 /** What a market's ideas are measured against, in a few words (the hero line). */
 const AGAINST_SHORT: { [m in Market]: string } = { ats: "the rule in force", su: "the method in force", ou: "plain both-agree" };
 
+/**
+ * A review's reason in "has now · needs" form (Jack, 2026-11-03), e.g.
+ * "not better on matched games: mean -0.04u, t=-0.5, needs 1.645" ->
+ * "Has −0.04u a game vs the rule, t −0.5 · Needs t 1.645+". Other reasons pass through.
+ */
+export function plainWhy(why: string, against: string): string {
+  const w = why.replace(/^insufficient evidence: /, "");
+  const m = /^not better on matched games: mean (-?[\d.]+)u, t=(-?[\d.]+)(?: \(([^)]*)\))?, needs ([\d.]+)$/.exec(w);
+  if (!m) return w;
+  const mean = Number(m[1]);
+  const t = m[2].replace("-", "−");
+  return `Has ${mean >= 0 ? "+" : "−"}${Math.abs(mean)}u a game vs ${against}, t ${t}${m[3] ? ` (${m[3]})` : ""} · Needs t ${m[4]}+`;
+}
+
 export async function PicksLog({ league, market }: { league: League; market: Market }) {
   const [journal, state, report] = await Promise.all([redisStore.journal(60).catch(() => []), redisStore.state().catch(() => null), getPicksReport(league).catch(() => null)]);
   const rep = report?.value ?? null;
@@ -60,7 +74,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
       <Hero
         eyebrow="What changed, and why"
         title={<span id="picks-log">Learner log</span>}
-        sub={`Every idea counts only games after it was first tracked. It goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with a clear edge over ${AGAINST_SHORT[market]}, and comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "the next slate review"}.`}
+        sub={`Every idea counts only games after it was first tracked. To go live it needs ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and to beat ${AGAINST_SHORT[market]} at t ${CRITERIA.MIN_T}+ (t is how sure the gain is real; ${CRITERIA.MIN_T} is about a 1-in-20 chance it's luck). One that loses to it just as clearly is dropped; a live one comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "the next slate review"}.`}
       />
       {rep && <ModelRecords league={league} market={market} report={rep} />}
       <TrackingProgress
@@ -81,7 +95,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
               weeks: wk,
               needWeeks: CRITERIA.MIN_WEEKS,
               result: d.t !== undefined ? `t ${d.t.toFixed(2)} of ${CRITERIA.MIN_T}` : undefined,
-              note: counted ? undefined : d.why.replace(/^insufficient evidence: /, ""),
+              note: counted ? undefined : plainWhy(d.why, AGAINST_SHORT[market]),
             };
           })}
         sub={`${MARKET_NAME[market]} ideas, measured against the rule in force on games after each registered. Counts update at each review, the morning after every slate.`}

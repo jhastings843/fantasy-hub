@@ -3,7 +3,7 @@
 // closest, and the journal.
 
 import Link from "next/link";
-import type { SectionView } from "@/lib/learning/engine";
+import type { Check, SectionView } from "@/lib/learning/engine";
 import { whenEt } from "../picks/ui";
 import type { TrackRow } from "../picks/board";
 import s from "../picks/picks.module.css";
@@ -11,6 +11,16 @@ import { SCHEME, SWITCH_RULE } from "@/lib/props/staking";
 
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const CLOSEST = 8;
+
+/**
+ * What a slice is short, in two lists (Jack, 2026-11-03): "Has −24.8u, t −1.09 · Needs a profit, t 2.33+".
+ * Games and weeks have their own columns. t is how sure the edge is real: 2.33 is about a 1-in-100 chance it's luck.
+ */
+export function hasNeeds(short: Check[]): string {
+  const have = short.map((c) => c.have ?? c.note);
+  const need = short.map((c) => c.need).filter(Boolean);
+  return `Has ${have.join(", ")}${need.length ? ` · Needs ${need.join(", ")}` : ""}`;
+}
 
 /** Every slice the engine is measuring, for the learner log's progress section. */
 export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
@@ -21,8 +31,8 @@ export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
     const live = e.status === "active" || paused;
     const rec = e.live ? `${e.live.w}-${e.live.l}${e.live.p ? `-${e.live.p}` : ""}, ${u(e.live.units)} since it went live` : undefined;
     // Games and weeks have their own bars; the note lists what else is short.
-    const short = ev?.checks.filter((c) => !c.pass && c.name !== "games" && c.name !== "weeks").map((c) => c.note) ?? [];
-    const still = !ev?.games ? "No games yet: only games after it was first tracked count." : short.length ? `Also needs ${short.slice(0, 2).join(", ")}` : ev.ready ? "Ready at the next review" : undefined;
+    const short = ev?.checks.filter((c) => !c.pass && c.name !== "games" && c.name !== "weeks") ?? [];
+    const still = !ev?.games ? "No games yet: only games after it was first tracked count." : short.length ? hasNeeds(short) : ev.ready ? "Ready at the next review" : undefined;
     return {
       id: `${prefix}${e.id}`,
       label: `${prefix}${e.label}`,
@@ -52,7 +62,7 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
         <Link href="/learning" className={s.dim} style={{ fontSize: 13 }}>
           Every section&apos;s learning on one page
         </Link>
-        <p className={s.p}>{`A slice goes live after ${g.minGames}+ games over ${g.minWeeks}+ weeks with a clear edge, and is rolled back if it turns. ${
+        <p className={s.p}>{`To go live a slice needs all of: ${g.minGames}+ games over ${g.minWeeks}+ weeks, ${g.minBets}+ bets${g.minWins ? `, ${g.minWins}+ winners` : ""}, a profit, and t ${g.minT}+ (t is how sure the edge is real; ${g.minT} is about ${g.minT >= 2.3 ? "a 1-in-100" : "a 1-in-20"} chance it's luck). A narrower slice must also beat the one it narrows. A live one is rolled back if it turns. ${
           v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; ${collecting} collecting.` : "First review runs at the next data pull."
         }`}</p>
       </div>
@@ -100,7 +110,7 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
                 <th>Games</th>
                 <th>Units</th>
                 <th>t</th>
-                <th>Still needs</th>
+                <th>Has now · needs</th>
               </tr>
             </thead>
             <tbody>
@@ -111,11 +121,7 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
                   <td className={`${s.num} ${e.ev!.units > 0 ? s.pos : e.ev!.units < 0 ? s.neg : ""}`}>{u(e.ev!.units)}</td>
                   <td className={s.num}>{e.ev!.t.toFixed(2)}</td>
                   <td className={s.dim}>
-                    {e.ev!.checks
-                      .filter((c) => !c.pass)
-                      .map((c) => c.note)
-                      .slice(0, 2)
-                      .join("; ") || "ready at the next review"}
+                    {e.ev!.checks.some((c) => !c.pass) ? hasNeeds(e.ev!.checks.filter((c) => !c.pass)) : "Ready at the next review"}
                   </td>
                 </tr>
               ))}
