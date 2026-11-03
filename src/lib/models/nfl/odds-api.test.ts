@@ -81,3 +81,13 @@ describe("matching and timing", () => {
     expect(readDue(k, new Date("2026-10-25T17:30:00Z"), false)).toBe(false); // kicked off
   });
 });
+
+import { currentUsage } from "./odds-api";
+describe("currentUsage", () => {
+  it("drops a count from an earlier month so a full quota can't block reads after it resets", () => {
+    const u = { used: 450, remaining: 50, at: "2026-10-30T12:00:00Z" };
+    expect(currentUsage(u, new Date("2026-10-31T09:00:00Z"))).toBe(u);
+    expect(currentUsage(u, new Date("2026-11-01T09:00:00Z"))).toBeNull();
+    expect(currentUsage(null, new Date())).toBeNull();
+  });
+});

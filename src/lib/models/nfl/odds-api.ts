@@ -135,3 +135,6 @@ export function readDue(kickoff: string, now: Date, have: boolean): boolean {
   const hour = Number(now.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }));
   return hour >= 8;
 }
+
+/** A saved quota count is only good for the month it was read in (the quota resets monthly). */
+export const currentUsage = <U extends { at: string }>(u: U | null, now: Date): U | null => (u && u.at.slice(0, 7) === now.toISOString().slice(0, 7) ? u : null);

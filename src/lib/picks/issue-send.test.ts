@@ -130,3 +130,14 @@ describe("durable issuance: independent review findings", () => {
     await expect(loadIssuedStrict("nfl", 2026)).rejects.toThrow("redis down");
   });
 });
+
+import { startedBefore } from "./issue-send";
+describe("startedBefore", () => {
+  it("is true once any play or total on the card has kicked off", () => {
+    const rec = (k?: string, t?: string) => ({ plays: [{ kickoff: k }], totals: t ? [{ kickoff: t }] : [] }) as never;
+    const at = Date.parse("2026-11-08T18:00:00Z");
+    expect(startedBefore([rec("2026-11-08T21:25:00Z")], at)).toBe(false);
+    expect(startedBefore([rec("2026-11-08T21:25:00Z", "2026-11-08T18:00:00Z")], at)).toBe(true);
+    expect(startedBefore([rec(undefined)], at)).toBe(false);
+  });
+});

@@ -1,4 +1,5 @@
 import "server-only";
+import { currentUsage } from "./odds-api";
 import { redis } from "@/lib/redis/client";
 import { BOOKS, MARKETS, MONTHLY_STOP, ODDS_SPORT, type OddsEvent, type OddsRead, matchEvent, parseEventOdds, readDue } from "./odds-api";
 
@@ -46,9 +47,15 @@ export async function loadOddsRead(season: number, ev: string): Promise<OddsRead
   return (await redis.get<OddsRead>(K.read(season, ev)).catch(() => null)) ?? null;
 }
 
-export async function loadOddsUsage(): Promise<OddsUsage | null> {
-  return (await redis.get<OddsUsage>(K.usage).catch(() => null)) ?? null;
+/**
+ * The month's usage, or null once it's from an earlier month: the quota resets
+ * monthly, and a stale count at the stop would otherwise block every read for
+ * good (audit 2026-11-02). Pure helper below, tested.
+ */
+export async function loadOddsUsage(now = new Date()): Promise<OddsUsage | null> {
+  return currentUsage((await redis.get<OddsUsage>(K.usage).catch(() => null)) ?? null, now);
 }
+
 
 /**
  * The saved read for each game, taking the morning-of read first for any
@@ -72,9 +79,10 @@ export async function morningOddsReads(
   const notes: string[] = [];
   try {
     // The events list is free.
-    const { body } = await get(`${BASE}/sports/${ODDS_SPORT}/events?apiKey=${key}`);
+    const { body, headers } = await get(`${BASE}/sports/${ODDS_SPORT}/events?apiKey=${key}`);
     const events = body as OddsEvent[];
-    let usage = await loadOddsUsage();
+    // The free call carries the live quota too: refresh the count before the stop check.
+    let usage = (await saveOddsUsage(headers, now.toISOString()).catch(() => null)) ?? (await loadOddsUsage(now));
     for (const g of due) {
       if (usage && usage.used + MARKETS.length > MONTHLY_STOP) {
         notes.push(`stopped at ${usage.used} credits this month (stop ${MONTHLY_STOP})`);

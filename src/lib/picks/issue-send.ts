@@ -25,6 +25,11 @@ const intentKey = (idem: string) => `picks:v2:intent:${idem}`;
 /** Comfortably inside the provider's 24h idempotency window. */
 export const RESEND_WINDOW_MS = 20 * 3600 * 1000;
 
+/** True when any play or total on these records has a kickoff at or before `at` (ms). */
+export function startedBefore(recs: Pick<IssuedRecord, "plays" | "totals">[], at: number): boolean {
+  return recs.some((r) => [...r.plays, ...(r.totals ?? [])].some((p) => !!p.kickoff && Date.parse(p.kickoff) <= at));
+}
+
 export interface Intent {
   html: string;
   subject: string;
@@ -84,6 +89,16 @@ export async function issueAndSend(input: IssueSendInput): Promise<IssueSendResu
       });
     }
     return { sent: false, outcome: "reconciled", issued: ["already issued and sent; log reconciled"] };
+  }
+  // A retried card whose first game has already kicked off would arrive with expired prices (audit 2026-11-02): never resend it.
+  if (!won && startedBefore(recs, now())) {
+    for (const r of recs) await markIssued(r, "unconfirmed");
+    return {
+      sent: false,
+      outcome: "unconfirmed",
+      error: `An earlier send of this card (${intent.createdAt}) never confirmed, and a game on it has started; not resent. Marked unconfirmed for a person to check.`,
+      issued,
+    };
   }
   if (!won && now() - new Date(intent.createdAt).getTime() > RESEND_WINDOW_MS) {
     for (const r of recs) await markIssued(r, "unconfirmed");
