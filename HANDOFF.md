@@ -1,3 +1,12 @@
+# 2026-11-02/03: audit and money guards (all deployed, main b1d7382+)
+Start here. Earlier sections below are history.
+- Real-money guards: football spread tiers and totals rule need a forward check (src/lib/picks/forward.ts, chosen-store.ts: 10+ games after first chosen, above break-even; NFL road-dog and CFB near-vegas grandfathered; fail closed). Pick cards never resend after a game starts (issue-send.ts startedBefore).
+- Staked props/NBA (none live yet): go-live push (notify/golive.ts via learning/store reviewIfDue), Today cards, 9am + late-add email, per-bet push (pulse staked-push). Limits in props/staked-core.ts limitProps (priced only, propId one id per prop, 3/game, 10u/day remembered in staked:v1:props-day:{date}). Fresh price check 60-75 min before lock (props/fresh.ts; NFL Odds API, NBA ESPN DK feed); unchecked sections push marked "this morning's price, not rechecked" (Jack's choice).
+- Monitoring: notify/problems.ts pushes when a cron route or pulse job reports problems 3 runs in a row. Weekly Picks UI check fixed (pnpm workspace, ubuntu-24.04) and passing.
+- Models: NFL play-by-play line (power.ts) tracked only (loses ATS at close); blend signals blend/blend4 on the NFL tracker; injuries: Doubtful = Out everywhere, returners in props and FTD/ATTD lists, NFL out-flag display only (features not adopted). First TD edge rule ftdEdge (6%+ price, 2+ pts), voids for players who sit; model not refit (held-out calibration fine).
+- KOTEZ: promo game only (DK Network hub, else Monday), frozen at kickoff, graded on longest TD.
+- Backlog: see .dashboard.json next_steps.
+
 # 2026-11-02 late: flipped spreads (Purdue-Gonzaga CBB; UConn CFB the week before)
 - Cause (CBB): on neutral floors ESPN's scoreboard and odds feed can disagree on which team is "home", and the scoreboard itself switched (Purdue home at save, Gonzaga home by tip). The board laid a saved Purdue-home line over a Gonzaga-home row: GONZ +5.5 instead of -5.5.
 - Fixes: readCbbLine(d, at, homeId) orients by each side's team id (lines.ts, flag fixed: "team"); track.ts orientTracked/flipSnap line a saved game up with the scoreboard row before it is shown, graded (score swapped) or saved again. lib/picks/orient.ts spreadFlipped: every spread reader (closing.ts current + summary closes, picks/nba.ts nbaOdds, nba/game-lines.ts) turns a spread around when it puts the moneyline/flagged favorite on the wrong side (|spread| >= 1). Tests: cbb/lines-orient.test.ts (real Gonzaga payload fixture), picks/orient.test.ts.
