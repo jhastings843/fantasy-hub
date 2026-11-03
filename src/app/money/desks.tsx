@@ -380,9 +380,19 @@ export function retroLog(log: { ts: string | null; headline: string; changes: st
 }
 
 /** The stock learner's weekly entries as log lines. */
+/** 5am Eastern on a YYYY-MM-DD day, as ISO: when launchd runs the weekly learner (Saturday 5:00). */
+export function fiveAmEt(day: string): string {
+  // EDT is UTC-4, EST is UTC-5; take the offset whose Eastern hour reads 5.
+  for (const off of ["-04:00", "-05:00"]) {
+    const d = new Date(`${day}T05:00:00${off}`);
+    if (Number(d.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false })) === 5) return d.toISOString();
+  }
+  return new Date(`${day}T10:00:00Z`).toISOString();
+}
+
 export function booksLog(log: { day: string; decisions: { action: string; book: string; why: string }[]; lessons: string | null }[]): LogEntry[] {
   return log.flatMap((e): LogEntry[] => {
-    const at = `${e.day}T21:00:00Z`;
+    const at = fiveAmEt(e.day);
     if (!e.decisions.length) return [{ at, kind: "test" as const, title: "Reviewed every book, no changes", detail: e.lessons ?? undefined }];
     return e.decisions.map((d) => ({ at, kind: (/retire|close|drop/i.test(d.action) ? "back" : /open|add|promot/i.test(d.action) ? "new" : "test") as LogEntry["kind"], title: `${d.action} ${d.book}`, detail: d.why }));
   });
