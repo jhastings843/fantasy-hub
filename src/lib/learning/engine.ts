@@ -86,6 +86,8 @@ export interface Entry {
   reason?: string;
   /** Lost its weekly cap in this section week: no bets until the next week's first review. */
   pausedWeek?: number;
+  /** Every pause, kept after it lifts, so the money record skips bets made while paused (from 2026-11-02). */
+  pauses?: { week: number; at: string }[];
 }
 
 export interface SectionState {
@@ -322,6 +324,7 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     const lost = (c?.bets ?? []).filter((b) => b.week === week && b.at >= e.activatedAt!).reduce((a, b) => a + b.net, 0);
     if (lost <= -gate.weeklyLossCap) {
       e.pausedWeek = week;
+      e.pauses = [...(e.pauses ?? []), { week, at: now }];
       journal.push({ at: now, week, kind: "rolled back", id: e.id, text: `Paused ${e.label} for the rest of week ${week}: down ${r2(-lost)}u this week, past its ${gate.weeklyLossCap}u cap. It bets again next week unless the rollback test drops it first.` });
     }
   }
@@ -526,10 +529,24 @@ export function sectionView(gate: Gate, s: SectionState, base: Candidate[], jour
   return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal };
 }
 
-/** Bets that counted while a slice was live, for money charts. */
+/**
+ * Bets that counted while a slice was live, for money charts: each bet once
+ * even when several live slices keep it (one bet is placed, audit 2026-11-02),
+ * and none from a paused stretch (a pause lasts to the end of its week).
+ */
 export function liveBets(s: SectionState, base: Candidate[]): Bet[] {
   const byId = new Map(expand(s, base).map((c) => [c.id, c]));
+  const seen = new Set<string>();
   return Object.values(s.entries).flatMap((e) =>
-    e.activatedAt ? (byId.get(e.id)?.bets ?? []).filter((b) => b.at >= e.activatedAt! && (!e.endedAt || b.at < e.endedAt)) : [],
+    e.activatedAt
+      ? (byId.get(e.id)?.bets ?? []).filter((b) => {
+          if (b.at < e.activatedAt! || (e.endedAt && b.at >= e.endedAt)) return false;
+          if ((e.pauses ?? []).some((p) => b.week === p.week && b.at >= p.at)) return false;
+          const k = b.key ?? `${b.game}|${b.at}|${b.net}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        })
+      : [],
   );
 }

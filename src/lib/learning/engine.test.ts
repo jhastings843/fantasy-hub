@@ -234,3 +234,18 @@ describe("the learner adds its own slices (2026-10-27)", () => {
     expect(review(g, r.state, [strip(overs), strip(rec)], "2026-11-01T00:00:00.000Z", 9, "2026-11-01").state.generated ?? []).toEqual([]);
   });
 });
+
+describe("liveBets for the money record", () => {
+  it("counts a bet once across live slices and skips bets made while paused", () => {
+    const b = (key: string, week: number, day: number, net = 1): Bet => ({ game: key, key, week, at: at(day), net });
+    const shared = b("p1", 7, 1);
+    const a: Candidate = { id: "a", label: "a", bets: [shared, b("p2", 7, 2, -1), b("p3", 8, 4)] };
+    const c: Candidate = { id: "c", label: "c", bets: [shared] };
+    const st = emptyState("t");
+    st.entries = {
+      a: { id: "a", label: "a", registeredAt: T0, status: "active", activatedAt: T0, pauses: [{ week: 7, at: at(2) }] } as never,
+      c: { id: "c", label: "c", registeredAt: T0, status: "active", activatedAt: T0 } as never,
+    };
+    expect(liveBets(st, [a, c]).map((x) => x.key)).toEqual(["p1", "p3"]);
+  });
+});
