@@ -212,6 +212,8 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
         const read = reads.get(e.id);
         const dk = read && Object.keys(read.firstTd).length ? { at: read.at, prices: read.firstTd } : old?.dk;
         const fd = read?.fd && Object.keys(read.fd.firstTd).length ? { at: read.at, prices: read.fd.firstTd } : old?.fd;
+        // Real clock, not the run's start: a run that began just before kickoff must not save what it read after (audit 2026-11-02).
+        if (e.date && Date.now() >= Date.parse(e.date)) continue;
         await redis.hset(FK.week(season, week), {
           [slug]: { ...old, game, capturedAt: now.toISOString(), firstSeenAt: old?.firstSeenAt ?? now.toISOString(), kickoff: e.date, espnId: e.id, ...(k ? { kalshi: k } : {}), ...(dk ? { dk } : {}), ...(fd ? { fd } : {}), ...(attd ? { attd } : {}) } satisfies OurFtdStored,
         });

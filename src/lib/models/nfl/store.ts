@@ -252,6 +252,8 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
           home: H,
           ...(Object.keys(dv).length ? { david: dv } : {}),
         };
+        // Real clock, not the run's start: a run that began just before kickoff must not save what it read after (audit 2026-11-02).
+        if (e.date && Date.now() >= Date.parse(e.date)) continue;
         await redis.hset(NK.week(season, week), { [e.id]: stored });
         await redis.sadd(NK.weeks(season), String(week));
         report.saved.push(`${A}@${H} ${markets.length} props, ${markets.filter((m) => m.clears).length} edges, prices ${Object.values(extra).filter((x) => x.price !== "assumed").length} real`);

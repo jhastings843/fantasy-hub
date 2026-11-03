@@ -358,6 +358,8 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
         kotc,
         ...(Object.keys(dv).length ? { david: dv } : {}),
       };
+      // Real clock, not the run's start: a run that began just before tip must not save what it read after (audit 2026-11-02).
+      if (g.tip && Date.now() >= Date.parse(g.tip)) continue;
       await redis.hset(K.week(season, week), { [g.id]: stored });
       await redis.sadd(K.weeks(season), String(week));
       report.saved.push(`${away.abbr}@${home.abbr} ${markets.length} props, ${markets.filter((m) => m.clears).length} edges${fb ? `, first basket ${fb.players.filter((x) => x.edge).length} edges` : ""}`);
