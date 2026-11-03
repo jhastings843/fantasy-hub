@@ -65,11 +65,17 @@ export function splitCsvLine(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (q) {
-      if (c === '"' && line[i + 1] === '"') (cur += '"'), i++;
+      if (c === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      }
       else if (c === '"') q = false;
       else cur += c;
     } else if (c === '"') q = true;
-    else if (c === ",") out.push(cur), (cur = "");
+    else if (c === ",") {
+      out.push(cur);
+      cur = "";
+    }
     else cur += c;
   }
   out.push(cur);
@@ -114,8 +120,13 @@ export class PlayAgg {
       g = { game: id, season: Number(f[c.season]), gameday: f[c.game_date], team: modernTeam(team), opp: modernTeam(opp), passEpa: 0, passN: 0, rushEpa: 0, rushN: 0 };
       this.games.set(k, g);
     }
-    if (pass) (g.passEpa += epa), g.passN++;
-    else (g.rushEpa += epa), g.rushN++;
+    if (pass) {
+      g.passEpa += epa;
+      g.passN++;
+    } else {
+      g.rushEpa += epa;
+      g.rushN++;
+    }
     this.plays++;
   }
 
@@ -138,7 +149,10 @@ export function carryRatings(last: Map<string, Rating>, carry: number): Map<stri
  */
 export function solveRatings(obs: TeamGame[], prior: Map<string, Rating>, n0: number, iters = 25): Map<string, Rating> {
   const teams = new Set<string>([...prior.keys()]);
-  for (const g of obs) teams.add(g.team), teams.add(g.opp);
+  for (const g of obs) {
+    teams.add(g.team);
+    teams.add(g.opp);
+  }
   const out = new Map<string, Rating>();
   for (const t of teams) out.set(t, { ...(prior.get(t) ?? ZERO) });
   const parts = [

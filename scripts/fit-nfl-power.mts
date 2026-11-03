@@ -136,7 +136,7 @@ function fitK(rows: Row[]): K {
   return { hfa, kPass, kRush, kRest, kQb };
 }
 const full = (k: K, h: { prior: number; carry: number; wp: number }): PowerParams => ({ ...h, ...k });
-const mse = (rows: Row[], f: (r: Row) => number) => rows.reduce((a, r) => a + (r.y - f(r)) ** 2, 0) / rows.length;
+const mse = <R extends Row>(rows: R[], f: (r: R) => number) => rows.reduce((a, r) => a + (r.y - f(r)) ** 2, 0) / rows.length;
 
 // 2. Validation.
 let best: { prior: number; carry: number; wp: number; mse: number } | null = null;
@@ -170,7 +170,11 @@ const corr = (() => {
   let sab = 0,
     saa = 0,
     sbb = 0;
-  for (let i = 0; i < a.length; i++) ((sab += (a[i] - ma) * (b[i] - mb)), (saa += (a[i] - ma) ** 2), (sbb += (b[i] - mb) ** 2));
+  for (let i = 0; i < a.length; i++) {
+    sab += (a[i] - ma) * (b[i] - mb);
+    saa += (a[i] - ma) ** 2;
+    sbb += (b[i] - mb) ** 2;
+  }
   return sab / Math.sqrt(saa * sbb);
 })();
 say(`correlation of our margin with the close: ${corr.toFixed(3)}; mean |ours - close| ${r2(test.reduce((a, r) => a + Math.abs(r.ours - r.close), 0) / test.length)} pts`);
