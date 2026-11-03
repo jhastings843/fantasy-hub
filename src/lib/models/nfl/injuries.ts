@@ -41,7 +41,11 @@ export interface ReportEntry {
 export interface TeamOut {
   qbOut: number;
   skillOut: number;
+  /** Who, for the flag shown on a game (live only): the starting QB and any skill player with 5%+ of usage newly out, "Jalen Hurts (QB)". */
+  names?: string[];
 }
+/** A skill player's usage share that earns a name on the flag. */
+export const NAME_SHARE = 0.05;
 
 /** Each team's last few games of targets + carries per player, folded in a game at a time. */
 export class UsageBook {
@@ -80,15 +84,25 @@ export const outIds = (report: ReportEntry[]) => new Set(report.filter((r) => is
  * `lastQb`: the id of the QB who started its previous game. `prevOut`: ids
  * out on its previous report. `share`: usage share by player id.
  */
-export function teamOut(report: ReportEntry[], o: { lastQb?: string; prevOut: Set<string>; share: (id: string) => number }): TeamOut {
+export function teamOut(report: ReportEntry[], o: { lastQb?: string; prevOut: Set<string>; share: (id: string) => number; nameOf?: (id: string) => string | undefined }): TeamOut {
   let qbOut = 0;
   let skillOut = 0;
+  const names: string[] = [];
   for (const r of report) {
     if (!isOut(r.status)) continue;
-    if (o.lastQb && r.id === o.lastQb) qbOut = 1;
-    if (SKILL_POS.has(r.pos) && !o.prevOut.has(r.id)) skillOut += o.share(r.id);
+    if (o.lastQb && r.id === o.lastQb) {
+      qbOut = 1;
+      const n = o.nameOf?.(r.id);
+      if (n) names.push(`${n} (QB)`);
+    }
+    if (SKILL_POS.has(r.pos) && !o.prevOut.has(r.id)) {
+      const sh = o.share(r.id);
+      skillOut += sh;
+      const n = o.nameOf?.(r.id);
+      if (n && sh >= NAME_SHARE) names.push(`${n} (${r.pos})`);
+    }
   }
-  return { qbOut, skillOut: Math.round(skillOut * 1e4) / 1e4 };
+  return { qbOut, skillOut: Math.round(skillOut * 1e4) / 1e4, ...(o.nameOf ? { names } : {}) };
 }
 
 /** The guard: a team missing its starting QB or at least `skillMin` of its usage, newly. */
@@ -111,7 +125,7 @@ export interface InjuryRead {
 
 export const injuryRead = (home: TeamOut, away: TeamOut, cut = SKILL_OUT_GUARD): InjuryRead => ({ home, away, flagged: bigOut(home, cut) || bigOut(away, cut) });
 
-/** True when our model's read on a game is held by the injury guard: its spread and total edges count as no pick. */
+/** True when a game carries the injury flag (Jack, 2026-11-02: show the flag only; it does not hold any pick or tracking). */
 export const injuryHeld = (o: { injury?: { flagged?: boolean } } | undefined | null) => !!o?.injury?.flagged;
 
 /** A usage book from nflverse weekly rows (data.ts NflRow): one team-game per season, week and team, in order. */

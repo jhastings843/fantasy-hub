@@ -563,6 +563,8 @@ export interface OursRead {
   total?: number;
   /** Home win chance, 0-1. */
   homeWin?: number;
+  /** NFL players newly out on each side and whether it's a big loss (starting QB or 15%+ of usage). Display only (models/nfl/injuries.ts). */
+  injury?: { home: string[]; away: string[]; flagged: boolean };
 }
 
 export interface BoardGame {

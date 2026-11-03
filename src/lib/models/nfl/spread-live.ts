@@ -6,6 +6,8 @@ import PARAMS from "./spread-params.json";
 import TOTALS from "./totals-params.json";
 import { nflPoints, nflProjection, nflTotal, type NflTotalsParams } from "./totals";
 import { live, primeParams } from "@/lib/models/params-store";
+import { injuryRead, type InjuryRead } from "./injuries";
+import { nflTeamsOut } from "./injuries-live";
 
 // Our NFL spread model, live (tracked only, Jack 2026-10-21: forward-test
 // it at early-week prices). For this week's games at the reference line
@@ -14,6 +16,13 @@ import { live, primeParams } from "@/lib/models/params-store";
 // before now; nflverse's codes match the Picks abbreviations. Each line also
 // carries our projected total (points ratings, totals.ts) and the home win
 // chance, so totals and straight up can be judged as sources too.
+//
+// Injuries (2026-11-02): each line carries `injury`, who's out on each side
+// (injuries.ts). They did not improve the spread or totals fit on held-out
+// seasons (scripts/fit-nfl-injuries.mts), so they don't move our numbers;
+// instead a game where a team is newly missing its starting QB or 15%+ of its
+// targets and carries is flagged for display only (Jack, 2026-11-02: in the
+// backtest those games did no worse). If the inputs can't be read, no flag.
 
 const P = live("nfl-spread", PARAMS as SpreadParams);
 const T = live("nfl-totals", TOTALS as NflTotalsParams);
@@ -37,7 +46,7 @@ async function games(): Promise<SpreadGame[]> {
  * total and home win chance (NFL from 2026-10-28; college from its own model,
  * lib/models/cfb, which has no features).
  */
-export type OurLine = ModelLine & { x?: Features; total?: number; homeWin?: number };
+export type OurLine = ModelLine & { x?: Features; total?: number; homeWin?: number; injury?: InjuryRead };
 
 /** Our line per game, keyed `${home}|${away}`. `line` is the home spread (negative = home favored). */
 export async function ourSpreadLines(season: number, want: { home: string; away: string; line: number }[]): Promise<Map<string, OurLine>> {
@@ -46,6 +55,7 @@ export async function ourSpreadLines(season: number, want: { home: string; away:
   const r = new Ratings(P.rating);
   for (const g of [...all].sort((a, b) => a.gameday.localeCompare(b.gameday) || a.id.localeCompare(b.id))) if (g.homeScore !== null) r.add(g);
   const pts = nflPoints(all, T);
+  const outs = await nflTeamsOut(season, all, want.flatMap((w) => [w.home, w.away])).catch(() => null);
   const out = new Map<string, OurLine>();
   for (const w of want) {
     const g = all.find((x) => x.season === season && x.home === w.home && x.away === w.away && x.homeScore === null);
@@ -56,7 +66,10 @@ export async function ourSpreadLines(season: number, want: { home: string; away:
     const r2 = (v: number) => Math.round(v * 100) / 100;
     const model = r2(w.line - res);
     const proj = nflProjection(model, nflTotal(pts, g), T);
-    out.set(`${w.home}|${w.away}`, { market: w.line, model, x: { gap: r2(x.gap), move: r2(x.move), cover: r2(x.cover), rest: x.rest, qb: x.qb }, total: proj.total, homeWin: proj.homeWin });
+    const h = outs?.get(w.home);
+    const a = outs?.get(w.away);
+    const injury = h && a ? injuryRead(h, a) : undefined;
+    out.set(`${w.home}|${w.away}`, { market: w.line, model, x: { gap: r2(x.gap), move: r2(x.move), cover: r2(x.cover), rest: x.rest, qb: x.qb }, total: proj.total, homeWin: proj.homeWin, ...(injury ? { injury } : {}) });
   }
   return out;
 }

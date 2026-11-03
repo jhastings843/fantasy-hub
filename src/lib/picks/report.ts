@@ -311,7 +311,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   const oursLast = latestOurs(snaps);
   if (week) for (const r of rows) {
     const o = oursLast.get(key({ week, home: r.home, away: r.away }));
-    if (o) r.ours = { spread: o.model, ...(o.total !== undefined ? { total: o.total } : {}), ...(o.homeWin !== undefined ? { homeWin: o.homeWin } : {}) };
+    if (o) r.ours = { spread: o.model, ...(o.total !== undefined ? { total: o.total } : {}), ...(o.homeWin !== undefined ? { homeWin: o.homeWin } : {}), ...(o.injury ? { injury: { home: o.injury.home.names ?? [], away: o.injury.away.names ?? [], flagged: o.injury.flagged } } : {}) };
   }
   const lastRows = week ? rowsFromForecasts(snaps, week - 1) : [];
   const lastWeek = week ? lastRows.map((r) => ({ week: week - 1, home: r.home, away: r.away })) : [];

@@ -94,3 +94,15 @@ describe("live helpers", () => {
     expect(rosterReport([{ key: "traviskelce", status: "Out" }, { key: "nobody", status: "Out" }, { key: "traviskelce" }], players)).toEqual([{ id: "00-1", pos: "TE", status: "Out" }]);
   });
 });
+
+import { teamOut as teamOutNamed } from "./injuries";
+describe("teamOut names for the display flag", () => {
+  it("names the starting QB and skill players with 5%+ of usage, not depth guys", () => {
+    const t = teamOutNamed(
+      [{ id: "qb", pos: "QB", status: "Out" }, { id: "wr", pos: "WR", status: "Doubtful" }, { id: "te3", pos: "TE", status: "Out" }],
+      { lastQb: "qb", prevOut: new Set(), share: (id) => (id === "wr" ? 0.2 : 0.02), nameOf: (id) => ({ qb: "Jalen Hurts", wr: "A.J. Brown", te3: "Depth Guy" })[id] },
+    );
+    expect(t.names).toEqual(["Jalen Hurts (QB)", "A.J. Brown (WR)"]);
+    expect(t.qbOut).toBe(1);
+  });
+});
