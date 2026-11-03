@@ -1,4 +1,5 @@
 import "server-only";
+import { isOut } from "@/lib/injuries/status";
 import { redis } from "@/lib/redis/client";
 import { samTeam } from "@/lib/firsttd/grade";
 import { gradeGame, nameKey, type EspnBoxTeam } from "@/lib/props/grade";
@@ -170,7 +171,7 @@ export async function runOurNflProps(now = new Date()): Promise<OurNflReport> {
             for (const a of g.items ?? []) {
               if (!a.id || !a.fullName) continue;
               names.set(a.id, { name: a.fullName, team: T });
-              if (a.injuries?.some((i) => i.status === "Out" || i.status === "Injured Reserve")) outKeys.add(`${T}|${nameKey(a.fullName)}`);
+              if (a.injuries?.some((i) => isOut(i.status))) outKeys.add(`${T}|${nameKey(a.fullName)}`);
             }
         }
         const byKey = new Map<string, { id: string; pos: string }>(); // "TEAM|namekey" -> nflverse id

@@ -11,6 +11,7 @@
 // 4. Graded later: did DraftKings move toward our new number by tip (line or
 //    no-vig chance), and did the side win.
 
+import { isOut } from "@/lib/injuries/status";
 import type { PropMarket } from "@/lib/props/parse";
 import { implied } from "@/lib/props/parse";
 import { noVig } from "./market";
@@ -56,15 +57,15 @@ export interface StatusChange {
 
 /**
  * Changes since the last read. `prev` is athlete id -> status at the last
- * read; a player missing from the feed is available. Only "Out" counts as out,
- * the same rule the model uses.
+ * read; a player missing from the feed is available. Out, Doubtful and the like
+ * count as out (lib/injuries/status.ts), the same rule the model uses.
  */
 export function changes(prev: { [id: string]: string }, now: FeedEntry[], names: { [id: string]: { name: string; team: string } } = {}): StatusChange[] {
   const cur = new Map(now.map((e) => [e.id, e]));
   const out: StatusChange[] = [];
-  for (const e of now) if (e.status === "Out" && prev[e.id] !== "Out") out.push({ id: e.id, name: e.name, team: e.team, change: "out", comment: e.comment });
+  for (const e of now) if (isOut(e.status) && !isOut(prev[e.id])) out.push({ id: e.id, name: e.name, team: e.team, change: "out", comment: e.comment });
   for (const [id, st] of Object.entries(prev))
-    if (st === "Out" && cur.get(id)?.status !== "Out") {
+    if (isOut(st) && !isOut(cur.get(id)?.status)) {
       const e = cur.get(id);
       out.push({ id, name: e?.name ?? names[id]?.name ?? id, team: e?.team ?? names[id]?.team ?? "", change: "back", comment: e?.comment ?? "no longer listed out" });
     }

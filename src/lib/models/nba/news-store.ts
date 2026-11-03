@@ -1,4 +1,5 @@
 import "server-only";
+import { isOut } from "@/lib/injuries/status";
 import { redis } from "@/lib/redis/client";
 import { etDate, nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { settle } from "@/lib/props/grade";
@@ -61,7 +62,7 @@ export async function runNbaNews(now = new Date()): Promise<string> {
   // The day's first read is the baseline: everything on it was known this morning.
   if (!Object.keys(prev).length) {
     await save();
-    return `baseline: ${feed.filter((e) => e.status === "Out").length} out on ${teams.size} teams`;
+    return `baseline: ${feed.filter((e) => isOut(e.status)).length} out on ${teams.size} teams`;
   }
   delete prev["_"];
 
@@ -78,7 +79,7 @@ export async function runNbaNews(now = new Date()): Promise<string> {
     return rotationPlayer(entries[c.id], pr && pr.games ? pr.min / pr.games : null);
   });
   const lines: string[] = [];
-  const outIds = new Set(feed.filter((e) => e.status === "Out").map((e) => e.id));
+  const outIds = new Set(feed.filter((e) => isOut(e.status)).map((e) => e.id));
   const backIds = new Set(news.filter((c) => c.change === "back").map((c) => c.id));
   const byGame = new Map<string, StatusChange[]>();
   for (const c of news) {

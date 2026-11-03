@@ -1,4 +1,5 @@
 import "server-only";
+import { isOut } from "@/lib/injuries/status";
 import { redis } from "@/lib/redis/client";
 import { etDate, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "@/lib/props/grade";
@@ -231,7 +232,7 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
           if (!a.id) continue;
           names.set(a.id, { name: a.fullName ?? "", team: t.abbr });
           pos.set(a.id, a.position?.abbreviation ?? "");
-          if ((a.injuries?.some((i) => i.status === "Out") || opts.extraOut?.has(a.id)) && !opts.extraIn?.has(a.id)) out.add(a.id);
+          if ((a.injuries?.some((i) => isOut(i.status)) || opts.extraOut?.has(a.id)) && !opts.extraIn?.has(a.id)) out.add(a.id);
         }
       }
       // Available: who is likely to play, as the backtest had it (the players
@@ -320,7 +321,15 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
       for (const t of [away, home]) {
         const mine = rosterIds.filter((id) => names.get(id)!.team === t.abbr);
         const lastDate = mine.flatMap((id) => (entries[id]?.games ?? []).filter((x) => x.team === t.abbr).map((x) => x.date)).sort().at(-1);
-        lastStarters[t.abbr] = mine.filter((id) => entries[id]?.games.some((x) => x.date === lastDate && x.team === t.abbr && x.starter)).map((id) => ({ id, pos: pos.get(id) ?? "" }));
+        const last = mine.filter((id) => entries[id]?.games.some((x) => x.date === lastDate && x.team === t.abbr && x.starter));
+        // A starter back from injury (Jack, 2026-11-02): started each of his own last 3 games for this team (or all of them, if fewer). With him the five keep the most projected minutes.
+        const back = mine.filter((id) => {
+          if (last.includes(id)) return false;
+          const gs = (entries[id]?.games ?? []).filter((x) => x.team === t.abbr).slice(-3);
+          return gs.length > 0 && gs.every((x) => x.starter);
+        });
+        const five = back.length ? [...last, ...back].sort((a, b) => (proj.get(b)?.min ?? 0) - (proj.get(a)?.min ?? 0)).slice(0, 5) : last;
+        lastStarters[t.abbr] = five.map((id) => ({ id, pos: pos.get(id) ?? "" }));
       }
       const fbNames = new Map([...names].map(([id, v]) => [id, { ...v, pos: pos.get(id) ?? "" }]));
       const fb = fbDk.length ? fbBoard(home.abbr, away.abbr, fbDk, lastStarters, fbNames, fbTables, FBP) : null;

@@ -1,4 +1,5 @@
 import "server-only";
+import { isOut } from "@/lib/injuries/status";
 import { redis } from "@/lib/redis/client";
 import { samTeam, firstTouchdown, grade, type EspnScoringPlay, type Graded } from "@/lib/firsttd/grade";
 import { kalshiFirstTd, type KalshiGame } from "@/lib/firsttd/kalshi";
@@ -167,7 +168,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
             for (const a of g.items ?? []) {
               if (a.id && a.fullName) espnName.set(a.id, nameKey(a.fullName));
               if (!a.fullName) continue;
-              if (a.injuries?.some((i) => i.status === "Out" || i.status === "Injured Reserve")) out.add(nameKey(a.fullName));
+              if (a.injuries?.some((i) => isOut(i.status))) out.add(nameKey(a.fullName));
               else active.add(nameKey(a.fullName));
             }
           // Last 3 games plus players back from injury (team-list.ts).
