@@ -8,7 +8,7 @@ import { STAT_LABEL, type Stat } from "@/lib/props/parse";
 import { nameKey, type GradedBet } from "@/lib/props/grade";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import { marketBets, type GradedGame as FtdGradedGame } from "@/lib/firsttd/trends";
-import { bestBets, type Books } from "./nfl/ftd-price";
+import { bestBets, ftdEdge, type Books } from "./nfl/ftd-price";
 
 type Keep = Parameters<typeof marketBets>[1];
 
@@ -226,6 +226,7 @@ export function fbCandidates(boards: FbGradedBoard[]): Candidate[] {
 export const OUR_FTD_SLICES: [string, string, Keep][] = [
   ["ftdb:value", "Our chance above the best price (Kalshi, DK or FanDuel)", (p, c) => p.p > c],
   ["ftdb:value3", "Above the best price by 3+ points", (p, c) => p.p >= c + 0.03],
+  ["ftdb:gate", "The edge rule: best price 6%+ and ours above it by 2+ points (from Nov 2, 2026)", (p, c) => ftdEdge(p.p, c)],
   ["ftdb:pick", "Our most likely scorer, at the best price", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team],
   ["ftdb:short", "Best price 10% or less, ours above it", (p, c) => c <= 0.1 && p.p > c],
   ["ftdb:long", "Best price above 10%, ours above it", (p, c) => c > 0.1 && p.p > c],

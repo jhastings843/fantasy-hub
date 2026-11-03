@@ -53,6 +53,17 @@ export function bestCost(g: Books, name: string): { cost: number; where: string;
   return opts.sort((a, b) => a.cost - b.cost)[0] ?? null;
 }
 
+/**
+ * What counts as a First TD edge (Jack, 2026-11-02): the best price is 6% or
+ * shorter (about +1567 or less) and our chance beats it by 2+ points. The old
+ * rule (any amount above the price) went 2-126, -102.9u, with 111 of the 128
+ * bets priced under 6% (0-111). Thin evidence either way: judged from here on.
+ *
+ *   ftdEdge(0.12, 0.09) true · ftdEdge(0.06, 0.03) false (long shot) · ftdEdge(0.11, 0.10) false (1 pt)
+ */
+export const FTD_EDGE = { minCost: 0.06, gap: 0.02 };
+export const ftdEdge = (p: number, cost: number) => cost >= FTD_EDGE.minCost && p >= cost + FTD_EDGE.gap;
+
 type Keep = (p: FtdPlayer & { p: number }, cost: number, g: FtdGame) => boolean;
 
 /** Every bet a slice would make, one unit at the best price, graded. marketBets' counterpart for our model. */

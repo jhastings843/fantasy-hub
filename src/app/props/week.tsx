@@ -20,7 +20,7 @@ import { getOurFtdView, type OurFtdStored } from "@/lib/models/nfl/ftd-store";
 import { noVig } from "@/lib/models/nba/market";
 import { OUR_FTD_SLICES, ourSliceBets, record } from "@/lib/models/learn";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
-import { bestBets, bestCost, bookPrice } from "@/lib/models/nfl/ftd-price";
+import { bestBets, bestCost, bookPrice, ftdEdge } from "@/lib/models/nfl/ftd-price";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats, type Stat } from "../picks/board";
@@ -824,7 +824,7 @@ async function FirstTdWeek({ season }: { season: number }) {
       pricedPlayers(g.game).flatMap((p): Edge[] => {
         const b = best(g, p.name);
         const c = b?.cost ?? null;
-        if (c === null || p.p <= c) return [];
+        if (c === null || !ftdEdge(p.p, c)) return [];
         const team = g.game.teams.find((t) => t.team === p.team)!;
         const k = kalshi(g, p.name);
         const d = dkPrice(g, p.name);

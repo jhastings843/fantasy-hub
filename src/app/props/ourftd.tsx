@@ -4,7 +4,7 @@ import { updated } from "./updated";
 import { nameKey } from "@/lib/props/grade";
 import { getOurFtdView, type OurFtdStored, type OurFtdView } from "@/lib/models/nfl/ftd-store";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
-import { bestBets, bestCost } from "@/lib/models/nfl/ftd-price";
+import { bestBets, bestCost, ftdEdge } from "@/lib/models/nfl/ftd-price";
 import { GameTable, type GameRowData } from "./week";
 import { SecHead } from "../picks/board";
 import { OUR_FTD_SLICES } from "@/lib/models/learn";
@@ -29,7 +29,7 @@ function Card({ g }: { g: OurFtdStored }) {
     const cost = k?.ask ? kalshiCost(k.ask) : null;
     const dk = g.dk?.prices[nameKey(p.name)];
     const b = bestCost(g, p.name);
-    return { p, cost, dk, value: b !== null && p.p > b.cost };
+    return { p, cost, dk, value: b !== null && ftdEdge(p.p, b.cost) };
   });
   const values = rows.filter((r) => r.value).length;
   const r = g.result;
@@ -150,10 +150,10 @@ export async function OurFtdResults({ season }: { season: number }) {
             rows={[...v.graded]
               .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? ""))
               .map((x): GameRowData => {
-                // The same bets bestBets grades: every priced player whose chance beats his best price.
+                // Every priced player who clears the edge rule (ftd-price.ts ftdEdge) at his best price.
                 const bets = pricedPlayers(x.game).flatMap((pl) => {
                   const c = bestCost(x, pl.name);
-                  return c && c.cost < 1 && pl.p > c.cost ? [{ pl, c, win: x.result.key === pl.key, net: x.result.key === pl.key ? (1 - c.cost) / c.cost : -1 }] : [];
+                  return c && c.cost < 1 && ftdEdge(pl.p, c.cost) ? [{ pl, c, win: x.result.key === pl.key, net: x.result.key === pl.key ? (1 - c.cost) / c.cost : -1 }] : [];
                 });
                 const won = bets.filter((b) => b.win).length;
                 const units = bets.reduce((a, b) => a + b.net, 0);

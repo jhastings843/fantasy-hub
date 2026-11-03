@@ -30,3 +30,13 @@ describe("best First TD price", () => {
     expect(bets[0].net).toBeCloseTo(6.5, 6);
   });
 });
+
+import { ftdEdge } from "./ftd-price";
+describe("ftdEdge", () => {
+  it("needs a price of 6%+ and 2+ points above it", () => {
+    expect(ftdEdge(0.12, 0.09)).toBe(true);
+    expect(ftdEdge(0.06, 0.03)).toBe(false);
+    expect(ftdEdge(0.11, 0.1)).toBe(false);
+    expect(ftdEdge(0.08, 0.06)).toBe(true);
+  });
+});
