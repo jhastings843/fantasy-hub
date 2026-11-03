@@ -41,10 +41,13 @@ export interface StakedToday {
 }
 
 /** Every prop a live learner slice bets today and that hasn't started, across all prop sections. */
-export async function stakedPropsToday(now = new Date()): Promise<StakedToday> {
-  const today = etDate(now);
-  const nfl = nflSeasonOf(now);
-  const nba = nbaSeasonOfDate(now);
+export async function stakedPropsToday(at = new Date(), opts: { since?: Date } = {}): Promise<StakedToday> {
+  const today = etDate(at);
+  const nfl = nflSeasonOf(at);
+  const nba = nbaSeasonOfDate(at);
+  // "Not started" is judged at `since` (default: now). The Today tab passes the
+  // start of the day so bets in play still show; graded games still drop out.
+  const now = opts.since ?? at;
   const problems: string[] = [];
   const ids: [string, number][] = [
     [PROPS_SECTION.nfl, nfl],
@@ -71,7 +74,7 @@ export async function stakedPropsToday(now = new Date()): Promise<StakedToday> {
   };
   const labels = (id: string) => Object.fromEntries((E.get(id) ?? []).map((e) => [e.id, e.label]));
 
-  const nbaBoard = on(OUR_SECTION.nbaProps) || on(OUR_SECTION.nbaFirstBasket) || on(SECTIONS.nbaLotto) || on(SECTIONS.nbaKotc) ? getOurNbaView(nba, now).then((v) => v.board) : null;
+  const nbaBoard = on(OUR_SECTION.nbaProps) || on(OUR_SECTION.nbaFirstBasket) || on(SECTIONS.nbaLotto) || on(SECTIONS.nbaKotc) ? getOurNbaView(nba, at).then((v) => v.board) : null;
   const ftdBoard = on(OUR_SECTION.nflFirstTd) || on(SECTIONS.nflAttd) ? getOurFtdView(nfl).then((v) => v.board) : null;
 
   const parts = await Promise.all([

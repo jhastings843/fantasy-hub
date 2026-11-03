@@ -7,6 +7,7 @@ import { nbaGameHref, readGame } from "../picks/nba/NbaView";
 import { findGame, scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { TeamLogo, type LogoLeague } from "@/components/TeamLogo";
+import { stakedNbaToday, stakedPropsToday, type StakedBet } from "@/lib/props/staked";
 import { loadProducts } from "../props/top";
 import { ModelGrid, PageHead, SecHead, Stats, statusChip, type ModelRow } from "../picks/board";
 import { LEAGUE_NAME, kickoffEt, line, price, rec } from "../picks/ui";
@@ -83,6 +84,34 @@ function footballSlips(r: PicksReport): Slip[] {
   return out;
 }
 
+/**
+ * Staked props and NBA bets (lib/props/staked.ts) as slips, the football way.
+ * Only staked bets come back from there, never tracked ones. The card's chip
+ * names the section ("NBA props · 1u"); the note names the live slice.
+ */
+function stakedSlips(bets: StakedBet[], now: number): Slip[] {
+  return bets.map((b): Slip => {
+    const [away, home] = b.game.split(" at ");
+    const league: LogoLeague = b.sport === "NBA" ? "nba" : "nfl";
+    return {
+      key: `staked-${b.id}`,
+      href: b.href,
+      logos: { league, teams: home ? [{ team: away }, { team: home }] : [] },
+      league: b.sport,
+      pick: b.pick,
+      game: b.game,
+      when: kickoffEt(b.kickoff),
+      kickoff: b.kickoff,
+      state: Date.parse(b.kickoff) <= now ? "live" : "next",
+      kind: "issued",
+      tier: b.sectionName,
+      stake: b.stake,
+      price: b.price,
+      note: `${b.slice}${b.price === undefined ? ` · ${b.priceText}` : b.book && b.book !== "DraftKings" ? ` · at ${b.book}` : ""}`,
+    };
+  });
+}
+
 function SlipCard({ x }: { x: Slip }) {
   const chip =
     x.kind === "issued" ? (
@@ -138,14 +167,19 @@ function SlipCard({ x }: { x: Slip }) {
 
 export default async function TodayPage() {
   const season = seasonOf(new Date());
-  const [nfl, cfb, board, nbaView, nflProducts, nbaProducts] = await Promise.all([
+  const nowDate = new Date();
+  const [nfl, cfb, board, nbaView, nflProducts, nbaProducts, stakedProps, stakedNba] = await Promise.all([
     getPicksReport("nfl").catch(() => null),
     getPicksReport("cfb").catch(() => null),
     getNbaBoard().catch(() => null),
     getNbaPicksView().catch(() => null),
     loadProducts("nfl", season).catch(() => null),
     loadProducts("nba", season).catch(() => null),
+    // Props from the start of today, so bets in play still show; NBA picks not yet tipped (started ones are in nbaLive).
+    stakedPropsToday(nowDate, { since: new Date(nowDate.getTime() - 18 * 3_600_000) }).catch(() => ({ bets: [], problems: [] })),
+    stakedNbaToday(nowDate).catch(() => ({ bets: [], problems: [] })),
   ]);
+  const staked = stakedSlips([...stakedProps.bets, ...stakedNba.bets], nowDate.getTime());
   const reports = [nfl?.value, cfb?.value].filter((r): r is PicksReport => !!r);
   // Live scores for started football games (ESPN, free); NBA's board carries its own.
   const boards = await Promise.all(reports.map(async (r) => [r.league, r.board.some((g) => g.basis === "started" && !g.final) ? await scoreboard(r.league).catch(() => []) : []] as const));
@@ -182,8 +216,8 @@ export default async function TodayPage() {
     })
     .filter((x) => x.pick);
 
-  const live = [...football.filter((x) => x.state === "live"), ...nbaLive];
-  const next = football.filter((x) => x.state === "next");
+  const live = [...football.filter((x) => x.state === "live"), ...nbaLive, ...staked.filter((x) => x.state === "live")];
+  const next = [...football.filter((x) => x.state === "next"), ...staked.filter((x) => x.state === "next")].sort((a, b) => a.kickoff.localeCompare(b.kickoff));
   const liveStakes = live.filter((x) => x.kind === "issued");
   const issuedNext = next.filter((x) => x.kind === "issued");
 
