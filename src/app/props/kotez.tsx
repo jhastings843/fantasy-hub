@@ -9,6 +9,7 @@ import { Background, SecHead } from "../picks/board";
 import { GameTable, type GameRowData } from "./week";
 import { tvByEvent } from "@/lib/live/espn";
 import { loadKotez } from "@/lib/models/nfl/kotez-store";
+import { backers, payoutLine, type KotezPayout } from "@/lib/models/nfl/kotez-payout";
 import { nameKey } from "@/lib/props/grade";
 import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
@@ -135,6 +136,20 @@ export async function KotezWeek({ season }: { season: number }) {
   );
 }
 
+/** Our backers estimate for the winner beside DK's count: the record we will calibrate the price-squared share on. */
+function BackersCheck({ payout }: { payout: KotezPayout }) {
+  const n = backers(payout);
+  const e = payout.est;
+  return (
+    <p className={s.thin}>
+      {e
+        ? `Backers on ${e.name}: we estimated ${pct(e.share)} of the field; DK ${payout.bettors ? "says" : "paid out to about"} ${n !== null ? n.toLocaleString("en-US") : "?"}.${e.impliedEntrants ? ` If our share was right, about ${(Math.round(e.impliedEntrants / 1000) * 1000).toLocaleString("en-US")} people entered.` : ""}`
+        : `DK ${payout.bettors ? "says" : "paid out to about"} ${n !== null ? n.toLocaleString("en-US") : "?"} backers. We had no DraftKings price on him, so no estimate to compare.`}{" "}
+      <a href={payout.source}>DK Network post</a>
+    </p>
+  );
+}
+
 /** Results: each promo game, frozen at kickoff, graded on the longest TD. */
 export async function KotezResults({ season }: { season: number }) {
   const all = await loadKotez(season).catch(() => null);
@@ -160,9 +175,15 @@ export async function KotezResults({ season }: { season: number }) {
         ["Longest TD", x.gradedAt ? (x.result ? `${won} ${x.result.yards} yd` : "no TD") : "·"],
         ["We gave him", x.gradedAt && x.result ? pct(ourOn(x)) : "·"],
         ["Our value pick", p ? `${p.name} ${p.value!.toFixed(2)}x` : "none"],
+        ["DK paid", x.payout ? payoutLine(x.payout) : x.gradedAt && x.result ? "not posted yet" : "·"],
       ],
       read: !x.gradedAt ? ["Open", s.readTrack] : p && x.result?.winners.some((w) => nameKey(w.name) === nameKey(p.name)) ? ["Pick won", s.readW] : ["Pick missed", s.readPass],
-      body: <Table rows={x.rows} />,
+      body: (
+        <>
+          {x.payout && <BackersCheck payout={x.payout} />}
+          <Table rows={x.rows} />
+        </>
+      ),
     };
   });
   return (
@@ -173,7 +194,7 @@ export async function KotezResults({ season }: { season: number }) {
           <Tile value={done.length ? `${hits} of ${done.length}` : "·"} label={done.length ? "our top value pick took the crown" : "first promo game pending"} />
           <Tile value={done.length ? pct(avg) : "·"} label="average chance we gave the winner" />
         </div>
-        {rows.length ? <GameTable head={["Longest TD", "We gave him", "Our value pick"]} rows={rows} /> : <p className={s.calm}>No promo game saved yet. The next one is saved on its game day once DraftKings names it (or the Monday game if it doesn&apos;t).</p>}
+        {rows.length ? <GameTable head={["Longest TD", "We gave him", "Our value pick", "DK paid"]} rows={rows} /> : <p className={s.calm}>No promo game saved yet. The next one is saved on its game day once DraftKings names it (or the Monday game if it doesn&apos;t).</p>}
       </div>
     </section>
   );
