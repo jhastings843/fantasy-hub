@@ -5,6 +5,7 @@ import type { JournalEntry } from "./learning/review";
 import type { Push } from "@/lib/notify/pushover";
 import { fmtUnits } from "./units";
 import { priceWithBook } from "./shop";
+import type { StakedBet } from "@/lib/props/staked-core";
 
 /** A quoted price; an unquoted one is said so, never shown as -110. */
 const price = (p?: number) => (p === undefined ? "no price" : p > 0 ? `+${p}` : `${p}`);
@@ -386,15 +387,37 @@ const u = (x: number) => `${Math.round(x * 100) / 100}u`;
 const dayLabel = (date: string) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 
+/**
+ * Staked props and NBA bets (lib/props/staked.ts), one card: what to bet,
+ * the price, the stake, and the live slice or tier behind it. Empty string
+ * with none, so the email is unchanged on a day without them. Pure.
+ */
+export function stakedCard(bets: StakedBet[]): string {
+  if (!bets.length) return "";
+  const rows = bets
+    .map(
+      (b) => `<tr>
+  <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(b.pick)} (${escapeHtml(b.priceText)})<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${b.sectionName} · ${b.game} · ${when(b.kickoff)}`)}</div><div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(b.slice)}</div></td>
+  <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 13px/1.4 ${FONT};color:${PALETTE.accent};white-space:nowrap;">${b.stake}u</td>
+</tr>`,
+    )
+    .join("");
+  return card(`${label("Props and NBA · staked")}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>
+${small("Each prop is a bet because a learner slice that cleared its gate keeps it; NBA picks stake under NBA's own limits. At the price shown; check the live number before betting.")}`);
+}
+
 /** The 9am game-day email: today's bets at this morning's line, and any sent bet that is now off. */
-export function buildTodayEmail(input: { date: string; leagues: TodayLeague[]; appUrl: string; generatedAt: string; late?: boolean }): { html: string; subject: string } {
+export function buildTodayEmail(input: { date: string; leagues: TodayLeague[]; appUrl: string; generatedAt: string; late?: boolean; staked?: StakedBet[] }): { html: string; subject: string } {
   const { leagues, appUrl, late } = input;
-  const bets = betsOf(leagues);
+  const staked = input.staked ?? [];
+  const bets = betsOf(leagues) + staked.length;
+  const units = unitsOf(leagues) + staked.reduce((a, b) => a + b.stake, 0);
   const off = leagues.reduce((n, l) => n + l.diff.off.length + l.diff.totalsOff.length, 0);
   const subject = late
-    ? `Late add: ${bets} (${u(unitsOf(leagues))}) · ${dayLabel(input.date)}`
+    ? `Late add: ${bets} (${u(units)}) · ${dayLabel(input.date)}`
     : bets
-      ? `Today's bets: ${bets} (${u(unitsOf(leagues))}) · ${dayLabel(input.date)}`
+      ? `Today's bets: ${bets} (${u(units)}) · ${dayLabel(input.date)}`
       : `Today: ${off} sent bet${off === 1 ? " is" : "s are"} off · ${dayLabel(input.date)}`;
   const body = leagues
     .filter((l) => l.diff.added.length || l.diff.addedTotals.length || l.diff.off.length || l.diff.totalsOff.length)
@@ -416,7 +439,7 @@ ${totals ? `<div style="padding-top:12px;">${label("Totals")}</div><table role="
 ${diff.off.length || diff.totalsOff.length ? updateBlock(r, offOnly) : ""}
 ${small(feedsLine(r))}`);
     })
-    .join("");
+    .join("") + stakedCard(staked);
   const html = emailPage({
     title: subject,
     kicker: `${dayLabel(input.date)} · ${late ? `${new Date(input.generatedAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} ET` : "9am ET"}`,

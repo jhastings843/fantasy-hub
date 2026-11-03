@@ -11,7 +11,8 @@ import { toIssued, toIssuedUpdate } from "./issued";
 import { loadIssued } from "./issued-store";
 import { issueAndSend, loadIntent, recoverPending } from "./issue-send";
 import { weekOf } from "./parse";
-import { GAME_DAY_SLOTS, type GameDaySlot, type LateSlot, diffUpdate, lateOnly, onDate } from "./update";
+import { GAME_DAY_SLOTS, LATE_LEAD_MS, type GameDaySlot, type LateSlot, diffUpdate, lateOnly, onDate } from "./update";
+import { markEmailed, unsentStaked } from "@/lib/notify/staked";
 import { redis } from "@/lib/redis/client";
 import { RELEASE_MINUTE, etDate } from "./hold";
 import { redisStore } from "./learning/store";
@@ -224,8 +225,11 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
     return Response.json({ ok: true, skipped: true, reason: `Waiting before today's bets: ${notReady.join(", ")}.` });
   }
 
-  const matters = leagues.some(({ diff: d }) => d.added.length || d.addedTotals.length || d.off.length || d.totalsOff.length);
-  const email = buildTodayEmail({ date, leagues, appUrl, generatedAt: now.toISOString() });
+  const footballMatters = leagues.some(({ diff: d }) => d.added.length || d.addedTotals.length || d.off.length || d.totalsOff.length);
+  // Staked props and NBA bets ride in the same email (none: the email is unchanged). Not on a test.
+  const staked = test ? [] : await unsentStaked(now);
+  const matters = footballMatters || staked.length > 0;
+  const email = buildTodayEmail({ date, leagues, appUrl, generatedAt: now.toISOString(), staked });
   if (dry) return new Response(email.html, { headers: { "content-type": "text/html; charset=utf-8" } });
   // What each sport decided over, for the sizing replay: recorded on quiet
   // days too, since a different sizing might have fit a bet the limits refused.
@@ -259,8 +263,10 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
     records,
   });
   if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
-  const pushed = out.sent ? await push(todayPush({ date, leagues, appUrl })) : { pushed: false, reason: "email not sent" };
-  return Response.json({ ok: true, sent: out.sent, subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason, shop: shopNotes });
+  if (out.sent && staked.length) await markEmailed(staked, now);
+  // The football push as before; staked props and NBA bets get their own push each (notify/staked.ts).
+  const pushed = out.sent && footballMatters ? await push(todayPush({ date, leagues, appUrl })) : { pushed: false, reason: out.sent ? "no football bets; staked props push on their own" : "email not sent" };
+  return Response.json({ ok: true, sent: out.sent, subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason, shop: shopNotes, staked: staked.length });
 }
 
 /**
@@ -337,16 +343,19 @@ async function runLateAdds(input: { now: Date; date: string; season: string; day
   // A sport whose quotes are missing or stale adds nothing: a late add is judged at the line it shows.
   const fresh = (l: TodayLeague) => !l.r.reference.stale && !!l.r.reference.fetchedAt;
   const leagues = composed.leagues.filter(fresh).map((l) => ({ ...l, diff: lateOnly(l.diff, now) })).filter((l) => l.diff.added.length || l.diff.addedTotals.length);
-  if (!leagues.length) return Response.json({ ok: true, skipped: true, reason: "Today's email went out; no late adds." });
+  // Props and NBA bets staked since the last email, by football's late-add rule (none inside an hour of lock; their pushes cover that hour).
+  const staked = await unsentStaked(now, LATE_LEAD_MS);
+  if (!leagues.length && !staked.length) return Response.json({ ok: true, skipped: true, reason: "Today's email went out; no late adds." });
 
   const idem = `picks-day:${date}:late${n}`;
   const lateSlot: LateSlot = `${slot}${n}`;
-  const email = buildTodayEmail({ date, leagues, appUrl, generatedAt: now.toISOString(), late: true });
+  const email = buildTodayEmail({ date, leagues, appUrl, generatedAt: now.toISOString(), late: true, staked });
   const meta = { issuedAt: now.toISOString(), subject: email.subject };
   const records = leagues.map((l) => toIssuedUpdate(l.r, l.diff, lateSlot, meta));
-  await saveDecisionsBounded(decisionsFor(leagues, { at: now.toISOString(), sendKey: idem, date }), { season: leagues[0].r.season, sendKey: idem, at: now.toISOString() });
+  if (leagues.length) await saveDecisionsBounded(decisionsFor(leagues, { at: now.toISOString(), sendKey: idem, date }), { season: leagues[0].r.season, sendKey: idem, at: now.toISOString() });
   const out = await issueAndSend({ logId: "picks-day-late", season, week: day * 10 + n, subject: email.subject, html: email.html, idempotencyKey: idem, records });
   if (out.outcome === "failed") return Response.json({ ok: false, error: out.error, issued: out.issued }, { status: 500 });
-  const pushed = out.sent ? await push(todayPush({ date, leagues, appUrl, late: true })) : { pushed: false, reason: "email not sent" };
-  return Response.json({ ok: true, sent: out.sent, subject: email.subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason });
+  if (out.sent && staked.length) await markEmailed(staked, now);
+  const pushed = out.sent && leagues.length ? await push(todayPush({ date, leagues, appUrl, late: true })) : { pushed: false, reason: out.sent ? "no football late adds; staked props push on their own" : "email not sent" };
+  return Response.json({ ok: true, sent: out.sent, subject: email.subject, date, season, issued: out.issued, pushed: pushed.pushed, pushNote: pushed.reason, staked: staked.length });
 }

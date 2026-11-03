@@ -47,3 +47,26 @@ describe("late-add email", () => {
     expect(todayPush({ date: "2026-10-31", leagues, appUrl: "https://x", late: true }).title).toBe("Late add: 1 · 2u");
   });
 });
+
+describe("staked props and NBA bets in the email", () => {
+  const leagues: TodayLeague[] = [{ r: r("nfl"), diff: diff({ added: [tb] }) }];
+  const prop = { id: "p", section: "nba-props-ours", sectionName: "NBA props", sport: "NBA" as const, game: "BOS at NYK", player: "Jalen Brunson", pick: "Jalen Brunson Under 27.5 pts", market: "pts", priceText: "-110 DraftKings", price: -110, kickoff: "2026-10-16T00:30:00Z", slice: "Edges on the under", stake: 1, href: "/props?m=nba" };
+  it("none staked: the email is byte for byte what it was", () => {
+    const a = buildTodayEmail({ date: "2026-10-15", leagues, appUrl: "https://x", generatedAt: "2026-10-15T13:00:00Z" });
+    const b = buildTodayEmail({ date: "2026-10-15", leagues, appUrl: "https://x", generatedAt: "2026-10-15T13:00:00Z", staked: [] });
+    expect(b).toEqual(a);
+    expect(a.html).not.toContain("Props and NBA");
+  });
+  it("adds a card and counts them in the subject", () => {
+    const e = buildTodayEmail({ date: "2026-10-15", leagues, appUrl: "https://x", generatedAt: "2026-10-15T13:00:00Z", staked: [prop] });
+    expect(e.subject).toBe("Today's bets: 2 (3u) · Thu, Oct 15");
+    expect(e.html).toContain("Props and NBA · staked");
+    expect(e.html).toContain("Jalen Brunson Under 27.5 pts (-110 DraftKings)");
+    expect(e.html).toContain("Edges on the under");
+    expect(e.html).not.toContain("—");
+  });
+  it("a props-only day is still today's bets, and a props-only late add says so", () => {
+    expect(buildTodayEmail({ date: "2026-10-15", leagues: [], appUrl: "https://x", generatedAt: "2026-10-15T13:00:00Z", staked: [prop] }).subject).toBe("Today's bets: 1 (1u) · Thu, Oct 15");
+    expect(buildTodayEmail({ date: "2026-10-15", leagues: [], appUrl: "https://x", generatedAt: "2026-10-15T18:00:00Z", late: true, staked: [prop] }).subject).toBe("Late add: 1 (1u) · Thu, Oct 15");
+  });
+});
