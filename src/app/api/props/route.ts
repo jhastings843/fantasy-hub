@@ -1,3 +1,4 @@
+import { watchProblems } from "@/lib/notify/problems";
 import { runProps } from "@/lib/props/store";
 
 export const dynamic = "force-dynamic";
@@ -14,5 +15,6 @@ export async function GET(request: Request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const report = await runProps();
+  await watchProblems("Props capture", report.problems);
   return Response.json({ ok: report.problems.length === 0, report });
 }

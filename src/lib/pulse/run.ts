@@ -1,3 +1,4 @@
+import { watchProblems } from "@/lib/notify/problems";
 import "server-only";
 import { runNbaNews } from "@/lib/models/nba/news-store";
 import { runSamCbbWatch } from "@/lib/models/cbb/sam-watch";
@@ -576,6 +577,8 @@ export async function runPulse(
   // advice that is stale until lunch.
   if (claimed && jobs.every((j) => j.ok)) await recordTierRun(tier);
   jobs.push(news, sam, skips, pool, cbb, samCbb, staked);
+  // A job failing three pulses in a row pushes once (notify/problems.ts).
+  await Promise.all(jobs.map((j) => watchProblems(`Pulse ${j.job}`, j.ok ? [] : [j.error ?? "failed"])));
 
   const receipt: PulseReceipt = {
     at: new Date().toISOString(),
