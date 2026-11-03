@@ -4,6 +4,7 @@ import type { UpdateDiff } from "./update";
 import type { JournalEntry } from "./learning/review";
 import type { Push } from "@/lib/notify/pushover";
 import { fmtUnits } from "./units";
+import { forwardNote } from "./forward";
 import { priceWithBook } from "./shop";
 import type { StakedBet } from "@/lib/props/staked-core";
 
@@ -184,6 +185,7 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
   const ruleLine = st.rule
     ? `Rule: ${st.rule.label.toLowerCase()}, ${rec(st.rule.record)} in the backtest.${st.second ? ` Tier 2: ${st.second.label.toLowerCase()}, ${rec(st.second.record)} on the games it adds beyond Tier 1.` : " No Tier 2: nothing else wins on the games Tier 1 leaves."}`
     : "No cut has a big enough winning sample yet, so nothing is a bet.";
+  const fwd = forwardNote(st);
   const caveats = [
     sel.sourceOnly
       ? `${sel.sourceOnly} more fit at the sites' own lines but have no current quote, so they are research only, not plays.`
@@ -204,7 +206,7 @@ function leagueCard(r: PicksReport, sel: EmailSelection, appUrl: string): string
   return card(`${label(`${league} · Week ${r.week ?? "?"}`)}
 ${unitsLine(r)}
 ${lastWeekLine(r)}
-${paragraph(ruleLine)}
+${paragraph(ruleLine)}${fwd ? `\n${small(fwd, PALETTE.body)}` : ""}
 ${small(feedsLine(r))}
 <div style="padding-top:14px;">${label("Early looks: no stakes, not bets yet")}</div>
 ${

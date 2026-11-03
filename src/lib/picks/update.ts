@@ -149,6 +149,8 @@ export function diffUpdate(r: PicksReport, records: IssuedRecord[], now = new Da
         ? "The models now split at the current line"
         : g.tier === "wait"
           ? "Now depends on a PEM line that isn't on file"
+          : g.forwardHold
+            ? `${g.forwardHold === "t1" ? "Tier 1" : "Tier 2"} is tracked now: its forward check hasn't passed`
           : g.side && g.side !== p.side
             ? "Both models now sit on the other side"
             : `No longer fits ${p.tier === "t1" ? "Tier 1" : "Tier 2"} at the current line`;

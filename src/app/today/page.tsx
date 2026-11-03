@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPicksReport, type PicksReport } from "@/lib/picks/report";
 import { getNbaBoard } from "@/lib/picks/nba-store";
+import { forwardNote } from "@/lib/picks/forward";
+import { tierStakes } from "@/lib/picks/engine";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { nbaGameHref, readGame } from "../picks/nba/NbaView";
 import { findGame, scoreboard } from "@/lib/live/espn";
@@ -228,7 +230,7 @@ export default async function TodayPage() {
     ...reports.map((r): ModelRow => {
       const rule = r.strategies.rule;
       return rule
-        ? { name: `${LEAGUE_NAME[r.league]} spreads`, role: `Rule: ${rule.label}`, status: "active", note: `Issues Tier 1 and Tier 2 with a saved price and a stake. ${rec(rule.record)} since tracking. Sam and David feed it; neither stakes alone.` }
+        ? { name: `${LEAGUE_NAME[r.league]} spreads`, role: `Rule: ${rule.label}`, status: tierStakes(rule) || tierStakes(r.strategies.second) ? "active" : "collecting", note: `Issues Tier 1 and Tier 2 with a saved price and a stake. ${rec(rule.record)} since tracking. Sam and David feed it; neither stakes alone.${forwardNote(r.strategies) ? ` ${forwardNote(r.strategies)}` : ""}` }
         : { name: `${LEAGUE_NAME[r.league]} spreads`, role: "No rule clears the bar", status: "collecting", note: "Nothing issues until a cut clears the bar. Every game is tracked." };
     }),
     ...reports.map((r): ModelRow => {

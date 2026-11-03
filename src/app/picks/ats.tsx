@@ -2,6 +2,7 @@
 import type { BoardGame, CutResult, CutTest } from "@/lib/picks/engine";
 import { bettable, cutResult, matches } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
+import { forwardNote, holdText } from "@/lib/picks/forward";
 import type { BetRow } from "@/lib/picks/units";
 import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
@@ -89,6 +90,7 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
       <dd>
         <TierChip t={g.tier} /> {g.read?.agree ? `avg edge ${g.read.avgEdge.toFixed(1)}` : ""}
         {g.vetoedBy ? ` · skipped: ${g.vetoedBy} disagrees (veto)` : ""}
+        {g.forwardHold ? ` · ${holdText(g.forwardHold)}` : ""}
       </dd>
       {g.p !== undefined && (
         <>
@@ -378,6 +380,7 @@ function FinishedDetails({ g, r }: { g: BoardGame; r: PicksReport }) {
           <TierChip t={g.tier} /> {g.side ? pickText(g, name) : g.read && !g.read.agree ? "Sam and David split" : g.play}
           {g.read?.agree ? <span className={s.muted}>{` · avg edge ${g.read.avgEdge.toFixed(1)}, models ${g.read.modelGap.toFixed(1)} apart`}</span> : null}
           {g.vetoedBy ? <span className={s.muted}>{` · fits the rule, skipped: ${g.vetoedBy} disagrees and the review made ${g.vetoedBy === "PEM" ? "PEM" : "him"} a veto`}</span> : null}
+          {g.forwardHold ? <span className={s.muted}>{` · ${holdText(g.forwardHold)}`}</span> : null}
         </dd>
         <dt>Cuts</dt>
         <dd>
@@ -763,6 +766,7 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
                 ? ` Tier 2: ${st.second.label.toLowerCase()}, judged only on the ${n(st.second.record)} decided games it adds (${rec(st.second.record)}; whole cut ${rec(st.second.fullRecord)}).`
                 : " No Tier 2: nothing else wins on the games Tier 1 leaves."}
             </p>
+            {forwardNote(st) ? <p className={s.p}>{forwardNote(st)}</p> : null}
           </div>
           <div className={`${s.big} ${s.num}`}>
             {rec(st.rule.record)}
