@@ -6,6 +6,12 @@ name: Waiver research
 # the pulse because a web-search turn runs a minute or two and the pulse
 # shares a 50-second budget across everything it does.
 #
+# Since 2026-11-03 the research runs here on the runner (15-minute budget),
+# not in the Vercel route (5-minute ceiling): a single redraft search turn
+# ran past 3.5 minutes that morning. Until the runner has its secrets
+# (ANTHROPIC_API_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN) the
+# job falls back to the old route call.
+#
 # GitHub cron is UTC. 13:00 UTC is 9am EDT (8am EST); 00:00 UTC Wednesday is
 # 8pm EDT Tuesday (7pm EST).
 
@@ -25,18 +31,47 @@ on:
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
+    env:
+      APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      FORMAT: ${{ inputs.format || 'all' }}
+      FORCE: ${{ inputs.force }}
     steps:
-      - name: Research this week's waiver consensus
-        env:
-          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          FORMAT: ${{ inputs.format || 'all' }}
-          FORCE: ${{ inputs.force }}
+      - name: Which path
+        id: path
         run: |
-          # One format per request: a search turn runs a couple of minutes
-          # and the function has a five-minute ceiling, so the two formats
-          # cannot share one call.
+          if [ -n "$ANTHROPIC_API_KEY" ] && [ -n "$UPSTASH_REDIS_REST_URL" ] && [ -n "$UPSTASH_REDIS_REST_TOKEN" ]; then
+            echo "runner=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Runner secrets missing; using the Vercel route (5-minute ceiling, redraft may time out)"
+            echo "runner=0" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.path.outputs.runner == '1'
+        uses: actions/checkout@v4
+      - if: steps.path.outputs.runner == '1'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - if: steps.path.outputs.runner == '1'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.path.outputs.runner == '1'
+        run: pnpm install --frozen-lockfile
+      - name: Research on the runner
+        if: steps.path.outputs.runner == '1'
+        run: |
+          pnpm dlx tsx@4 --tsconfig scripts/tsconfig.json scripts/waiver-research.mts \
+            --format "$FORMAT" ${FORCE:+--force}
+      - name: Research through the Vercel route (fallback)
+        if: steps.path.outputs.runner != '1'
+        run: |
+          # One format per request: the function has a five-minute ceiling.
           if [ "$FORMAT" = "all" ]; then formats="dynasty redraft"; else formats="$FORMAT"; fi
           failed=0
           for f in $formats; do

@@ -25,9 +25,18 @@ const MODEL = "claude-opus-5";
  * room to spare, about 12 cents a run at $10 per 1,000 searches.
  */
 export const SEARCH_USES = 12;
-/** The route's maxDuration is 300 s. Search stops by 210 s, extraction by 285 s. */
-export const SEARCH_BUDGET_MS = 210_000;
-export const TOTAL_BUDGET_MS = 285_000;
+/**
+ * Time budgets. Inside the Vercel route (maxDuration 300 s) search stops by
+ * 210 s and extraction by 285 s. The GitHub job (scripts/waiver-research.mts)
+ * has no such ceiling and passes RUNNER_BUDGET: one redraft search turn ran
+ * past 210 s on Nov 3, 2026, so the route alone cannot always finish redraft.
+ */
+export interface ResearchBudget {
+  searchMs: number;
+  totalMs: number;
+}
+export const VERCEL_BUDGET: ResearchBudget = { searchMs: 210_000, totalMs: 285_000 };
+export const RUNNER_BUDGET: ResearchBudget = { searchMs: 12 * 60_000, totalMs: 15 * 60_000 };
 /** A resume shorter than this rarely finishes a search turn. */
 const MIN_RESUME_MS = 45_000;
 
@@ -111,6 +120,7 @@ export async function researchWaiverTargets(
   format: ResearchFormat,
   season: string,
   week: number,
+  budget: ResearchBudget = VERCEL_BUDGET,
 ): Promise<WaiverResearch> {
   // One clock for the whole run (2026-11-03: the Nov 3 redraft pass hit the
   // function's 300-second ceiling and Vercel returned a bare 504). Each call
@@ -136,12 +146,12 @@ export async function researchWaiverTargets(
       "You are a fantasy football waiver wire analyst. You read this week's published waiver columns and community threads and report their consensus faithfully, with the disagreements kept visible. You never invent a player, a role change, or a bid.",
     tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
     messages,
-  }, { timeout: left(SEARCH_BUDGET_MS) });
+  }, { timeout: left(budget.searchMs) });
   // Resume a paused turn only while there is time for it. Past the budget,
   // the paused turns' text is what gets extracted (it holds the columns
   // already read), which beats losing the whole run.
   for (let resumes = 0; response.stop_reason === "pause_turn" && resumes < 4; resumes++) {
-    if (Date.now() - started > SEARCH_BUDGET_MS - MIN_RESUME_MS) break;
+    if (Date.now() - started > budget.searchMs - MIN_RESUME_MS) break;
     messages.push({ role: "assistant", content: response.content });
     try {
       response = await client.messages.create({
@@ -150,7 +160,7 @@ export async function researchWaiverTargets(
         output_config: { effort: "medium" },
         tools: [{ type: "web_search_20260209", name: "web_search", max_uses: SEARCH_USES }],
         messages,
-      }, { timeout: left(SEARCH_BUDGET_MS) });
+      }, { timeout: left(budget.searchMs) });
     } catch (e) {
       // A resume that runs out of time keeps what the earlier turns found.
       if (!(e instanceof Anthropic.APIConnectionTimeoutError)) throw e;
@@ -186,7 +196,7 @@ export async function researchWaiverTargets(
       max_tokens: 8000,
       output_config: { effort: "low", format: zodOutputFormat(ResearchSchema) },
       messages: [{ role: "user", content: `${instruction}\n\n${prose}` }],
-    }, { timeout: left(TOTAL_BUDGET_MS) });
+    }, { timeout: left(budget.totalMs) });
     return parsed.parsed_output;
   };
   let out = await extract(

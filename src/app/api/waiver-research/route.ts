@@ -1,16 +1,10 @@
-import { getNflState } from "@/lib/sleeper/client";
-import {
-  readWaiverResearch,
-  researchWaiverTargets,
-  type ResearchFormat,
-} from "@/lib/waivers/research";
-import { friendlyAiError } from "@/lib/ai-errors";
+import { formatsFor, runWaiverResearch } from "@/lib/waivers/run-research";
 
 export const dynamic = "force-dynamic";
 
-// A web-search turn runs a minute or two. This route is called from its own
-// scheduled workflow on Tuesdays, not from the pulse, whose 50-second budget
-// is shared with everything else.
+// A web-search turn runs a minute or two, sometimes past three. The weekly
+// job now runs the research on the GitHub runner (scripts/waiver-research.mts)
+// and only falls back to this route when the runner lacks its secrets.
 export const maxDuration = 300;
 
 // POST /api/waiver-research?format=all|dynasty|redraft[&force=1]
@@ -22,37 +16,7 @@ export async function POST(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
-
   const params = new URL(request.url).searchParams;
-  const wanted = params.get("format") ?? "all";
-  const force = params.get("force") === "1";
-  const formats: ResearchFormat[] =
-    wanted === "dynasty" ? ["dynasty"] : wanted === "redraft" ? ["redraft"] : ["dynasty", "redraft"];
-
-  const state = await getNflState();
-  const results: Record<string, unknown> = {};
-  for (const format of formats) {
-    try {
-      const existing = force ? null : await readWaiverResearch(state.season, state.week, format);
-      const research = existing ?? (await researchWaiverTargets(format, state.season, state.week));
-      results[format] = {
-        ok: true,
-        cached: Boolean(existing),
-        week: research.week,
-        targets: research.targets.length,
-        generatedAt: research.generatedAt,
-        top: research.targets.slice(0, 5).map((t) => `${t.name} ${t.faabPercent ?? "?"}%`),
-      };
-    } catch (e) {
-      // Out of credit reads as a plain sentence rather than a raw 400, so the
-      // failure names its own fix.
-      const friendly = friendlyAiError(e);
-      results[format] = {
-        ok: false,
-        error: friendly ?? (e instanceof Error ? e.message : String(e)),
-      };
-    }
-  }
-  const ok = Object.values(results).every((r) => (r as { ok: boolean }).ok);
-  return Response.json({ ok, week: state.week, results }, { status: ok ? 200 : 500 });
+  const out = await runWaiverResearch(formatsFor(params.get("format")), { force: params.get("force") === "1" });
+  return Response.json(out, { status: out.ok ? 200 : 500 });
 }
