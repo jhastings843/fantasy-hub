@@ -30,6 +30,12 @@ export async function OurSpreadCard({ season }: { season: number }) {
           the biggest last-week covers ran 51.5 to 52.4% in both eras. That small overreaction may be worth more at earlier prices,
           which old data can&apos;t test. So each game is judged at the first price we had a number, and against the close.
         </p>
+        <p className={s.p}>
+          Added 2026-11-02: our own line from play by play, built without any market number. Each team gets pass and rush ratings on
+          offense and defense (EPA per play, adjusted for who they played, starting from last season pulled halfway to average), turned
+          into points with home field, rest and a new starting QB. On 2020-2026 games it missed final margins by more than the closing
+          line did and lost against the close when it disagreed, so it is tracked here only, from the first read that had it.
+        </p>
         <p className={s.p}>{`A signal earns a closer look at ${GATE.games}+ games over ${GATE.weeks}+ weeks with closing-line value above zero at t ${GATE.t}. Nothing here is bet.`}</p>
         <div className={s.tw}>
           <table className={s.table}>
