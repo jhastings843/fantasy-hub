@@ -24,7 +24,8 @@ import type { NflParams } from "@/lib/models/nfl/props";
 import type { NbaParams } from "@/lib/models/nba/props";
 import { FRESH_LEAD_MS, applyFresh, freshKey, pricedAttd, pricedProps, repriceAttd, repriceNba, repriceNfl, type FreshQuote, type Priced } from "./fresh-core";
 import { loadFreshQuotes } from "./fresh";
-import { attdStakedBets, fbStaked, kotcStaked, lottoStaked, nbaPicksStaked, ourFtdStaked, ourPropsStaked, samFtdStaked, systemStaked, tidy, limitProps, type LiveEntry, type StakedBet } from "./staked-core";
+import { attdStakedBets, fbStaked, kotcStaked, lottoStaked, nbaPicksStaked, ourFtdStaked, ourPropsStaked, samFtdStaked, sizeStakes, systemStaked, tidy, limitProps, type LiveEntry, type StakedBet } from "./staked-core";
+import type { SchemeId } from "./staking";
 
 export type { StakedBet } from "./staked-core";
 
@@ -150,7 +151,11 @@ export async function stakedPropsToday(at = new Date(), opts: { since?: Date } =
       return [];
     }
   });
-  const { bets: limited, cut } = limitProps(tidy(parts.flat()), prior);
+  // Each section's staking scheme (the learner's switch rule; flat until one switches), applied before the caps.
+  const schemes = new Map<string, SchemeId>(ids.flatMap(([id], i): [string, SchemeId][] => (states[i]?.stake ? [[id, states[i]!.stake!.scheme]] : [])));
+  const sized = sizeStakes(tidy(parts.flat()), schemes);
+  const { bets: limited, cut: capped } = limitProps(sized.bets, prior);
+  const cut = [...sized.cut, ...capped];
   const added = limited.filter((b) => !prior.some((p) => p.id === b.id));
   if (added.length) {
     const [first, ...more] = added.map((b) => JSON.stringify({ id: b.id, game: `${b.sport}|${b.game}`, stake: b.stake }));

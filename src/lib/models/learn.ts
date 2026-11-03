@@ -9,6 +9,7 @@ import { nameKey, type GradedBet } from "@/lib/props/grade";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import { marketBets, type GradedGame as FtdGradedGame } from "@/lib/firsttd/trends";
 import { bestBets, ftdEdge, type Books } from "./nfl/ftd-price";
+import { costToAmerican } from "@/lib/props/staking";
 
 type Keep = Parameters<typeof marketBets>[1];
 
@@ -74,7 +75,10 @@ export function ourSliceBets(list: GradedPropsGame[], id: string): { x: GradedPr
 }
 
 type SliceBet = ReturnType<typeof ourSliceBets>[number];
-const toBet = ({ x, bet, marketId, line }: SliceBet): Bet => ({ game: x.slug, key: `${x.week}|${x.slug}|${marketId}|${bet.side}`, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line) });
+const toBet = ({ x, bet, marketId, line }: SliceBet): Bet => {
+  const p = x.chance?.[marketId]?.[bet.side];
+  return { game: x.slug, key: `${x.week}|${x.slug}|${marketId}|${bet.side}`, week: x.week, at: x.kickoff ?? x.capturedAt ?? "", net: bet.net, toward: towardOf(bet.side, x.first?.[marketId], line), ...(p !== undefined ? { p, price: bet.price } : {}) };
+};
 
 // Venom's NFL prop boards (pass yards, rush yards, receptions; Jack, 2026-10-30).
 // No line and no side: a weekly 0-100 score for every player on the board for how
@@ -215,7 +219,7 @@ export interface FbGradedBoard {
   home: string;
   /** Our top player in the game. */
   top: string;
-  bets: { id: string; team: string; price: number; net: number }[];
+  bets: { id: string; team: string; price: number; net: number; p?: number }[];
 }
 
 export const FB_SLICES: [string, string, (b: FbGradedBoard, x: FbGradedBoard["bets"][number]) => boolean][] = [
@@ -231,7 +235,7 @@ export function fbCandidates(boards: FbGradedBoard[]): Candidate[] {
     id,
     label,
     ...(id === "fb:all" ? {} : { parent: "fb:all" }),
-    bets: boards.flatMap((b) => b.bets.filter((x) => keep(b, x)).map((x): Bet => ({ game: b.event, key: `${b.event}|${x.id}`, week: b.week, at: b.at, net: x.net }))),
+    bets: boards.flatMap((b) => b.bets.filter((x) => keep(b, x)).map((x): Bet => ({ game: b.event, key: `${b.event}|${x.id}`, week: b.week, at: b.at, net: x.net, ...(x.p !== undefined ? { p: x.p, price: x.price } : {}) }))),
   }));
 }
 
@@ -254,6 +258,6 @@ export function ourFtdCandidates(list: (FtdGradedGame & Books)[]): Candidate[] {
     id,
     label,
     ...(id === "ftdb:value" ? {} : { parent: "ftdb:value" }),
-    bets: bestBets(list, keep).map((b): Bet => ({ game: b.game.slug, key: `${b.game.week}|${b.game.slug}|${b.player}`, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000 })),
+    bets: bestBets(list, keep).map((b): Bet => ({ game: b.game.slug, key: `${b.game.week}|${b.game.slug}|${b.player}`, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000, p: b.p, price: costToAmerican(b.cost) })),
   }));
 }

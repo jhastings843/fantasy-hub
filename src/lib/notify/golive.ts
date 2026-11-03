@@ -4,7 +4,8 @@ import { push, type Push } from "./pushover";
 import type { Candidate, JournalLine, SectionState } from "@/lib/learning/engine";
 
 // Go-live alerts (Jack, 2026-11-02): one Pushover alert when a learner slice
-// goes live, is paused by its weekly loss cap, or is rolled back, in every
+// goes live, is paused by its weekly loss cap, or is rolled back, or when a
+// section's staking scheme switches (lib/props/staking.ts), in every
 // section that runs on the shared engine (lib/learning/store.ts reviewIfDue
 // calls this after it writes the journal). NBA picks' go-live gate flipping
 // on or off gets one too (notifyNbaGate). Each alert is remembered in Redis,
@@ -31,12 +32,13 @@ export const SECTION_NAME: { [id: string]: string } = {
 
 export const sectionName = (id: string) => SECTION_NAME[id] ?? id;
 
-export type AlertKind = "live" | "paused" | "rolled back";
+export type AlertKind = "live" | "paused" | "rolled back" | "stake";
 
 /** The alert a journal line asks for, or null (registrations and reviews never push). */
 export function alertKind(j: JournalLine): AlertKind | null {
   if (!j.id) return null;
   if (j.kind === "activated") return "live";
+  if (j.kind === "staking") return "stake";
   if (j.kind === "rolled back") return j.text.startsWith("Paused") ? "paused" : "rolled back";
   return null;
 }
@@ -57,6 +59,7 @@ export function alertFor(section: string, j: JournalLine, rec?: { w: number; l: 
   const what = label ?? j.id!;
   if (kind === "live")
     return { title: `Now live: ${name}`, message: `${name}: ${what} is now live${rec ? ` (${rec.w}-${rec.l}, ${signed(rec.units)})` : ""}. Its bets carry 1u from now on.` };
+  if (kind === "stake") return { title: `Stake change: ${name}`, message: `${name}: ${j.text}` };
   if (kind === "paused") return { title: `Paused: ${name}`, message: `${name}: ${j.text}` };
   return { title: `Dropped: ${name}`, message: `${name}: ${j.text} No more stakes on it.` };
 }

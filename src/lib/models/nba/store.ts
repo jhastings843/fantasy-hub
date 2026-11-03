@@ -24,6 +24,7 @@ import type { GameRatings } from "./game";
 import PARAMS from "./params.json";
 import FB_PARAMS from "./fb-params.json";
 import { live, paramsProblem, paramsVersion, primeParams } from "@/lib/models/params-store";
+import { chanceOf } from "@/lib/props/staking";
 
 // Our NBA props model, live. Each run:
 // 1. Ingests finished games it hasn't seen (ESPN summaries) into the season's
@@ -497,7 +498,7 @@ export async function gradedList(season: number): Promise<GradedPropsGame[]> {
   const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, ...carded(g, g.result), first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}) }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, ...carded(g, g.result), first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}), ...chanceOf(g.extra) }] : [])))
     .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? "") || a.slug.localeCompare(b.slug));
 }
 
@@ -509,7 +510,10 @@ export async function fbGraded(season: number): Promise<(FbGradedBoard & { board
     .flatMap(([week, games]) =>
       Object.entries(games).flatMap(([event, g]) => {
         if (!g.fb || g.fb.result === undefined) return [];
-        const bets = fbBets(g.fb).map((b) => ({ id: b.id, team: g.fb!.players.find((x) => x.id === b.id)?.team ?? "", price: b.price, net: b.net }));
+        const bets = fbBets(g.fb).map((b) => {
+          const pl = g.fb!.players.find((x) => x.id === b.id);
+          return { id: b.id, team: pl?.team ?? "", price: b.price, net: b.net, ...(pl ? { p: pl.p } : {}) };
+        });
         return [{ event, week, at: g.kickoff ?? g.capturedAt, tip: g.fb.tip, home: g.fb.home, top: g.fb.players[0]?.id ?? "", bets, board: g.fb }];
       }),
     )

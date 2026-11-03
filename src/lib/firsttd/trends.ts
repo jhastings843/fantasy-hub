@@ -48,8 +48,8 @@ export const MARKET_SLICES: [string, string, Keep][] = [
 ];
 
 /** One contract per priced player a slice keeps, at Kalshi's ask (fee in). Games without Kalshi prices are skipped. */
-export function marketBets(list: GradedGame[], keep: Keep): { game: FtdGame; kickoff?: string; cost: number; win: boolean; net: number }[] {
-  const out: { game: FtdGame; kickoff?: string; cost: number; win: boolean; net: number }[] = [];
+export function marketBets(list: GradedGame[], keep: Keep): { game: FtdGame; kickoff?: string; cost: number; win: boolean; net: number; p: number }[] {
+  const out: { game: FtdGame; kickoff?: string; cost: number; win: boolean; net: number; p: number }[] = [];
   for (const { game, result, kalshi, kickoff, capturedAt } of list) {
     if (!kalshi) continue;
     for (const p of pricedPlayers(game)) {
@@ -58,7 +58,7 @@ export function marketBets(list: GradedGame[], keep: Keep): { game: FtdGame; kic
       const cost = kalshiCost(k.ask);
       if (cost >= 1 || !keep(p, cost, game)) continue;
       const win = isPlayer(result, p);
-      out.push({ game, kickoff: kickoff ?? capturedAt, cost, win, net: win ? (1 - cost) / cost : -1 });
+      out.push({ game, kickoff: kickoff ?? capturedAt, cost, win, net: win ? (1 - cost) / cost : -1, p: p.p });
     }
   }
   return out;

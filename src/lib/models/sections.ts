@@ -99,7 +99,7 @@ export function attdCandidates(games: (AttdGraded & { at: string })[], venom?: M
         const t = g.result[r.key];
         if (r.dk === undefined || t === null || t === undefined) return [];
         if (!inSlice(ATTD_MEMBERS, id, { ours: r.anytime, price: r.dk, ...(picks ? { venom: picks.has(r.key) } : {}) })) return [];
-        return [{ game: g.slug, key: `${g.slug}|${r.key}`, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1) }];
+        return [{ game: g.slug, key: `${g.slug}|${r.key}`, week: g.week, at: g.at, net: r3(t > 0 ? payout(r.dk) : -1), p: r.anytime, price: r.dk }];
       });
     }),
   }));
@@ -128,7 +128,7 @@ export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number
     id,
     label,
     ...(id === "lotto:value" ? {} : { parent: "lotto:value" }),
-    bets: graded.filter((r) => inSlice(LOTTO_MEMBERS, id, r)).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1) })),
+    bets: graded.filter((r) => inSlice(LOTTO_MEMBERS, id, r)).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1), p: r.ours, price: r.over })),
   }));
   // The ticket at its real stake: one per night, so it needs the long gate's patience.
   const ticket: Candidate = {
@@ -154,10 +154,10 @@ export { KOTC_QUALIFIES } from "./nba/kotc-tag";
  * him; was edge-only until 2026-10-27), graded from the board's result (null
  * when no prop qualifies, the game isn't graded yet, or he didn't play).
  */
-export function taggedProp(boards: OurStoredProps[], name: string): { id: string; net: number } | null {
+export function taggedProp(boards: OurStoredProps[], name: string): { id: string; net: number; p: number; price: number } | null {
   const t = bestTag(boards, name);
   const g = t ? gradeTag(t) : null;
-  return g ? { id: g.id, net: g.net } : null;
+  return t && g ? { id: g.id, net: g.net, p: t.ours, price: t.price } : null;
 }
 
 const KOTC_SLICES: [string, string, number][] = [
@@ -178,7 +178,7 @@ export function kotcCandidates(nights: KotcNight[], boards: OurStoredProps[], se
       const mine = boards.filter((b) => n.games.some((g) => g.id === b.espnId));
       return n.board.rows.slice(0, top).flatMap((row): Bet[] => {
         const t = taggedProp(mine, row.name);
-        return t ? [{ game: n.date, week: nbaWeek(new Date(n.firstTip), season), at: n.firstTip, net: r3(t.net) }] : [];
+        return t ? [{ game: n.date, week: nbaWeek(new Date(n.firstTip), season), at: n.firstTip, net: r3(t.net), p: t.p, price: t.price }] : [];
       });
     }),
   }));

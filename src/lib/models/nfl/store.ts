@@ -19,6 +19,7 @@ import { morningOddsReads } from "./odds-api-store";
 import { projectNflGame, type NflParams, type NflPlayerInput, type NflProjection, type NflStat } from "./props";
 import PARAMS from "./params.json";
 import { live, paramsProblem, paramsVersion, primeParams } from "@/lib/models/params-store";
+import { chanceOf } from "@/lib/props/staking";
 
 // Our NFL props model, live. Each run:
 // 1. Reads this season's weekly player stats from nflverse (the release CSV,
@@ -313,7 +314,7 @@ export async function nflGradedList(season: number): Promise<GradedPropsGame[]> 
   const nums = ((await redis.smembers(NK.weeks(season))) ?? []).map(Number);
   const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
   return weeks
-    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}) }] : [])))
+    .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, game: g.game, result: g.result, first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}), ...chanceOf(g.extra) }] : [])))
     .sort((a, b) => b.week - a.week || (b.kickoff ?? "").localeCompare(a.kickoff ?? ""));
 }
 

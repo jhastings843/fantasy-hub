@@ -15,6 +15,7 @@ import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
 import { tvByEvent } from "@/lib/live/espn";
 import s from "../picks/picks.module.css";
+import { StakingBlock } from "./learning";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
@@ -432,7 +433,7 @@ export async function AttdWeek({ season }: { season: number }) {
 }
 
 export async function AttdResults({ season }: { season: number }) {
-  const graded = await attdGraded(season).catch(() => null);
+  const [graded, learning] = await Promise.all([attdGraded(season).catch(() => null), getAttdLearning(season).catch(() => null)]);
   if (!graded) return <p className={s.calm}>Anytime TD results couldn&apos;t be read just now.</p>;
   const venomWeeks = new Map(await Promise.all([...new Set(graded.map((g) => g.week))].map(async (w) => [w, await loadVenomChances(season, w).catch(() => new Map<string, number>())] as const)));
   const sum = summarizeAttd(graded);
@@ -449,6 +450,11 @@ export async function AttdResults({ season }: { season: number }) {
           <Tile value={p.n ? `${p.hits} of ${p.n}` : "·"} label={p.n ? `priced players scored · we said ${p.ours.toFixed(0)}, DK ${p.dk.toFixed(0)}` : "priced players scored"} />
         </div>
       </div>
+      {learning?.staking && (
+        <div className={s.pageFrame}>
+          <StakingBlock v={learning} />
+        </div>
+      )}
       <ParlayRecord season={season} />
       <NightRecord season={season} />
       {graded.length > 0 && (

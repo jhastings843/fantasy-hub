@@ -16,6 +16,7 @@ import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats } from "../picks/board";
 import { GameTable, type GameRowData } from "./week";
 import s from "../picks/picks.module.css";
+import { StakingBlock } from "./learning";
 import k from "./props.module.css";
 
 const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
@@ -350,7 +351,7 @@ function nightRow(x: KotcNight, boards: OurStoredProps[]): GameRowData {
 }
 
 export async function KotcResults({ season }: { season: number }) {
-  const [nights, boards] = await Promise.all([getKotcNights(season).catch(() => null), allBoards(season).catch(() => [] as OurStoredProps[])]);
+  const [nights, boards, learning] = await Promise.all([getKotcNights(season).catch(() => null), allBoards(season).catch(() => [] as OurStoredProps[]), getNbaSectionLearning(SECTIONS.nbaKotc, season).catch(() => null)]);
   if (!nights) return <p className={s.calm}>King of the Court couldn&apos;t be read just now.</p>;
   const graded = nights.filter((x) => x.result).sort((a, b) => b.date.localeCompare(a.date));
   const n = graded.length;
@@ -375,6 +376,11 @@ export async function KotcResults({ season }: { season: number }) {
           { k: "Backtest", v: "22% / 29%", sub: "favorite led vs chance given, 82 nights of 2025-26", small: true },
         ]}
       />
+      {learning?.staking && (
+        <div className={s.pageFrame}>
+          <StakingBlock v={learning} />
+        </div>
+      )}
       {n > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Night by night" aside="Newest first · our top 10's tagged props at 1u · open a night for each tag" />

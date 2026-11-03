@@ -20,6 +20,8 @@
 //
 // Pure: lib/learning/store.ts does the Redis side.
 
+import { decideScheme, stakingBase, stakingTable, SCHEME, type StakeChoice, type StakingTable } from "@/lib/props/staking";
+
 export interface Bet {
   /** Game key; bets with the same key share one unit of evidence. */
   game: string;
@@ -32,6 +34,10 @@ export interface Bet {
   toward?: number;
   /** Unique id of the bet (game, player, market, side). Slices whose bets carry one can be combined by the learner. */
   key?: string;
+  /** Our saved win chance on the side, when the section saves one: lets lib/props/staking.ts size the bet other ways. */
+  p?: number;
+  /** The saved American price the bet is graded at (cost-priced bets converted), for the same. */
+  price?: number;
 }
 
 export interface Candidate {
@@ -100,6 +106,8 @@ export interface SectionState {
   lastReviewSlate?: string;
   /** Slices the learner proposed itself: the bets two base slices share. */
   generated?: Generated[];
+  /** How the section's live bets are staked (lib/props/staking.ts switch rule); absent = flat 1u. */
+  stake?: StakeChoice;
 }
 
 /** A combined slice: the bets base slice `a` shares with base slice `b`, judged against `a`. */
@@ -168,7 +176,7 @@ function proposeCombos(gate: Gate, s: SectionState, base: Candidate[], ev: Map<s
 export interface JournalLine {
   at: string;
   week: number;
-  kind: "registered" | "activated" | "rolled back" | "review";
+  kind: "registered" | "activated" | "rolled back" | "review" | "staking";
   id?: string;
   text: string;
 }
@@ -372,6 +380,15 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     state = register(state, expand(state, base), now, week).state;
     journal.push({ at: now, week, kind: "registered", text: `Proposed ${combos.length} combined slice${combos.length > 1 ? "s" : ""}: ${combos.map((c) => c.label).join("; ")}. Each counts games from today and must beat the slice it narrows.` });
   }
+  // Staking: the switch rule on the section's widest slice (staking.ts). Only staked bets use it.
+  const base0 = stakingBase(base);
+  if (base0) {
+    const d = decideScheme(base0.bets, prev.stake?.scheme ?? "flat");
+    if (d.changed) {
+      state = { ...state, stake: { scheme: d.scheme, at: now, why: d.why } };
+      journal.push({ at: now, week, kind: "staking", id: `stake:${d.scheme}`, text: `Stakes now ${SCHEME[d.scheme].label.toLowerCase()}: ${d.why}.` });
+    }
+  }
   return { state, journal, evidence: ev };
 }
 
@@ -508,6 +525,8 @@ export interface SectionView {
   lastReviewWeek?: number;
   entries: EntryView[];
   journal: JournalLine[];
+  /** Every staking scheme on the section's widest slice (absent when no saved chance to size by). */
+  staking?: StakingTable;
 }
 
 /** What a page shows for a section, computed fresh from the saved state and today's data. */
@@ -526,7 +545,9 @@ export function sectionView(gate: Gate, s: SectionState, base: Candidate[], jour
     const l = bets.filter((b) => b.net < 0).length;
     return { ...e, status, ev, live: { bets: bets.length, w, l, p: bets.length - w - l, units: r2(bets.reduce((a, b) => a + b.net, 0)), games: new Set(bets.map((b) => b.game)).size } };
   });
-  return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal };
+  const sb = stakingBase(base);
+  const staking = sb ? stakingTable(sb, s.stake?.scheme ?? "flat", s.stake?.at) : undefined;
+  return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal, ...(staking ? { staking } : {}) };
 }
 
 /**

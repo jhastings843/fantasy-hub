@@ -12,6 +12,7 @@ import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } fro
 import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
+import { StakingBlock } from "./learning";
 
 const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
 const am = (p: number) => (p > 0 ? `+${p.toLocaleString("en-US")}` : `${p}`);
@@ -250,7 +251,7 @@ export async function LottoToday({ season }: { season: number }) {
 }
 
 export async function LottoResults({ season }: { season: number }) {
-  const d = await load(season);
+  const [d, learning] = await Promise.all([load(season), getNbaSectionLearning(SECTIONS.nbaLotto, season).catch(() => null)]);
   if (!d) return <p className={s.calm}>Lottos couldn&apos;t be read just now.</p>;
   const sum = summarize(d.rungs, d.tickets);
   const r = sum.rungs;
@@ -267,6 +268,11 @@ export async function LottoResults({ season }: { season: number }) {
           <Tile value={r.n ? `${r.hits} of ${r.n}` : "·"} label={r.n ? `every long rung hit · we expected ${r.ours.toFixed(0)}, DK's prices ${r.book.toFixed(0)}` : "every long rung · first grades pending"} />
         </div>
       </div>
+      {learning?.staking && (
+        <div className={s.pageFrame}>
+          <StakingBlock v={learning} />
+        </div>
+      )}
       {nights.length > 0 && (
         <div className={s.pageFrame}>
           <SecHead title="Night by night" aside="Newest first · both records each night · open a night for the ticket and every edge rung" />

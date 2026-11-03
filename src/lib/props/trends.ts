@@ -38,6 +38,8 @@ export interface GradedPropsGame {
   dk?: { [id: string]: { open: number; current: number } };
   /** Copy read after kickoff: why it is still trusted. */
   late?: string;
+  /** Our model's saved chance of each side per market (our boards only), for staking (lib/props/staking.ts). */
+  chance?: { [id: string]: { over: number; under: number } };
   /** Kickoff as saved with the copy; dates the week on the Money page's chart. */
   kickoff?: string;
   /** When the pregame copy was saved: the learning engine's date for a game with no kickoff. */

@@ -7,6 +7,7 @@ import type { SectionView } from "@/lib/learning/engine";
 import { whenEt } from "../picks/ui";
 import type { TrackRow } from "../picks/board";
 import s from "../picks/picks.module.css";
+import { SCHEME, SWITCH_RULE } from "@/lib/props/staking";
 
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const CLOSEST = 8;
@@ -88,6 +89,7 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
           </tbody>
         </table>
       </div>
+      <StakingBlock v={v} />
       {closest.length > 0 && (
         <div className={s.tw}>
           <table className={s.table}>
@@ -132,5 +134,57 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
         </ul>
       )}
     </>
+  );
+}
+
+const pct = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(1)}%`;
+
+/**
+ * The section's widest slice staked every way (lib/props/staking.ts), from
+ * our saved chance and the saved price: what flat 1u made and what the other
+ * schemes would have. "Bankroll" compounds each bet at 1u = 1% of bankroll.
+ */
+export function StakingBlock({ v }: { v: SectionView }) {
+  const t = v.staking;
+  if (!t || !t.rows.some((r) => r.bets > 0)) return null;
+  const test = new Map(t.tests.map((x) => [x.scheme, x]));
+  return (
+    <div className={s.tw}>
+      <table className={s.table}>
+        <caption className={s.caption}>{`Staking: ${t.baseLabel.toLowerCase()}, every graded bet sized each way`}</caption>
+        <thead>
+          <tr>
+            <th>Scheme</th>
+            <th>Bets</th>
+            <th>Units</th>
+            <th>ROI</th>
+            <th>Drawdown</th>
+            <th>Bankroll</th>
+          </tr>
+        </thead>
+        <tbody>
+          {t.rows.map((r) => (
+            <tr key={r.scheme}>
+              <td>
+                {SCHEME[r.scheme].label}
+                {r.scheme === t.inUse && <span className={s.pos}>{" · in use"}</span>}
+              </td>
+              <td className={s.num}>{r.bets}</td>
+              <td className={`${s.num} ${r.units > 0 ? s.pos : r.units < 0 ? s.neg : ""}`}>{u(r.units)}</td>
+              <td className={s.num}>{pct(r.roi)}</td>
+              <td className={s.num}>{r.drawdown ? `−${r.drawdown.toFixed(1)}u` : "0u"}</td>
+              <td className={`${s.num} ${r.logGrowth > 0 ? s.pos : r.logGrowth < 0 ? s.neg : ""}`} title={`log-growth ${r.logGrowth}${test.get(r.scheme) ? `, paired t vs flat ${test.get(r.scheme)!.t}` : ""}`}>
+                {pct(Math.exp(r.logGrowth) - 1)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className={s.dim} style={{ fontSize: 12.5, marginTop: 6 }}>
+        {`ROI is units won per unit risked. Bankroll is what the bets would have done to a bankroll at 1u = 1%, compounding. Live bets leave flat only when a scheme grows the bankroll more over ${SWITCH_RULE.minBets}+ graded bets in ${SWITCH_RULE.minWeeks}+ weeks (paired t ${SWITCH_RULE.minT}+), and go back once it falls below flat.${
+          t.missing ? ` ${t.missing} older bet${t.missing === 1 ? " has" : "s have"} no saved chance and ${t.missing === 1 ? "is" : "are"} left out.` : ""
+        }${t.inUse !== "flat" && t.since ? ` ${SCHEME[t.inUse].label} since ${whenEt(t.since)}.` : ""}`}
+      </p>
+    </div>
   );
 }

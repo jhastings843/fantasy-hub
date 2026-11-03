@@ -5,6 +5,7 @@
 
 import type { Candidate } from "@/lib/learning/engine";
 import { MARKET_SLICES, marketBets, type GradedGame } from "./trends";
+import { costToAmerican } from "@/lib/props/staking";
 
 export const FTD_SECTION = "nfl-firsttd";
 
@@ -16,6 +17,6 @@ export function ftdCandidates(list: GradedGame[]): Candidate[] {
     id,
     label,
     ...(PARENT[id] ? { parent: PARENT[id] } : {}),
-    bets: marketBets(list, keep).map((b) => ({ game: b.game.slug, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000 })),
+    bets: marketBets(list, keep).map((b) => ({ game: b.game.slug, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000, p: b.p, price: costToAmerican(b.cost) })),
   }));
 }

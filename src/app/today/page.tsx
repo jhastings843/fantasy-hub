@@ -54,6 +54,8 @@ interface Slip {
   kind: "issued" | "ready" | "tracked";
   tier: string;
   stake?: number;
+  /** The staking scheme behind a non-flat stake: "quarter Kelly". */
+  stakeNote?: string;
   price?: number;
   note?: string;
   /** Where the card opens: the game pop-up. */
@@ -109,6 +111,7 @@ function stakedSlips(bets: StakedBet[], now: number): Slip[] {
       kind: "issued",
       tier: b.sectionName,
       stake: b.stake,
+      ...(b.stakeNote ? { stakeNote: b.stakeNote } : {}),
       price: b.price,
       note: `${b.slice}${b.price === undefined ? ` · ${b.priceText}` : b.book && b.book !== "DraftKings" ? ` · at ${b.book}` : ""}${checkNote(b)}`,
     };
@@ -118,7 +121,7 @@ function stakedSlips(bets: StakedBet[], now: number): Slip[] {
 function SlipCard({ x }: { x: Slip }) {
   const chip =
     x.kind === "issued" ? (
-      <span className={`${s.readChip} ${s.readBet}`}>{`${x.tier} · ${x.stake}u`}</span>
+      <span className={`${s.readChip} ${s.readBet}`}>{`${x.tier} · ${x.stake}u${x.stakeNote ? `, ${x.stakeNote}` : ""}`}</span>
     ) : x.kind === "ready" ? (
       <span className={`${s.readChip} ${s.readPend}`}>{`${x.tier} · not sent`}</span>
     ) : (

@@ -54,7 +54,7 @@ describe("King of the Court tagged prop", () => {
   it("takes the side with the biggest gap to DK's break-even at -200 or longer, edge or not, graded from the box score", () => {
     const b = board({ "pts|Jokic": { over: 0.62, under: 0.38, games: 5 }, "ast|Jokic": { over: 0.9, under: 0.1, games: 5 }, "reb|Jokic": { over: 0.45, under: 0.55, games: 5 } }, { "pts|Jokic": 31, "reb|Jokic": 10 });
     // pts over: 62% vs 60% (+2); reb under: 55% vs 52.4% (+2.6) wins; ast over at -250 doesn't qualify, ast under +190 is far below.
-    expect(taggedProp([b], "Jokic")).toEqual({ id: "reb|Jokic", net: 0.909 });
+    expect(taggedProp([b], "Jokic")).toEqual({ id: "reb|Jokic", net: 0.909, p: 0.55, price: -110 });
     expect(taggedProp([b], "Embiid")).toBeNull();
   });
 

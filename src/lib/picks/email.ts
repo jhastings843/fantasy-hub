@@ -6,7 +6,7 @@ import type { Push } from "@/lib/notify/pushover";
 import { fmtUnits } from "./units";
 import { forwardNote, totalsForwardNote } from "./forward";
 import { priceWithBook } from "./shop";
-import type { StakedBet } from "@/lib/props/staked-core";
+import { stakeText, type StakedBet } from "@/lib/props/staked-core";
 
 /** A quoted price; an unquoted one is said so, never shown as -110. */
 const price = (p?: number) => (p === undefined ? "no price" : p > 0 ? `+${p}` : `${p}`);
@@ -401,7 +401,7 @@ export function stakedCard(bets: StakedBet[]): string {
     .map(
       (b) => `<tr>
   <td style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 14px/1.35 ${FONT};color:${PALETTE.ink};">${escapeHtml(b.pick)} (${escapeHtml(b.priceText)})<div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(`${b.sectionName} · ${b.game} · ${when(b.kickoff)}`)}</div><div style="font:400 12px/1.4 ${FONT};color:${PALETTE.muted};">${escapeHtml(b.slice)}</div></td>
-  <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 13px/1.4 ${FONT};color:${PALETTE.accent};white-space:nowrap;">${b.stake}u</td>
+  <td align="right" style="padding:7px 0;border-top:1px solid ${PALETTE.hairline};font:600 13px/1.4 ${FONT};color:${PALETTE.accent};white-space:nowrap;">${escapeHtml(stakeText(b))}</td>
 </tr>`,
     )
     .join("");

@@ -35,6 +35,7 @@ import { bestTag } from "@/lib/models/nba/kotc-tag";
 import type { KotcNight } from "@/lib/models/nba/kotc-store";
 import type { OurStoredProps } from "@/lib/models/nba/store";
 import { nbaBets, type NbaTracked } from "@/lib/picks/nba-track";
+import { SCHEME, costToAmerican, stakeFor, type SchemeId } from "./staking";
 
 export type Sport = "NFL" | "NBA";
 
@@ -64,6 +65,10 @@ export interface StakedBet {
   /** The live slice(s) or tier that make it a bet. */
   slice: string;
   stake: number;
+  /** The staking scheme that sized it, when not flat: "quarter Kelly" (lib/props/staking.ts). */
+  stakeNote?: string;
+  /** Our saved chance and the American price (cost-priced bets converted), so a non-flat scheme can size it. */
+  chance?: { p: number; price: number };
   /** Page path that shows it. */
   href: string;
   /**
@@ -154,7 +159,9 @@ export function ourPropsStaked(input: { section: string; sectionName: string; sp
         const slices = liveKeeping(entries, b.kickoff!, (id) => sideFor(id) === side);
         if (!slices.length) continue;
         const at = playPrice(m, side);
-        const bet = propBet(input, b, m, side, at, slices);
+        const p = (b.extra?.[m.id] as { over?: number; under?: number } | undefined)?.[side];
+        const bet0 = propBet(input, b, m, side, at, slices);
+        const bet = at && typeof p === "number" ? { ...bet0, chance: { p, price: at.price } } : bet0;
         out.push(b.espnId ? { ...bet, quote: { event: b.espnId, home: b.home ?? b.game.home, away: b.away ?? b.game.away, stat: m.stat } } : bet);
       }
     }
@@ -294,7 +301,7 @@ export function ourFtdStaked(input: { boards: FtdBoard[]; entries: LiveEntry[]; 
       if (!b || b.cost >= 1) return [];
       const slices = liveKeeping(input.entries, g.kickoff!, (id) => !!OUR_FTD_SLICES.find(([x]) => x === id)?.[2](p, b.cost, g.game));
       const price = b.book === "dk" ? bookPrice(g.dk, p.name) : b.book === "fd" ? bookPrice(g.fd, p.name) : null;
-      return slices.length ? [ftdBet(input.section, "NFL First TD", g, p, b.where, price ?? undefined, bookName(b.book), slices, "/props?m=ftd")] : [];
+      return slices.length ? [{ ...ftdBet(input.section, "NFL First TD", g, p, b.where, price ?? undefined, bookName(b.book), slices, "/props?m=ftd"), chance: { p: p.p, price: costToAmerican(b.cost) } }] : [];
     });
   });
 }
@@ -310,7 +317,7 @@ export function samFtdStaked(input: { boards: { game: FtdGame; kickoff?: string;
       const cost = kalshiCost(k.ask);
       if (cost >= 1) return [];
       const slices = liveKeeping(input.entries, g.kickoff!, (id) => !!MARKET_SLICES.find(([x]) => x === id)?.[2](p, cost, g.game));
-      return slices.length ? [ftdBet(input.section, "NFL First TD (Sam)", g, p, `${Math.round(cost * 100)}¢ Kalshi`, undefined, "Kalshi", slices, "/props?m=ftd")] : [];
+      return slices.length ? [{ ...ftdBet(input.section, "NFL First TD (Sam)", g, p, `${Math.round(cost * 100)}¢ Kalshi`, undefined, "Kalshi", slices, "/props?m=ftd"), chance: { p: p.p, price: costToAmerican(cost) } }] : [];
     });
   });
 }
@@ -345,6 +352,7 @@ export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: strin
           kickoff: g.kickoff!,
           slice: slices.join("; ") || "Live Anytime TD slice",
           stake: 1,
+          chance: { p: r.anytime, price: r.dk },
           href: "/props?m=attd",
           ...(g.espnId ? { quote: { event: g.espnId, home: g.game.home, away: g.game.away, stat: "anytime" } } : {}),
         },
@@ -385,6 +393,7 @@ export function fbStaked(input: { boards: (OurStoredProps | (StoredProps & { fb?
           kickoff: g.kickoff!,
           slice: slices.join("; "),
           stake: 1,
+          chance: { p: x.p, price: x.price },
           href: "/props?m=fb",
         },
       ];
@@ -418,6 +427,7 @@ export function lottoStaked(input: { rungs: Rung[]; ticket: Ticket | null; entri
       kickoff: r.at,
       slice: liveKeeping(input.entries, r.at, (id) => inSlice(LOTTO_MEMBERS, id, r)).join("; ") || "Live lotto slice",
       stake: 1,
+      chance: { p: r.ours, price: r.over },
       href: "/props?m=lotto",
     });
   }
@@ -476,6 +486,7 @@ export function kotcStaked(input: { night: KotcNight | null; boards: OurStoredPr
         kickoff: t.board.kickoff,
         slice,
         stake: 1,
+        chance: { p: t.ours, price: t.price },
         href: "/props?m=kotc",
       },
     ];
@@ -515,6 +526,40 @@ export function nbaPicksStaked(input: { games: NbaTracked[]; live: boolean; now:
       },
     ];
   });
+}
+
+// ------------------------------------------------------------------- staking
+
+/** "2u, quarter Kelly" or "1u": the stake as cards, pushes and emails show it. */
+export const stakeText = (b: Pick<StakedBet, "stake" | "stakeNote">) => `${b.stake}u${b.stakeNote ? `, ${b.stakeNote}` : ""}`;
+
+/**
+ * Sizes each bet by its section's staking scheme (stored by the learner's
+ * switch rule, lib/props/staking.ts). Flat sections, bets with no saved chance
+ * and fixed-stake bets (the lotto ticket) keep their stake. A scheme that sets
+ * 0 means no bet: it is cut and reported. Runs before limitProps, so the
+ * per-game and per-day caps see the sized stakes. Pure.
+ *
+ *   sizeStakes([{ section: "nfl-attd-ours", stake: 1, chance: { p: 0.4, price: 150 } }], new Map([["nfl-attd-ours", "kelly25"]]))
+ *     -> { bets: [{ ..., stake: 0.75, stakeNote: "quarter Kelly" }], cut: [] }
+ */
+export function sizeStakes(bets: StakedBet[], schemes: Map<string, SchemeId>): { bets: StakedBet[]; cut: string[] } {
+  const cut: string[] = [];
+  const out: StakedBet[] = [];
+  for (const b of bets) {
+    const scheme = schemes.get(b.section) ?? "flat";
+    if (scheme === "flat" || !b.chance || b.stake !== 1) {
+      out.push(b);
+      continue;
+    }
+    const stake = stakeFor(scheme, b.chance);
+    if (!(stake > 0)) {
+      cut.push(`${b.pick}: ${SCHEME[scheme].note} stakes nothing at ${b.priceText}`);
+      continue;
+    }
+    out.push({ ...b, stake, stakeNote: SCHEME[scheme].note });
+  }
+  return { bets: out, cut };
 }
 
 // ------------------------------------------------------------------- shared
@@ -621,7 +666,7 @@ export function stakedPush(b: StakedBet, appUrl: string): { title: string; messa
   const at = new Date(b.kickoff).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
   return {
     title: `${b.sectionName}: ${b.stake}u bet`,
-    message: `${b.pick} · ${b.stake}u (${checkedPrice(b)}) · ${b.game}, ${at} ET\n${b.slice}`,
+    message: `${b.pick} · ${stakeText(b)} (${checkedPrice(b)}) · ${b.game}, ${at} ET\n${b.slice}`,
     url: `${appUrl}${b.href}`,
     urlTitle: "Open",
   };
