@@ -169,6 +169,63 @@ if (!REFIT) {
   } else say("  not kept (needs both tests better and a paired gain beyond 2 SE)");
 }
 
+// Calibration candidates (2026-11-02: the live board's value bets priced under 6% went 0-111 with our sum at 3.6).
+// Each reshapes a team's listed shares (summing to 1 - other) and sends what it takes to "any other". Fit on
+// train, scored on both tests: scorer log loss given the team, and per-player predicted vs happened by band.
+type Tf = (sh: number[], p: FtdParams) => number[];
+const TF: { [fam: string]: [number, Tf][] } = {
+  // Shrink low shares toward zero: s * s / (s + h), the cut to "any other".
+  shrink: [0.002, 0.005, 0.01, 0.02, 0.03, 0.05].map((h) => [h, (sh) => sh.map((s) => (s * s) / (s + h))]),
+  // Log-odds scale on each share (as ATTD's calib), renormalized to the listed total.
+  calib: [1.05, 1.1, 1.15, 1.2, 1.3].map((a) => [a, (sh, p) => {
+    const q = sh.map((s) => (s <= 0 ? 0 : 1 / (1 + Math.exp(-a * Math.log(s / (1 - s))))));
+    const t = q.reduce((x, y) => x + y, 0) || 1;
+    return q.map((x) => ((1 - p.other) * x) / t);
+  }]),
+  // A bigger "any other": every listed share scaled down.
+  other: [0.08, 0.1, 0.12, 0.15].map((o) => [o, (sh, p) => sh.map((s) => (s * (1 - o)) / (1 - p.other))]),
+};
+const sharesT = (ls: TdLine[], p: FtdParams, tf?: Tf) => (tf ? tf(scorerShares(ls, p), p) : scorerShares(ls, p));
+const scorerLossT = (cs: Case[], p: FtdParams, tf?: Tf) => {
+  let l = 0, n = 0;
+  for (const c of cs) {
+    if (c.first.kind !== "offense") continue;
+    const sh = sharesT(c.lists[c.first.team] ?? [], p, tf);
+    const i = scorerIdx(c);
+    l -= Math.log(Math.max(i >= 0 ? sh[i] : 1 - sh.reduce((a, x) => a + x, 0), 1e-6));
+    n++;
+  }
+  return l / n;
+};
+const bandsT = (cs: Case[], p: FtdParams, tf?: Tf) => {
+  const cal: { p: number; y: number }[] = [];
+  for (const c of cs) {
+    const t = teamFirst(c.pts.home, c.pts.away, p);
+    for (const team of [c.home, c.away]) {
+      const tp = team === c.home ? t.home : t.away;
+      sharesT(c.lists[team] ?? [], p, tf).forEach((s, i) => cal.push({ p: tp * s, y: c.first.kind === "offense" && c.first.team === team && scorerIdx(c) === i ? 1 : 0 }));
+    }
+  }
+  const b = (lo: number, hi: number) => {
+    const x = cal.filter((r) => r.p >= lo && r.p < hi);
+    return `${x.reduce((a, r) => a + r.p, 0).toFixed(1)}/${x.reduce((a, r) => a + r.y, 0)} n${x.length}`;
+  };
+  return `<2% ${b(0, 0.02)}, 2-4% ${b(0.02, 0.04)}, 4-6% ${b(0.04, 0.06)}, <6% ${b(0, 0.06)}, 6-10% ${b(0.06, 0.1)}, 10%+ ${b(0.1, 1)}`;
+};
+if (!REFIT) {
+  say("\ncalibration candidates (scorer log loss given the team; bands: predicted sum / happened, n)");
+  say(`  current: train ${scorerLossT(train, P).toFixed(4)}, test 2025 ${scorerLossT(testA, P).toFixed(4)}, test 2026 ${scorerLossT(testB, P).toFixed(4)}`);
+  say(`    test 2025 ${bandsT(testA, P)}`);
+  say(`    test 2026 ${bandsT(testB, P)}`);
+  for (const [fam, opts] of Object.entries(TF)) {
+    const scored = opts.map(([v, tf]) => ({ v, tf, e: scorerLossT(train, P, tf) }));
+    for (const s of scored) say(`  ${fam} ${s.v}: train ${s.e.toFixed(4)}, test 2025 ${scorerLossT(testA, P, s.tf).toFixed(4)}, test 2026 ${scorerLossT(testB, P, s.tf).toFixed(4)}`);
+    const best = scored.sort((a, b) => a.e - b.e)[0];
+    say(`    best on train ${fam} ${best.v}: test 2025 ${bandsT(testA, P, best.tf)}`);
+    say(`    best on train ${fam} ${best.v}: test 2026 ${bandsT(testB, P, best.tf)}`);
+  }
+}
+
 function report(name: string, cs: Case[]) {
   const tl = teamLoss(cs, P);
   // Baseline: the league's rates, no market (each team even, "none" at its rate).
