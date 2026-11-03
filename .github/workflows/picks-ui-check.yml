@@ -19,11 +19,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Outside the repo: npm can't install into this pnpm workspace ("Cannot read properties of null (reading 'edgesOut')", every run since 2026-10-21).
       - name: Install a browser for the check
         run: |
-          npm i --no-save playwright@1.56.1
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y > /dev/null
+          npm i playwright@1.56.1
           npx playwright install --with-deps chromium
+          cp "$GITHUB_WORKSPACE/scripts/picks-ui-check.mjs" .
       - name: Check the live page
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: node scripts/picks-ui-check.mjs https://fantasy-hub-tan.vercel.app
+        run: cd "$RUNNER_TEMP/pw" && node picks-ui-check.mjs https://fantasy-hub-tan.vercel.app
