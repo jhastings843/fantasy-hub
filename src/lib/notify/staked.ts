@@ -2,13 +2,16 @@ import "server-only";
 import { redis } from "@/lib/redis/client";
 import { push } from "./pushover";
 import { stakedToday } from "@/lib/props/staked";
+import { takeFreshReads } from "@/lib/props/fresh";
 import { pushable, stakedPush, type StakedBet } from "@/lib/props/staked-core";
 
 // One Pushover push per staked prop or NBA bet, before lock (Jack,
 // 2026-11-02). Runs on every pulse (15 minutes): a bet is pushed the first
 // time it shows as staked with its game more than 5 minutes off, and
 // remembered under notify:v1:staked:{id} so no rerun repeats it. A bet first
-// seen inside those 5 minutes is never pushed: too late to place.
+// seen inside those 5 minutes is never pushed: too late to place. A prop the
+// fresh check covers waits for it (about an hour before lock, lib/props/fresh-core.ts)
+// and is pushed at the fresh price only if its edge is still there.
 
 const KEEP = 3 * 24 * 3600;
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app";
@@ -46,7 +49,8 @@ export const emailedKey = (id: string) => `notify:v1:emailed:${id}`;
 export async function unsentStaked(now: Date, leadMs = 0, ms = 8000): Promise<StakedBet[]> {
   const read = (async () => {
     const { bets } = await stakedToday(now);
-    const open = bets.filter((b) => Date.parse(b.kickoff) - now.getTime() >= Math.max(leadMs, 1));
+    // A prop whose fresh check found no edge (or no price) is not a bet any more.
+    const open = bets.filter((b) => Date.parse(b.kickoff) - now.getTime() >= Math.max(leadMs, 1) && b.check?.state !== "gone" && b.check?.state !== "failed");
     if (!open.length) return [];
     const seen = await Promise.all(open.map((b) => redis.exists(emailedKey(b.id)).catch(() => 0)));
     return open.filter((_, i) => !seen[i]);
@@ -59,9 +63,12 @@ export async function markEmailed(bets: StakedBet[], now = new Date()): Promise<
   await Promise.all(bets.map((b) => redis.set(emailedKey(b.id), now.toISOString(), { ex: KEEP }).catch(() => null)));
 }
 
-/** The pulse job: today's staked bets, each pushed once. */
+/** The pulse job: the fresh pre-lock reads that are due, then today's staked bets, each pushed once. */
 export async function runStakedPushes(now = new Date()): Promise<string> {
-  const { bets, problems } = await stakedToday(now);
+  let today = await stakedToday(now);
+  const fresh = await takeFreshReads(today.bets, now);
+  if (fresh.read) today = await stakedToday(now);
+  const { bets, problems } = today;
   const r = await pushStakedBets(bets, now);
-  return `${bets.length} staked today, ${r.pushed} pushed${problems.length ? `; unread: ${problems.join("; ")}` : ""}`;
+  return `${bets.length} staked today, ${r.pushed} pushed${fresh.notes.length ? `; ${fresh.notes.join("; ")}` : ""}${problems.length ? `; unread: ${problems.join("; ")}` : ""}`;
 }

@@ -17,9 +17,19 @@ import { getOurNflView } from "@/lib/models/nfl/store";
 import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { loadVenomProps } from "@/lib/models/nfl/venom";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
+import { live as liveParams, primeParams } from "@/lib/models/params-store";
+import NFL_PARAMS from "@/lib/models/nfl/params.json";
+import NBA_PARAMS from "@/lib/models/nba/params.json";
+import type { NflParams } from "@/lib/models/nfl/props";
+import type { NbaParams } from "@/lib/models/nba/props";
+import { FRESH_LEAD_MS, applyFresh, freshKey, pricedAttd, pricedProps, repriceAttd, repriceNba, repriceNfl, type FreshQuote, type Priced } from "./fresh-core";
+import { loadFreshQuotes } from "./fresh";
 import { attdStakedBets, fbStaked, kotcStaked, lottoStaked, nbaPicksStaked, ourFtdStaked, ourPropsStaked, samFtdStaked, systemStaked, tidy, limitProps, type LiveEntry, type StakedBet } from "./staked-core";
 
 export type { StakedBet } from "./staked-core";
+
+const NFL_P = liveParams("nfl-props", NFL_PARAMS as NflParams);
+const NBA_P = liveParams("nba-props", NBA_PARAMS as NbaParams);
 
 // Today's staked bets outside football's picks, read from Redis (rules in
 // staked-core.ts). Each section's learner state is read first, and its
@@ -77,6 +87,8 @@ export async function stakedPropsToday(at = new Date(), opts: { since?: Date } =
 
   const nbaBoard = on(OUR_SECTION.nbaProps) || on(OUR_SECTION.nbaFirstBasket) || on(SECTIONS.nbaLotto) || on(SECTIONS.nbaKotc) ? getOurNbaView(nba, at).then((v) => v.board) : null;
   const ftdBoard = on(OUR_SECTION.nflFirstTd) || on(SECTIONS.nflAttd) ? getOurFtdView(nfl).then((v) => v.board) : null;
+  // Kept for the fresh pre-lock check, which re-runs the same collectors on re-priced boards.
+  let nflOurs: NflOurs | null = null;
 
   const parts = await Promise.all([
     on(PROPS_SECTION.nfl)
@@ -100,6 +112,7 @@ export async function stakedPropsToday(at = new Date(), opts: { since?: Date } =
     on(OUR_SECTION.nflProps)
       ? guard("NFL props", async () => {
           const [v, venom] = await Promise.all([getOurNflView(nfl), loadVenomProps(nfl).catch(() => undefined)]);
+          nflOurs = { boards: v.board, venom };
           return ourPropsStaked({ section: OUR_SECTION.nflProps, sectionName: "NFL props", sport: "NFL", boards: v.board, entries: E.get(OUR_SECTION.nflProps)!, now, today, venom, href: "/props" });
         })
       : [],
@@ -132,14 +145,86 @@ export async function stakedPropsToday(at = new Date(), opts: { since?: Date } =
       return [];
     }
   });
-  const { bets, cut } = limitProps(tidy(parts.flat()), prior);
-  const fresh = bets.filter((b) => !prior.some((p) => p.id === b.id));
-  if (fresh.length) {
-    const [first, ...more] = fresh.map((b) => JSON.stringify({ id: b.id, game: `${b.sport}|${b.game}`, stake: b.stake }));
+  const { bets: limited, cut } = limitProps(tidy(parts.flat()), prior);
+  const added = limited.filter((b) => !prior.some((p) => p.id === b.id));
+  if (added.length) {
+    const [first, ...more] = added.map((b) => JSON.stringify({ id: b.id, game: `${b.sport}|${b.game}`, stake: b.stake }));
     await redis.sadd(dayKey, first, ...more).catch(() => 0);
     await redis.expire(dayKey, 3 * 86400).catch(() => 0);
   }
-  return { bets, problems: [...problems, ...cut.map((c) => `not staked: ${c}`)] };
+  // The fresh pre-lock check: each prop re-judged at its game's fresh quote, when there is one.
+  const quotes = await loadFreshQuotes(limited.flatMap((b) => freshKey(b) ?? []));
+  const re = await freshlyKept({ quotes, nflOurs, nbaBoard: on(OUR_SECTION.nbaProps) ? nbaBoard : null, ftdBoard: on(SECTIONS.nflAttd) ? ftdBoard : null, E, now, today }).catch((e) => {
+    problems.push(`fresh check: ${e instanceof Error ? e.message : String(e)}`);
+    return { bets: [] as StakedBet[], priced: new Map() as Priced };
+  });
+  const bets = applyFresh(limited, quotes, re.bets, re.priced);
+  // A check still pending this close to lock means the read never landed: say so (it won't push).
+  const late = at.getTime() + FRESH_LEAD_MS - 20 * 60_000;
+  const held = bets.flatMap((b) => {
+    const c = b.check;
+    if (c?.state === "gone" || c?.state === "failed") return [`not pushed: ${b.pick}: ${c.note}`];
+    if (c?.state === "pending" && Date.parse(b.kickoff) > at.getTime() && Date.parse(b.kickoff) < late) return [`not pushed: ${b.pick}: fresh price check still pending`];
+    return [];
+  });
+  return { bets, problems: [...problems, ...cut.map((c) => `not staked: ${c}`), ...held] };
+}
+
+type NflOurs = { boards: Awaited<ReturnType<typeof getOurNflView>>["board"]; venom?: Awaited<ReturnType<typeof loadVenomProps>> };
+
+/**
+ * The collectors again, on each board re-priced at its game's fresh quote
+ * (fresh-core.ts), plus the fresh price of every side the quotes priced.
+ */
+async function freshlyKept(x: {
+  quotes: Map<string, FreshQuote>;
+  nflOurs: NflOurs | null;
+  nbaBoard: Promise<Awaited<ReturnType<typeof getOurNbaView>>["board"]> | null;
+  ftdBoard: Promise<Awaited<ReturnType<typeof getOurFtdView>>["board"]> | null;
+  E: Map<string, LiveEntry[]>;
+  now: Date;
+  today: string;
+}): Promise<{ bets: StakedBet[]; priced: Priced }> {
+  if (![...x.quotes.values()].some((q) => q.ok)) return { bets: [], priced: new Map() };
+  await primeParams();
+  const quoteFor = (sport: "NFL" | "NBA", event: string | undefined, kickoff: string | undefined) => {
+    if (!event || !kickoff) return null;
+    return x.quotes.get(freshKey({ sport, kickoff, quote: { event } })!) ?? null;
+  };
+  const bets: StakedBet[] = [];
+  const priced: Priced = new Map();
+  const add = (p: Priced) => p.forEach((v, k) => priced.set(k, v));
+  if (x.nflOurs) {
+    const boards = x.nflOurs.boards.flatMap((b) => {
+      const q = quoteFor("NFL", b.espnId, b.kickoff);
+      return q?.ok && q.sport === "NFL" ? [repriceNfl(b, q.read, NFL_P)] : [];
+    });
+    if (boards.length) {
+      bets.push(...ourPropsStaked({ section: OUR_SECTION.nflProps, sectionName: "NFL props", sport: "NFL", boards, entries: x.E.get(OUR_SECTION.nflProps)!, now: x.now, today: x.today, venom: x.nflOurs.venom, href: "/props" }));
+      add(pricedProps(OUR_SECTION.nflProps, boards));
+    }
+  }
+  if (x.nbaBoard) {
+    const boards = (await x.nbaBoard).flatMap((b) => {
+      const q = quoteFor("NBA", b.espnId, b.kickoff);
+      return q?.ok && q.sport === "NBA" ? [repriceNba(b, new Map(q.lines), new Map(q.alts), NBA_P)] : [];
+    });
+    if (boards.length) {
+      bets.push(...ourPropsStaked({ section: OUR_SECTION.nbaProps, sectionName: "NBA props", sport: "NBA", boards, entries: x.E.get(OUR_SECTION.nbaProps)!, now: x.now, today: x.today, cardGames: 3, href: "/props?m=nba" }));
+      add(pricedProps(OUR_SECTION.nbaProps, boards));
+    }
+  }
+  if (x.ftdBoard) {
+    const boards = (await x.ftdBoard).flatMap((b) => {
+      const q = quoteFor("NFL", b.espnId, b.kickoff);
+      return q?.ok && q.sport === "NFL" ? [repriceAttd(b, q.read)] : [];
+    });
+    if (boards.length) {
+      bets.push(...attdStakedBets({ boards, entries: x.E.get(SECTIONS.nflAttd)!, now: x.now, today: x.today, section: SECTIONS.nflAttd }));
+      add(pricedAttd(SECTIONS.nflAttd, boards));
+    }
+  }
+  return { bets, priced };
 }
 
 /** NBA picks' staked tier bets today, not tipped (none unless the go-live gate is on). */

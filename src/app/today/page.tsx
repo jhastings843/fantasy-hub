@@ -10,6 +10,7 @@ import { findGame, scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { TeamLogo, type LogoLeague } from "@/components/TeamLogo";
 import { stakedNbaToday, stakedPropsToday, type StakedBet } from "@/lib/props/staked";
+import { checkNote } from "@/lib/props/staked-core";
 import { loadProducts } from "../props/top";
 import { ModelGrid, PageHead, SecHead, Stats, statusChip, type ModelRow } from "../picks/board";
 import { LEAGUE_NAME, kickoffEt, line, price, rec } from "../picks/ui";
@@ -109,7 +110,7 @@ function stakedSlips(bets: StakedBet[], now: number): Slip[] {
       tier: b.sectionName,
       stake: b.stake,
       price: b.price,
-      note: `${b.slice}${b.price === undefined ? ` · ${b.priceText}` : b.book && b.book !== "DraftKings" ? ` · at ${b.book}` : ""}`,
+      note: `${b.slice}${b.price === undefined ? ` · ${b.priceText}` : b.book && b.book !== "DraftKings" ? ` · at ${b.book}` : ""}${checkNote(b)}`,
     };
   });
 }

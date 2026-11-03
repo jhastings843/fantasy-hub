@@ -396,6 +396,7 @@ const dayLabel = (date: string) =>
  */
 export function stakedCard(bets: StakedBet[]): string {
   if (!bets.length) return "";
+  const provisional = bets.some((b) => b.check?.state === "pending");
   const rows = bets
     .map(
       (b) => `<tr>
@@ -406,6 +407,7 @@ export function stakedCard(bets: StakedBet[]): string {
     .join("");
   return card(`${label("Props and NBA · staked")}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:6px;">${rows}</table>
+${provisional ? small("Props are provisional, confirmed by push about an hour before lock.") : ""}
 ${small("Each prop is a bet because a learner slice that cleared its gate keeps it; NBA picks stake under NBA's own limits. At the price shown; check the live number before betting.")}`);
 }
 
