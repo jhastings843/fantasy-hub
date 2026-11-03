@@ -13,13 +13,13 @@ const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const CLOSEST = 8;
 
 /**
- * What a slice is short, in two lists (Jack, 2026-11-03): "Has −24.8u, t −1.09 · Needs a profit, t 2.33+".
+ * What a slice is short, in two lists (Jack, 2026-11-03): "t −1.09 (needs 2.33+) · lines moved our way 69, against us 77 (needs at least even)".
  * Games and weeks have their own columns. t is how sure the edge is real: 2.33 is about a 1-in-100 chance it's luck.
  */
 export function hasNeeds(short: Check[]): string {
-  const have = short.map((c) => c.have ?? c.note);
-  const need = short.map((c) => c.need).filter(Boolean);
-  return `Has ${have.join(", ")}${need.length ? ` · Needs ${need.join(", ")}` : ""}`;
+  // Units sit in their own column, and a t past the bar already means a profit.
+  const rows = short.filter((c) => c.name !== "units");
+  return (rows.length ? rows : short).map((c) => (c.have && c.need ? `${c.have} (needs ${c.need})` : c.note)).join(" · ");
 }
 
 /** Every slice the engine is measuring, for the learner log's progress section. */

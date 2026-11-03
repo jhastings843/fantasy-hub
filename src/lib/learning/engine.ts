@@ -228,6 +228,8 @@ function perGame(bets: Bet[]): Map<string, { at: string; week: number; net: numb
   return m;
 }
 
+const signT = (x: number) => (x < 0 ? `−${Math.abs(x)}` : `${x}`);
+
 /** A candidate's evidence on bets kicking off at or after `since`, judged against the gate. */
 export function evidence(gate: Gate, c: Candidate, since: string, parent?: Candidate): Evidence {
   const bets = c.bets.filter((b) => b.at >= since);
@@ -255,23 +257,23 @@ export function evidence(gate: Gate, c: Candidate, since: string, parent?: Candi
   const against = bets.filter((b) => (b.toward ?? 0) < 0).length;
   const ddCap = r2(gate.ddSd * Math.sqrt(Math.max(bets.length, 1)) + gate.ddSlack);
   const checks: Check[] = [
-    { name: "games", pass: games.size >= gate.minGames, note: `${games.size} of ${gate.minGames} games`, have: `${games.size} game${games.size === 1 ? "" : "s"}`, need: `${gate.minGames} games` },
-    { name: "weeks", pass: weeks >= gate.minWeeks, note: `${weeks} of ${gate.minWeeks} weeks`, have: `${weeks} week${weeks === 1 ? "" : "s"}`, need: `${gate.minWeeks} weeks` },
-    { name: "bets", pass: bets.length >= gate.minBets, note: `${bets.length} of ${gate.minBets} bets`, have: `${bets.length} bets`, need: `${gate.minBets} bets` },
-    ...(gate.minWins > 0 ? [{ name: "wins", pass: wins >= gate.minWins, note: `${wins} of ${gate.minWins} winners`, have: `${wins} winners`, need: `${gate.minWins} winners` }] : []),
+    { name: "games", pass: games.size >= gate.minGames, note: `${games.size} of ${gate.minGames} games`, have: `${games.size} game${games.size === 1 ? "" : "s"}`, need: `${gate.minGames}` },
+    { name: "weeks", pass: weeks >= gate.minWeeks, note: `${weeks} of ${gate.minWeeks} weeks`, have: `${weeks} week${weeks === 1 ? "" : "s"}`, need: `${gate.minWeeks}` },
+    { name: "bets", pass: bets.length >= gate.minBets, note: `${bets.length} of ${gate.minBets} bets`, have: `${bets.length} bets`, need: `${gate.minBets}` },
+    ...(gate.minWins > 0 ? [{ name: "wins", pass: wins >= gate.minWins, note: `${wins} of ${gate.minWins} winners`, have: `${wins} winners`, need: `${gate.minWins}` }] : []),
     { name: "units", pass: units > 0, note: `${units >= 0 ? "+" : ""}${units}u`, have: `${units >= 0 ? "+" : "−"}${Math.abs(units)}u`, need: "a profit" },
-    { name: "t", pass: t >= gate.minT, note: `t ${t} vs ${gate.minT}`, have: `t ${t}`, need: `t ${gate.minT}+` },
+    { name: "t", pass: t >= gate.minT, note: `t ${t} vs ${gate.minT}`, have: `t ${signT(t)}`, need: `${gate.minT}+` },
     ...(parent
-      ? [{ name: "parent", pass: (pairedT ?? 0) >= gate.minPairedT, note: `beats ${parent.label.toLowerCase()} at t ${pairedT} vs ${gate.minPairedT}`, have: `t ${pairedT} vs ${parent.label.toLowerCase()}`, need: `t ${gate.minPairedT}+ over it` }]
+      ? [{ name: "parent", pass: (pairedT ?? 0) >= gate.minPairedT, note: `beats ${parent.label.toLowerCase()} at t ${pairedT} vs ${gate.minPairedT}`, have: `t ${signT(pairedT ?? 0)} vs ${parent.label.toLowerCase().replace(/ \(.*\)$/, "")}`, need: `${gate.minPairedT}+` }]
       : []),
     {
       name: "line move",
       pass: toward + against < gate.moveMin || toward >= against,
       note: toward + against < gate.moveMin ? `${toward + against} moved lines, check starts at ${gate.moveMin}` : `${toward} toward, ${against} against`,
-      have: `lines moved our way ${toward}, against ${against}`,
-      need: "at least as many our way",
+      have: `lines moved our way ${toward}, against us ${against}`,
+      need: "at least even",
     },
-    { name: "drawdown", pass: dd <= ddCap, note: `${r2(dd)}u vs ${ddCap}u cap`, have: `a ${r2(dd)}u drop`, need: `under ${ddCap}u` },
+    { name: "drawdown", pass: dd <= ddCap, note: `${r2(dd)}u vs ${ddCap}u cap`, have: `worst drop ${r2(dd)}u`, need: `under ${ddCap}u` },
   ];
   return { id: c.id, games: games.size, weeks, bets: bets.length, wins, units, t, pairedT, drawdown: r2(dd), toward, against, checks, ready: checks.every((x) => x.pass) };
 }
