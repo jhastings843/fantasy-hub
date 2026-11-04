@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redisStore } from "@/lib/picks/learning/store";
+import { getPicksCore } from "@/lib/picks/report";
 import { getOurNflView } from "@/lib/models/nfl/store";
 import { getAttdLearning, getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { getPropsView } from "@/lib/props/store";
@@ -104,6 +105,41 @@ async function picksGroups(now: Date): Promise<Group[]> {
   }
 }
 
+interface InForce {
+  league: string;
+  market: string;
+  label: string;
+  stakes: boolean;
+  why: string;
+  href: string;
+}
+
+/**
+ * The rules behind the bets the 9am email actually sends (Jack, 2026-11-03: "don't we have some live stakes?").
+ * These are the weekly spread rule, Tier 2 and the totals rule per league, each staking only once its
+ * forward check passes (picks/forward.ts). They are not learner slices, so the forecast below doesn't list them.
+ */
+async function inForce(): Promise<{ rows: InForce[]; error?: string }> {
+  const rows: InForce[] = [];
+  const errs: string[] = [];
+  for (const l of ["nfl", "cfb"] as const) {
+    const L = l === "nfl" ? "NFL" : "CFB";
+    const href = l === "nfl" ? "/picks" : "/picks/cfb";
+    try {
+      const c = (await getPicksCore(l)).value;
+      if (!c) throw new Error("no picks data");
+      const add = (market: string, r: { label: string; forward?: { stake: boolean; reason: string } } | null | undefined) =>
+        r && rows.push({ league: L, market, label: r.label, stakes: !!r.forward?.stake, why: r.forward?.reason ?? "No forward check yet, so tracked only.", href });
+      add("Spread rule (Tier 1)", c.strategies.rule);
+      add("Spread Tier 2", c.strategies.second);
+      add("Totals rule", c.totalsBacktest.rule);
+    } catch (e) {
+      errs.push(`${L}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { rows, ...(errs.length ? { error: errs.join("; ") } : {}) };
+}
+
 const CHIP: { [k in Outlook]: { text: string; tone?: "pos" | "neg" } } = {
   live: { text: "live", tone: "pos" },
   likely: { text: "likely", tone: "pos" },
@@ -147,6 +183,7 @@ export default async function ForecastPage() {
   const season = seasonOf(now);
   const nbaSeason = nbaSeasonOfDate(now);
   const davidOnly = (id: string) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam");
+  const force = inForce();
   const groups = (
     await Promise.all([
       picksGroups(now),
@@ -163,6 +200,8 @@ export default async function ForecastPage() {
     ])
   ).flat();
 
+  const live = await force;
+  const staking = live.rows.filter((r) => r.stakes);
   const all = groups.flatMap((g) => g.rows);
   const count = (o: Outlook[]) => all.filter((f) => o.includes(f.outlook)).length;
   const top = all.filter((f) => f.outlook === "likely" || f.outlook === "possible").sort(byOutlook).slice(0, 5);
@@ -190,22 +229,47 @@ export default async function ForecastPage() {
         <section className={s.section}>
           <div className={s.tiles}>
             <div className={`${s.tile} ${s.good}`}>
+              <span className={s.tileV}>{staking.length}</span>
+              <span className={s.tileK}>rules staking now</span>
+            </div>
+            <div className={s.tile}>
               <span className={s.tileV}>{count(["live"])}</span>
-              <span className={s.tileK}>live now</span>
+              <span className={s.tileK}>learned slices live</span>
             </div>
             <div className={s.tile}>
               <span className={s.tileV}>{count(["likely", "possible"])}</span>
               <span className={s.tileK}>likely or possible</span>
-            </div>
-            <div className={s.tile}>
-              <span className={s.tileV}>{count(["long shot"])}</span>
-              <span className={s.tileK}>long shots</span>
             </div>
             <div className={`${s.tile} ${s.bad}`}>
               <span className={s.tileV}>{count(["unlikely", "out of time", "retired"])}</span>
               <span className={s.tileK}>unlikely, out of time or retired</span>
             </div>
           </div>
+        </section>
+
+        <section className={s.section}>
+          <h2 className={s.h2}>Betting now</h2>
+          <p className={s.p} style={{ marginBottom: 10 }}>
+            The rules behind the bets the 9am email sends. Each league&apos;s weekly spread rule, Tier 2 and totals rule stake once their forward check passes;
+            they are picked weekly from the best cuts, not learned slices, so they aren&apos;t in the forecast below. NBA picks aren&apos;t staked yet.
+          </p>
+          {live.error && <p className={s.p}>Couldn&apos;t load: {live.error}</p>}
+          <ul className={s.cards}>
+            {live.rows.map((r) => (
+              <li key={`${r.league}:${r.market}`} className={s.card}>
+                <div className={s.cardTop}>
+                  <span className={s.dim} style={{ fontSize: 12 }}>
+                    {r.league} · {r.market}
+                  </span>
+                  <span className={s.tag} style={{ color: r.stakes ? "var(--pos)" : undefined }}>{r.stakes ? "staking" : "tracked only"}</span>
+                </div>
+                <b style={{ fontSize: 15, lineHeight: 1.3 }}>
+                  <Link href={r.href}>{r.label}</Link>
+                </b>
+                <span className={s.dim} style={{ fontSize: 12.5 }}>{r.why}</span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className={s.section}>
