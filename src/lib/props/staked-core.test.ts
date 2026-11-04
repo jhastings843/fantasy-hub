@@ -72,6 +72,8 @@ describe("ourPropsStaked", () => {
     expect(rest).toHaveLength(0);
     expect(b).toMatchObject({ pick: "Jalen Brunson Under 27.5 pts", price: -110, book: "DraftKings", stake: 1, game: "BOS at NYK", kickoff: tip, slice: "Slice edge:under; Slice edge:pts" });
     expect(b.id).toBe("nba-props-ours|401|pts|Jalen Brunson|under");
+    // The team rides along so Today can open the player's pop-up.
+    expect([b.player, b.team]).toEqual(["Jalen Brunson", "NYK"]);
   });
   it("nothing when no slice keeps it, the slice is paused, or the game started", () => {
     expect(ours([entry("edge:over")])).toEqual([]);
@@ -97,6 +99,7 @@ describe("fbStaked", () => {
     const bets = fbStaked({ boards: [{ ...board([]), fb }], entries: [entry("fb:tip")], now, today, section: "nba-firstbasket-ours" });
     expect(bets.map((b) => b.pick)).toEqual(["Karl-Anthony Towns (NYK) first basket"]);
     expect(bets[0].priceText).toBe("+450 DraftKings");
+    expect(bets[0].team).toBe("NYK");
   });
 });
 
@@ -104,7 +107,7 @@ describe("attdStakedBets", () => {
   it("uses the Anytime TD page's own test", () => {
     const g = { game: { slug: "2026_09_DAL_GB", away: "DAL", home: "GB" } as never, kickoff: tip, attd: { rows: [{ id: "1", key: "jjacobs", name: "Josh Jacobs", team: "GB", m: 0.8, anytime: 0.55, two: 0.2, dk: -110 }, { id: "2", key: "x", name: "Long Shot", team: "GB", m: 0.1, anytime: 0.1, two: 0.01, dk: 900 }] } };
     const bets = attdStakedBets({ boards: [g], entries: [entry("attd:value")], now, today, section: "nfl-attd-ours" });
-    expect(bets.map((b) => b.player)).toEqual(["Josh Jacobs"]);
+    expect(bets.map((b) => [b.player, b.team])).toEqual([["Josh Jacobs", "GB"]]);
   });
   it("a live Venom slice stakes his picks once his board is in, and names itself", () => {
     const g = { game: { slug: "2026_09_DAL_GB", away: "DAL", home: "GB" } as never, kickoff: tip, attd: { rows: [{ id: "1", key: "jjacobs", name: "Josh Jacobs", team: "GB", m: 0.8, anytime: 0.55, two: 0.2, dk: -110 }, { id: "3", key: "tkraft", name: "Tucker Kraft", team: "GB", m: 0.4, anytime: 0.35, two: 0.05, dk: 200 }] } };
