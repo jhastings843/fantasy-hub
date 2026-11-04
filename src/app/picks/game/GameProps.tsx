@@ -4,6 +4,8 @@
 // games), the top 6 by edge, each as a compact box: our chance against the
 // price's break-even and edge per unit. David's projection sits beside ours
 // when the saved board already carries it. Tracked only, never staked.
+import { PopLink } from "@/components/hh/PopLink";
+import { playerPropHref } from "../hrefs";
 import { cache } from "react";
 import { implied, nbaSeasonOfDate, type PropMarket } from "@/lib/props/parse";
 import { edgePerUnit } from "@/lib/picks/our-boxes";
@@ -72,7 +74,7 @@ export function propBoxes(b: Board, nba: boolean): PropBox[] {
 const nbaView = cache((season: number) => getOurNbaView(season).catch(() => null));
 const nflView = cache((season: number) => getOurNflView(season).catch(() => null));
 
-function Boxes({ boxes, href, empty }: { boxes: PropBox[] | null; href: string; empty: string }) {
+function Boxes({ boxes, href, empty, player }: { boxes: PropBox[] | null; href: string; empty: string; /** A player's props pop-up, from name and team. */ player?: (name: string, team: string) => string }) {
   return (
     <section aria-label="Props">
       <h3 className={p.h3}>Props · our model</h3>
@@ -83,7 +85,7 @@ function Boxes({ boxes, href, empty }: { boxes: PropBox[] | null; href: string; 
               <li key={x.key} className={p.prop}>
                 <div className={p.propHead}>
                   <span className={p.propWho}>
-                    {`${x.player} `}
+                    {player && x.team ? <PopLink href={player(x.player, x.team)}>{x.player}</PopLink> : x.player}{" "}
                     <span className={s.dim}>{x.team}</span>
                   </span>
                   <span className={p.propBet}>
@@ -128,12 +130,12 @@ function Boxes({ boxes, href, empty }: { boxes: PropBox[] | null; href: string; 
 export async function NbaGameProps({ id }: { id: string }) {
   const v = await nbaView(nbaSeasonOfDate(new Date()));
   const b = v?.board.find((g) => g.espnId === id || g.game.slug === id);
-  return <Boxes boxes={b ? propBoxes(b, true) : null} href="/props?m=nba" empty={!v ? "Couldn't load our NBA props just now." : b ? "No prop edges from our model in this game." : "No props board from our model for this game yet."} />;
+  return <Boxes boxes={b ? propBoxes(b, true) : null} player={(n, t) => playerPropHref("nba", t, n, id)} href="/props?m=nba" empty={!v ? "Couldn't load our NBA props just now." : b ? "No prop edges from our model in this game." : "No props board from our model for this game yet."} />;
 }
 
 /** NFL: our props board for this week's game between these two teams. */
 export async function NflGameProps({ season, home, away }: { season: number; home: string; away: string }) {
   const v = await nflView(season);
   const b = v?.board.find((g) => g.home === home && g.away === away);
-  return <Boxes boxes={b ? propBoxes(b, false) : null} href="/props?m=pp" empty={!v ? "Couldn't load our NFL props just now." : b ? "No prop edges from our model in this game." : "No props board from our model for this game yet."} />;
+  return <Boxes boxes={b ? propBoxes(b, false) : null} player={(n, t) => playerPropHref("nfl", t, n, b?.espnId ?? b?.game.slug)} href="/props?m=pp" empty={!v ? "Couldn't load our NFL props just now." : b ? "No prop edges from our model in this game." : "No props board from our model for this game yet."} />;
 }

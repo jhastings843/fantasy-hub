@@ -3,6 +3,7 @@
 // logos"): away over home, each with its logo, then kickoff and channel on
 // their own line. Fixed rhythm, so long names never push a row out of line.
 import { TeamLogo, type LogoLeague } from "@/components/TeamLogo";
+import { PopLink } from "@/components/hh/PopLink";
 import { whenEt } from "../picks/ui";
 import p from "./props.module.css";
 
@@ -16,22 +17,24 @@ export interface MatchupProps {
   state?: "pre" | "live" | "final";
   score?: string;
   tv?: string;
+  /** The game pop-up: each team name opens it. */
+  href?: string;
 }
 
-export function Matchup({ league, away, home, when, state = "pre", score, tv }: MatchupProps) {
+export function Matchup({ league, away, home, when, state = "pre", score, tv, href }: MatchupProps) {
   const day = when ? new Date(when).toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" }) : "";
   const status = state === "live" ? "Live" : state === "final" ? (day ? `Final · ${day}` : "Final") : when ? whenEt(when) : "";
   return (
     <span className={p.mu}>
       <span className={p.muTeam}>
         <TeamLogo league={league} team={away} size={18} />
-        <span className={p.muName}>{away}</span>
+        <span className={p.muName}>{href ? <PopLink href={href}>{away}</PopLink> : away}</span>
       </span>
       <span className={p.muTeam}>
         <TeamLogo league={league} team={home} size={18} />
         <span className={p.muName}>
           <span className={p.muAt}>at </span>
-          {home}
+          {href ? <PopLink href={href}>{home}</PopLink> : home}
         </span>
       </span>
       <span className={p.muWhen}>

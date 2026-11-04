@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cbbGameHref } from "../hrefs";
 import { getCbbBoard, getCbbRecord, CBB_PARAMS, type CbbBoard, type CbbBoardRow, type CbbRecord } from "@/lib/models/cbb/store";
 import { SIGNALS, signalsOf, graded, type SignalRecord } from "@/lib/models/cbb/track";
 import BACKTEST from "@/lib/models/cbb/backtest.json";
@@ -238,7 +239,7 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
   return (
     <details className={`${s.gRow} ${s.ledger} ${l && l.tier !== "lean" && g.state === "pre" && (m !== "su" ? !!r.line : false) ? c.hot : ""}`}>
       <summary>
-        <GameCell league="cfb" away={g.away.abbr} home={g.home.abbr} awayName={teamLabel(g.away)} homeName={teamLabel(g.home)} quote={{ homeId: g.home.id, awayId: g.away.id }} status={status} />
+        <GameCell league="cfb" away={g.away.abbr} home={g.home.abbr} awayName={teamLabel(g.away)} homeName={teamLabel(g.home)} href={cbbGameHref(g.id)} quote={{ homeId: g.home.id, awayId: g.away.id }} status={status} />
         <span className={s.gNum} data-k={m === "su" ? "Moneyline" : "DraftKings"}>
           {mk.v}
           {mk.sub && <small>{mk.sub}</small>}

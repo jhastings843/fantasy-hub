@@ -3,6 +3,8 @@
 // anything is a bet, a strip of four numbers, the biggest edges as cards with
 // the market's line against our number, a table of every game whose rows open
 // to every prop, and the gate detail in a drawer.
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref, nbaGameHref, playerPropHref } from "../picks/hrefs";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { SectionView } from "@/lib/learning/engine";
@@ -47,6 +49,9 @@ export interface Edge {
   key: string;
   player: string;
   game: string;
+  /** The player's props pop-up and the game pop-up, when they can be built. */
+  playerHref?: string;
+  gameHref?: string;
   when?: string;
   bet: string;
   ours: number;
@@ -131,10 +136,13 @@ export function EdgeCard({ e }: { e: Edge }) {
       </div>
       <div>
         <div className={s.edgeLine}>
-          <span title={e.player}>{e.player}</span>
+          <span title={e.player}>{e.playerHref ? <PopLink href={e.playerHref}>{e.player}</PopLink> : e.player}</span>
           <span className={s.edgePick}>{e.bet}</span>
         </div>
-        <div className={s.edgeBet}>{`${e.price} · ${e.game}`}</div>
+        <div className={s.edgeBet}>
+          {`${e.price} · `}
+          {e.gameHref ? <PopLink href={e.gameHref}>{e.game}</PopLink> : e.game}
+        </div>
       </div>
       <dl className={s.edgeTrio}>
         <div>
@@ -263,7 +271,7 @@ export function Gate({ learning, label }: { learning: SectionView; label: string
 
 /* ----------------------------------------------------- player props --- */
 
-function propEdges(board: (OurStoredProps | OurNflStored)[], extraMore: (g: OurStoredProps | OurNflStored, m: PropMarket) => [string, string][], david?: (m: PropMarket, gameKey: string) => number | undefined): Edge[] {
+function propEdges(league: "nfl" | "nba", board: (OurStoredProps | OurNflStored)[], extraMore: (g: OurStoredProps | OurNflStored, m: PropMarket) => [string, string][], david?: (m: PropMarket, gameKey: string) => number | undefined): Edge[] {
   return board
     .flatMap((g) =>
       g.game.markets
@@ -279,6 +287,8 @@ function propEdges(board: (OurStoredProps | OurNflStored)[], extraMore: (g: OurS
             key: `${g.game.slug}|${m.id}`,
             player: m.player,
             game: `${g.away} at ${g.home}`,
+            playerHref: m.team ? playerPropHref(league, m.team, m.player, g.espnId ?? g.game.slug) : undefined,
+            gameHref: league === "nba" ? (g.espnId ? nbaGameHref(g.espnId) : undefined) : footballGameHref("nfl", g.away, g.home),
             when: g.kickoff,
             bet: `${sideWord(side)} ${m.line} ${SHORT[m.stat ?? ""] ?? m.statLabel}`,
             ours: x?.[side] ?? 0,
@@ -346,6 +356,7 @@ function PropGames({ board, sport, settled, live, tv }: { board: (OurStoredProps
                   state={st === "final" || lg?.state === "post" ? "final" : st === "live" ? "live" : "pre"}
                   score={lg && lg.state !== "pre" ? `${lg.away.abbr} ${lg.away.score}, ${lg.home.abbr} ${lg.home.score}${lg.state === "in" ? ` · ${lg.detail}` : ""}` : undefined}
                   tv={g.espnId ? tv?.get(g.espnId) : undefined}
+                  href={sport === "nba" ? (g.espnId ? nbaGameHref(g.espnId) : undefined) : footballGameHref("nfl", g.away, g.home)}
                 />
               </span>
               <span className={s.propGroupAside}>
@@ -385,7 +396,7 @@ function PropGames({ board, sport, settled, live, tv }: { board: (OurStoredProps
                   <details key={m.id} className={s.propRow}>
                     <summary>
                       <span className={s.propWho}>
-                        <b>{m.player}</b>
+                        <b>{m.team ? <PopLink href={playerPropHref(sport, m.team, m.player, g.espnId ?? g.game.slug)}>{m.player}</PopLink> : m.player}</b>
                         <span className={pp.propBet}>
                           {`${m.line} ${SHORT[m.stat ?? ""] ?? m.statLabel}`}
                           <span className={pp.propTeam}>{` · ${m.team}`}</span>
@@ -472,7 +483,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
     const ahead = tonight.filter((g) => Date.parse(g.kickoff!) > now);
     // A card needs the player's minutes from this season's role: 3+ games. Before that the number leans on last season, and a summer role change reads as a huge fake edge.
     const settled = (g: OurStoredProps | OurNflStored, m: PropMarket) => ((g as OurStoredProps).extra[m.id]?.games ?? 0) >= NBA_CARD_GAMES;
-    const allEdges = propEdges(ahead, (g, m) => [
+    const allEdges = propEdges("nba", ahead, (g, m) => [
       ["Projected minutes", `${(g as OurStoredProps).extra[m.id]?.min ?? "·"}`],
       ["Our mean", `${m.model}`],
       ["DK over / under", `${am(m.books[0].over ?? -110)} / ${am(m.books[0].under ?? -110)}`],
@@ -519,6 +530,7 @@ async function PlayerPropsWeek({ league, season }: { league: "nba" | "nfl"; seas
   const dIdx = new Map((pv?.david.games ?? []).flatMap((dg) => dg.props.map((p) => [`${nameKey(p.player)}|${p.market}|${p.line}`, p.projection] as const)));
   const david = (m: PropMarket) => (m.stat && DAVID_MARKET[m.stat] ? dIdx.get(`${nameKey(m.player)}|${DAVID_MARKET[m.stat]}|${m.line}`) : undefined);
   const edges = propEdges(
+    "nfl",
     ahead,
     (g, m) => {
       const x = (g as OurNflStored).extra[m.id];
@@ -707,6 +719,8 @@ async function FirstBasketWeek({ season }: { season: number }) {
             key: `${g.game.slug}|${x.id}`,
             player: x.name,
             game: `${g.away} at ${g.home}`,
+            playerHref: playerPropHref("nba", x.team, x.name, g.espnId ?? g.game.slug),
+            gameHref: g.espnId ? nbaGameHref(g.espnId) : undefined,
             when: g.kickoff,
             bet: `First basket · ${x.team}`,
             ours: x.p,
@@ -835,6 +849,8 @@ async function FirstTdWeek({ season }: { season: number }) {
             key: `${g.game.slug}|${p.key}`,
             player: p.name,
             game: `${g.game.away} at ${g.game.home}`,
+            playerHref: playerPropHref("nfl", p.team, p.name, g.espnId ?? g.game.slug),
+            gameHref: footballGameHref("nfl", g.game.away, g.game.home),
             when: g.kickoff,
             bet: `First TD · ${p.team}`,
             ours: p.p,

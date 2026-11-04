@@ -254,6 +254,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
           home={g.home.abbr}
           awayName={g.away.short}
           homeName={g.home.short}
+          href={nbaGameHref(g.id)}
           status={
             g.state === "in" ? (
               <>
@@ -288,7 +289,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
       <div className={s.gBody}>
         <NbaStats x={x} m={m} />
         <NbaWhy g={g} />
-        <Link href={nbaGameHref(g.id)} className={s.linkA} style={{ fontWeight: 600, fontSize: 14, display: "inline-block", marginTop: 10 }}>
+        <Link href={nbaGameHref(g.id)} scroll={false} className={s.linkA} style={{ fontWeight: 600, fontSize: 14, display: "inline-block", marginTop: 10 }}>
           Open the game: every market ›
         </Link>
       </div>

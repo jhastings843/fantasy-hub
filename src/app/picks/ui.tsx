@@ -3,6 +3,7 @@ import { BREAK_EVEN, MIN_SAMPLE, type Record as Rec, type Tier } from "@/lib/pic
 import type { League } from "@/lib/picks/parse";
 import type { RefLine } from "@/lib/picks/engine";
 import { TeamLogo } from "@/components/TeamLogo";
+import { PopLink } from "@/components/hh/PopLink";
 import { Fragment, type ReactNode } from "react";
 import s from "./picks.module.css";
 
@@ -133,20 +134,20 @@ export function pieces(text: string): ReactNode {
  * the same whatever the team names. `status` replaces the kickoff line
  * (live score, final) and `extra` adds a chip after the home team.
  */
-export function GameCell({ league, away, home, awayName, homeName, quote, status, extra }: { league: League | "nba"; away: string; home: string; awayName: string; homeName: string; quote?: Pick<RefLine, "kickoff" | "tv" | "homeId" | "awayId">; status?: ReactNode; extra?: ReactNode }) {
+export function GameCell({ league, away, home, awayName, homeName, quote, status, extra, href }: { league: League | "nba"; away: string; home: string; awayName: string; homeName: string; quote?: Pick<RefLine, "kickoff" | "tv" | "homeId" | "awayId">; status?: ReactNode; extra?: ReactNode; /** The game pop-up: each team name opens it. */ href?: string }) {
   const lg = league === "nba" ? "nba" : league === "nfl" ? "nfl" : "cfb";
   const when = quote?.kickoff ? `${kickoffEt(quote.kickoff)}${quote.tv ? ` · ${quote.tv}` : ""}` : undefined;
   return (
     <span className={s.matchCell}>
       <span className={s.matchTeam}>
         <TeamLogo league={lg} team={away} espnId={quote?.awayId} size={18} />
-        <span className={s.matchName}>{awayName}</span>
+        <span className={s.matchName}>{href ? <PopLink href={href}>{awayName}</PopLink> : awayName}</span>
       </span>
       <span className={s.matchTeam}>
         <TeamLogo league={lg} team={home} espnId={quote?.homeId} size={18} />
         <span className={s.matchName}>
           <span className={s.matchAt}>at </span>
-          {homeName}
+          {href ? <PopLink href={href}>{homeName}</PopLink> : homeName}
         </span>
         {extra}
       </span>

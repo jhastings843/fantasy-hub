@@ -212,6 +212,7 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
           home={g.home}
           awayName={name(g.away)}
           homeName={home}
+          href={gameHref(r, g)}
           quote={g.ref ?? g.lastRef}
           status={
             st === "started" && live?.state === "post" ? (
@@ -1026,7 +1027,7 @@ function GameExpand({ g, r }: { g: BoardGame; r: PicksReport }) {
       </div>
       <GameStats g={g} r={r} />
       <EdgeCards g={g} r={r} />
-      <Link href={gameHref(r, g)} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
+      <Link href={gameHref(r, g)} scroll={false} className={s.linkA} style={{ fontWeight: 600, fontSize: 14 }}>
         Full breakdown: every step of the call ›
       </Link>
     </div>

@@ -1,4 +1,5 @@
 // Straight up (pick'em, not a wager) and totals: this week, results, research.
+import { footballGameHref } from "./hrefs";
 import { marginBand, marginLabel, suPick } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import type { PoolTrack } from "@/lib/picks/pool-store";
@@ -357,6 +358,7 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
                 home={g.home}
                 awayName={name(g.away)}
                 homeName={name(g.home)}
+                href={footballGameHref(r.league, g.away, g.home)}
                 quote={(() => {
                   const b = r.board.find((x) => x.away === g.away && x.home === g.home);
                   return b?.ref ?? b?.lastRef ?? g.ref;
