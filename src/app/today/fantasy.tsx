@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { PlayerLink } from "@/components/PlayerLink";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getMyLeagues } from "@/lib/league/discover";
@@ -24,6 +25,7 @@ export interface Claim {
   key: string;
   leagueId: string;
   league: string;
+  playerId: string;
   name: string;
   position: string;
   team: string | null;
@@ -43,7 +45,9 @@ export interface LineupMove {
   league: string;
   slot: string;
   start: string;
+  startId: string | null;
   sit: string | null;
+  sitId: string | null;
   reason: string;
   pickup: boolean;
 }
@@ -70,6 +74,7 @@ function claimsOf(w: WaiverContext): Claim[] {
     key: `${w.leagueId}-${kind}-${t.player.playerId}`,
     leagueId: w.leagueId,
     league: w.leagueName,
+    playerId: t.player.playerId,
     name: t.player.name,
     position: t.player.position,
     team: t.player.team,
@@ -98,7 +103,9 @@ function moveOf(leagueId: string, league: string, slot: SlotAdvice, pickup: Star
     league,
     slot: slot.slot,
     start: pickup ? pickup.player.name : (slot.recommended?.name ?? "nobody"),
+    startId: pickup ? pickup.player.playerId : (slot.recommended?.playerId ?? null),
     sit: out?.name ?? null,
+    sitId: out?.playerId ?? null,
     reason: pickup ? `Free agent: ${dropText(pickup.dropFor).toLowerCase()}` : slot.reason,
     pickup: !!pickup,
   };
@@ -157,10 +164,10 @@ export const getFantasyNow = cache(async (): Promise<FantasyNow> => {
 function ClaimRow({ c }: { c: Claim }) {
   return (
     <div className="border-b border-hh-line py-3 last:border-b-0">
-      <Link href={leaguePath(c.leagueId, "waivers")} className="group flex min-h-11 items-start justify-between gap-3">
+      <div className="flex min-h-11 items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="font-semibold text-hh-ink group-hover:text-hh-accent-ink">{c.name}</span>
+            <span className="font-semibold text-hh-ink"><PlayerLink id={c.playerId} name={c.name} leagueId={c.leagueId} /></span>
             <Num className="text-xs text-hh-muted">{`${c.position}${c.team ? ` · ${c.team}` : ""}`}</Num>
           </div>
           <p className="mt-0.5 text-sm text-hh-ink-2">{c.drop}</p>
@@ -169,8 +176,11 @@ function ClaimRow({ c }: { c: Claim }) {
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           {c.bid !== null ? <Num className="text-[22px] font-semibold leading-none text-hh-accent-ink">{`$${c.bid}`}</Num> : <span className="text-xs text-hh-muted">no bid set</span>}
           {c.walkAway !== null && c.bid !== null && c.walkAway > c.bid && <Num className="text-xs text-hh-muted">{`stop at $${c.walkAway}`}</Num>}
+          <Link href={leaguePath(c.leagueId, "waivers")} className="inline-flex min-h-8 items-center gap-0.5 text-xs font-semibold text-hh-accent-ink hover:underline">
+            Open waivers <ChevronRight size={13} aria-hidden />
+          </Link>
         </div>
-      </Link>
+      </div>
       {(c.why || c.priceReason || c.longShot) && (
         <Disclosure summary="Why">
           {c.why && <p>{c.why}</p>}
@@ -186,16 +196,26 @@ function ClaimRow({ c }: { c: Claim }) {
 function MoveRow({ m }: { m: LineupMove }) {
   return (
     <div className="border-b border-hh-line py-3 last:border-b-0">
-      <Link href={leaguePath(m.leagueId, "lineup")} className="group flex min-h-11 items-start justify-between gap-3">
+      <div className="flex min-h-11 items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[15px] leading-snug text-hh-ink">
-            <b className="font-semibold group-hover:text-hh-accent-ink">{`${m.pickup ? "Add" : "Start"} ${m.start}`}</b>
-            {m.sit && <span className="text-hh-ink-2">{` over ${m.sit}`}</span>}
+            <b className="font-semibold">
+              {`${m.pickup ? "Add" : "Start"} `}
+              {m.startId ? <PlayerLink id={m.startId} name={m.start} leagueId={m.leagueId} /> : m.start}
+            </b>
+            {m.sit && (
+              <span className="text-hh-ink-2">
+                {" over "}
+                {m.sitId ? <PlayerLink id={m.sitId} name={m.sit} leagueId={m.leagueId} /> : m.sit}
+              </span>
+            )}
           </p>
-          <p className="mt-0.5 text-xs text-hh-muted">{m.league}</p>
+          <Link href={leaguePath(m.leagueId, "lineup")} className="mt-0.5 inline-flex min-h-8 items-center gap-0.5 text-xs text-hh-muted hover:text-hh-accent-ink">
+            {`${m.league} · open the lineup`} <ChevronRight size={13} aria-hidden />
+          </Link>
         </div>
         <Num className="shrink-0 rounded-[4px] border border-hh-line px-1.5 py-0.5 text-xs text-hh-ink-2">{m.slot}</Num>
-      </Link>
+      </div>
       <Disclosure summary="Why">{m.reason}</Disclosure>
     </div>
   );
@@ -211,7 +231,7 @@ export async function FantasySpot() {
       <Spotlight label={`Top claim · ${c.league}`} aside={f.week ? `Week ${f.week} waivers` : undefined}>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="font-display text-[28px] font-bold uppercase leading-none text-hh-ink">{c.name}</p>
+            <p className="font-display text-[28px] font-bold uppercase leading-none text-hh-ink"><PlayerLink id={c.playerId} name={c.name} leagueId={c.leagueId} /></p>
             <Num className="mt-1 block text-sm text-hh-muted">{`${c.position}${c.team ? ` · ${c.team}` : ""}`}</Num>
           </div>
           {c.bid !== null && <Num className="text-[34px] font-semibold leading-none text-hh-accent-ink">{`$${c.bid}`}</Num>}

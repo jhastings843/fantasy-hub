@@ -1,4 +1,5 @@
 import { Chip, Disclosure, Section, Spotlight } from "@/components/hh/ui";
+import { PlayerLink } from "@/components/PlayerLink";
 import { buildWaivers } from "@/lib/waivers/build";
 import type { SeasonTarget, StartableTarget, WaiverPlayer } from "@/lib/waivers/rank";
 import { usageText } from "@/lib/waivers/freshness";
@@ -101,7 +102,7 @@ function StartRow({ t }: { t: StartableTarget }) {
     <div className="border-b border-hh-line py-4">
       <div className="flex flex-wrap items-center gap-2">
         <Chip tone="accent">{t.slot}</Chip>
-        <span className="font-medium text-hh-ink ">{t.player.name}</span>
+        <span className="font-medium text-hh-ink"><PlayerLink id={t.player.playerId} name={t.player.name} /></span>
         <Chip>{t.player.position}</Chip>
         {t.player.flexRank !== null ? (
           <Chip>FLEX {t.player.flexRank}</Chip>
@@ -134,14 +135,14 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
     <div className="flex flex-col gap-1.5 border-b border-hh-line py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-hh-ink ">{t.player.name}</span>
+          <span className="font-medium text-hh-ink"><PlayerLink id={t.player.playerId} name={t.player.name} /></span>
           <Chip>{t.player.position}</Chip>
           {seasonChip(t.player)}
         </div>
         <p className="mt-1 text-sm leading-relaxed text-hh-muted ">
           {t.dropFor ? (
             <>
-              Drop <span className="font-medium text-hh-ink-2 ">{t.dropFor.name}</span>
+              Drop <span className="font-medium text-hh-ink-2"><PlayerLink id={t.dropFor.playerId} name={t.dropFor.name} /></span>
               {t.dropFor.seasonRank !== null ? ` (#${t.dropFor.seasonRank})` : " (unranked)"}
               {t.placesBetter !== null ? `, ${t.placesBetter} places better` : ""}.
             </>
@@ -163,7 +164,7 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
         </Disclosure>
         {t.alternative ? (
           <p className="mt-1 text-sm leading-relaxed text-hh-muted ">
-            Or <span className="font-medium text-hh-ink-2 ">{t.alternative.name}</span>
+            Or <span className="font-medium text-hh-ink-2"><PlayerLink id={t.alternative.playerId} name={t.alternative.name} /></span>
             {t.alternative.jingles
               ? `, his waiver pick${t.alternative.jingles.rank != null ? ` #${t.alternative.jingles.rank}` : ""} at $${t.alternative.jingles.faab} of $${t.alternative.jingles.budget}`
               : ""}
@@ -281,7 +282,7 @@ export default async function WaiversPage({
                 key={d.playerId}
                 className="inline-flex items-center gap-2 rounded-[4px] border border-hh-line px-3 py-1.5 text-sm"
               >
-                <span className="text-hh-ink ">{d.name}</span>
+                <span className="text-hh-ink"><PlayerLink id={d.playerId} name={d.name} /></span>
                 <span className="text-xs text-hh-muted ">
                   {d.seasonRank !== null ? `#${d.seasonRank}` : "unranked"}
                 </span>

@@ -1,4 +1,5 @@
 import { Chip, Disclosure, Num, Section, Spotlight, PosBadge } from "@/components/hh/ui";
+import { PlayerLink } from "@/components/PlayerLink";
 import { TeamEdge } from "@/components/hh/team";
 import { buildWeeklyLineups, type LeagueLineup } from "@/lib/lineup/build";
 import type { AdvicePlayer, SlotAdvice } from "@/lib/lineup/weekly-advice";
@@ -80,7 +81,7 @@ function PlayerLine({ p, slot }: { p: AdvicePlayer; slot: string }) {
             : "font-medium text-hh-ink "
         }
       >
-        {p.name}
+        <PlayerLink id={p.playerId} name={p.name} />
       </span>
       <Chip tone={p.unranked ? "neg" : showAdjusted ? "gold" : "muted"}>
         {rankText(p, slot)}
@@ -300,7 +301,7 @@ function PickupCard({ target, slot }: { target: StartableTarget; slot?: string }
         <Eyebrow>{slot ? "Change this: free agent" : "Grab this"}</Eyebrow>
       </div>
       <p className="mt-2 text-base font-semibold text-hh-ink">
-        Add {target.player.name}
+        Add <PlayerLink id={target.player.playerId} name={target.player.name} />
       </p>
       <p className="mt-1 text-sm leading-relaxed text-hh-ink-2">
         {rank}
@@ -441,7 +442,7 @@ export default async function LineupPage({
                 key={p.player.playerId}
                 className="text-sm leading-relaxed text-hh-ink-2"
               >
-                <span className="font-medium">{p.player.name}</span> is {p.why}.
+                <span className="font-medium"><PlayerLink id={p.player.playerId} name={p.player.name} /></span> is {p.why}.
               </li>
             ))}
             {league.advice.superflexFellThrough && (
@@ -467,7 +468,7 @@ export default async function LineupPage({
                 key={d.started.playerId}
                 className="text-sm leading-relaxed text-hh-ink-2"
               >
-                <span className="font-medium">{d.started.name}</span> at {d.slot}: he has him at
+                <span className="font-medium"><PlayerLink id={d.started.playerId} name={d.started.name} /></span> at {d.slot}: he has him at
                 FLEX {d.started.flexRank}, we move him to {d.started.adjustedFlexRank}
                 {d.insteadOf ? `, ahead of ${d.insteadOf.name}` : ""}.
               </li>
