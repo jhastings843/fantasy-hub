@@ -217,11 +217,19 @@ export async function FantasySpot() {
           {c.bid !== null && <Num className="text-[34px] font-semibold leading-none text-hh-accent-ink">{`$${c.bid}`}</Num>}
         </div>
         <div className="mt-4">
-          <Call verb={c.bid !== null ? `Claim for $${c.bid}.` : "Claim him."} reason={c.drop} />
+          <Call
+            verb={c.bid !== null ? `Claim for $${c.bid}${c.walkAway !== null && c.walkAway > c.bid ? `, stop at $${c.walkAway}` : ""}.` : "Claim him."}
+            reason={c.drop}
+          />
+          {c.longShot && <p className="mt-1 text-sm text-hh-neg">The room will likely pay more than he is worth to you.</p>}
         </div>
-        {(c.why || c.priceReason) && (
-          <Disclosure summary="Why this claim" className="mt-1">
+        <Link href={leaguePath(c.leagueId, "waivers")} className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-hh-accent-ink">
+          Open waivers <ChevronRight size={15} aria-hidden />
+        </Link>
+        {(c.why || c.priceReason || c.tierLabel) && (
+          <Disclosure summary="Why this claim">
             {c.why && <p>{c.why}</p>}
+            {c.tierLabel && <p className="mt-1">{`${c.tierLabel}.`}</p>}
             {c.priceReason && <p className="mt-1">{c.priceReason}</p>}
           </Disclosure>
         )}
@@ -235,6 +243,13 @@ export async function FantasySpot() {
         <Link href={leaguePath(m.leagueId, "lineup")} className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-hh-accent-ink">
           Open the lineup <ChevronRight size={15} aria-hidden />
         </Link>
+      </Spotlight>
+    );
+  }
+  if (f.problems.length || f.lineupBlocked) {
+    return (
+      <Spotlight label="Fantasy couldn't be checked">
+        <Call verb="No bets waiting, and claims and lineups couldn't be read just now." reason={[...f.problems, f.lineupBlocked].filter(Boolean).join(" ")} />
       </Spotlight>
     );
   }
@@ -257,7 +272,7 @@ export async function FantasySection({ skipTop }: { skipTop: boolean }) {
         label="Waiver claims"
         aside={<Num>{`${f.claims.length} worth making`}</Num>}
       >
-        {claims.length ? claims.map((c) => <ClaimRow key={c.key} c={c} />) : <Empty>{f.claims.length ? "That's the only one this week." : "Nothing worth claiming in your waiver leagues."}</Empty>}
+        {claims.length ? claims.map((c) => <ClaimRow key={c.key} c={c} />) : <Empty>{f.claims.length ? "That's the only one this week." : f.problems.length ? "Couldn't check every waiver league; see the note below." : "Nothing worth claiming in your waiver leagues."}</Empty>}
         {f.guillotine.map((g) => (
           <Link key={g.id} href={leaguePath(g.id, "faab")} className="flex min-h-11 items-center justify-between gap-3 border-t border-hh-line pt-2 text-sm text-hh-ink-2 hover:text-hh-accent-ink">
             <span>{`${g.name}: guillotine bids have their own guide`}</span>
@@ -266,7 +281,7 @@ export async function FantasySection({ skipTop }: { skipTop: boolean }) {
         ))}
       </Section>
       <Section id="t-lineup" label="Lineup changes" aside={<Num>{`${f.moves.length} to make`}</Num>}>
-        {f.lineupBlocked ? <Empty>{f.lineupBlocked}</Empty> : moves.length ? moves.map((m) => <MoveRow key={m.key} m={m} />) : <Empty>{f.moves.length ? "That's the only one." : "Every lineup already matches the rankings."}</Empty>}
+        {f.lineupBlocked ? <Empty>{f.lineupBlocked}</Empty> : moves.length ? moves.map((m) => <MoveRow key={m.key} m={m} />) : <Empty>{f.moves.length ? "That's the only one." : f.problems.length ? "Couldn't check every lineup; see the note below." : "Every lineup already matches the rankings."}</Empty>}
         {f.problems.length > 0 && (
           <ul className="mt-2 flex flex-col gap-1 text-xs text-hh-neg">
             {f.problems.map((p) => (

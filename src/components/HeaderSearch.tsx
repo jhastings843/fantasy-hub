@@ -84,7 +84,7 @@ export default function HeaderSearch() {
           setQ(e.target.value);
           setOpen(true);
         }}
-        className="h-10 w-full rounded-[6px] border border-hh-line bg-hh-panel py-2 pl-9 pr-3 text-[16px] text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none sm:pr-9 sm:text-sm"
+        className="h-11 w-full rounded-[6px] border border-hh-line bg-hh-panel py-2 pl-9 pr-3 text-[16px] text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none sm:pr-9 sm:text-sm"
       />
       {!q && <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-hh-line px-1 font-mono text-[10px] text-hh-muted sm:block">/</kbd>}
       {show && (

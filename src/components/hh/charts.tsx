@@ -38,6 +38,7 @@ export function Sparkline({
   const last = values[values.length - 1];
   const tone = last >= 0 ? "var(--hh-pos)" : "var(--hh-neg)";
   return (
+    <span className="relative inline-block max-w-full">
     <svg
       viewBox={`0 0 ${width} ${height}`}
       width={width}
@@ -57,6 +58,10 @@ export function Sparkline({
         </rect>
       ))}
     </svg>
+      <span className="sr-only">
+        {values.map((v, i) => `${labels?.[i] ?? `Point ${i + 1}`}: ${format(v)}`).join(". ")}
+      </span>
+    </span>
   );
 }
 

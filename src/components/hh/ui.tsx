@@ -99,7 +99,7 @@ export function Num({ children, tone, className = "" }: { children: ReactNode; t
 
 export function Chip({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold leading-4 ${CHIP[tone]}`}>
+    <span className={`inline-flex max-w-full items-center gap-1.5 rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold leading-4 ${CHIP[tone]}`}>
       {tone === "live" && <span className="hh-live-dot !size-1.5" aria-hidden />}
       {children}
     </span>

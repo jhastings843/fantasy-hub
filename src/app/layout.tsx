@@ -47,21 +47,18 @@ function Brand() {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b-2 border-hh-ink bg-hh-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur-md dark:border-b dark:border-hh-line dark:bg-[#0a0d11]/95">
-      <div className="mx-auto flex h-[var(--hh-nav-h)] w-full max-w-6xl items-center gap-3 px-4 sm:gap-5 sm:px-6 lg:px-8">
-        <Brand />
-        <div className="h-full min-w-0 flex-1">
+      {/* One search box. Very narrow phones wrap it onto its own row so it never squeezes the brand. */}
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 px-4 sm:gap-x-5 sm:px-6 lg:px-8">
+        <div className="flex h-[var(--hh-nav-h)] items-center">
+          <Brand />
+        </div>
+        <div className="h-[var(--hh-nav-h)] min-w-0 flex-1">
           <HubTabs />
         </div>
-        <div className="flex min-w-0 items-center justify-end gap-2">
-          <div className="hidden min-[420px]:block">
-            <HeaderSearch />
-          </div>
-          <ThemeToggle />
+        <div className="order-last w-full pb-2.5 min-[420px]:order-none min-[420px]:w-auto min-[420px]:pb-0">
+          <HeaderSearch />
         </div>
-      </div>
-      {/* Very narrow phones: search gets its own row so it never squeezes the brand. */}
-      <div className="px-4 pb-2.5 min-[420px]:hidden">
-        <HeaderSearch />
+        <ThemeToggle />
       </div>
     </header>
   );

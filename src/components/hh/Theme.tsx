@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 // Theme: follows the system (light = C3 paper, dark = teal terminal) unless the
@@ -37,15 +37,18 @@ const LABEL: Record<ThemeChoice, string> = { system: "Theme: follows your device
 
 export function ThemeToggle() {
   const [choice, setChoice] = useState<ThemeChoice>("system");
+  // The live choice, for the device-theme listener (storage can be blocked, so it can't be re-read).
+  const current = useRef<ThemeChoice>("system");
 
   useEffect(() => {
     // Reading storage after mount keeps server and client markup identical.
     const c = read();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChoice(c);
+    current.current = c;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
-      if (read() === "system") apply("system", true);
+      if (current.current === "system") apply("system", true);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -54,6 +57,7 @@ export function ThemeToggle() {
   const pick = () => {
     const next = NEXT[choice];
     setChoice(next);
+    current.current = next;
     try {
       if (next === "system") localStorage.removeItem(KEY);
       else localStorage.setItem(KEY, next);
@@ -70,7 +74,7 @@ export function ThemeToggle() {
       onClick={pick}
       aria-label={`${LABEL[choice]}. Tap to change.`}
       title={LABEL[choice]}
-      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-[6px] border border-hh-line text-hh-ink-2 transition-colors hover:border-hh-accent hover:text-hh-accent-ink"
+      className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-[6px] border border-hh-line text-hh-ink-2 transition-colors hover:border-hh-accent hover:text-hh-accent-ink"
     >
       <Icon size={17} strokeWidth={1.8} aria-hidden />
     </button>
