@@ -1,3 +1,7 @@
+# 2026-11-04 ~12:30am: team search LIVE (5748e9a, deploy fantasy-f3d5yn4p7); write-lock READY on branch security/write-lock
+- Search: lib/search/teams.ts (one entry per team; college merged on ESPN school id; exact name match shows only that team), /api/search adds `teams`, HeaderSearch team rows first (game rows hidden when a team matches), /team + @modal/(.)team (TeamCard: per-sport game, lines, our read, props with edges). Built by a subagent, reviewed and fixed by Claude (exact-match filter, game rows hidden, "Pass Pass").
+- Write-lock (Jack chose passphrase login): branch security/write-lock = src/proxy.ts (POST /api/survivor/*, /api/refresh need signed hh_session cookie, fails closed), /unlock page, lib/auth/session.ts (+tests), Survivor/Refresh send locked devices to /unlock. NOT merged: needs Jack to add HH_SESSION_SECRET and HH_PASSPHRASE (production + preview) in Vercel first, or every save is refused. Then merge + push, and unlock each device once.
+
 # 2026-11-04 ~12:05am: REDESIGN + LOTTO FIX LIVE IN PRODUCTION (main 7541631, deploy fantasy-jt054hprg)
 - Jack: "push everything we have worked on live". insecure-defaults audit ran first: nothing from this release; 3 PRE-EXISTING open API routes (survivor/entries POST can burn Anthropic credits, survivor POST overwrites pool state, refresh POST flushes cache; raw error text on refresh/survivor). Fixing needs Jack's OK (API routes).
 - Lotto tracked slices (lotto:checked, lotto:checked-noreb) register at the next lotto review.
