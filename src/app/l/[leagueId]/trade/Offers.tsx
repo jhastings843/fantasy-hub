@@ -68,9 +68,10 @@ function OfferBody({ o, i, onApply, top }: { o: TradeOffer; i: number; onApply: 
         </div>
         <Chip tone={CHANCE_TONE[o.chance.tone]}>{o.chance.label}</Chip>
       </div>
-      <div className="flex items-start gap-3 border-y border-hh-line py-3">
+      {/* Stacked on phones so full names fit; side by side from 640px. */}
+      <div className="flex flex-col gap-3 border-y border-hh-line py-3 sm:flex-row sm:items-start">
         <Side label="You send" players={o.send} />
-        <span aria-hidden className="self-center text-hh-muted">↔</span>
+        <span aria-hidden className="hidden self-center text-hh-muted sm:inline">↔</span>
         <Side label="You get" players={o.receive} accent />
       </div>
       <ul className="flex flex-col gap-1">
@@ -105,9 +106,9 @@ export default function Offers({ offers, onApply }: { offers: TradeOffer[]; onAp
           <p className="max-w-[70ch] text-sm text-hh-ink-2">
             The best deal with each manager who has one, strongest first. Each fixes one of your rooms from their surplus and still scores as a win for them.
           </p>
-          <ol className="mt-1 grid gap-x-8 lg:grid-cols-2">
+          <ol className="mt-1 grid grid-cols-[minmax(0,1fr)] gap-x-8 lg:grid-cols-2">
             {rest.map((o, j) => (
-              <li key={o.partnerRosterId} className="border-b border-hh-line py-4">
+              <li key={o.partnerRosterId} className="min-w-0 border-b border-hh-line py-4">
                 <OfferBody o={o} i={j + 1} onApply={onApply} />
               </li>
             ))}
