@@ -81,7 +81,7 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
   return (
     <main className={s.page}>
       <div className="mx-auto flex w-full min-w-0 max-w-[1104px] flex-col gap-8">
-        <PageHead title="Issued performance" sub="Settled spreads and totals use the issued stakes; all numbers come from the board's report." aside={<Num>{`${L} ${r.season} · the method`}</Num>} />
+        <PageHead title="How our picks work" sub="Every step from the two models to a sent bet, and how the issued picks have done. All numbers come from the board's report." aside={<Num>{`${L} ${r.season} · the method`}</Num>} />
         {back}
         <Section label="How it has done">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">

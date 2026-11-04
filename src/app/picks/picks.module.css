@@ -837,3 +837,7 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 
 /* Stat captions are words: the text face. */
 .statK { font-family: var(--font-plex), system-ui, sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; }
+
+/* Prop cards keep a light box each, so every prop reads as its own unit (Jack, 2026-11-04). */
+.edgeCard { border: 1px solid var(--rule); border-radius: var(--hh-radius); padding: 14px 16px; background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.edgeGrid { gap: 12px; }
