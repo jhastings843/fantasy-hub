@@ -90,7 +90,7 @@ export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
           </button>
         ))}
       </div>
-      <div className={s.tw}>
+      <div className="min-w-0 max-w-full overflow-x-auto">
         <table className={s.table}>
           <caption className={s.caption}>{`${league === "All" ? "All leagues" : league} · ${w}-${l}${p ? `-${p}` : ""} · ${units(net)}`}</caption>
           <thead>

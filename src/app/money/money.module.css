@@ -271,3 +271,33 @@
   .ixRow { grid-template-columns: 1fr; }
   .ixResult { justify-self: start; }
 }
+
+/* C3: data on rules, with the shared light/dark tokens and local chart styles. */
+.moneyPage { font-variant-numeric: tabular-nums; }
+.moneyPage :global(.hh-more), .moneyPage :global(.hh-more-body) { min-width: 0; max-width: 100%; }
+.panel, .card, .gauge, .ixSide, .strat, .note, .trackStrip, .chartEmpty {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 12px 0;
+}
+.panelTitle { text-transform: uppercase; letter-spacing: .02em; }
+.cards, .panels { gap: 20px 28px; }
+.cardLink { border-radius: 0; }
+.cardHead, .foldHead, .legend { flex-wrap: wrap; }
+.cardTitle { white-space: normal; overflow: visible; }
+.deskBreak { background: transparent; }
+.venueHead { border-top: var(--hh-rule-w) solid var(--hh-rule); }
+.scroll { min-width: 0; max-width: 100%; overflow-x: auto; margin: 0; padding: 0; }
+.chart, .bigChart { min-width: 0; max-width: 100%; }
+.foldHead { min-height: 44px; }
+.foldMeta, .rowMeta { letter-spacing: .02em; text-transform: none; }
+.moneyPage .holdRow { padding-inline: 0; }
+@media (max-width: 520px) {
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .ixSides { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .deskRow { padding-inline: 0; }
+  .deskBreak { padding-inline: 0; }
+}

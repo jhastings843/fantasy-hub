@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/hh/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getMoneyView } from "@/lib/money/store";
@@ -43,7 +44,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const b = snap?.books.find((x) => x.id === id) ?? (tb?.id === id ? tb : undefined);
   if (!snap || !b) {
     return (
-      <main className={s.page}>
+      <main className={`${s.page} ${m.moneyPage}`}>
         <div className={s.wrap}>
           <Link href="/money?v=books" className={s.linkA}>
             ‹ Stock books
@@ -62,7 +63,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const days = b.curve.length;
   const trades = b.fills.map((f) => ({ day: f.day, text: `${f.side === "buy" || /buy/i.test(f.side) ? "Bought" : "Sold"} ${f.symbol}` }));
   return (
-    <main className={s.page}>
+    <main className={`${s.page} ${m.moneyPage}`}>
       <div className={s.wrap}>
         <Link href={isTrend ? "/money?v=trends" : "/money?v=books"} className={s.linkA} style={{ fontSize: 14 }}>
           {isTrend ? "‹ Trends" : "‹ Stock books"}
@@ -87,11 +88,11 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
               { k: "Running", v: `${days} trading day${days === 1 ? "" : "s"}`, small: true, sub: `${b.fills.length} trade${b.fills.length === 1 ? "" : "s"}, ${b.positions.length} holding${b.positions.length === 1 ? "" : "s"}` },
             ]}
           />
-          <div className={s.curveBox}>
+          <div className={m.panel}>
             <BookChart points={b.curve} start={b.start} trades={trades} label={b.label} />
           </div>
 
-          <div className={s.curveBox}>
+          <Disclosure summary="The strategy, in plain English"><div className={m.panel}>
             <h2 className={s.h2}>The strategy, in plain English</h2>
             <p className={s.p} style={{ fontSize: 16 }}>{b.strategy?.what ?? b.about}</p>
             {b.strategy?.how && (
@@ -107,7 +108,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
               </>
             )}
             {!b.strategy && b.about && <p className={s.thin}>{b.about}</p>}
-          </div>
+          </div></Disclosure>
 
           <div className={s.section}>
             <div className={s.sectionHead}>
@@ -134,21 +135,21 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {grade && (
-            <div className={s.curveBox}>
+            <Disclosure summary="This week's grade"><div className={m.panel}>
               <h2 className={s.h2}>This week&apos;s grade</h2>
               <p className={s.p}>
                 {`${grade.action === "retire" ? "Would be retired" : "Keeps running"}: ${grade.sessions} sessions, ${grade.excess !== null ? `${pct(grade.excess)} against SPY` : "no SPY comparison"}${grade.t !== null ? `, t ${grade.t.toFixed(2)}` : ""}${
                   grade.passes === null ? "" : grade.passes ? ", strategy still passes the lab's filter" : ", strategy fails the lab's filter"
                 }. ${grade.why}`}
               </p>
-            </div>
+            </div></Disclosure>
           )}
 
           {log.length > 0 && (
-            <div className={s.section}>
+            <Disclosure summary="Learner log"><div className={s.section}>
               <h2 className={s.h2}>Learner log</h2>
               <LearnerLog entries={log.slice(0, 10)} empty="" />
-            </div>
+            </div></Disclosure>
           )}
 
           <details className={s.bg}>

@@ -8,7 +8,8 @@ import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { ourSliceBets, record } from "@/lib/models/learn";
 import { ftdBestRecord } from "../props/week";
-import { PageHead, SecHead, Stats } from "../picks/board";
+import { PageHead, Section, Stat, Num, Disclosure } from "@/components/hh/ui";
+import { Sparkline } from "@/components/hh/charts";
 import { LEAGUE_NAME, line } from "../picks/ui";
 import RecordsTable, { type IssuedRow } from "./RecordsTable";
 import s from "../picks/picks.module.css";
@@ -81,6 +82,13 @@ export default async function RecordsPage() {
   const l = settled.filter((b) => b.result === "L").length;
   const p = settled.filter((b) => b.result === "P").length;
 
+  const weeks = [...new Set(settled.map((b) => b.week))].sort((a, b) => a - b);
+  let running = 0;
+  const runningUnits = weeks.map((week) => {
+    running += settled.filter((b) => b.week === week).reduce((sum, b) => sum + b.net, 0);
+    return running;
+  });
+
   // Shadow records: graded at the saved price with no stake. Each comes from the same function its own page uses.
   const shadow: { what: string; href: string; w: number; l: number; p: number; units: number; basis: string }[] = [];
   if (nbaProps) {
@@ -102,37 +110,34 @@ export default async function RecordsPage() {
 
   return (
     <main className={s.page}>
-      <div className={s.wrap}>
-        <header className={s.pageFrame}>
-          <PageHead
-            title="Records"
-            sub="Every pick the emails issued, graded at the price saved when it was sent. Tracked-only records sit below and never add to these totals."
-            asof={`${season} season`}
-          />
-          <p className={s.issuedNote}>
-            <b>Issued is not placed.</b> An issued recommendation was sent with a saved price and stake. Nothing here confirms a person placed a real-money wager on it.
-          </p>
-          <Stats
-            label="Issued record"
-            items={[
-              { k: "Net, settled", v: settled.length ? u(net) : "0-0", sub: settled.length ? `${(risked ? (net / risked) * 100 : 0).toFixed(1)}% on ${risked.toFixed(1)}u risked` : "nothing settled", tone: settled.length ? (net >= 0 ? "up" : "down") : undefined },
-              { k: "Record", v: `${w}-${l}${p ? `-${p}` : ""}`, sub: `${settled.length} settled`, small: true },
-              { k: "Open", v: `${open.length}`, sub: open.length ? `${open.reduce((a, b) => a + b.stake, 0)}u not final yet` : "nothing open", small: true },
-              { k: "Leagues", v: reports.map((r) => LEAGUE_NAME[r.league]).join(" + ") || "None loaded", sub: "NBA has no issued picks yet", small: true },
-            ]}
-          />
-        </header>
+      <div className="mx-auto flex w-full min-w-0 max-w-[1104px] flex-col gap-8">
+        <PageHead title="Issued record" sub="Every pick the emails issued, graded at the price saved when it was sent." aside={<Num>{`${season} season`}</Num>} />
+        <Section label="Issued performance">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+            <Stat label="Net, settled" value={settled.length ? u(net) : "0-0"} sub={settled.length ? `${risked.toFixed(1)}u risked` : "nothing settled"} tone={settled.length ? net >= 0 ? "pos" : "neg" : undefined} />
+            <Stat label="W-L-P" value={`${w}-${l}-${p}`} sub={`${settled.length} settled`} />
+            <Stat label="Return" value={`${(risked ? (net / risked) * 100 : 0).toFixed(1)}%`} sub="On settled units risked" />
+            <Stat label="Open" value={open.length} sub={open.length ? `${open.reduce((a, b) => a + b.stake, 0)}u not final yet` : "nothing open"} />
+          </div>
+          <p className="mt-4 text-sm text-hh-muted">Leagues: {reports.map((r) => LEAGUE_NAME[r.league]).join(" + ") || "None loaded"}. NBA has no issued picks yet.</p>
+          <div className="mt-4">
+            <p className="mb-2 text-xs text-hh-muted">Running issued units by week number (NFL and college weeks counted together)</p>
+            <Sparkline values={runningUnits} labels={weeks.map((week) => `Week ${week}`)} label="Running issued units by week" width={480} height={72} format={u} />
+          </div>
+          <Disclosure summary="What this record counts">
+            <p>Tracked-only records sit below and never add to these totals.</p>
+            <p><b>Issued is not placed.</b> An issued recommendation was sent with a saved price and stake. Nothing here confirms a person placed a real-money wager on it.</p>
+          </Disclosure>
+        </Section>
 
-        <section className={s.section} aria-labelledby="rec-settled">
-          <SecHead id="rec-settled" title="Settled" aside="Graded at the saved price · sort below" />
+        <Section id="rec-settled" label="Settled" aside="Graded at the saved price · sort below">
           <RecordsTable rows={settled} />
           {unstaked > 0 && <p className={s.p}>{`${unstaked} early pick${unstaked === 1 ? " was" : "s were"} sent before stakes existed: in the win-loss record on each Picks page, not here.`}</p>}
-        </section>
+        </Section>
 
-        <section className={s.section} aria-labelledby="rec-open">
-          <SecHead id="rec-open" title="Open" aside="Not counted until final" />
+        <Section id="rec-open" label="Open" aside="Not counted until final">
           {open.length ? (
-            <div className={s.tw}>
+            <div className="min-w-0 max-w-full overflow-x-auto">
               <table className={s.table}>
                 <thead>
                   <tr>
@@ -163,13 +168,13 @@ export default async function RecordsPage() {
           ) : (
             <p className={s.calm}>Nothing issued is waiting on a result.</p>
           )}
-        </section>
+        </Section>
 
-        <section className={s.section} aria-labelledby="rec-shadow">
+        <Section label="Shadow records">
           <details className={s.details}>
             <summary id="rec-shadow">{`Shadow records: tracked, never staked · ${shadow.length} records`}</summary>
             <div className={s.detailsBody}>
-              <div className={s.tw}>
+              <div className="min-w-0 max-w-full overflow-x-auto">
                 <table className={s.table}>
                   <thead>
                     <tr>
@@ -198,7 +203,7 @@ export default async function RecordsPage() {
               </p>
             </div>
           </details>
-        </section>
+        </Section>
       </div>
     </main>
   );

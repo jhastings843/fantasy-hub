@@ -1,3 +1,5 @@
+import { Chip, Disclosure, Num, Section, Spotlight } from "@/components/hh/ui";
+import { TeamEdge } from "@/components/hh/team";
 import { buildWaivers } from "@/lib/waivers/build";
 import type { SeasonTarget, StartableTarget, WaiverPlayer } from "@/lib/waivers/rank";
 import { usageText } from "@/lib/waivers/freshness";
@@ -13,40 +15,18 @@ export const dynamic = "force-dynamic";
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+    <p className="text-xs font-semibold uppercase tracking-wider text-hh-muted ">
       {children}
     </p>
   );
 }
 
-function Chip({
-  tone = "zinc",
-  children,
-}: {
-  tone?: "amber" | "emerald" | "rose" | "zinc" | "cyan";
-  children: React.ReactNode;
-}) {
-  const tones = {
-    amber: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-    emerald: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-    rose: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
-    cyan: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300",
-    zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-  } as const;
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${tones[tone]}`}
-    >
-      {children}
-    </span>
-  );
-}
 
 function seasonChip(p: WaiverPlayer) {
-  if (p.seasonRank === null) return <Chip tone="rose">unranked</Chip>;
+  if (p.seasonRank === null) return <Chip tone="neg">unranked</Chip>;
   return (
     <>
-      <Chip tone="cyan">#{p.seasonRank}</Chip>
+      <Chip tone="gold">#{p.seasonRank}</Chip>
       {p.seasonPositionRank && <Chip>{p.seasonPositionRank}</Chip>}
       {p.tier && <Chip>{p.tier}</Chip>}
     </>
@@ -56,8 +36,8 @@ function seasonChip(p: WaiverPlayer) {
 function ResearchLine({ p }: { p: WaiverPlayer }) {
   if (!p.research) return null;
   return (
-    <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-      <Chip tone="cyan">
+    <p className="mt-1.5 text-xs leading-relaxed text-hh-ink-2 ">
+      <Chip tone="gold">
         {p.research.faabPercent != null ? `Consensus ${p.research.faabPercent}%` : "Consensus pick"}
       </Chip>{" "}
       {p.research.note}
@@ -73,8 +53,8 @@ function JinglesLine({ p }: { p: WaiverPlayer }) {
   // showing only one of them makes a reader do the conversion he already did.
   const bid = `$${faab} of $${budget}`;
   return (
-    <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-      <Chip tone="amber">
+    <p className="mt-1.5 text-xs leading-relaxed text-hh-ink-2 ">
+      <Chip tone="accent">
         Jingles{rank !== null ? ` #${rank}` : ""} {bid} ({Math.round(faabPercent)}%)
       </Chip>{" "}
       {note}
@@ -86,7 +66,7 @@ function UsageLine({ p }: { p: WaiverPlayer }) {
   if (!p.lastWeek) return null;
   const quiet = p.lastWeek.snaps < 10 && !p.onBye;
   return (
-    <p className={`mt-1 text-xs tabular-nums ${quiet ? "text-rose-600 dark:text-rose-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+    <p className={`mt-1 text-xs ${quiet ? "text-hh-neg " : "text-hh-muted "}`}>
       {usageText(p.lastWeek)}
       {quiet ? ". Barely played." : ""}
     </p>
@@ -103,26 +83,26 @@ function BidLine({ price }: { price: StartableTarget["price"] }) {
   return (
     <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <span className="text-sm tabular-nums">
-        <span className="text-zinc-500 dark:text-zinc-400">Bid </span>
-        <span className="font-semibold text-zinc-900 dark:text-zinc-100">${price.bid}</span>
+        <span className="text-hh-muted ">Bid </span>
+        <span className="font-semibold text-hh-ink ">${price.bid}</span>
         {price.walkAway > price.bid ? (
-          <span className="text-zinc-500 dark:text-zinc-400">, stop at ${price.walkAway}</span>
+          <span className="text-hh-muted ">, stop at ${price.walkAway}</span>
         ) : null}
       </span>
-      <Chip tone={price.tier === "winner" || price.tier === "starter" ? "amber" : "zinc"}>
+      <Chip tone={price.tier === "winner" || price.tier === "starter" ? "accent" : "muted"}>
         {price.tierLabel}
       </Chip>
-      {price.longShot ? <Chip tone="rose">likely loses at ${price.marketExpected}</Chip> : null}
+      {price.longShot ? <Chip tone="neg">likely loses at ${price.marketExpected}</Chip> : null}
     </div>
   );
 }
 
 function StartRow({ t }: { t: StartableTarget }) {
   return (
-    <div className="rounded-2xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+    <div className="border-b border-hh-line py-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Chip tone="amber">{t.slot}</Chip>
-        <span className="font-medium text-zinc-900 dark:text-zinc-100">{t.player.name}</span>
+        <Chip tone="accent">{t.slot}</Chip>
+        <span className="font-medium text-hh-ink ">{t.player.name}</span>
         <Chip>{t.player.position}</Chip>
         {t.player.flexRank !== null ? (
           <Chip>FLEX {t.player.flexRank}</Chip>
@@ -131,11 +111,11 @@ function StartRow({ t }: { t: StartableTarget }) {
             {t.player.position} {t.player.positionalRank}
           </Chip>
         ) : null}
-        <span className="text-sm text-zinc-500 tabular-nums dark:text-zinc-400">
+        <span className="text-sm text-hh-muted ">
           {matchupText(t.player)}
         </span>
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+      <p className="mt-2 text-sm leading-relaxed text-hh-ink-2 ">
         Would start at {t.slot} this week
         {t.displaces ? `, ahead of ${t.displaces.name}` : ""}.
       </p>
@@ -144,7 +124,7 @@ function StartRow({ t }: { t: StartableTarget }) {
       <UsageLine p={t.player} />
       <BidLine price={t.price} />
       {t.price ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1.5 text-xs leading-relaxed text-hh-muted ">
           {t.price.reason}
         </p>
       ) : null}
@@ -157,14 +137,14 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
     <div className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">{t.player.name}</span>
+          <span className="font-medium text-hh-ink ">{t.player.name}</span>
           <Chip>{t.player.position}</Chip>
           {seasonChip(t.player)}
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm leading-relaxed text-hh-muted ">
           {t.dropFor ? (
             <>
-              Drop <span className="font-medium text-zinc-700 dark:text-zinc-300">{t.dropFor.name}</span>
+              Drop <span className="font-medium text-hh-ink-2 ">{t.dropFor.name}</span>
               {t.dropFor.seasonRank !== null ? ` (#${t.dropFor.seasonRank})` : " (unranked)"}
               {t.placesBetter !== null ? `, ${t.placesBetter} places better` : ""}.
             </>
@@ -173,7 +153,7 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
           )}
         </p>
         {t.why ? (
-          <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm leading-relaxed text-hh-muted ">
             His weekly list: {t.why}.
           </p>
         ) : null}
@@ -182,13 +162,13 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
         <UsageLine p={t.player} />
         <BidLine price={t.price} />
         {t.price ? (
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs leading-relaxed text-hh-muted ">
             {t.price.reason}
           </p>
         ) : null}
         {t.alternative ? (
-          <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Or <span className="font-medium text-zinc-700 dark:text-zinc-300">{t.alternative.name}</span>
+          <p className="mt-1 text-sm leading-relaxed text-hh-muted ">
+            Or <span className="font-medium text-hh-ink-2 ">{t.alternative.name}</span>
             {t.alternative.jingles
               ? `, his waiver pick${t.alternative.jingles.rank != null ? ` #${t.alternative.jingles.rank}` : ""} at $${t.alternative.jingles.faab} of $${t.alternative.jingles.budget}`
               : ""}
@@ -210,7 +190,7 @@ export default async function WaiversPage({
   const { startable, seasonUpgrades, dropCandidates } = w.report;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-5xl min-w-0 break-words text-hh-ink px-4 py-8 sm:px-6 lg:px-8">
       <Eyebrow>{w.week ? `Week ${w.week}` : "Waivers"}</Eyebrow>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
         {startable.length > 0
@@ -219,7 +199,7 @@ export default async function WaiversPage({
             ? "Nothing to start, one worth holding."
             : "Nothing worth claiming."}
       </h1>
-      <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+      <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-hh-ink-2 ">
         {startable.length > 0
           ? "These would crack this week's lineup, which is the rare case. Everything below is the longer game."
           : seasonUpgrades.length > 0
@@ -228,17 +208,17 @@ export default async function WaiversPage({
       </p>
 
       {(w.budgetLeft !== null || w.freeAgentCount > 0) && (
-        <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-hh-ink-2 ">
           {w.budgetLeft !== null && (
             <span className="tabular-nums">
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+              <span className="font-semibold text-hh-ink ">
                 ${w.budgetLeft}
               </span>{" "}
               FAAB left{w.budgetTotal !== null ? ` of $${w.budgetTotal}` : ""}
             </span>
           )}
           <span className="tabular-nums">
-            <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+            <span className="font-semibold text-hh-ink ">
               {w.freeAgentCount}
             </span>{" "}
             of his ranked players unowned
@@ -247,19 +227,19 @@ export default async function WaiversPage({
       )}
 
       {w.pacing ? (
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-hh-ink-2 ">
           {w.pacing.note}
         </p>
       ) : null}
 
       {w.source.note && (
-        <div className="mt-6 max-w-2xl rounded-2xl border border-rose-200 bg-rose-50/60 p-4 text-sm leading-relaxed text-zinc-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-zinc-300">
+        <div className="mt-6 max-w-2xl text-sm leading-relaxed text-hh-ink-2  border-b border-hh-line py-4">
           {w.source.note}
         </div>
       )}
 
       {w.blocked && (
-        <div className="mt-6 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm leading-relaxed text-zinc-700 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-zinc-300">
+        <div className="mt-6 max-w-2xl text-sm leading-relaxed text-hh-ink-2  border-b border-hh-line py-4">
           {w.blocked}
         </div>
       )}
@@ -278,8 +258,8 @@ export default async function WaiversPage({
       {seasonUpgrades.length > 0 && (
         <div className="mt-8">
           <Eyebrow>{w.source.fresh ? "Worth a claim for the season" : w.source.label}</Eyebrow>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <div className="mt-3 overflow-hidden border-b border-hh-line py-4">
+            <div className="divide-y divide-hh-line ">
               {seasonUpgrades.map((t) => (
                 <SeasonRow key={t.player.playerId} t={t} />
               ))}
@@ -291,7 +271,7 @@ export default async function WaiversPage({
       {dropCandidates.length > 0 && (
         <div className="mt-8">
           <Eyebrow>Droppable, worst first</Eyebrow>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-hh-muted ">
             Anyone this week&rsquo;s lineup depends on is left out of this list, however poor
             their season rank. A fill-in who is actually starting on Sunday is worth more than a
             better player you cannot start.
@@ -300,10 +280,10 @@ export default async function WaiversPage({
             {dropCandidates.map((d) => (
               <span
                 key={d.playerId}
-                className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1.5 text-sm dark:border-zinc-800"
+                className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1.5 text-sm "
               >
-                <span className="text-zinc-800 dark:text-zinc-200">{d.name}</span>
-                <span className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+                <span className="text-hh-ink ">{d.name}</span>
+                <span className="text-xs text-hh-muted ">
                   {d.seasonRank !== null ? `#${d.seasonRank}` : "unranked"}
                 </span>
               </span>
@@ -312,7 +292,7 @@ export default async function WaiversPage({
         </div>
       )}
 
-      <div className="mt-10 max-w-2xl space-y-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+      <div className="mt-10 max-w-2xl space-y-2 text-xs leading-relaxed text-hh-muted ">
         <p>
           This week from {w.listTitle ?? "his weekly rankings"}
           {w.listUpdatedLabel ? `, last updated ${w.listUpdatedLabel}` : ""}. Season-long from{" "}

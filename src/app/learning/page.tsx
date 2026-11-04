@@ -15,6 +15,7 @@ import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionState } from "@/lib/learning/engine";
 import type { ReviewState } from "@/lib/picks/learning/review";
 import { whenEt } from "../picks/ui";
+import { PageHead, Section, Row as StatusRow, Chip, Disclosure, Num } from "@/components/hh/ui";
 import s from "../picks/picks.module.css";
 
 export const dynamic = "force-dynamic";
@@ -168,7 +169,7 @@ export default async function LearningPage() {
       title: "NBA picks",
       rows: [
         { name: "NBA spreads", loop: "NBA review: games are daily, so evidence grows every night; the review runs daily after each night's games with one change per market a week, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ats") },
-        { name: "NBA totals", loop: "NBA review: games are daily, so evidence grows every night; the review runs daily after each night's games with one change per market a week, Picks criteria on NBA games only, own limits", href: "/picks/nba?v=research", ...nbaRow("ou") },
+        { name: "NBA totals", loop: "NBA review: games are daily, so evidence grows every night; the review runs daily after each night's games with one change per market a week, Picks criteria on NBA games only, own limits", href: "/picks/nba?m=ou&v=research", ...nbaRow("ou") },
         {
           name: "NBA straight up",
           loop: "Record only",
@@ -187,7 +188,7 @@ export default async function LearningPage() {
         { name: "NFL first TD (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 2.33", href: "/props?m=ftd&v=results", ...engineRow(ourFtd) },
         { name: "NFL player props (David)", loop: ENGINE, href: "/props?v=research", ...engineRow(davidOnly) },
         { name: "NBA player props (our model)", loop: `${ENGINE}. Games are daily and graded overnight; the cap on new live slices runs Monday to Sunday`, href: "/props?m=nba&v=results", ...engineRow(ourNbaProps) },
-        { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 2.33", href: "/props?m=nba&v=results", ...engineRow(ourFb) },
+        { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 2.33", href: "/props?m=fb&v=results", ...engineRow(ourFb) },
         { name: "NFL anytime TD (our model)", loop: "Shared engine, Anytime TD gate: 30+ games over 3+ weeks, 100+ bets and 25+ winners. A live slice's players are marked as bets", href: "/props?m=attd&v=log", ...engineRow(attd) },
         { name: "NBA lottos (our model)", loop: "Shared engine, long-price gate: 60+ games over 4+ weeks, 12+ winners. A live slice's rungs, or the nightly ticket, are marked as bets", href: "/props?m=lotto&v=log", ...engineRow(lotto) },
         { name: "NBA King of the Court (our model)", loop: `${ENGINE}. Judged per night; a live slice marks the tagged props of our top N as bets`, href: "/props?m=kotc&v=log", ...engineRow(kotc) },
@@ -197,16 +198,17 @@ export default async function LearningPage() {
 
   return (
     <main className={s.page}>
-      <div className={s.wrap}>
-        <header className={s.header}>
-          <span className={s.eyebrow}>{`Every section · ${season}`}</span>
-          <h1 className={s.h1}>Learning</h1>
+      <div className="mx-auto flex w-full min-w-0 max-w-[1104px] flex-col gap-8">
+        <header className="flex flex-col gap-4">
+          <PageHead title="Learning" sub="Each section learns from its own games and goes live only after clearing its bar." aside={<Num>{`Every section · ${season}`}</Num>} />
+          <Disclosure summary="How learning works">
           <p className={s.p}>
             Each section learns from its own games only: an NFL totals edge never borrows from college spreads, and NBA props never borrow from NFL props. The rules are
             the same everywhere: a change is tested on games after it was first tracked, goes live only when it clears its section&apos;s bar, and is rolled back if it
             loses after that.
           </p>
-          <Link href="/learning/forecast" className={s.navBtn}>
+          </Disclosure>
+          <Link href="/learning/forecast" className="flex min-h-11 items-center justify-between gap-4 border-b border-hh-line py-3 text-hh-accent-ink">
             <span className={s.navBtnText}>
               <b>Go-live forecast</b>
               <span>When each slice meets its sample, and its chance of going live this season</span>
@@ -217,29 +219,24 @@ export default async function LearningPage() {
           </Link>
         </header>
         {groups.map((g) => (
-          <section key={g.title} className={s.section}>
-            <h2 className={s.h2}>{g.title}</h2>
-            <ul className={s.cards}>
-              {g.rows.map((r) => (
-                <li key={r.name} className={s.card}>
-                  <b>
-                    <Link href={r.href}>{r.name}</Link>
-                    {r.waiting && <span className={s.tag} style={{ marginLeft: 6 }}>not running</span>}
-                  </b>
-                  <span className={s.dim} style={{ fontSize: 13 }}>{r.loop}</span>
-                  <span style={{ fontSize: 14 }}>
-                    <span className={s.tag}>live</span>
-                    {r.live}
-                  </span>
-                  <span style={{ fontSize: 14 }}>
-                    <span className={s.tag}>testing</span>
-                    {r.collecting}
-                  </span>
-                  <span className={s.dim} style={{ fontSize: 12 }}>{r.last ? `Last review ${whenEt(r.last)}` : r.waiting ? "" : "No review yet"}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <Section key={g.title} label={g.title}>
+            {g.rows.map((r) => {
+              return (
+                <StatusRow key={r.name} className="!block">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Link href={r.href} className="font-semibold text-hh-ink hover:text-hh-accent-ink">{r.name}</Link>
+                    {r.waiting && <Chip>not running</Chip>}
+                  </div>
+                  <p className="mt-1 text-sm text-hh-ink-2"><span className="text-hh-muted">Live: </span>{r.live}</p>
+                  <Disclosure summary="Rules, testing and latest review">
+                    <p>{r.loop}</p>
+                    <p className="mt-2"><b>Testing: </b>{r.collecting}</p>
+                    <p className="mt-2 text-xs text-hh-muted">{r.last ? `Last review ${whenEt(r.last)}` : r.waiting ? "" : "No review yet"}</p>
+                  </Disclosure>
+                </StatusRow>
+              );
+            })}
+          </Section>
         ))}
       </div>
     </main>

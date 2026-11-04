@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/hh/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getMoneyView } from "@/lib/money/store";
@@ -112,23 +113,19 @@ function BetsTab({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
       {pending.length > 0 && (
         <div className={m.panel}>
           <h2 className={m.panelTitle}>Open</h2>
-          <div className={m.scroll}>
-            <table className={s.table}>
+          <div className={m.scroll}><table className={s.table}>
               <thead><tr><th>Bet</th><th>Risk</th><th>Price</th><th>Status</th><th>Net</th></tr></thead>
               <tbody>{pending.map((b) => <BetRow key={b.id} b={b} />)}</tbody>
-            </table>
-          </div>
+            </table></div>
         </div>
       )}
       <div className={m.panel}>
         <h2 className={m.panelTitle}>Graded</h2>
         {graded.length ? (
-          <div className={m.scroll}>
-            <table className={s.table}>
+          <div className={m.scroll}><table className={s.table}>
               <thead><tr><th>Bet</th><th>Risk</th><th>Price</th><th>Result</th><th>Net</th></tr></thead>
               <tbody>{graded.map((b) => <BetRow key={b.id} b={b} />)}</tbody>
-            </table>
-          </div>
+            </table></div>
         ) : (
           <p className={s.calm}>Nothing graded yet. Bets grade themselves from ESPN once the game is final.</p>
         )}
@@ -245,28 +242,26 @@ function PhilTab({ p }: { p: Phil }) {
         {philChart(p)}
       </div>
       {p.brierPhil !== null && p.brierMarket !== null && (
-        <BrierGauge
+        <Disclosure summary="Calibration against the market"><BrierGauge
           title={`${who(p)} against the market`}
           ours={p.brierPhil}
           ourLabel={who(p)}
           mkt={p.brierMarket}
           mktLabel="Market"
           note={`Brier score on the same ${p.settled} settled bets; the shorter bar wins.${p.settled < 30 ? ` ${p.settled} is too few to call either way.` : ""}`}
-        />
+        /></Disclosure>
       )}
       {p.open.length > 0 && (
         <div className={m.panel}>
           <h2 className={m.panelTitle}>Open</h2>
-          <div className={m.scroll}>
-            <table className={s.table}>
+          <div className={m.scroll}><table className={s.table}>
               <thead><tr><th>Market</th><th>Stake</th><th>Status</th><th></th></tr></thead>
               <tbody>{p.open.map((b) => <PhilRow key={b.id} b={b} />)}</tbody>
-            </table>
-          </div>
+            </table></div>
         </div>
       )}
       {p.categories.length > 0 && (
-        <div className={m.panel}>
+        <Disclosure summary="By category"><div className={m.panel}>
           <h2 className={m.panelTitle}>By category</h2>
           <div className={m.meters}>
             {p.categories.map((c) => (
@@ -279,25 +274,23 @@ function PhilTab({ p }: { p: Phil }) {
               </div>
             ))}
           </div>
-        </div>
+        </div></Disclosure>
       )}
       <details className={`${m.panel} ${m.fold}`}>
         <summary className={m.foldHead}>
           <h2 className={m.panelTitle}>Settled</h2>
           <span className={m.foldMeta}>{`${p.settledBets.length} bets`}</span>
         </summary>
-        <div className={m.scroll}>
-          <table className={s.table}>
+        <div className={m.scroll}><table className={s.table}>
             <thead><tr><th>Market</th><th>Stake</th><th>Result</th><th>P&amp;L</th></tr></thead>
             <tbody>{p.settledBets.map((b) => <PhilRow key={b.id} b={b} />)}</tbody>
-          </table>
-        </div>
+          </table></div>
       </details>
       {p.learner && p.learner.length > 0 && (
-        <div className={s.section}>
+        <Disclosure summary="Learner log"><div className={s.section}>
           <h3 className={s.h2}>Learner log</h3>
           <LearnerLog entries={retroLog(p.learner).slice(0, 8)} empty="" />
-        </div>
+        </div></Disclosure>
       )}
       <Background title={`How ${who(p)} works, and every retro in full`}>
         <p className={s.notice}>
@@ -395,7 +388,7 @@ function RecentTrades({ books, n = 12 }: { books: Book[]; n?: number }) {
     .slice(0, n);
   if (!rows.length) return <p className={s.muted}>No trades yet.</p>;
   return (
-    <table className={m.trades}>
+    <div className={m.scroll}><table className={m.trades}>
       <tbody>
         {rows.map(({ f, b }, k) => (
           <tr key={`${b.id}${k}`}>
@@ -406,7 +399,7 @@ function RecentTrades({ books, n = 12 }: { books: Book[]; n?: number }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 
@@ -539,18 +532,18 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
           <span className={m.why}>{`Retired: ${books.filter((b) => b.retired).map((b) => b.label).join(", ")}. Their pages keep the full record.`}</span>
         )}
       </div>
-      <div className={m.panel}>
+      <Disclosure summary="Recent trades"><div className={m.panel}>
         <div className={m.panelHead}>
           <h2 className={m.panelTitle}>Recent trades</h2>
           <span className={m.foldMeta}>latest 12, every book</span>
         </div>
         <RecentTrades books={books} />
-      </div>
+      </div></Disclosure>
       {log.length > 0 && (
-        <div className={s.section}>
+        <Disclosure summary="Learner log"><div className={s.section}>
           <h3 className={s.h2}>Learner log</h3>
           <LearnerLog entries={booksLog(log).slice(0, 10)} empty="" />
-        </div>
+        </div></Disclosure>
       )}
       {(log.length > 0 || (grades && grades.books.length > 0)) && (
         <Background title="Every grade and learn entry in full">
@@ -736,8 +729,7 @@ function TrendLearner({ tr }: { tr: Trends }) {
           : "The cap moves only when graded picks show the extra picks beat SPY, or the last one inside the cap loses to it."}
       </p>
       {rows.length ? (
-        <div className={m.scroll}>
-          <table className={s.table}>
+        <div className={m.scroll}><table className={s.table}>
             <thead><tr><th>Kind of pick</th><th className={s.num}>Picks</th><th className={s.num}>Weeks</th><th className={s.num}>vs SPY</th><th className={s.num}>t</th><th className={s.num}>Newer half</th></tr></thead>
             <tbody>
               {rows.map((x) => (
@@ -751,8 +743,7 @@ function TrendLearner({ tr }: { tr: Trends }) {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </table></div>
       ) : (
         <p className={m.sub}>No pick is graded yet, so every kind of pick is still collecting. The table fills in as picks reach their horizon.</p>
       )}
@@ -831,12 +822,12 @@ function TrendsTab({ tr }: { tr: Trends }) {
           { k: "Benched", v: `${benched.length}`, sub: benched.length ? benched.join(", ") : `needs ${tr.bench?.n ?? 20} graded of a kind` },
         ]}
       />
-      <p className={m.sub}>
+      <Disclosure summary="How the trend book works">      <p className={m.sub}>
         Every trading morning Claude reads Google&apos;s trending searches and Wikipedia&apos;s most-read pages, searches for what is coming up, and names its best {tr.learner?.cap ?? latest?.cap ?? 3}{" "}listed
         companies riding a trend. The book buys them at the open, $10,000 a slot, and sells at the pick&apos;s horizon, on a 15% drop, or when the story is over. Every pick
         is graded against SPY, and each Saturday a review rewrites the playbook the picker follows.
         {tr.liveFrom ? ` Until ${shortDay(tr.liveFrom)} it is a shadow run: every pick is graded, none is bought.` : ""}
-      </p>
+      </p></Disclosure>
       <div className={m.panels}>
         {b && (
           <Link href={`/money/book/${encodeURIComponent(b.id)}`} className={m.cardLink} aria-label="Trend themes: open the full chart">
@@ -881,7 +872,7 @@ function TrendsTab({ tr }: { tr: Trends }) {
 
       <TrendPending tr={tr} />
 
-      <div className={s.section}>
+      <Disclosure summary="What it has learned"><div className={s.section}>
         <div className={s.sectionHead}>
           <h3 className={s.h2}>What it has learned</h3>
           <p className={s.p}>
@@ -896,7 +887,7 @@ function TrendsTab({ tr }: { tr: Trends }) {
             {dims.map((d) => (
               <div key={d} className={m.panel}>
                 <div className={m.panelHead}><h2 className={m.panelTitle}>{BUCKET_TITLE[d] ?? d}</h2></div>
-                <table className={s.table}>
+                <div className={m.scroll}><table className={s.table}>
                   <thead><tr><th>Bet</th><th className={s.num}>Picks</th><th className={s.num}>vs SPY</th><th className={s.num}>Beat SPY</th></tr></thead>
                   <tbody>
                     {(tr.buckets?.[d] ?? []).map((x) => (
@@ -911,12 +902,12 @@ function TrendsTab({ tr }: { tr: Trends }) {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </div></Disclosure>
 
       {(tr.graded ?? []).length > 0 && (
         <details className={`${m.panel} ${m.fold}`}>
@@ -924,10 +915,10 @@ function TrendsTab({ tr }: { tr: Trends }) {
             <h2 className={m.panelTitle}>Graded picks</h2>
             <span className={m.foldMeta}>{`latest ${tr.graded!.length}`}</span>
           </summary>
-          <table className={s.table}>
+          <div className={m.scroll}><table className={s.table}>
             <thead><tr><th>Pick</th><th className={s.num}>Stock</th><th className={s.num}>SPY</th><th className={s.num}>vs SPY</th></tr></thead>
             <tbody>{tr.graded!.map((o) => <GradedRow key={o.id} o={o} />)}</tbody>
-          </table>
+          </table></div>
         </details>
       )}
       {b && (
@@ -1106,7 +1097,7 @@ function KalshiTab({ k }: { k: Kalshi }) {
         Nothing is placed, and none of this is in his Polymarket numbers. Passes are tracked too, so the edge rule can be tested on what he turned down.
       </p>
 
-      <div className={m.panel}>
+      <Disclosure summary="What Phil is learning"><div className={m.panel}>
         <h2 className={m.panelTitle}>What it&apos;s learning</h2>
         <div className={m.goals}>
           <Goal label="Is Phil sharper than Kalshi's price?" have={k.settled} need={30}
@@ -1116,26 +1107,22 @@ function KalshiTab({ k }: { k: Kalshi }) {
           <Goal label="Same skill on both venues?" have={k.pooling.pairs} need={k.pooling.needed}
             why="Needs markets Phil priced on both venues and that have settled. Even if they match, the records stay separate until a review says otherwise." />
         </div>
-        <div className={m.scroll}>
-          <table className={s.table}>
+        <div className={m.scroll}><table className={s.table}>
             <thead><tr><th>Where it came from</th><th>Decisions</th><th>Bets</th><th>Settled</th><th>P&amp;L</th></tr></thead>
             <tbody>{origin("matched", "Also on Polymarket")}{origin("kalshi_only", "Kalshi only")}</tbody>
-          </table>
-        </div>
+          </table></div>
         {k.comparisons.total > 0 && (
           <p className={s.notice}>{`${k.comparisons.total} Polymarket markets checked against Kalshi: ${k.comparisons.equivalent ?? 0} the same bet, ${(k.comparisons.rejected ?? 0) + (k.comparisons.flagged ?? 0)} turned away for different wording, dates or rules.`}</p>
         )}
-      </div>
+      </div></Disclosure>
 
       <div className={m.panel}>
         <h2 className={m.panelTitle}>Watching</h2>
         {k.watching.length ? (
-          <div className={m.scroll}>
-            <table className={s.table}>
+          <div className={m.scroll}><table className={s.table}>
               <thead><tr><th>Market</th><th>Call</th><th>Stake</th><th></th></tr></thead>
               <tbody>{k.watching.map((r) => <KalshiRowView key={r.id} r={r} />)}</tbody>
-            </table>
-          </div>
+            </table></div>
         ) : (
           <p className={s.calm}>Nothing open yet. Phil looks at up to three Kalshi markets each full cycle and records a bet or a pass here.</p>
         )}
@@ -1151,15 +1138,13 @@ function KalshiTab({ k }: { k: Kalshi }) {
       )}
 
       {k.recent.length > 0 && (
-        <div className={m.panel}>
+        <Disclosure summary="Settled shadow bets"><div className={m.panel}>
           <h2 className={m.panelTitle}>Settled</h2>
-          <div className={m.scroll}>
-            <table className={s.table}>
+          <div className={m.scroll}><table className={s.table}>
               <thead><tr><th>Market</th><th>Call</th><th>Stake</th><th>Result</th></tr></thead>
               <tbody>{k.recent.map((r) => <KalshiRowView key={r.id} r={r} settled />)}</tbody>
-            </table>
-          </div>
-        </div>
+            </table></div>
+        </div></Disclosure>
       )}
       {k.learner && k.learner.length > 0 && (
         <PhilLearnLog
@@ -1281,8 +1266,7 @@ function GateBar({ have, need }: { have: number; need: number }) {
 
 function SliceTable({ rows, gate }: { rows: WeatherSlice[]; gate: WeatherSliceGate }) {
   return (
-    <div className={m.scroll}>
-      <table className={`${s.table} ${m.sliceTable}`}>
+    <div className={m.scroll}><table className={`${s.table} ${m.sliceTable}`}>
         <thead>
           <tr><th>Slice</th><th>Record</th><th>Per $1</th><th>t</th><th>Bets</th><th>Days</th></tr>
         </thead>
@@ -1301,8 +1285,7 @@ function SliceTable({ rows, gate }: { rows: WeatherSlice[]; gate: WeatherSliceGa
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </table></div>
   );
 }
 
@@ -1401,7 +1384,7 @@ function WeatherTab({ w }: { w: Weather }) {
         <h2 className={m.panelTitle}>Bankroll</h2>
         {weatherChart(w, 220, 640)}
       </div>
-      <WeatherSlices w={w} />
+      <Disclosure summary="Slices and slice changes"><WeatherSlices w={w} /></Disclosure>
       <Background title="How the desk forecasts and bets">
         <p className={m.sub}>
           {`Bets on tomorrow's high in ${w.cities.length} cities on Kalshi. Each forecast averages five weather models with the National Weather Service forecast, correcting each by what it has learned about the station and weighting whichever has missed by less. The desk's odds are blended with the market's: ${Math.round(w.trust.w * 100)}% desk, ${100 - Math.round(w.trust.w * 100)}% market${
@@ -1554,7 +1537,7 @@ function Overview({ v }: { v: Awaited<ReturnType<typeof getMoneyView>> }) {
     <section className={s.section}>
       <div className={s.section}>
         <SecHead title="Each desk vs its yardstick" aside="Open a desk for its ledger" />
-        <p className={s.p}>Each desk against what it has to beat (oxblood bar: the desk; grey: the yardstick; for Brier scores the shorter bar wins). Open a desk for its ledger. Paper dollars and units never add together.</p>
+        <p className={s.p}>Each desk against what it has to beat (coloured bar: the desk; grey: the yardstick; for Brier scores the shorter bar wins). Open a desk for its ledger. Paper dollars and units never add together.</p>
         <SecHead title="Paper dollars" aside="Prediction markets, weather and stock books" />
         <DeskTable list={list.filter((d) => d.money === "usd")} />
         <SecHead title="Units" aside="Issued picks and tracked prop edges" />
@@ -1724,7 +1707,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
   // eslint-disable-next-line react-hooks/purity
   const age = snap ? (Date.now() - Date.parse(snap.generatedAt)) / 3600_000 : null;
   return (
-    <main className={s.page}>
+    <main className={`${s.page} ${m.moneyPage}`}>
       <div className={s.wrap}>
         <header className={s.pageFrame}>
           <PageHead

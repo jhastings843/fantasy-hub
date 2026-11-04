@@ -136,3 +136,22 @@ export function Row({ children, className = "" }: { children: ReactNode; classNa
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-2 text-sm text-hh-muted">{children}</p>;
 }
+
+const POS_VAR: Record<string, string> = { QB: "--pos-qb", RB: "--pos-rb", WR: "--pos-wr", TE: "--pos-te", K: "--pos-k", DEF: "--pos-def", DST: "--pos-def" };
+
+/**
+ * A lineup slot or position: a coloured mark plus the label in ink, so the
+ * column scans by position (colour is the second cue; the text is the first).
+ * Flex, superflex and bench get a neutral outline mark.
+ */
+export function PosBadge({ pos }: { pos: string }) {
+  const up = pos.toUpperCase();
+  const v = POS_VAR[up];
+  const label = up.replace("SUPER_FLEX", "SFLEX").replace("REC_FLEX", "RFLEX");
+  return (
+    <span className="inline-flex min-w-[3.25rem] items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-hh-ink-2">
+      <span aria-hidden className="size-2.5 shrink-0 rounded-[2px]" style={v ? { background: `var(${v})` } : { border: "1.5px solid var(--hh-muted)" }} />
+      {label}
+    </span>
+  );
+}

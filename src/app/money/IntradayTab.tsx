@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/hh/ui";
 import type { Intraday, IntradayRow, IntradayStats } from "@/lib/money/types";
 import { decidedOdds, filterRead, intradayHead, openTrades, todayRows } from "@/lib/money/intraday";
 import { LineChart } from "./Chart";
@@ -166,7 +167,7 @@ export function IntradayTab({ d }: { d: Intraday }) {
         !h.waiting && <p className={s.thin}>The chart starts after the second session.</p>
       )}
 
-      <div className={m.panel}>
+      <Disclosure summary="Is the filter helping?"><div className={m.panel}>
         <div className={m.panelHead}>
           <h2 className={m.panelTitle}>Is the filter helping?</h2>
           <span className={`${s.readChip} ${readCls}`}>{read.kind === "early" || read.kind === "empty" ? "Too early" : read.kind === "helping" ? "Helping" : read.kind === "hurting" ? "Hurting" : "No clear gap"}</span>
@@ -183,7 +184,7 @@ export function IntradayTab({ d }: { d: Intraday }) {
         {tags.length > 0 && (
           <details className={m.inner}>
             <summary>{`Split by context tag (${tags.length})`}</summary>
-            <table className={m.trades}>
+            <div className={m.scroll}><table className={m.trades}>
               <tbody>
                 {tags.map(([k, st]) => (
                   <tr key={k}>
@@ -193,10 +194,10 @@ export function IntradayTab({ d }: { d: Intraday }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </details>
         )}
-      </div>
+      </div></Disclosure>
 
       <div className={m.panel}>
         <div className={m.panelHead}>
@@ -254,7 +255,7 @@ export function IntradayTab({ d }: { d: Intraday }) {
             <h2 className={m.panelTitle}>Recent taken trades</h2>
             <span className={m.foldMeta}>{`latest ${recent.length}`}</span>
           </summary>
-          <table className={m.trades}>
+          <div className={m.scroll}><table className={m.trades}>
             <tbody>
               {recent.map((r) => (
                 <tr key={`${r.day}${r.symbol}${r.trigger_time}`}>
@@ -269,11 +270,11 @@ export function IntradayTab({ d }: { d: Intraday }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </details>
       )}
 
-      <div className={m.panel}>
+      <Disclosure summary="The rule"><div className={m.panel}>
         <div className={m.panelHead}>
           <h2 className={m.panelTitle}>The rule</h2>
           <span className={m.foldMeta}>fixed, paper only</span>
@@ -291,7 +292,7 @@ export function IntradayTab({ d }: { d: Intraday }) {
             <span><b className={s.num}>{clock(rules.flat_by)}</b>everything sold by</span>
           </div>
         )}
-      </div>
+      </div></Disclosure>
 
       {(d.skills ?? []).length > 0 && (
         <details className={`${m.panel} ${m.fold}`}>

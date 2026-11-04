@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/hh/ui";
 // The Money redesign (2026-10-21, from the mock): each desk judged against
 // its own yardstick, not just its balance. One row per desk on the overview,
 // a headline on each desk's tab, and one learner log across desks. Dollars and
@@ -316,13 +317,13 @@ export function MoneyHero({ list }: { list: Desk[] }) {
 
 export function MoneyLogSection({ entries }: { entries: LogEntry[] }) {
   return (
-    <div className={s.section}>
+    <Disclosure summary="Learner log, every desk"><div className={s.section}>
       <h3 className={s.h2}>Learner log, every desk</h3>
       <LearnerLog entries={entries} empty="Nothing logged yet. Each desk posts its learning with its next run." />
       <p className={s.thin}>
         Picks and props keep their own logs: <Link href="/picks?v=log">Picks learner log</Link>, <Link href="/props?v=log">Props learner log</Link>.
       </p>
-    </div>
+    </div></Disclosure>
   );
 }
 

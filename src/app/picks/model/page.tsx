@@ -9,7 +9,7 @@ import { CRITERIA } from "@/lib/picks/learning/model";
 import { leagueOf } from "../learning";
 import { OurSpreadCard } from "../ours";
 import { CfbModelCard } from "../cfb-model";
-import { Hero, Stats } from "../board";
+import { PageHead, Section, Stat, Disclosure, Num } from "@/components/hh/ui";
 import { LEAGUE_NAME, href, rec, units, whenEt } from "../ui";
 import s from "../picks.module.css";
 
@@ -55,7 +55,7 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
   if (!r) {
     return (
       <main className={s.page}>
-        <div className={s.wrap}>
+        <div className="mx-auto flex w-full min-w-0 max-w-[1104px] flex-col gap-8">
           {back}
           <p className={s.calm}>The picks report isn&apos;t available right now. Try again in a few minutes.</p>
         </div>
@@ -80,21 +80,23 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
   ];
   return (
     <main className={s.page}>
-      <div className={s.wrap}>
+      <div className="mx-auto flex w-full min-w-0 max-w-[1104px] flex-col gap-8">
+        <PageHead title="Issued performance" sub="Settled spreads and totals use the issued stakes; all numbers come from the board's report." aside={<Num>{`${L} ${r.season} · the method`}</Num>} />
         {back}
-        <Hero eyebrow={`${L} ${r.season} · the method`} title="How our picks work" sub="Every step from the two models to a sent bet, and how it has done. All numbers come from the same report the board uses." />
-        <Stats
-          label="How it has done"
-          items={[
+        <Section label="How it has done">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+          {[
             { k: `${L} spreads`, v: spreads.w + spreads.l + spreads.p ? units(spreads.units) : "0-0", sub: spreads.w + spreads.l + spreads.p ? `${rec(spreads)} as sent` : "no bets settled", tone: spreads.w + spreads.l ? (spreads.units >= 0 ? "up" : "down") : undefined },
             { k: `${L} totals`, v: totals.w + totals.l + totals.p ? units(totals.units) : "0-0", sub: totals.w + totals.l + totals.p ? `${rec(totals)} as sent` : "no bets settled", tone: totals.w + totals.l ? (totals.units >= 0 ? "up" : "down") : undefined },
             { k: `${L} straight up`, v: su.w + su.l ? `${su.w}-${su.l}` : "0-0", sub: "winners picked, no stakes" },
             { k: "Vs the closing line", v: sentClv ? `${sentClv.avg > 0 ? "+" : ""}${sentClv.avg.toFixed(2)} pts` : "·", sub: sentClv ? `${sentClv.n} sent bets with a close${sentClv.price ? `; price ${sentClv.price.avg > 0 ? "+" : ""}${(sentClv.price.avg * 100).toFixed(1)}% on ${sentClv.price.n}` : ""}` : "no closes yet", small: true },
-          ]}
-        />
-        <section className={s.section} aria-labelledby="steps">
-          <h2 className={s.h2} id="steps">From the models to a bet</h2>
-          <div className={s.curveBox}>
+          ].map((item) => <Stat key={item.k} label={item.k} value={item.v} sub={item.sub} tone={item.tone === "up" ? "pos" : item.tone === "down" ? "neg" : undefined} />)}
+          </div>
+        </Section>
+        <Section id="steps" label="The method">
+          <Disclosure summary="From the models to a bet">
+          <p className="mb-3">Every step from the two models to a sent bet, and how it has done. All numbers come from the same report the board uses.</p>
+          <div>
             <dl className={s.kv}>
               {steps.map((x, i) => (
                 <Fragment key={x.k}>
@@ -110,9 +112,10 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
             {"; the review's own log is under "}
             <Link href={href(league, "ats", "log")}>Learner log</Link>.
           </p>
-        </section>
-        <section className={s.section} aria-labelledby="changes">
-          <h2 className={s.h2} id="changes">Recent changes</h2>
+          </Disclosure>
+        </Section>
+        <Section id="changes" label="Learner changes">
+          <Disclosure summary="Recent changes">
           {mine.length ? (
             <ul className={`${s.journal} ${s.cardsInset}`}>
               {mine.map((j, i) => (
@@ -126,12 +129,12 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
           ) : (
             <p className={s.calm}>No changes recorded yet.</p>
           )}
-        </section>
-        <section className={s.section} aria-labelledby="ours">
-          <h2 className={s.h2} id="ours">{league === "nfl" ? "Our own NFL spread model" : "Our own college model"}</h2>
+          </Disclosure>
+        </Section>
+        <Section id="ours" label={league === "nfl" ? "Our own NFL spread model" : "Our own college model"}>
           <p className={s.p}>Built and graded here, separate from Sam and David. It is tracked only and never stakes until it clears its own gate.</p>
           {league === "nfl" ? <OurSpreadCard season={r.season} /> : <CfbModelCard season={r.season} />}
-        </section>
+        </Section>
       </div>
     </main>
   );

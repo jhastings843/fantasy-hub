@@ -12,6 +12,7 @@ import { SECTIONS } from "@/lib/models/sections";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionView } from "@/lib/learning/engine";
 import { byOutlook, forecast, SEASON_END, type Forecast, type ForecastInput, type Outlook, type Sport } from "@/lib/learning/forecast";
+import { PageHead, Section, Stat, Disclosure, Chip } from "@/components/hh/ui";
 import s from "../../picks/picks.module.css";
 
 export const dynamic = "force-dynamic";
@@ -158,7 +159,7 @@ function Row({ f }: { f: Forecast }) {
   const c = CHIP[f.outlook];
   const showOdds = f.chance !== null && f.outlook !== "out of time";
   return (
-    <li className={s.card}>
+    <li className="flex min-w-0 flex-col gap-1.5 border-b border-hh-line py-3">
       <div className={s.cardTop}>
         <b style={{ fontSize: 15, lineHeight: 1.3, overflowWrap: "anywhere" }}>{f.label}</b>
         {showOdds && (
@@ -169,7 +170,7 @@ function Row({ f }: { f: Forecast }) {
         )}
       </div>
       <span style={{ fontSize: 13 }}>
-        <span className={s.tag} style={c.tone ? { color: `var(--${c.tone})` } : undefined}>{c.text}</span>
+        <Chip tone={c.tone ?? "muted"}>{c.text}</Chip>{" "}
         {f.games > 0 && `${f.games} games, t ${f.t}`}
         {f.sampleBy && ` · sample met ${md(f.sampleBy)}`}
       </span>
@@ -194,7 +195,7 @@ export default async function ForecastPage() {
       engineGroup("NFL first TD (our model)", "/props?m=ftd&v=results", "nfl", async () => (await getOurFtdView(season)).learning, now),
       engineGroup("NFL anytime TD (our model)", "/props?m=attd&v=log", "nfl", () => getAttdLearning(season), now),
       engineGroup("NBA player props (our model)", "/props?m=nba&v=results", "nba", async () => (await getOurNbaView(nbaSeason, now)).learning, now),
-      engineGroup("NBA first basket (our model)", "/props?m=nba&v=results", "nba", async () => (await getOurNbaView(nbaSeason, now)).fb.learning, now),
+      engineGroup("NBA first basket (our model)", "/props?m=fb&v=results", "nba", async () => (await getOurNbaView(nbaSeason, now)).fb.learning, now),
       engineGroup("NBA lottos (our model)", "/props?m=lotto&v=log", "nba", () => getNbaSectionLearning(SECTIONS.nbaLotto, nbaSeason), now),
       engineGroup("NBA King of the Court", "/props?m=kotc&v=log", "nba", () => getNbaSectionLearning(SECTIONS.nbaKotc, nbaSeason), now),
     ])
@@ -209,12 +210,57 @@ export default async function ForecastPage() {
 
   return (
     <main className={s.page}>
-      <div className={s.wrap}>
-        <header className={s.header}>
-          <span className={s.eyebrow}>
-            <Link href="/learning">Learning</Link> · Go-live forecast
-          </span>
-          <h1 className={s.h1}>What could go live</h1>
+      <div className="mx-auto flex w-full min-w-0 max-w-[1104px] flex-col gap-8">
+        <PageHead title="What could go live" sub="See what is betting now and which collecting slices have the best chance this season." aside={<><Link href="/learning">Learning</Link> · Go-live forecast</>} />
+        <Section label="Status">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+            <Stat label="rules staking now" value={staking.length} tone={staking.length ? "pos" : undefined} />
+            <Stat label="learned slices live" value={count(["live"])} />
+            <Stat label="likely or possible" value={count(["likely", "possible"])} />
+            <Stat label="unlikely, out of time or retired" value={count(["unlikely", "out of time", "retired"])} tone="neg" />
+          </div>
+        </Section>
+
+
+        <Section label="Betting now">
+          <Disclosure summary="Which rules issue bets">
+          <p className={s.p} style={{ marginBottom: 10 }}>
+            The rules behind the bets the 9am email sends. Each league&apos;s weekly spread rule, Tier 2 and totals rule stake once their forward check passes;
+            they are picked weekly from the best cuts, not learned slices, so they aren&apos;t in the forecast below. NBA picks aren&apos;t staked yet.
+          </p>
+          </Disclosure>
+          {live.error && <p className={s.p}>Couldn&apos;t load: {live.error}</p>}
+          <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3">
+            {live.rows.map((r) => (
+              <li key={`${r.league}:${r.market}`} className="flex min-w-0 flex-col gap-1.5 border-b border-hh-line py-3">
+                <div className={s.cardTop}>
+                  <span className={s.dim} style={{ fontSize: 12 }}>
+                    {r.league} · {r.market}
+                  </span>
+                  <Chip tone={r.stakes ? "pos" : "muted"}>{r.stakes ? "staking" : "tracked only"}</Chip>
+                </div>
+                <b style={{ fontSize: 15, lineHeight: 1.3 }}>
+                  <Link href={r.href}>{r.label}</Link>
+                </b>
+                <span className={s.dim} style={{ fontSize: 12.5 }}>{r.why}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section label="Best bets to go live">
+          {top.length ? (
+            <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3">
+              {top.map((f) => (
+                <Row key={f.id} f={f} />
+              ))}
+            </ul>
+          ) : (
+            <p className={s.p}>Nothing is better than a long shot yet. That is normal this early: most slices have a few weeks of games at most.</p>
+          )}
+        </Section>
+
+        <Disclosure summary="How the forecast is estimated">
           <p className={s.p}>
             Every slice still collecting, with the date it meets its sample at its current pace and an estimated chance it clears its bar before the season ends.
             The estimate starts from &ldquo;no real edge&rdquo; (most betting edges are small or not there) and moves only partway toward what each slice has shown so far. A
@@ -224,81 +270,20 @@ export default async function ForecastPage() {
             The chance is of going live, not of having a real edge. Every slice is checked after every slate, so some will clear their bar by luck; the rollback
             rule is what catches those.
           </p>
-        </header>
-
-        <section className={s.section}>
-          <div className={s.tiles}>
-            <div className={`${s.tile} ${s.good}`}>
-              <span className={s.tileV}>{staking.length}</span>
-              <span className={s.tileK}>rules staking now</span>
-            </div>
-            <div className={s.tile}>
-              <span className={s.tileV}>{count(["live"])}</span>
-              <span className={s.tileK}>learned slices live</span>
-            </div>
-            <div className={s.tile}>
-              <span className={s.tileV}>{count(["likely", "possible"])}</span>
-              <span className={s.tileK}>likely or possible</span>
-            </div>
-            <div className={`${s.tile} ${s.bad}`}>
-              <span className={s.tileV}>{count(["unlikely", "out of time", "retired"])}</span>
-              <span className={s.tileK}>unlikely, out of time or retired</span>
-            </div>
-          </div>
-        </section>
-
-        <section className={s.section}>
-          <h2 className={s.h2}>Betting now</h2>
-          <p className={s.p} style={{ marginBottom: 10 }}>
-            The rules behind the bets the 9am email sends. Each league&apos;s weekly spread rule, Tier 2 and totals rule stake once their forward check passes;
-            they are picked weekly from the best cuts, not learned slices, so they aren&apos;t in the forecast below. NBA picks aren&apos;t staked yet.
-          </p>
-          {live.error && <p className={s.p}>Couldn&apos;t load: {live.error}</p>}
-          <ul className={s.cards}>
-            {live.rows.map((r) => (
-              <li key={`${r.league}:${r.market}`} className={s.card}>
-                <div className={s.cardTop}>
-                  <span className={s.dim} style={{ fontSize: 12 }}>
-                    {r.league} · {r.market}
-                  </span>
-                  <span className={s.tag} style={{ color: r.stakes ? "var(--pos)" : undefined }}>{r.stakes ? "staking" : "tracked only"}</span>
-                </div>
-                <b style={{ fontSize: 15, lineHeight: 1.3 }}>
-                  <Link href={r.href}>{r.label}</Link>
-                </b>
-                <span className={s.dim} style={{ fontSize: 12.5 }}>{r.why}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className={s.section}>
-          <h2 className={s.h2}>Best bets to go live</h2>
-          {top.length ? (
-            <ul className={s.cards}>
-              {top.map((f) => (
-                <Row key={f.id} f={f} />
-              ))}
-            </ul>
-          ) : (
-            <p className={s.p}>Nothing is better than a long shot yet. That is normal this early: most slices have a few weeks of games at most.</p>
-          )}
-        </section>
+        </Disclosure>
 
         {groups.map((g) => {
           const loud = g.rows.filter((f) => !QUIET.includes(f.outlook));
           const quiet = g.rows.filter((f) => QUIET.includes(f.outlook));
           return (
-            <section key={g.title} className={s.section}>
-              <h2 className={s.h2}>
-                <Link href={g.href}>{g.title}</Link>
-              </h2>
+            <Section key={g.title} label={<Link href={g.href}>{g.title}</Link>}>
               <span className={s.dim} style={{ fontSize: 12 }}>
                 Season ends {md(SEASON_END[g.sport])} (estimate) · {g.rows.length} slices
               </span>
               {g.error && <p className={s.p}>Couldn&apos;t load this section: {g.error}</p>}
+              <Disclosure summary={`Slice detail · ${g.rows.length} slices`}>
               {loud.length > 0 && (
-                <ul className={s.cards} style={{ marginTop: 8 }}>
+                <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3" style={{ marginTop: 8 }}>
                   {loud.map((f) => (
                     <Row key={f.id} f={f} />
                   ))}
@@ -310,14 +295,15 @@ export default async function ForecastPage() {
                   <summary>
                     {quiet.length} unlikely, waiting or retired ({["unlikely", "no games", "out of time", "retired"].map((o) => `${quiet.filter((f) => f.outlook === o).length} ${CHIP[o as Outlook].text}`).filter((x) => !x.startsWith("0 ")).join(", ")})
                   </summary>
-                  <ul className={s.cards} style={{ marginTop: 10 }}>
+                  <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3" style={{ marginTop: 10 }}>
                     {quiet.map((f) => (
                       <Row key={f.id} f={f} />
                     ))}
                   </ul>
                 </details>
               )}
-            </section>
+              </Disclosure>
+            </Section>
           );
         })}
       </div>
