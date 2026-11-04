@@ -1,3 +1,5 @@
+import { nbaAbbr, nflAbbr } from "@/lib/search/teams";
+
 // Where a team, matchup or player name opens its pop-up (Jack, 2026-11-04:
 // "every team/match/player should have a pop up box when i click the name").
 // Every link built here goes to a route app/@modal intercepts, so a client-side
@@ -21,3 +23,12 @@ export const cbbGameHref = (id: string) => `/picks/cbb/game?id=${encodeURICompon
  */
 export const playerPropHref = (league: "nfl" | "nba", team: string, name: string, game?: string | null) =>
   `/props/player?l=${league}&t=${encodeURIComponent(team)}&n=${encodeURIComponent(name)}${game ? `&g=${encodeURIComponent(game)}` : ""}`;
+
+/**
+ * A team's pop-up (/team: every sport the site covers for that organisation).
+ * Pro teams by abbreviation in any source's spelling (Sleeper, ESPN, props);
+ * colleges by ESPN school id. Used wherever only a team code is in scope
+ * (fantasy rosters, survivor), so a team name always opens something.
+ */
+export const teamHref = (league: "nfl" | "nba", abbr: string) => `/team?k=${encodeURIComponent(`${league}:${league === "nfl" ? nflAbbr(abbr) : nbaAbbr(abbr)}`)}`;
+export const collegeTeamHref = (espnId: string | number) => `/team?k=${encodeURIComponent(`ncaa:${espnId}`)}`;
