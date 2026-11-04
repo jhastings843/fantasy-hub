@@ -37,7 +37,6 @@ function Brand() {
       <svg aria-hidden viewBox="0 0 24 24" className="size-6">
         <rect x="1" y="1" width="22" height="22" rx="5" fill="var(--hh-ink)" />
         <path d="M7 6v12M17 6v12M7 12h10" stroke="var(--hh-bg)" strokeWidth="2.6" strokeLinecap="square" />
-        <rect x="15" y="15" width="6" height="6" rx="1.5" fill="var(--hh-accent)" />
       </svg>
       <span className="ledger-brand text-[24px] font-bold text-hh-ink">Hobby Hub</span>
     </Link>
