@@ -24,17 +24,23 @@ import type { LeagueType } from "@/lib/league/types";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
 import { tradeOffers } from "@/lib/dynasty/trade-offers";
+import { Chip, Disclosure, Empty, Num, PosBadge, Section, type Tone } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { teamHref } from "@/app/picks/hrefs";
 import Offers from "./Offers";
 
-const POSITION_TINT: Record<string, string> = {
-  QB: "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
-  RB: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  WR: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
-  TE: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  K: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  DEF: "bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300",
-  PK: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300",
-};
+// Shared control looks (C3): hairline outline, panel fill, accent on focus,
+// 44px tall on phones and compact from sm up.
+const BTN_PRIMARY =
+  "inline-flex h-11 shrink-0 items-center justify-center rounded-[6px] bg-hh-accent px-3 text-xs font-semibold text-[var(--hh-on-accent)] transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-hh-accent sm:h-8";
+const BTN_SECONDARY =
+  "inline-flex h-11 shrink-0 items-center justify-center rounded-[6px] border border-hh-line bg-hh-panel px-3 text-xs font-semibold text-hh-ink transition-colors hover:border-hh-accent hover:text-hh-accent-ink focus:border-hh-accent focus:outline-none sm:h-8";
+
+/** A team code next to a player: the team's pop-up, or plain text for free agents. */
+function TeamCode({ team }: { team: string | null | undefined }) {
+  if (!team) return <>FA</>;
+  return <PopLink href={teamHref("nfl", team)}>{team}</PopLink>;
+}
 
 interface RecapItem {
   key: string;
@@ -47,9 +53,9 @@ interface RecapItem {
 const POSITIONS_DISPLAY = ["QB", "RB", "WR", "TE"] as const;
 
 function rankClass(rank: number, totalTeams: number): string {
-  if (rank <= 3) return "text-emerald-700 dark:text-emerald-400 font-medium";
-  if (rank > totalTeams - 3) return "text-rose-700 dark:text-rose-400 font-medium";
-  return "text-zinc-700 dark:text-zinc-300";
+  if (rank <= 3) return "text-hh-pos font-medium";
+  if (rank > totalTeams - 3) return "text-hh-neg font-medium";
+  return "text-hh-ink-2";
 }
 
 function PlayerRowItem({
@@ -63,15 +69,15 @@ function PlayerRowItem({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${
+      className={`flex min-h-11 cursor-pointer items-center gap-3 px-2 py-3 transition-colors ${
         checked
-          ? "bg-amber-50 dark:bg-amber-950/30"
-          : "hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+          ? "bg-hh-accent-soft"
+          : "hover:bg-hh-sunk"
       }`}
     >
       <input
         type="checkbox"
-        className="size-4 shrink-0 rounded border-zinc-300 text-amber-600 focus:ring-amber-500 dark:border-zinc-700 dark:bg-zinc-800"
+        className="size-4 shrink-0 rounded-[3px] border-hh-line accent-[var(--hh-accent)]"
         checked={checked}
         onChange={onChange}
       />
@@ -89,29 +95,13 @@ function PlayerRowItem({
             className="truncate text-sm font-medium"
             stopPropagation
           />
-          {p.untouchable && (
-            <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-              Keep
-            </span>
-          )}
-          {p.buyLow && (
-            <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-              Buy
-            </span>
-          )}
-          {p.sellHigh && (
-            <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-              Sell
-            </span>
-          )}
-          {p.breakout && (
-            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-              Break
-            </span>
-          )}
+          {p.untouchable && <Chip>Keep</Chip>}
+          {p.buyLow && <Chip tone="pos">Buy</Chip>}
+          {p.sellHigh && <Chip tone="neg">Sell</Chip>}
+          {p.breakout && <Chip tone="accent">Break</Chip>}
           <JinglesRankChip p={p} />
         </div>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        <span className="text-xs text-hh-muted">
           {[p.team ?? "FA", p.position].filter(Boolean).join(" · ")}
           {p.overallRank > 0
             ? ` · #${p.overallRank} ${p.position}${p.positionRank}`
@@ -119,9 +109,9 @@ function PlayerRowItem({
         </span>
       </div>
       <span className="flex shrink-0 flex-col items-end">
-        <span className="text-sm font-semibold tabular-nums">
+        <Num className="text-sm font-semibold text-hh-ink">
           {p.value > 0 ? p.value.toLocaleString() : "-"}
-        </span>
+        </Num>
         <MarketDelta p={p} />
       </span>
     </label>
@@ -136,31 +126,22 @@ function PlayerRowItem({
 function JinglesRankChip({ p }: { p: PlayerRow }) {
   if (p.jinglesDrop) {
     return (
-      <span
-        title="On Jingles' latest 'Players I'm Fine Dropping' list, so priced as a sell"
-        className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-      >
-        J drop
+      <span title="On Jingles' latest 'Players I'm Fine Dropping' list, so priced as a sell" className="shrink-0">
+        <Chip tone="neg">J drop</Chip>
       </span>
     );
   }
   if (p.marketValue === undefined) return null;
   if (p.jinglesRank === null || p.jinglesRank === undefined) {
     return (
-      <span
-        title="Not on Jingles' season list, though the market rates him inside it"
-        className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-      >
-        Off list
+      <span title="Not on Jingles' season list, though the market rates him inside it" className="shrink-0">
+        <Chip>Off list</Chip>
       </span>
     );
   }
   return (
-    <span
-      title={`Jingles has him ${p.position}${p.jinglesPositionRank ?? "?"}, #${p.jinglesRank} overall`}
-      className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-    >
-      J {p.position}{p.jinglesPositionRank ?? p.jinglesRank}
+    <span title={`Jingles has him ${p.position}${p.jinglesPositionRank ?? "?"}, #${p.jinglesRank} overall`} className="shrink-0">
+      <Chip tone="gold">J {p.position}{p.jinglesPositionRank ?? p.jinglesRank}</Chip>
     </span>
   );
 }
@@ -171,14 +152,12 @@ function MarketDelta({ p }: { p: PlayerRow }) {
   const d = p.value - p.marketValue;
   if (d === 0) return null;
   return (
-    <span
-      title={`Market ${p.marketValue.toLocaleString()}`}
-      className={`text-[10px] font-medium tabular-nums ${
-        d > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-      }`}
-    >
-      {d > 0 ? "+" : ""}
-      {d.toLocaleString()} vs mkt
+    <span title={`Market ${p.marketValue.toLocaleString()}`} className="text-[10px] font-medium">
+      <Num tone={d > 0 ? "pos" : "neg"}>
+        {d > 0 ? "+" : ""}
+        {d.toLocaleString()}
+      </Num>{" "}
+      <span className={d > 0 ? "text-hh-pos" : "text-hh-neg"}>vs mkt</span>
     </span>
   );
 }
@@ -241,14 +220,14 @@ function PositionFilter({
             type="button"
             onClick={() => setFilter(it.key)}
             disabled={count === 0 && it.key !== "all"}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`h-11 rounded-[6px] px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-hh-accent disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 ${
               active
-                ? "bg-amber-500 text-white"
-                : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                ? "bg-hh-accent text-[var(--hh-on-accent)]"
+                : "border border-hh-line bg-hh-panel text-hh-ink-2 hover:border-hh-accent hover:text-hh-accent-ink"
             }`}
           >
             {it.label}{" "}
-            <span className={active ? "opacity-80" : "opacity-60"}>
+            <span className={`hh-num ${active ? "opacity-80" : "opacity-60"}`}>
               {count}
             </span>
           </button>
@@ -269,27 +248,23 @@ function RecapColumn({
   total: number;
   outcome: "win" | "lose" | "even";
 }) {
-  const containerCls =
+  const edgeCls =
     outcome === "win"
-      ? "bg-gradient-to-br from-emerald-50/80 to-transparent border-emerald-200/60 dark:from-emerald-950/30 dark:border-emerald-900/60"
+      ? "border-hh-pos"
       : outcome === "lose"
-        ? "bg-gradient-to-br from-rose-50/80 to-transparent border-rose-200/60 dark:from-rose-950/30 dark:border-rose-900/60"
-        : "bg-zinc-50/50 border-zinc-200/60 dark:bg-zinc-900/40 dark:border-zinc-800/60";
+        ? "border-hh-neg"
+        : "border-hh-line";
   const headColor =
     outcome === "win"
-      ? "text-emerald-700 dark:text-emerald-400"
+      ? "text-hh-pos"
       : outcome === "lose"
-        ? "text-rose-700 dark:text-rose-400"
-        : "text-zinc-700 dark:text-zinc-300";
-  const totalColor =
-    outcome === "win"
-      ? "bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent dark:from-emerald-400 dark:to-emerald-300"
-      : outcome === "lose"
-        ? "bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent dark:from-rose-400 dark:to-rose-300"
-        : "text-zinc-700 dark:text-zinc-300";
+        ? "text-hh-neg"
+        : "text-hh-ink-2";
+  const totalTone: Tone | undefined =
+    outcome === "win" ? "pos" : outcome === "lose" ? "neg" : undefined;
   return (
     <div
-      className={`flex flex-col gap-2 rounded-xl border p-3 ${containerCls}`}
+      className={`flex min-w-0 flex-col gap-2 border-l-2 pl-3 ${edgeCls}`}
     >
       <div className={`flex items-center gap-1.5 text-sm font-bold ${headColor}`}>
         <span className="truncate">{name} receives</span>
@@ -298,20 +273,14 @@ function RecapColumn({
         )}
       </div>
       {items.length === 0 ? (
-        <p className="py-1 text-xs text-zinc-400 dark:text-zinc-600">
+        <p className="py-1 text-xs text-hh-muted">
           Nothing selected.
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {items.map((it) => (
             <li key={it.key} className="flex items-center gap-2">
-              <span
-                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                  POSITION_TINT[it.position] ?? POSITION_TINT.PK
-                }`}
-              >
-                {it.position}
-              </span>
+              <PosBadge pos={it.position} />
               {it.playerId ? (
                 <PlayerLink
                   id={it.playerId}
@@ -323,34 +292,32 @@ function RecapColumn({
                   {it.label}
                 </span>
               )}
-              <span className="shrink-0 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+              <Num className="shrink-0 text-xs text-hh-muted">
                 {it.value.toLocaleString()}
-              </span>
+              </Num>
             </li>
           ))}
         </ul>
       )}
-      <div className="border-t border-zinc-200/60 pt-2 dark:border-zinc-800/60">
-        <span className={`text-3xl font-black tracking-tight tabular-nums ${totalColor}`}>
+      <div className="border-t border-hh-line pt-2">
+        <Num tone={totalTone} className={`text-3xl font-semibold leading-none ${totalTone ? "" : "text-hh-ink-2"}`}>
           {total.toLocaleString()}
-        </span>
+        </Num>
       </div>
     </div>
   );
 }
 
-function verdictBadgeClass(v: TradeVerdict): string {
+function verdictTone(v: TradeVerdict): Tone {
   switch (v) {
     case "accept":
-      return "bg-emerald-500 text-white";
     case "lean_accept":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
+      return "pos";
     case "even":
-      return "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+      return "muted";
     case "lean_decline":
-      return "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300";
     case "decline":
-      return "bg-rose-500 text-white";
+      return "neg";
   }
 }
 
@@ -632,7 +599,7 @@ export default function TradeBuilder({
 
   if (!myTeam) {
     return (
-      <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
+      <p className="border-l-2 border-hh-neg py-1 pl-3 text-sm text-hh-neg">
         Could not find your roster in this league.
       </p>
     );
@@ -799,17 +766,15 @@ export default function TradeBuilder({
   return (
     <div className="flex flex-col gap-6">
       {jingles && (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-            Jingles in the price
-          </span>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-hh-muted">
+          <Chip tone="gold">Jingles in the price</Chip>
           <span>
             Every value here is half the market, half where he ranks the player on{" "}
             <a
               href={jingles.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
+              className="font-medium text-hh-accent-ink hover:underline"
             >
               {jingles.title}
             </a>{" "}
@@ -822,7 +787,7 @@ export default function TradeBuilder({
       )}
       <Offers offers={offers} onApply={applyBestTrade} />
       {bestTrades.length === 0 && myTeam && (
-        <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+        <p className="border-b border-hh-line py-3 text-xs text-hh-muted">
           No trade ideas across the league right now. Your rooms rank{" "}
           {POSITIONS_DISPLAY.map((pos) => `${pos} #${myTeam.positionRanks[pos] ?? "?"}`).join(", ")} of{" "}
           {teams.length}, and nothing on another roster both lifts one of them and works for the other side.
@@ -830,43 +795,34 @@ export default function TradeBuilder({
         </p>
       )}
       {bestTrades.length > 0 && (
-        <details className="group">
-          <summary className="flex cursor-pointer list-none flex-col gap-1">
-            <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight">
-              <ChevronDown className="h-4 w-4 -rotate-90 transition-transform group-open:rotate-0" />
-              More trade ideas ({bestTrades.length})
-            </h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Player-for-player swaps that fill your weakest positions from
-              each opponent&apos;s surplus, scored by positional gain and
-              value parity. Tap Apply to load into the builder.
-            </p>
-          </summary>
-          <ul className="mt-3 grid gap-3 md:grid-cols-2">
+        <Disclosure summary={`More trade ideas (${bestTrades.length})`}>
+          <p className="text-xs text-hh-muted">
+            Player-for-player swaps that fill your weakest positions from
+            each opponent&apos;s surplus, scored by positional gain and
+            value parity. Tap Apply to load into the builder.
+          </p>
+          <ul className="mt-2 grid gap-x-8 md:grid-cols-2">
             {bestTrades.map((idea) => (
               <li
                 key={`${idea.partnerRosterId}-${packageKey(idea.send)}-${packageKey(idea.receive)}`}
-                className="group flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-500/10 dark:border-zinc-800/80 dark:bg-zinc-900/80 dark:hover:border-amber-800"
+                className="flex flex-col gap-3 border-b border-hh-line py-4"
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-bold">
+                  <span className="text-sm font-semibold text-hh-ink">
                     vs. {idea.partnerName}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {idea.kind === "youth_arbitrage" && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        Get younger
-                      </span>
+                      <Chip tone="pos">Get younger</Chip>
                     )}
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
-                      {idea.positionalGain.position} #
-                      {idea.positionalGain.from} → #{idea.positionalGain.to}
-                    </span>
+                    <Chip tone="gold">
+                      {idea.positionalGain.position} <Num>#{idea.positionalGain.from}</Num> → <Num>#{idea.positionalGain.to}</Num>
+                    </Chip>
                   </div>
                 </div>
-                <div className="flex items-stretch gap-2 text-sm">
-                  <div className="flex flex-1 flex-col gap-1 rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 dark:border-zinc-800/80 dark:bg-zinc-950/40">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <div className="flex items-stretch gap-3 text-sm">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="hh-label">
                       Send
                     </span>
                     {idea.send.map((p) => (
@@ -879,15 +835,15 @@ export default function TradeBuilder({
                           name={p.name}
                           className="truncate text-xs"
                         />
-                        <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                        <Num className="text-xs text-hh-muted">
                           {p.value.toLocaleString()}
-                        </span>
+                        </Num>
                       </div>
                     ))}
                   </div>
-                  <span className="self-center text-zinc-400">↔</span>
-                  <div className="flex flex-1 flex-col gap-1 rounded-lg border border-emerald-200/80 bg-gradient-to-br from-emerald-50/80 to-emerald-50/30 p-2 dark:border-emerald-900/60 dark:from-emerald-950/30 dark:to-emerald-950/15">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  <span aria-hidden className="self-center text-hh-muted">↔</span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="hh-label !text-hh-pos">
                       Receive
                     </span>
                     {idea.receive.map((p) => (
@@ -900,21 +856,21 @@ export default function TradeBuilder({
                           name={p.name}
                           className="truncate text-xs font-medium"
                         />
-                        <span className="text-xs font-semibold tabular-nums">
+                        <Num className="text-xs font-semibold text-hh-ink">
                           {p.value.toLocaleString()}
-                        </span>
+                        </Num>
                       </div>
                     ))}
                   </div>
                 </div>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs text-hh-muted">
                   {partnerSummary(idea.partner)}
                 </p>
                 <ul className="flex flex-col gap-0.5">
                   {idea.reasoning.map((r) => (
                     <li
                       key={r}
-                      className="text-xs text-zinc-600 dark:text-zinc-400"
+                      className="text-xs text-hh-ink-2"
                     >
                       • {r}
                     </li>
@@ -923,26 +879,26 @@ export default function TradeBuilder({
                 <button
                   type="button"
                   onClick={() => applyBestTrade(idea)}
-                  className="self-start rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-amber-500/30 transition-all hover:shadow-md hover:shadow-amber-500/50 hover:brightness-110"
+                  className={`self-start ${BTN_PRIMARY}`}
                 >
                   Apply
                 </button>
               </li>
             ))}
           </ul>
-        </details>
+        </Disclosure>
       )}
 
       <div className="flex flex-col gap-2">
         <label
           htmlFor="partner"
-          className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
+          className="hh-label"
         >
           Trade with
         </label>
         <select
           id="partner"
-          className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base font-medium dark:border-zinc-800 dark:bg-zinc-900"
+          className="h-11 w-full rounded-[6px] border border-hh-line bg-hh-panel px-3 text-[16px] font-medium text-hh-ink focus:border-hh-accent focus:outline-none sm:text-sm"
           value={partnerId}
           onChange={(e) => changePartner(Number(e.target.value))}
         >
@@ -956,21 +912,18 @@ export default function TradeBuilder({
       </div>
 
       {partnerTeam && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Position rankings
-          </h2>
-          <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <Section label="Position rankings">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <tr className="border-b border-hh-line">
+                  <th className="hh-label px-2 py-2 text-left">
                     Team
                   </th>
                   {POSITIONS_DISPLAY.map((p) => (
                     <th
                       key={p}
-                      className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
+                      className="hh-label px-2 py-2 text-center"
                     >
                       {p}
                     </th>
@@ -978,59 +931,56 @@ export default function TradeBuilder({
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                  <td className="px-3 py-2 text-left font-medium">You</td>
+                <tr className="border-b border-hh-line">
+                  <td className="px-2 py-2 text-left font-medium">You</td>
                   {POSITIONS_DISPLAY.map((p) => (
-                    <td key={p} className="px-2 py-2 text-center tabular-nums">
-                      <span className={rankClass(myTeam.positionRanks[p], teams.length)}>
+                    <td key={p} className="px-2 py-2 text-center">
+                      <Num className={rankClass(myTeam.positionRanks[p], teams.length)}>
                         {myTeam.positionRanks[p]}
-                      </span>
+                      </Num>
                     </td>
                   ))}
                 </tr>
                 <tr>
-                  <td className="px-3 py-2 text-left font-medium">
+                  <td className="px-2 py-2 text-left font-medium">
                     {partnerTeam.ownerName}
                   </td>
                   {POSITIONS_DISPLAY.map((p) => (
-                    <td key={p} className="px-2 py-2 text-center tabular-nums">
-                      <span className={rankClass(partnerTeam.positionRanks[p], teams.length)}>
+                    <td key={p} className="px-2 py-2 text-center">
+                      <Num className={rankClass(partnerTeam.positionRanks[p], teams.length)}>
                         {partnerTeam.positionRanks[p]}
-                      </span>
+                      </Num>
                     </td>
                   ))}
                 </tr>
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-xs text-hh-muted">
             1 = strongest of {teams.length}. Green = top 3, red = bottom 3.
           </p>
-        </div>
+        </Section>
       )}
 
       {fits.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Trade fits
-          </h2>
-          <div className="grid gap-3 md:grid-cols-2">
+        <Section label="Trade fits">
+          <div className="grid gap-x-8 md:grid-cols-2">
             {fits.map((fit) => (
               <div
                 key={`${fit.position}-${fit.side}`}
-                className="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50/40 p-4 dark:border-amber-900/60 dark:bg-amber-950/20"
+                className="flex flex-col gap-2 border-b border-hh-line py-3"
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-semibold">
+                  <span className="text-sm font-semibold text-hh-ink">
                     {fit.side === "send"
                       ? `Send a ${fit.position}`
                       : `Target their ${fit.position}`}
                   </span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    you #{fit.yourRank} · them #{fit.theirRank}
+                  <span className="text-xs text-hh-muted">
+                    you <Num>#{fit.yourRank}</Num> · them <Num>#{fit.theirRank}</Num>
                   </span>
                 </div>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="text-xs text-hh-ink-2">
                   {fit.side === "send"
                     ? `You have surplus ${fit.position}; they're weak there. Consider offering one of these:`
                     : `They have surplus ${fit.position}; you're weak there. Consider asking for one of these:`}
@@ -1046,9 +996,9 @@ export default function TradeBuilder({
                         name={p.name}
                         className="truncate flex-1"
                       />
-                      <span className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+                      <Num className="text-xs text-hh-muted">
                         {p.value > 0 ? p.value.toLocaleString() : "-"}
-                      </span>
+                      </Num>
                       <button
                         type="button"
                         onClick={() => {
@@ -1062,7 +1012,7 @@ export default function TradeBuilder({
                             setTheirSel(next);
                           }
                         }}
-                        className="shrink-0 rounded-md border border-amber-300 bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-amber-600 dark:border-amber-700"
+                        className={BTN_PRIMARY}
                       >
                         Add
                       </button>
@@ -1072,7 +1022,7 @@ export default function TradeBuilder({
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
       {(() => {
@@ -1139,19 +1089,17 @@ export default function TradeBuilder({
             : "even";
 
         return (
-          <div className="sticky top-14 z-10 -mx-4 border-y border-zinc-200 bg-zinc-50/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-zinc-800 dark:bg-zinc-950/95">
+          <div className="sticky top-14 z-10 -mx-4 border-y-[1.5px] border-hh-ink bg-hh-bg/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <h3 className="hh-label">
                   Trade summary
                 </h3>
                 <div className="flex items-center gap-2">
                   {assessment && (
-                    <span
-                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${verdictBadgeClass(assessment.verdict)}`}
-                    >
+                    <Chip tone={verdictTone(assessment.verdict)}>
                       {verdictLabel(assessment.verdict)}
-                    </span>
+                    </Chip>
                   )}
                   {(mySel.size > 0 ||
                     theirSel.size > 0 ||
@@ -1160,7 +1108,7 @@ export default function TradeBuilder({
                     <button
                       type="button"
                       onClick={reset}
-                      className="shrink-0 rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className={BTN_SECONDARY}
                     >
                       Clear
                     </button>
@@ -1182,11 +1130,14 @@ export default function TradeBuilder({
                 />
               </div>
               {baseline > 0 && (
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="text-xs text-hh-muted">
                   {verdict}
-                  {delta !== 0
-                    ? ` · ${delta > 0 ? "+" : ""}${delta.toLocaleString()} (${pct > 0 ? "+" : ""}${pct}%)`
-                    : ""}
+                  {delta !== 0 ? (
+                    <>
+                      {" · "}
+                      <Num>{`${delta > 0 ? "+" : ""}${delta.toLocaleString()} (${pct > 0 ? "+" : ""}${pct}%)`}</Num>
+                    </>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -1195,16 +1146,16 @@ export default function TradeBuilder({
       })()}
 
       {assessment && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <Section label="Verdict" className="gap-3">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold tracking-tight">
+            <h3 className="text-[15px] font-semibold text-hh-ink">
               Verdict: {verdictLabel(assessment.verdict)}
             </h3>
             <ul className="flex flex-col gap-0.5">
               {assessment.reasoning.map((r, i) => (
                 <li
                   key={i}
-                  className="text-xs text-zinc-600 dark:text-zinc-400"
+                  className="text-xs text-hh-ink-2"
                 >
                   • {r}
                 </li>
@@ -1216,25 +1167,25 @@ export default function TradeBuilder({
             partnerId !== ANYONE &&
             Math.abs(delta) >= 100 &&
             levelers.length > 0 && (
-              <details className="group flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50/40 p-3 dark:border-sky-900/60 dark:bg-sky-950/20">
-                <summary className="flex cursor-pointer items-center justify-between gap-2 list-none">
+              <details className="group mt-3 flex flex-col gap-2 border-y border-hh-line py-2">
+                <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <ChevronDown
                       size={14}
                       aria-hidden
-                      className="shrink-0 -rotate-90 text-sky-700 transition-transform group-open:rotate-0 dark:text-sky-300"
+                      className="shrink-0 -rotate-90 text-hh-accent-ink transition-transform group-open:rotate-0"
                     />
-                    <span className="text-sm font-bold text-sky-900 dark:text-sky-200">
+                    <span className="text-sm font-semibold text-hh-ink">
                       Level out this trade
                     </span>
                   </div>
-                  <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                  <span className="text-[11px] font-medium text-hh-accent-ink">
                     {delta > 0
                       ? `You're up ${delta.toLocaleString()}; add to your side`
                       : `You're down ${Math.abs(delta).toLocaleString()}; ask for more`}
                   </span>
                 </summary>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="text-xs text-hh-ink-2">
                   Each option below shows the resulting value gap if applied.
                   Smaller gaps mean a more balanced trade.
                 </p>
@@ -1250,46 +1201,29 @@ export default function TradeBuilder({
                     return (
                       <li
                         key={`${opt.type}-${opt.player?.id ?? opt.pickId ?? i}`}
-                        className="flex items-center gap-2 rounded-lg border border-sky-200/60 bg-white/80 px-3 py-2 dark:border-sky-900/40 dark:bg-zinc-900/60"
+                        className="flex items-center gap-2 border-b border-hh-line py-2 last:border-b-0"
                       >
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="flex items-center gap-1.5 text-sm font-medium">
-                            {opt.player && (
-                              <span
-                                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                                  POSITION_TINT[opt.player.position] ??
-                                  POSITION_TINT.PK
-                                }`}
-                              >
-                                {opt.player.position}
-                              </span>
-                            )}
-                            {!opt.player && (
-                              <span className="shrink-0 rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                                PK
-                              </span>
-                            )}
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-hh-ink">
+                            <PosBadge pos={opt.player ? opt.player.position : "PK"} />
                             <span className="truncate">{opt.description}</span>
                           </span>
-                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                            {opt.closesGapBy.toLocaleString()} value on{" "}
+                          <span className="text-[11px] text-hh-muted">
+                            <Num>{opt.closesGapBy.toLocaleString()}</Num> value on{" "}
                             {sideLabel} · resulting gap{" "}
-                            <span
-                              className={
-                                Math.abs(opt.resultingDelta) <= 100
-                                  ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                                  : ""
-                              }
+                            <Num
+                              tone={Math.abs(opt.resultingDelta) <= 100 ? "pos" : undefined}
+                              className={Math.abs(opt.resultingDelta) <= 100 ? "font-semibold" : ""}
                             >
                               {opt.resultingDelta > 0 ? "+" : ""}
                               {opt.resultingDelta.toLocaleString()}
-                            </span>
+                            </Num>
                           </span>
                         </span>
                         <button
                           type="button"
                           onClick={() => applyLeveler(opt)}
-                          className="shrink-0 rounded-md border border-sky-300 bg-sky-500 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-sky-600 dark:border-sky-700"
+                          className={BTN_PRIMARY}
                         >
                           {action}
                         </button>
@@ -1302,16 +1236,16 @@ export default function TradeBuilder({
 
           {assessment.counters.length > 0 && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <span className="hh-label mt-3">
                 Suggested counters
               </span>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col">
                 {assessment.counters.map((c, i) => (
                   <li
                     key={i}
-                    className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2 dark:border-amber-900/60 dark:bg-amber-950/20"
+                    className="flex items-center gap-2 border-b border-hh-line py-2 last:border-b-0"
                   >
-                    <span className="flex-1 text-xs text-zinc-700 dark:text-zinc-300">
+                    <span className="flex-1 text-xs text-hh-ink-2">
                       {c.description}
                     </span>
                     {c.pickIdToAdd && (
@@ -1322,7 +1256,7 @@ export default function TradeBuilder({
                           next.add(c.pickIdToAdd!);
                           setTheirPickIds(next);
                         }}
-                        className="shrink-0 rounded-md border border-amber-300 bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-amber-600 dark:border-amber-700"
+                        className={BTN_PRIMARY}
                       >
                         Add
                       </button>
@@ -1335,7 +1269,7 @@ export default function TradeBuilder({
                           next.add(c.playerToAdd!.id);
                           setTheirSel(next);
                         }}
-                        className="shrink-0 rounded-md border border-amber-300 bg-amber-500 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-amber-600 dark:border-amber-700"
+                        className={BTN_PRIMARY}
                       >
                         Add
                       </button>
@@ -1348,7 +1282,7 @@ export default function TradeBuilder({
                           next.delete(c.playerToRemove!.id);
                           setMySel(next);
                         }}
-                        className="shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                        className={BTN_SECONDARY}
                       >
                         Remove
                       </button>
@@ -1358,14 +1292,12 @@ export default function TradeBuilder({
               </ul>
             </div>
           )}
-        </section>
+        </Section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            You give ({mySel.size + myPickIds.size})
-          </h2>
+      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
+        <Section label={<>You give (<Num>{mySel.size + myPickIds.size}</Num>)</>}>
+          <div className="flex flex-col gap-3">
           {tradesPicks && (
             <PicksPanel
               picks={picks}
@@ -1389,7 +1321,7 @@ export default function TradeBuilder({
             setFilter={setMyPosFilter}
             players={myTeam.players}
           />
-          <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <ul className="flex flex-col divide-y divide-hh-line border-y border-hh-line">
             {myTeam.players
               .filter(
                 (p) => myPosFilter === "all" || p.position === myPosFilter,
@@ -1404,13 +1336,12 @@ export default function TradeBuilder({
                 </li>
               ))}
           </ul>
-        </section>
+          </div>
+        </Section>
 
         {partnerTeam && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              You get ({theirSel.size + theirPickIds.size})
-            </h2>
+          <Section label={<>You get (<Num>{theirSel.size + theirPickIds.size}</Num>)</>}>
+            <div className="flex flex-col gap-3">
             {tradesPicks && (
               <PicksPanel
                 picks={picks}
@@ -1434,7 +1365,7 @@ export default function TradeBuilder({
               setFilter={setTheirPosFilter}
               players={partnerTeam.players}
             />
-            <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            <ul className="flex flex-col divide-y divide-hh-line border-y border-hh-line">
               {partnerTeam.players
                 .filter(
                   (p) =>
@@ -1450,24 +1381,23 @@ export default function TradeBuilder({
                   </li>
                 ))}
             </ul>
-          </section>
+            </div>
+          </Section>
         )}
 
         {partnerId === ANYONE && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              You get: auto-matches across the league
-            </h2>
+          <Section label="You get: auto-matches across the league">
+            <div className="flex flex-col gap-3">
             {mySel.size === 0 && myPickIds.size === 0 ? (
-              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
+              <Empty>
                 Pick players or picks on the left to see league-wide trade
                 options.
-              </div>
+              </Empty>
             ) : leagueWideMatches.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/40 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
+              <Empty>
                 No competitive matches found at this value (
-                {myGiveValue.toLocaleString()}). Try a different combo.
-              </div>
+                <Num>{myGiveValue.toLocaleString()}</Num>). Try a different combo.
+              </Empty>
             ) : (
               (() => {
                 const tiers: Record<LeagueWideMatchTier, LeagueWideMatch[]> = {
@@ -1482,35 +1412,25 @@ export default function TradeBuilder({
                   key: LeagueWideMatchTier;
                   label: string;
                   caption: string;
-                  pillCls: string;
-                  borderCls: string;
+                  tone: Tone;
                 }> = [
                   {
                     key: "steal",
                     label: "Steals",
                     caption: "+1,000 to +2,000 value",
-                    pillCls:
-                      "bg-emerald-500 text-white dark:bg-emerald-500",
-                    borderCls:
-                      "border-emerald-300 dark:border-emerald-800",
+                    tone: "pos",
                   },
                   {
                     key: "edge",
                     label: "Edge",
                     caption: "+500 to +999 value",
-                    pillCls:
-                      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-                    borderCls:
-                      "border-emerald-200 dark:border-emerald-900/60",
+                    tone: "gold",
                   },
                   {
                     key: "fair",
                     label: "Fair value",
                     caption: "Roughly even",
-                    pillCls:
-                      "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-                    borderCls:
-                      "border-zinc-200/80 dark:border-zinc-800/80",
+                    tone: "muted",
                   },
                 ];
 
@@ -1523,39 +1443,31 @@ export default function TradeBuilder({
                       className="group flex flex-col gap-2"
                       open
                     >
-                      <summary className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 border-b border-hh-line py-1 hover:text-hh-accent-ink">
                         <ChevronDown
                           size={14}
                           aria-hidden
-                          className="shrink-0 -rotate-90 text-zinc-400 transition-transform group-open:rotate-0 dark:text-zinc-500"
+                          className="shrink-0 -rotate-90 text-hh-muted transition-transform group-open:rotate-0"
                         />
-                        <span
-                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${meta.pillCls}`}
-                        >
-                          {meta.label}
-                        </span>
-                        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                          {meta.caption} · {list.length} match
+                        <Chip tone={meta.tone}>{meta.label}</Chip>
+                        <span className="text-[11px] text-hh-muted">
+                          {meta.caption} · <Num>{list.length}</Num> match
                           {list.length === 1 ? "" : "es"}
                         </span>
                       </summary>
-                      <ul className="flex flex-col gap-2 pt-1">
+                      <ul className="flex flex-col">
                         {list.map((m) => (
                           <li
                             key={`${m.partnerRosterId}-${packageKey(m.receivePlayers)}`}
-                            className={`flex flex-col gap-2 rounded-2xl border bg-white/80 p-3 backdrop-blur dark:bg-zinc-900/80 ${meta.borderCls}`}
+                            className="flex flex-col gap-2 border-b border-hh-line py-3"
                           >
                             <div className="flex items-baseline justify-between gap-2">
-                              <span className="text-sm font-bold">
+                              <span className="text-sm font-semibold text-hh-ink">
                                 vs. {m.partnerName}
                               </span>
-                              {m.isFit && (
-                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                                  Fit
-                                </span>
-                              )}
+                              {m.isFit && <Chip tone="accent">Fit</Chip>}
                             </div>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            <p className="text-xs text-hh-muted">
                               {partnerSummary(m.partner)}
                             </p>
                             {m.receivePlayers.map((p) => (
@@ -1575,43 +1487,43 @@ export default function TradeBuilder({
                                     name={p.name}
                                     className="truncate text-sm font-semibold"
                                   />
-                                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                                    {[p.team ?? "FA", p.position]
-                                      .filter(Boolean)
-                                      .join(" · ")}
+                                  <span className="text-xs text-hh-muted">
+                                    <TeamCode team={p.team} />
+                                    {p.position ? ` · ${p.position}` : ""}
                                   </span>
                                 </div>
-                                <span className="shrink-0 text-sm font-bold tabular-nums">
+                                <Num className="shrink-0 text-sm font-semibold text-hh-ink">
                                   {p.value.toLocaleString()}
-                                </span>
+                                </Num>
                               </div>
                             ))}
                             <div className="flex items-center justify-between gap-2 pt-1">
                               <span
-                                className={`text-xs font-semibold tabular-nums ${
-                                  m.delta >= 500
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : m.delta >= 100
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : m.delta >= -100
-                                        ? "text-zinc-500 dark:text-zinc-400"
-                                        : "text-rose-600 dark:text-rose-400"
+                                className={`text-xs font-semibold ${
+                                  m.delta >= 100
+                                    ? "text-hh-pos"
+                                    : m.delta >= -100
+                                      ? "text-hh-muted"
+                                      : "text-hh-neg"
                                 }`}
                               >
-                                {m.delta > 0 ? "+" : ""}
-                                {m.delta.toLocaleString()} value
+                                <Num>
+                                  {m.delta > 0 ? "+" : ""}
+                                  {m.delta.toLocaleString()}
+                                </Num>{" "}
+                                value
                                 {Math.abs(m.delta) <= 100 ? " (even)" : ""}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => applyMatch(m)}
-                                className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm shadow-amber-500/30 hover:shadow-md hover:shadow-amber-500/50 hover:brightness-110"
+                                className={BTN_PRIMARY}
                               >
                                 Apply
                               </button>
                             </div>
                             {m.reasoning.length > 0 && (
-                              <ul className="flex flex-col gap-0.5 pt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                              <ul className="flex flex-col gap-0.5 pt-1 text-[11px] text-hh-muted">
                                 {m.reasoning.map((r) => (
                                   <li key={r}>• {r}</li>
                                 ))}
@@ -1622,12 +1534,17 @@ export default function TradeBuilder({
                                 const levelers = getMatchLevelers(m);
                                 if (levelers.length === 0) return null;
                                 return (
-                                  <details className="group flex flex-col gap-1.5 rounded-lg border border-sky-200/70 bg-sky-50/40 px-2.5 py-1.5 dark:border-sky-900/50 dark:bg-sky-950/20">
-                                    <summary className="flex cursor-pointer items-center justify-between gap-2 list-none">
-                                      <span className="text-[11px] font-bold text-sky-900 dark:text-sky-200">
+                                  <details className="group flex flex-col gap-1.5 border-l-2 border-hh-accent pl-3">
+                                    <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+                                      <span className="flex items-center gap-1.5 text-xs font-semibold text-hh-accent-ink">
+                                        <ChevronDown
+                                          size={13}
+                                          aria-hidden
+                                          className="shrink-0 -rotate-90 transition-transform group-open:rotate-0"
+                                        />
                                         Level it out
                                       </span>
-                                      <span className="text-[10px] text-sky-700 dark:text-sky-300">
+                                      <span className="text-[11px] text-hh-muted">
                                         add to your side to keep partner honest
                                       </span>
                                     </summary>
@@ -1644,27 +1561,24 @@ export default function TradeBuilder({
                                         return (
                                           <li
                                             key={`${opt.type}-${opt.player?.id ?? opt.pickId ?? oi}`}
-                                            className="flex items-center gap-2 rounded-md bg-white/70 px-2 py-1 dark:bg-zinc-900/60"
+                                            className="flex items-center gap-2 border-b border-hh-line py-1.5 last:border-b-0"
                                           >
                                             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                              <span className="truncate text-xs font-medium">
+                                              <span className="truncate text-xs font-medium text-hh-ink">
                                                 + {label}{" "}
-                                                <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                                                  ({(v ?? 0).toLocaleString()})
+                                                <span className="font-normal text-hh-muted">
+                                                  (<Num>{(v ?? 0).toLocaleString()}</Num>)
                                                 </span>
                                               </span>
-                                              <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                              <span className="text-[11px] text-hh-muted">
                                                 gap{" "}
-                                                <span
-                                                  className={
-                                                    Math.abs(opt.resultingDelta) <= 100
-                                                      ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                                                      : ""
-                                                  }
+                                                <Num
+                                                  tone={Math.abs(opt.resultingDelta) <= 100 ? "pos" : undefined}
+                                                  className={Math.abs(opt.resultingDelta) <= 100 ? "font-semibold" : ""}
                                                 >
                                                   {opt.resultingDelta > 0 ? "+" : ""}
                                                   {opt.resultingDelta.toLocaleString()}
-                                                </span>
+                                                </Num>
                                               </span>
                                             </span>
                                             <button
@@ -1672,7 +1586,7 @@ export default function TradeBuilder({
                                               onClick={() =>
                                                 applyMatchWithLeveler(m, opt)
                                               }
-                                              className="shrink-0 rounded-md border border-sky-300 bg-sky-500 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-sky-600 dark:border-sky-700"
+                                              className={BTN_PRIMARY}
                                             >
                                               Add & apply
                                             </button>
@@ -1691,12 +1605,13 @@ export default function TradeBuilder({
                 });
               })()
             )}
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            <p className="text-[11px] text-hh-muted">
               Tiered by value advantage. Losing trades are omitted. Matches
               filter out trades that would create same-team duplicates on
               your roster (per your rule).
             </p>
-          </section>
+            </div>
+          </Section>
         )}
       </div>
     </div>
@@ -1727,13 +1642,14 @@ function PicksPanel({
   );
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex flex-col gap-2 border-b border-hh-line pb-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <span className="hh-label">
           Picks
         </span>
         <select
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-medium dark:border-zinc-800 dark:bg-zinc-950"
+          aria-label="Add pick"
+          className="h-11 rounded-[6px] border border-hh-line bg-hh-panel px-2 text-[16px] font-medium text-hh-ink focus:border-hh-accent focus:outline-none sm:h-8 sm:text-xs"
           value=""
           onChange={(e) => {
             const id = Number(e.target.value);
@@ -1753,29 +1669,27 @@ function PicksPanel({
         </select>
       </div>
       {selectedPicks.length === 0 ? (
-        <p className="text-xs text-zinc-400 dark:text-zinc-600">
+        <p className="text-xs text-hh-muted">
           No picks selected.
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
+        <ul className="flex flex-col divide-y divide-hh-line">
           {selectedPicks.map((p) => (
             <li
               key={p.id}
               className="flex items-center gap-2 py-1.5"
             >
-              <span className="shrink-0 rounded bg-zinc-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                PK
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              <PosBadge pos="PK" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-hh-ink">
                 {p.label}
               </span>
-              <span className="shrink-0 text-sm font-semibold tabular-nums">
+              <Num className="shrink-0 text-sm font-semibold text-hh-ink">
                 {(isSuperflex ? p.valueSf : p.value1qb).toLocaleString()}
-              </span>
+              </Num>
               <button
                 type="button"
                 onClick={() => onToggle(p.id)}
-                className="shrink-0 rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-[6px] text-hh-muted hover:bg-hh-sunk hover:text-hh-neg focus:outline-none focus-visible:ring-2 focus-visible:ring-hh-accent sm:size-8"
                 aria-label="Remove pick"
               >
                 ×
@@ -1785,13 +1699,13 @@ function PicksPanel({
         </ul>
       )}
       {selectedPicks.length > 0 && (
-        <div className="flex items-center justify-between border-t border-zinc-200 pt-2 text-xs dark:border-zinc-800">
-          <span className="font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <div className="flex items-center justify-between border-t border-hh-line pt-2 text-xs">
+          <span className="hh-label">
             Total picks value
           </span>
-          <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+          <Num tone="accent" className="font-semibold">
             {total.toLocaleString()}
-          </span>
+          </Num>
         </div>
       )}
     </div>
@@ -1827,17 +1741,17 @@ function FaabPanel({
 }) {
   const tooMuch = amount > available;
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex flex-col gap-2 border-b border-hh-line pb-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <span className="hh-label">
           {label}
         </span>
-        <span className="text-xs tabular-nums text-zinc-400 dark:text-zinc-500">
-          ${available} of ${budget} left
+        <span className="text-xs text-hh-muted">
+          <Num>${available}</Num> of <Num>${budget}</Num> left
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-zinc-400">$</span>
+        <span className="text-sm text-hh-muted">$</span>
         <input
           type="number"
           min={0}
@@ -1846,21 +1760,22 @@ function FaabPanel({
           value={amount === 0 ? "" : amount}
           placeholder="0"
           onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
-          className="w-24 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-sm tabular-nums dark:border-zinc-800 dark:bg-zinc-950"
+          aria-label={label}
+          className="hh-num h-11 w-24 rounded-[6px] border border-hh-line bg-hh-panel px-2 text-[16px] text-hh-ink focus:border-hh-accent focus:outline-none sm:h-8 sm:text-sm"
         />
         {amount > 0 && (
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {Math.round((amount / budget) * 100)}% of the budget
+          <span className="text-xs text-hh-muted">
+            <Num>{Math.round((amount / budget) * 100)}%</Num> of the budget
           </span>
         )}
       </div>
       {tooMuch && (
-        <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+        <p className="text-xs font-medium text-hh-neg">
           That is more than the ${available} they have left.
         </p>
       )}
       {amount > 0 && !tooMuch && (
-        <p className="text-[11px] leading-snug text-zinc-400 dark:text-zinc-600">
+        <p className="text-[11px] leading-snug text-hh-muted">
           Not counted in the value totals. What a budget is worth depends on who
           hits waivers this season, and a made up rate would look precise and be
           fiction.

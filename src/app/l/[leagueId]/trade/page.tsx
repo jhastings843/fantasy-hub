@@ -27,18 +27,16 @@ export const dynamic = "force-dynamic";
 
 function ConfigError({ message }: { message: string }) {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
         <Link
           href="/fantasy"
-          className="text-sm text-zinc-500 dark:text-zinc-400"
+          className="text-sm text-hh-muted hover:text-hh-accent-ink"
         >
           ‹ Leagues
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Trade analyzer
-        </h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
+        <h1 className="hh-title">Trade analyzer</h1>
+        <p className="border-l-2 border-hh-neg py-1 pl-3 text-sm text-hh-neg">
           {message}
         </p>
       </div>
@@ -139,23 +137,21 @@ export default async function TradePage({
   markUntouchables(teams, leagueId, myRoster.roster_id);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full min-w-0 max-w-7xl break-words px-4 py-8 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-1">
           <Link
             href={`/l/${leagueId}`}
-            className="text-sm text-zinc-500 dark:text-zinc-400"
+            className="text-sm text-hh-muted hover:text-hh-accent-ink"
           >
             ‹ League
           </Link>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Trade analyzer
-            </h1>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="hh-title">Trade analyzer</h1>
             <RefreshButton leagueId={leagueId} />
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {league.name} · {league.season}
+          <p className="text-sm text-hh-muted">
+            {league.name} · <span className="hh-num">{league.season}</span>
           </p>
         </div>
         <TradeBuilder

@@ -1,5 +1,8 @@
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
+import { PopLink } from "@/components/hh/PopLink";
+import { Chip, Num } from "@/components/hh/ui";
+import { teamHref } from "@/app/picks/hrefs";
 import type { RookieRow } from "./RookieList";
 
 interface UserPick {
@@ -47,19 +50,7 @@ function FlagChip({
   label: string;
   tone: "buy" | "sell" | "break";
 }) {
-  const cls =
-    tone === "buy"
-      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-      : tone === "sell"
-        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-        : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
-  return (
-    <span
-      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${cls}`}
-    >
-      {label}
-    </span>
-  );
+  return <Chip tone={tone === "buy" ? "pos" : tone === "sell" ? "neg" : "gold"}>{label}</Chip>;
 }
 
 function RookieRowItem({
@@ -76,15 +67,9 @@ function RookieRowItem({
   const surplus = pickValue != null ? r.value - pickValue : null;
   return (
     <li
-      className={`flex items-center gap-2.5 px-3 py-2 ${
-        isFit
-          ? "bg-amber-50/60 dark:bg-amber-950/20"
-          : ""
-      }`}
+      className="flex min-h-11 items-center gap-2.5 py-2"
     >
-      <span className="w-5 shrink-0 text-[11px] font-semibold tabular-nums text-zinc-500 dark:text-zinc-400">
-        {rank}
-      </span>
+      <Num className="w-5 shrink-0 text-[11px] font-semibold text-hh-muted">{rank}</Num>
       <PlayerAvatar
         name={r.name}
         position={r.position ?? null}
@@ -99,35 +84,27 @@ function RookieRowItem({
             className="truncate text-sm font-medium"
           />
           {isFit && (
-            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-              Fit
-            </span>
+            <Chip tone="accent">Fit</Chip>
           )}
           {r.buyLow && <FlagChip label="Buy" tone="buy" />}
           {r.sellHigh && <FlagChip label="Sell" tone="sell" />}
           {r.breakout && <FlagChip label="Break" tone="break" />}
         </div>
-        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-          {[r.team ?? "FA", r.position, r.age ? `age ${r.age}` : null]
+        <span className="text-[11px] text-hh-muted">
+          {r.team ? <PopLink href={teamHref("nfl", r.team)}>{r.team}</PopLink> : "FA"}
+          {[r.position, r.age ? `age ${r.age}` : null]
             .filter(Boolean)
-            .join(" · ")}
+            .map((x) => ` · ${x}`)
+            .join("")}
         </span>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="text-sm font-semibold tabular-nums">
-          {r.value.toLocaleString()}
-        </span>
+        <Num className="text-sm font-semibold text-hh-ink">{r.value.toLocaleString()}</Num>
         {surplus != null && Math.abs(surplus) >= 100 && (
-          <span
-            className={`text-[10px] font-bold tabular-nums ${
-              surplus > 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-zinc-400 dark:text-zinc-600"
-            }`}
-          >
+          <Num tone={surplus > 0 ? "pos" : "muted"} className="text-[10px] font-bold">
             {surplus > 0 ? "+" : ""}
             {surplus.toLocaleString()}
-          </span>
+          </Num>
         )}
       </div>
     </li>
@@ -154,43 +131,37 @@ function PickCard({
   );
 
   return (
-    <div
-      className={`flex flex-col overflow-hidden rounded-2xl border ${
-        isPast
-          ? "border-zinc-200 bg-zinc-50 opacity-60 dark:border-zinc-800 dark:bg-zinc-950"
-          : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-      }`}
-    >
-      <div className="flex items-baseline justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+    <div className={`flex min-w-0 flex-col ${isPast ? "opacity-60" : ""}`}>
+      <div className="hh-ruled flex items-baseline justify-between gap-3 pb-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-base font-bold tabular-nums">
+          <Num className="text-base font-bold text-hh-ink">
             {pick.round}.{pick.slot.toString().padStart(2, "0")}
-          </span>
-          <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          </Num>
+          <span className="hh-label">
             {pick.zone.charAt(0).toUpperCase() + pick.zone.slice(1)}{" "}
             {ordinal(pick.round)}
           </span>
         </div>
-        <span className="text-xs tabular-nums text-amber-700 dark:text-amber-400">
+        <span className="text-xs text-hh-muted">
           pick value{" "}
-          <span className="font-semibold">
-            {pick.value != null ? pick.value.toLocaleString() : "—"}
-          </span>
+          <Num className="font-semibold text-hh-accent-ink">
+            {pick.value != null ? pick.value.toLocaleString() : "n/a"}
+          </Num>
         </span>
       </div>
 
       {targets.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
-          No targets available — pool is empty.
+        <p className="py-3 text-sm text-hh-muted">
+          No targets available: the pool is empty.
         </p>
       ) : (
         <>
           {fits.length > 0 && (
             <div>
-              <div className="bg-amber-50/40 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+              <div className="pt-2 text-[10px] font-bold uppercase tracking-wider text-hh-accent-ink">
                 Position fits ({weakestPositions.join(" / ")})
               </div>
-              <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+              <ul className="flex flex-col divide-y divide-hh-line">
                 {fits.slice(0, 5).map((r) => (
                   <RookieRowItem
                     key={r.id}
@@ -205,10 +176,10 @@ function PickCard({
           )}
           {others.length > 0 && (
             <div>
-              <div className="bg-zinc-100 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
+              <div className="pt-2 text-[10px] font-bold uppercase tracking-wider text-hh-muted">
                 Best available
               </div>
-              <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+              <ul className="flex flex-col divide-y divide-hh-line">
                 {others.slice(0, 8).map((r) => (
                   <RookieRowItem
                     key={r.id}
@@ -243,19 +214,15 @@ export function RoundTargets({
   return (
     <section className="flex flex-col gap-3">
       <header className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold tracking-tight">
-          Round-by-round targets
-        </h2>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <h2 className="hh-label">Round-by-round targets</h2>
+        <p className="text-xs text-hh-muted">
           Realistic gets at each of your picks, ranked by RosterAudit value.
           Weak-position rookies tagged{" "}
-          <span className="font-semibold text-amber-700 dark:text-amber-400">
-            Fit
-          </span>
+          <Chip tone="accent">Fit</Chip>
           . Updates as the draft progresses.
         </p>
       </header>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
         {userPicks.map((pick) => (
           <PickCard
             key={pick.pickNo}

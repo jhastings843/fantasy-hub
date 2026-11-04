@@ -1,23 +1,23 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
-  ClipboardList,
   ChevronDown,
   Info,
   Lock,
   RotateCcw,
   Settings2,
-  Shield,
-  TrendingUp,
 } from "lucide-react";
 import { formatPickPaste, parsePickPaste } from "@/lib/survivor/paste";
-import { NFL_TEAMS, logoUrl } from "@/lib/survivor/teams";
+import { NFL_TEAMS } from "@/lib/survivor/teams";
 import type { Candidate, CandidateFlag, SurvivorReport } from "@/lib/survivor/types";
+import { Chip, Disclosure, Num, Section, Spotlight, type Tone } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { TeamLogo } from "@/components/TeamLogo";
+import { teamHref } from "@/app/picks/hrefs";
 
 const pct = (x: number, d = 1) => `${(x * 100).toFixed(d)}%`;
 
@@ -39,10 +39,19 @@ function countdown(iso: string | null): string | null {
   return `${Math.floor(hours / 24)}d`;
 }
 
-const FLAG_TINT: Record<CandidateFlag["severity"], string> = {
-  info: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300",
-  warn: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  danger: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
+// Controls on the hh tokens: 44px tall on phones, a little tighter from sm up.
+const BTN =
+  "inline-flex h-11 items-center justify-center gap-1.5 rounded-[6px] border border-hh-line bg-hh-panel px-3 text-xs font-semibold text-hh-ink-2 transition-colors hover:border-hh-accent hover:text-hh-accent-ink focus:outline-none focus-visible:border-hh-accent disabled:opacity-50 sm:h-9";
+const BTN_PRIMARY =
+  "inline-flex h-11 items-center justify-center gap-2 rounded-[6px] bg-hh-accent px-4 text-sm font-semibold text-[var(--hh-on-accent)] transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-hh-accent focus-visible:ring-offset-2 focus-visible:ring-offset-hh-bg disabled:opacity-50";
+const INPUT =
+  "h-11 rounded-[6px] border border-hh-line bg-hh-panel px-3 text-[16px] text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none sm:h-9 sm:text-sm";
+const FIELD_LABEL = "text-[11px] font-semibold uppercase tracking-wider text-hh-muted";
+
+const FLAG_TONE: Record<CandidateFlag["severity"], Tone> = {
+  info: "muted",
+  warn: "gold",
+  danger: "neg",
 };
 
 const FLAG_LABEL: Record<CandidateFlag["kind"], string> = {
@@ -55,20 +64,32 @@ const FLAG_LABEL: Record<CandidateFlag["kind"], string> = {
 };
 
 function Logo({ abbr, size }: { abbr: string; size: number }) {
+  return <TeamLogo league="nfl" team={abbr} size={size} />;
+}
+
+/** A team name for THIS week's board: opens the team pop-up. */
+function TeamName({ abbr }: { abbr: string }) {
+  return <PopLink href={teamHref("nfl", abbr)}>{abbr}</PopLink>;
+}
+
+function Flags({ flags }: { flags: CandidateFlag[] }) {
+  if (flags.length === 0) return null;
   return (
-    <Image
-      src={logoUrl(abbr)}
-      alt=""
-      width={size}
-      height={size}
-      unoptimized
-      className="shrink-0 object-contain"
-    />
+    <ul className="flex flex-col gap-1.5">
+      {flags.map((f, i) => (
+        <li key={i} className="flex items-start gap-2">
+          <span className="mt-0.5 shrink-0">
+            <Chip tone={FLAG_TONE[f.severity]}>{FLAG_LABEL[f.kind]}</Chip>
+          </span>
+          <span className="text-xs leading-relaxed text-hh-ink-2">{f.text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 /** One number with its label, aligned for scanning down a column. */
-function Stat({
+function Fig({
   label,
   value,
   tone = "default",
@@ -79,22 +100,14 @@ function Stat({
   tone?: "default" | "good" | "bad" | "accent";
   hint?: string;
 }) {
-  const toneClass =
-    tone === "good"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "bad"
-        ? "text-rose-600 dark:text-rose-400"
-        : tone === "accent"
-          ? "text-amber-700 dark:text-amber-400"
-          : "text-zinc-900 dark:text-zinc-50";
+  const t: Tone | undefined =
+    tone === "good" ? "pos" : tone === "bad" ? "neg" : tone === "accent" ? "accent" : undefined;
   return (
     <div className="flex flex-col gap-0.5" title={hint}>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-        {label}
-      </span>
-      <span className={`text-sm font-semibold tabular-nums ${toneClass}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-hh-muted">{label}</span>
+      <Num tone={t} className={`text-sm font-semibold ${t ? "" : "text-hh-ink"}`}>
         {value}
-      </span>
+      </Num>
     </div>
   );
 }
@@ -121,80 +134,62 @@ function TakenPick({
   onChange: () => void;
 }) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-b from-emerald-50/70 to-white p-5 dark:border-emerald-600/70 dark:from-emerald-950/25 dark:to-zinc-900 lg:p-6">
-      <div className="flex items-center gap-2">
-        <Check size={14} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-          Your pick, week {report.week}
+    <Spotlight
+      label={
+        <span className="inline-flex items-center gap-1.5">
+          <Check size={13} aria-hidden />
+          Your pick, week <Num>{report.week}</Num>
         </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4">
-        <Logo abbr={taken.team} size={48} />
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {taken.team} <span className="text-zinc-400 dark:text-zinc-500">over</span>{" "}
-            {taken.opponent}
-          </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {taken.home ? "Home" : "Away"} &middot; {kickoffLabel(taken.kickoff)}
-          </p>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <Logo abbr={taken.team} size={48} />
+          <div className="flex flex-col gap-0.5">
+            <p className="text-3xl font-semibold tracking-tight text-hh-ink sm:text-4xl">
+              <TeamName abbr={taken.team} /> <span className="text-hh-muted">over</span>{" "}
+              <TeamName abbr={taken.opponent} />
+            </p>
+            <p className="text-sm text-hh-ink-2">
+              {taken.home ? "Home" : "Away"} &middot; {kickoffLabel(taken.kickoff)}
+            </p>
+          </div>
+          <button type="button" disabled={working} onClick={onChange} className={`${BTN} ml-auto text-sm`}>
+            <RotateCcw size={15} aria-hidden />
+            Change pick
+          </button>
         </div>
-        <button
-          type="button"
-          disabled={working}
-          onClick={onChange}
-          className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600"
-        >
-          <RotateCcw size={15} aria-hidden />
-          Change pick
-        </button>
+
+        <div className="grid grid-cols-2 gap-4 border-t border-hh-line pt-4 sm:grid-cols-4">
+          <Fig label="Win" value={pct(taken.winProb)} tone="good" />
+          <Fig
+            label="Field on it"
+            value={pct(taken.ownership)}
+            hint="Share of the field on this team, so the share that survives with you."
+          />
+          <Fig
+            label="Equity"
+            value={`${taken.equityMultiplier.toFixed(2)}x`}
+            tone={taken.equityMultiplier >= 1 ? "good" : "bad"}
+            hint="Above 1.00 gains ground on the field, below loses it."
+          />
+          <Fig
+            label="Future cost"
+            value={taken.futureCost.toFixed(3)}
+            tone={taken.futureCost > 0.05 ? "bad" : "default"}
+            hint="Discounted log-survival given up by burning this team now."
+          />
+        </div>
+
+        {report.myPickNote && (
+          <p className="border-l-2 border-hh-gold pl-3 text-sm leading-relaxed text-hh-ink-2">
+            {report.myPickNote}
+          </p>
+        )}
+
+        <Flags flags={taken.flags} />
       </div>
-
-      <div className="grid grid-cols-2 gap-4 border-t border-emerald-200/70 pt-4 sm:grid-cols-4 dark:border-emerald-900/50">
-        <Stat label="Win" value={pct(taken.winProb)} tone="good" />
-        <Stat
-          label="Field on it"
-          value={pct(taken.ownership)}
-          hint="Share of the field on this team, so the share that survives with you."
-        />
-        <Stat
-          label="Equity"
-          value={`${taken.equityMultiplier.toFixed(2)}x`}
-          tone={taken.equityMultiplier >= 1 ? "good" : "bad"}
-          hint="Above 1.00 gains ground on the field, below loses it."
-        />
-        <Stat
-          label="Future cost"
-          value={taken.futureCost.toFixed(3)}
-          tone={taken.futureCost > 0.05 ? "bad" : "default"}
-          hint="Discounted log-survival given up by burning this team now."
-        />
-      </div>
-
-      {report.myPickNote && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
-          {report.myPickNote}
-        </p>
-      )}
-
-      {taken.flags.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
-          {taken.flags.map((f, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span
-                className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${FLAG_TINT[f.severity]}`}
-              >
-                {FLAG_LABEL[f.kind]}
-              </span>
-              <span className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
-                {f.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    </Spotlight>
   );
 }
 
@@ -405,13 +400,21 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12);
 
+  const logNeeded = report.unloggedWeeks.length > 0;
+  const ownershipSource =
+    report.ownership.source === "projected"
+      ? `Ownership projected for your pool (${report.calibration.alpha.toFixed(2)}x chalk)`
+      : report.ownership.source === "manual"
+        ? "Ownership from your logged picks"
+        : "Ownership from Yahoo national";
+
   return (
     <div className="flex flex-col gap-8">
       {reports.length > 1 && (
         <div
           role="tablist"
           aria-label="Survivor pool"
-          className="flex gap-1 rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900"
+          className="flex gap-1 border-b border-hh-line"
         >
           {reports.map((r) => {
             const active = r.poolId === report.poolId;
@@ -422,33 +425,27 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                 role="tab"
                 aria-selected={active}
                 onClick={() => setPoolId(r.poolId)}
-                className={`flex min-h-11 flex-1 flex-col justify-center rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                  active
-                    ? "bg-amber-100 dark:bg-amber-950/50"
-                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className={`-mb-px flex min-h-11 flex-1 flex-col justify-center border-b-2 px-3 py-2 text-left transition-colors focus:outline-none focus-visible:bg-hh-sunk ${
+                  active ? "border-hh-accent" : "border-transparent hover:bg-hh-sunk"
                 }`}
               >
-                <span
-                  className={`text-sm font-semibold ${
-                    active
-                      ? "text-amber-900 dark:text-amber-200"
-                      : "text-zinc-700 dark:text-zinc-300"
-                  }`}
-                >
+                <span className={`text-sm font-semibold ${active ? "text-hh-accent-ink" : "text-hh-ink-2"}`}>
                   {r.pool.name}
                 </span>
                 {/* Each pool's own answer, so agreement or disagreement is
                     visible without switching tabs. */}
-                <span className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                <span className="text-[11px] text-hh-muted">
                   {r.status.alive ? (
                     <>
                       {r.myPick ?? r.bestTeam ?? "nothing left"}
                       {r.myPick ? " taken" : ""}
-                      {" \u00b7 "}
-                      {r.spentTeams.length} spent
+                      {" · "}
+                      <Num>{r.spentTeams.length}</Num> spent
                     </>
                   ) : (
-                    `Out in week ${r.status.endedBy?.week ?? "?"}`
+                    <>
+                      Out in week <Num>{r.status.endedBy?.week ?? "?"}</Num>
+                    </>
                   )}
                 </span>
               </button>
@@ -459,61 +456,55 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
 
       {/* Header */}
       <header className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
-            Week {report.week}
-          </span>
-          {locksIn && !out && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 text-[11px] font-semibold text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-              <Lock size={11} aria-hidden />
-              Locks in {locksIn}
-            </span>
-          )}
-          <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-            {report.entriesAlive.toLocaleString()} entries alive
-          </span>
-          <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-            {32 - spentSet.size} teams left
-          </span>
-          {/* What the pool is playing for. Drives which end of a tie the board
-              takes, so it belongs next to the pick rather than buried. */}
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-              report.posture.mode === "outright"
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                : "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300"
-            }`}
-          >
-            {report.posture.mode === "outright" ? "Plays for an outright win" : "Plays for a share"}
-            <span className="font-normal tabular-nums opacity-80">
-              ~{report.posture.expectedSurvivors < 10
-                ? report.posture.expectedSurvivors.toFixed(1)
-                : Math.round(report.posture.expectedSurvivors)}{" "}
-              left at 18
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowSettings((s) => !s)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700"
-          >
-            <Settings2 size={13} aria-hidden />
-            Pool
-          </button>
-        </div>
-        <p className="max-w-2xl text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-          {report.posture.summary}
-        </p>
         <div className="flex flex-col gap-2">
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Survivor
-          </h1>
-          <p className="max-w-2xl text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
+          <h1 className="hh-title">Survivor</h1>
+          <p className="max-w-2xl text-[15px] leading-relaxed text-hh-ink-2">
             Ranked on first-place equity, not weekly safety. Live moneylines,
             public pick percentages, and the cost of burning a team you will want
             in November.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Chip tone="accent">
+            Week <Num>{report.week}</Num>
+          </Chip>
+          {locksIn && !out && (
+            <Chip>
+              <Lock size={11} aria-hidden />
+              Locks in <Num>{locksIn}</Num>
+            </Chip>
+          )}
+          <span className="text-xs text-hh-muted">
+            <Num>{report.entriesAlive.toLocaleString()}</Num> entries alive
+          </span>
+          <span className="text-xs text-hh-muted">
+            <Num>{32 - spentSet.size}</Num> teams left
+          </span>
+          {/* What the pool is playing for. Drives which end of a tie the board
+              takes, so it belongs next to the pick rather than buried. */}
+          <Chip tone={report.posture.mode === "outright" ? "pos" : "gold"}>
+            {report.posture.mode === "outright" ? "Plays for an outright win" : "Plays for a share"}
+            <span className="font-normal opacity-80">
+              ~
+              <Num>
+                {report.posture.expectedSurvivors < 10
+                  ? report.posture.expectedSurvivors.toFixed(1)
+                  : Math.round(report.posture.expectedSurvivors)}
+              </Num>{" "}
+              left at 18
+            </span>
+          </Chip>
+          <button
+            type="button"
+            onClick={() => setShowSettings((s) => !s)}
+            aria-expanded={showSettings}
+            className={`${BTN} ml-auto`}
+          >
+            <Settings2 size={13} aria-hidden />
+            Pool settings
+          </button>
+        </div>
+        <p className="max-w-2xl text-xs leading-relaxed text-hh-muted">{report.posture.summary}</p>
       </header>
 
       {showSettings && (
@@ -537,466 +528,158 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
 
       {/* The pick */}
       {taken ? null : best ? (
-        <section className="grid gap-4 lg:grid-cols-3">
-          <article className="flex flex-col gap-5 rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50/70 to-white p-5 dark:border-amber-600/70 dark:from-amber-950/25 dark:to-zinc-900 lg:col-span-2 lg:p-6">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={14} className="text-amber-600 dark:text-amber-400" aria-hidden />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                Take this
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <Logo abbr={best.team} size={56} />
-              <div className="flex flex-col">
-                <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                  {best.team}
-                </h2>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {best.home ? "vs" : "at"} {best.opponent} &middot;{" "}
-                  {kickoffLabel(best.kickoff)}
-                  {best.spread !== null && (
-                    <span className="tabular-nums"> &middot; {best.spread > 0 ? "+" : ""}{best.spread}</span>
-                  )}
-                </p>
-              </div>
-              <div className="ml-auto text-right">
-                <div className="text-4xl font-semibold tabular-nums tracking-tight text-amber-700 dark:text-amber-400">
-                  {pct(best.winProb)}
+        <div className="grid gap-8 lg:grid-cols-3">
+          <Spotlight label="Take this" className="lg:col-span-2">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-wrap items-center gap-4">
+                <Logo abbr={best.team} size={56} />
+                <div className="flex flex-col">
+                  <p className="text-3xl font-semibold tracking-tight text-hh-ink sm:text-4xl">
+                    <TeamName abbr={best.team} />
+                  </p>
+                  <p className="text-sm text-hh-ink-2">
+                    {best.home ? "vs" : "at"} <TeamName abbr={best.opponent} /> &middot;{" "}
+                    {kickoffLabel(best.kickoff)}
+                    {best.spread !== null && (
+                      <>
+                        {" "}&middot; <Num>{best.spread > 0 ? "+" : ""}{best.spread}</Num>
+                      </>
+                    )}
+                  </p>
                 </div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  to win
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 border-y border-amber-200/70 py-4 sm:grid-cols-4 dark:border-amber-900/40">
-              <Stat
-                label="Field on it"
-                value={pct(best.ownership)}
-                tone={best.ownership > best.winProb ? "bad" : "default"}
-                hint="Share of entries expected to make this same pick."
-              />
-              <Stat
-                label="Rivals survive"
-                value={pct(best.fieldSurvival)}
-                hint="Fraction of the field still alive next week if this pick hits."
-              />
-              <Stat
-                label="Equity"
-                value={`${best.equityMultiplier.toFixed(2)}x`}
-                tone={best.equityMultiplier >= 1 ? "good" : "bad"}
-                hint="Value against an even share of the prize. Above 1.00 means you gain ground."
-              />
-              <Stat
-                label="Burn cost"
-                value={best.futureCost.toFixed(3)}
-                tone={best.futureCost > 0.05 ? "bad" : "default"}
-                hint="Discounted log-survival given up by burning this team now."
-              />
-            </div>
-
-            {best.flags.length > 0 && (
-              <ul className="flex flex-col gap-1.5">
-                {best.flags.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span
-                      className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${FLAG_TINT[f.severity]}`}
-                    >
-                      {FLAG_LABEL[f.kind]}
-                    </span>
-                    <span className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
-                      {f.text}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <button
-              type="button"
-              disabled={working}
-              onClick={() => takePick(best.team)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"
-            >
-              <Check size={16} aria-hidden />
-              I took {best.team}
-            </button>
-          </article>
-
-          <div className="flex flex-col gap-4">
-            {safest ? (
-              <article className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="flex items-center gap-2">
-                  <Shield size={14} className="text-cyan-600 dark:text-cyan-400" aria-hidden />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
-                    Safest board
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Logo abbr={safest.team} size={36} />
-                  <div className="flex flex-col">
-                    <span className="text-xl font-semibold tracking-tight">
-                      {safest.team}
-                    </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {safest.home ? "vs" : "at"} {safest.opponent}
-                    </span>
+                <div className="ml-auto text-right">
+                  <Num tone="accent" className="block text-4xl font-semibold tracking-tight">
+                    {pct(best.winProb)}
+                  </Num>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-hh-muted">
+                    to win
                   </div>
-                  <span className="ml-auto text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
-                    {pct(safest.winProb)}
-                  </span>
                 </div>
-                <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                  {(report.safetyGiveUp * 100).toFixed(1)} points safer than{" "}
-                  {best.team}, but {pct(safest.ownership)} of the field is already
-                  there. Equity {safest.equityMultiplier.toFixed(2)}x.
-                </p>
-                <button
-                  type="button"
-                  disabled={working}
-                  onClick={() => takePick(safest.team)}
-                  className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-700"
-                >
-                  I took {safest.team} instead
-                </button>
-              </article>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-y border-hh-line py-4 sm:grid-cols-4">
+                <Fig
+                  label="Field on it"
+                  value={pct(best.ownership)}
+                  tone={best.ownership > best.winProb ? "bad" : "default"}
+                  hint="Share of entries expected to make this same pick."
+                />
+                <Fig
+                  label="Rivals survive"
+                  value={pct(best.fieldSurvival)}
+                  hint="Fraction of the field still alive next week if this pick hits."
+                />
+                <Fig
+                  label="Equity"
+                  value={`${best.equityMultiplier.toFixed(2)}x`}
+                  tone={best.equityMultiplier >= 1 ? "good" : "bad"}
+                  hint="Value against an even share of the prize. Above 1.00 means you gain ground."
+                />
+                <Fig
+                  label="Burn cost"
+                  value={best.futureCost.toFixed(3)}
+                  tone={best.futureCost > 0.05 ? "bad" : "default"}
+                  hint="Discounted log-survival given up by burning this team now."
+                />
+              </div>
+
+              <Flags flags={best.flags} />
+
+              <button
+                type="button"
+                disabled={working}
+                onClick={() => takePick(best.team)}
+                className={BTN_PRIMARY}
+              >
+                <Check size={16} aria-hidden />
+                I took {best.team}
+              </button>
+            </div>
+          </Spotlight>
+
+          <div className="flex flex-col gap-8">
+            {safest ? (
+              <Section label="Safest board">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <Logo abbr={safest.team} size={36} />
+                    <div className="flex flex-col">
+                      <span className="text-xl font-semibold tracking-tight text-hh-ink">
+                        <TeamName abbr={safest.team} />
+                      </span>
+                      <span className="text-xs text-hh-muted">
+                        {safest.home ? "vs" : "at"} <TeamName abbr={safest.opponent} />
+                      </span>
+                    </div>
+                    <Num className="ml-auto text-2xl font-semibold text-hh-ink">{pct(safest.winProb)}</Num>
+                  </div>
+                  <p className="text-xs leading-relaxed text-hh-ink-2">
+                    <Num>{(report.safetyGiveUp * 100).toFixed(1)}</Num> points safer than{" "}
+                    {best.team}, but <Num>{pct(safest.ownership)}</Num> of the field is already
+                    there. Equity <Num>{safest.equityMultiplier.toFixed(2)}x</Num>.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={() => takePick(safest.team)}
+                    className={`${BTN} self-start`}
+                  >
+                    I took {safest.team} instead
+                  </button>
+                </div>
+              </Section>
             ) : (
-              <article className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="flex items-center gap-2">
-                  <Shield size={14} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                    No trade-off
-                  </span>
-                </div>
-                <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <Section label="No trade-off">
+                <p className="text-xs leading-relaxed text-hh-ink-2">
                   {best.team} is both the safest board and the best equity this
                   week. Nothing to weigh.
                 </p>
-              </article>
+              </Section>
             )}
 
-            <article className="flex flex-col gap-2.5 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Why
-              </span>
-              <ul className="flex flex-col gap-2">
+            <Section label="Why">
+              <ul className="flex flex-col">
                 {report.reasoning.map((r, i) => (
                   <li
                     key={i}
-                    className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300"
+                    className="border-b border-hh-line py-2 text-xs leading-relaxed text-hh-ink-2 last:border-b-0"
                   >
                     {r}
                   </li>
                 ))}
               </ul>
-            </article>
+            </Section>
           </div>
-        </section>
+        </div>
       ) : (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-sm font-semibold">{report.headline}</p>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <Spotlight label="No pick">
+          <p className="text-sm font-semibold text-hh-ink">{report.headline}</p>
+          <p className="mt-1 text-sm text-hh-ink-2">
             Every team playing this week is already burned, or the slate has
             locked.
           </p>
-        </div>
+        </Spotlight>
       )}
 
       {/* Notes */}
       {report.notes.length > 0 && (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col">
           {report.notes.map((n, i) => (
             <li
               key={i}
-              className="flex items-start gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50/60 px-3.5 py-2.5 dark:border-zinc-800 dark:bg-zinc-900/50"
+              className="flex items-start gap-2.5 border-b border-hh-line py-2.5 last:border-b-0"
             >
-              <Info size={13} aria-hidden className="mt-0.5 shrink-0 text-zinc-400 dark:text-zinc-500" />
-              <span className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                {n}
-              </span>
+              <Info size={13} aria-hidden className="mt-0.5 shrink-0 text-hh-muted" />
+              <span className="text-xs leading-relaxed text-hh-ink-2">{n}</span>
             </li>
           ))}
         </ul>
       )}
 
-      {/* Log last week, which is the only recurring input the tool asks for */}
-      <section className="flex flex-col gap-3">
-        <div
-          className={`flex flex-col gap-3 rounded-2xl border p-5 ${
-            report.unloggedWeeks.length > 0
-              ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20"
-              : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-          }`}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <ClipboardList
-                  size={14}
-                  aria-hidden
-                  className={
-                    report.unloggedWeeks.length > 0
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-zinc-400 dark:text-zinc-500"
-                  }
-                />
-                <span
-                  className={`text-[11px] font-bold uppercase tracking-wider ${
-                    report.unloggedWeeks.length > 0
-                      ? "text-amber-700 dark:text-amber-400"
-                      : "text-zinc-500 dark:text-zinc-400"
-                  }`}
-                >
-                  {report.unloggedWeeks.length > 0
-                    ? `Log Week ${logWeek}`
-                    : nothingToLogYet
-                      ? "Pool history"
-                      : `${report.field.weeksLogged} week(s) logged`}
-                </span>
-              </div>
-              <p className="max-w-xl text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                {report.unloggedWeeks.length > 0
-                  ? `Week ${logWeek} is finished, so your pool now shows what everyone picked. Paste it once and three things update: how far your pool leans off the public, which teams the field has burned, and how many entries are left.`
-                  : nothingToLogYet
-                    ? "Nothing to log yet. Once a week finishes, your pool shows what everyone picked and which teams they have used. Paste that here and the ownership numbers stop being Yahoo's public estimate and start being your pool."
-                    : "Every finished week is in, so the ownership numbers are projected for your pool rather than taken from Yahoo alone."}
-              </p>
-            </div>
-            {!nothingToLogYet && !report.board && (
-              <button
-                type="button"
-                onClick={() => (pasteOpen ? setPasteOpen(false) : openWeek(logWeek))}
-                className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                  report.unloggedWeeks.length > 0
-                    ? "bg-amber-500 text-white hover:bg-amber-600"
-                    : "border border-zinc-200 text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:text-zinc-400"
-                }`}
-              >
-                {pasteOpen
-                  ? "Close"
-                  : report.unloggedWeeks.length > 0
-                    ? `Paste Week ${logWeek} picks`
-                    : "Edit logged weeks"}
-              </button>
-            )}
-          </div>
-
-          {pasteOpen && !report.board && (
-            <div className="flex flex-col gap-2 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
-              {finishedWeeks.length > 1 && (
-                <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Week to log">
-                  {finishedWeeks.map((w) => {
-                    const saved = Boolean(pool.weeklyPicks[String(w)]);
-                    const active = w === logWeek;
-                    return (
-                      <button
-                        key={w}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        onClick={() => openWeek(w)}
-                        className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold tabular-nums transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                          active
-                            ? "border-amber-500 bg-amber-500 text-white"
-                            : saved
-                              ? "border-zinc-300 bg-white text-zinc-700 hover:border-amber-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
-                              : "border-dashed border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
-                        }`}
-                      >
-                        Wk {w}
-                        {saved ? <Check size={11} aria-label="logged" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                {logWeekSaved
-                  ? `Week ${logWeek} as saved. Change any line and update, or delete the week to log it again from scratch.`
-                  : "One team per line, team code then percentage (or a head count in a small pool). Any separator, and a partial list is fine."}
-              </p>
-              <textarea
-                value={paste}
-                onChange={(e) => setPaste(e.target.value)}
-                rows={6}
-                placeholder={"LAC 32.2%\nJAX 21.7%\nDET 18.2%"}
-                className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:bg-zinc-950"
-              />
-              {pasteError && (
-                <p className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400">
-                  <AlertTriangle size={12} aria-hidden />
-                  {pasteError}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={working}
-                  onClick={submitPaste}
-                  className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-                >
-                  {logWeekSaved ? "Update" : "Save"} Week {logWeek}
-                </button>
-                {logWeekSaved && (
-                  <button
-                    type="button"
-                    disabled={working}
-                    onClick={() => {
-                      const next = { ...pool.weeklyPicks };
-                      delete next[String(logWeek)];
-                      void patch({ weeklyPicks: next });
-                      setPasteOpen(false);
-                      setPaste("");
-                    }}
-                    className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:border-rose-300 hover:text-rose-700 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-400"
-                  >
-                    Delete Week {logWeek}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {report.board?.source === "sleeper" ? (
-            <div className="flex flex-col gap-1 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
-              <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Read live from Sleeper
-              </p>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                All {report.board.entries.toLocaleString()} entries and their whole pick history,
-                straight off the league. {report.board.alive} alive,{" "}
-                {report.board.untouched.length} teams nobody surviving has used. Nothing to paste
-                and nothing to keep in step.
-              </p>
-            </div>
-          ) : null}
-
-          {report.board?.source !== "sleeper" && (
-          <>
-          {/* The board itself, read from a screenshot.
-              Percentages answer this week. Rows answer the season: which
-              entries are carrying which burned teams, which is the thing the
-              model can only estimate. */}
-          <div className="flex flex-col gap-2 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Read the board from a screenshot
-                </p>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {boardRead
-                    ? `${boardRead} rows stored, so burned teams and the count left are exact rather than modelled.`
-                    : "Screenshot the pool's grid of names and picks. Every entry, every week, read row by row."}
-                </p>
-              </div>
-              <label
-                className={`shrink-0 cursor-pointer rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                  boardBusy
-                    ? "bg-zinc-200 text-zinc-500 dark:bg-zinc-800"
-                    : "border border-zinc-200 text-zinc-600 hover:border-amber-400 hover:text-amber-700 dark:border-zinc-800 dark:text-zinc-400"
-                }`}
-              >
-                {boardBusy ? "Reading..." : boardRead ? "Upload a newer one" : "Upload screenshot"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  disabled={boardBusy}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    if (file) void uploadBoard(file);
-                  }}
-                />
-              </label>
-            </div>
-            {boardResult && (
-              <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                Read {boardResult.rows} entries, {boardResult.alive} still alive.
-                {boardResult.unreadable > 0
-                  ? ` ${boardResult.unreadable} pick${boardResult.unreadable === 1 ? "" : "s"} could not be identified, so check those rows.`
-                  : ""}
-              </p>
-            )}
-            {boardError && (
-              <p className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400">
-                <AlertTriangle size={12} aria-hidden />
-                {boardError}
-              </p>
-            )}
-          </div>
-
-          </>
-          )}
-
-          {report.field.weeksLogged > 0 && !report.board && (
-            <div className="grid gap-4 border-t border-zinc-200/70 pt-3 sm:grid-cols-3 dark:border-zinc-800">
-              <Stat
-                label="Entries left"
-                value={report.field.entriesAlive.toLocaleString()}
-                hint="Derived from the picks you logged and the results, not typed in."
-              />
-              <Stat
-                label="Chalk factor"
-                value={`${report.calibration.alpha.toFixed(2)}x`}
-                tone={report.calibration.alpha > 1.15 ? "accent" : "default"}
-                hint="Above 1 means your pool crowds the favourite harder than the public does."
-              />
-              <Stat
-                label="Fit confidence"
-                value={report.calibration.confidence}
-                hint={`Based on ${report.calibration.weeks} logged week(s).`}
-              />
-            </div>
-          )}
-
-          {burnedByField.length > 0 && (
-            <div className="flex flex-col gap-2 border-t border-zinc-200/70 pt-3 dark:border-zinc-800">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                What the field has burned
-              </span>
-              <ul className="flex flex-wrap gap-1.5">
-                {burnedByField.map(([team, share]) => (
-                  <li
-                    key={team}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2 py-1 dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <Logo abbr={team} size={16} />
-                    <span className="text-[11px] font-semibold">{team}</span>
-                    <span className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {pct(share, 0)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                These are unavailable to that share of the surviving field. If
-                you still hold one for a week it is a big favourite, most of the
-                pool cannot follow you.
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* The board, hidden once the decision is made. */}
       {!taken && rest.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              The rest of the board
-            </h2>
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              {report.ownership.source === "projected"
-                ? `Ownership projected for your pool (${report.calibration.alpha.toFixed(2)}x chalk)`
-                : report.ownership.source === "manual"
-                  ? "Ownership from your logged picks"
-                  : "Ownership from Yahoo national"}
-            </span>
-          </div>
-
-          <ul className="flex flex-col gap-2">
+        <Section label="The rest of the board" aside={ownershipSource}>
+          <ul className="flex flex-col">
             {rest.map((c, i) => (
               <CandidateRow
                 key={`${c.team}-${c.week}`}
@@ -1012,7 +695,7 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
             <button
               type="button"
               onClick={() => setShowAll((s) => !s)}
-              className="inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700"
+              className={`${BTN} mt-3`}
             >
               <ChevronDown
                 size={13}
@@ -1021,60 +704,286 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
               />
               {showAll
                 ? "Show fewer"
-                : `Show all ${report.candidates.length} legal picks`}
+                : <>Show all <Num>{report.candidates.length}</Num> legal picks</>}
             </button>
           )}
-        </section>
+        </Section>
       )}
+
+      {/* Log last week, which is the only recurring input the tool asks for.
+          A finished week still waiting for its picks keeps a visible line above the fold of the box. */}
+      <Section
+        label={
+          logNeeded
+            ? `Log Week ${logWeek}`
+            : nothingToLogYet
+              ? "Pool history"
+              : `${report.field.weeksLogged} week(s) logged`
+        }
+        aside={logNeeded ? <Chip tone="gold">Needs your paste</Chip> : undefined}
+      >
+        <p className="max-w-xl text-xs leading-relaxed text-hh-ink-2">
+          {logNeeded
+            ? `Week ${logWeek} is finished, so your pool now shows what everyone picked. Paste it once and three things update: how far your pool leans off the public, which teams the field has burned, and how many entries are left.`
+            : nothingToLogYet
+              ? "Nothing to log yet. Once a week finishes, your pool shows what everyone picked and which teams they have used. Paste that here and the ownership numbers stop being Yahoo's public estimate and start being your pool."
+              : "Every finished week is in, so the ownership numbers are projected for your pool rather than taken from Yahoo alone."}
+        </p>
+
+        <Disclosure summary="Field logging and screenshots" className="mt-2">
+          <div className="flex flex-col gap-4">
+            {!nothingToLogYet && !report.board && (
+              <button
+                type="button"
+                onClick={() => (pasteOpen ? setPasteOpen(false) : openWeek(logWeek))}
+                className={logNeeded ? `${BTN_PRIMARY} self-start text-xs` : `${BTN} self-start`}
+              >
+                {pasteOpen
+                  ? "Close"
+                  : logNeeded
+                    ? `Paste Week ${logWeek} picks`
+                    : "Edit logged weeks"}
+              </button>
+            )}
+
+            {pasteOpen && !report.board && (
+              <div className="flex flex-col gap-2 border-t border-hh-line pt-3">
+                {finishedWeeks.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Week to log">
+                    {finishedWeeks.map((w) => {
+                      const saved = Boolean(pool.weeklyPicks[String(w)]);
+                      const active = w === logWeek;
+                      return (
+                        <button
+                          key={w}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => openWeek(w)}
+                          className={`inline-flex h-11 items-center gap-1 rounded-[6px] border px-2.5 text-[11px] font-semibold transition-colors focus:outline-none focus-visible:border-hh-accent sm:h-8 ${
+                            active
+                              ? "border-hh-accent bg-hh-accent text-[var(--hh-on-accent)]"
+                              : saved
+                                ? "border-hh-line bg-hh-panel text-hh-ink-2 hover:border-hh-accent"
+                                : "border-dashed border-hh-gold text-hh-gold hover:bg-hh-sunk"
+                          }`}
+                        >
+                          Wk <Num>{w}</Num>
+                          {saved ? <Check size={11} aria-label="logged" /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-hh-ink-2">
+                  {logWeekSaved
+                    ? `Week ${logWeek} as saved. Change any line and update, or delete the week to log it again from scratch.`
+                    : "One team per line, team code then percentage (or a head count in a small pool). Any separator, and a partial list is fine."}
+                </p>
+                <textarea
+                  value={paste}
+                  onChange={(e) => setPaste(e.target.value)}
+                  rows={6}
+                  placeholder={"LAC 32.2%\nJAX 21.7%\nDET 18.2%"}
+                  className="rounded-[6px] border border-hh-line bg-hh-panel px-3 py-2 font-mono text-[16px] text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none sm:text-xs"
+                />
+                {pasteError && (
+                  <p className="flex items-center gap-1.5 text-xs text-hh-neg">
+                    <AlertTriangle size={12} aria-hidden />
+                    {pasteError}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={working}
+                    onClick={submitPaste}
+                    className={`${BTN_PRIMARY} text-xs`}
+                  >
+                    {logWeekSaved ? "Update" : "Save"} Week {logWeek}
+                  </button>
+                  {logWeekSaved && (
+                    <button
+                      type="button"
+                      disabled={working}
+                      onClick={() => {
+                        const next = { ...pool.weeklyPicks };
+                        delete next[String(logWeek)];
+                        void patch({ weeklyPicks: next });
+                        setPasteOpen(false);
+                        setPaste("");
+                      }}
+                      className={`${BTN} hover:!border-hh-neg hover:!text-hh-neg`}
+                    >
+                      Delete Week {logWeek}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {report.board?.source === "sleeper" ? (
+              <div className="flex flex-col gap-1 border-t border-hh-line pt-3">
+                <p className="text-xs font-semibold text-hh-ink">Read live from Sleeper</p>
+                <p className="text-xs text-hh-ink-2">
+                  All <Num>{report.board.entries.toLocaleString()}</Num> entries and their whole pick history,
+                  straight off the league. <Num>{report.board.alive}</Num> alive,{" "}
+                  <Num>{report.board.untouched.length}</Num> teams nobody surviving has used. Nothing to paste
+                  and nothing to keep in step.
+                </p>
+              </div>
+            ) : null}
+
+            {report.board?.source !== "sleeper" && (
+              /* The board itself, read from a screenshot.
+                 Percentages answer this week. Rows answer the season: which
+                 entries are carrying which burned teams, which is the thing the
+                 model can only estimate. */
+              <div className="flex flex-col gap-2 border-t border-hh-line pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-hh-ink">Read the board from a screenshot</p>
+                    <p className="text-xs text-hh-ink-2">
+                      {boardRead
+                        ? `${boardRead} rows stored, so burned teams and the count left are exact rather than modelled.`
+                        : "Screenshot the pool's grid of names and picks. Every entry, every week, read row by row."}
+                    </p>
+                  </div>
+                  <label
+                    className={`${BTN} shrink-0 cursor-pointer focus-within:border-hh-accent ${
+                      boardBusy ? "!cursor-default bg-hh-sunk text-hh-muted" : ""
+                    }`}
+                  >
+                    {boardBusy ? "Reading..." : boardRead ? "Upload a newer one" : "Upload screenshot"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={boardBusy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void uploadBoard(file);
+                      }}
+                    />
+                  </label>
+                </div>
+                {boardResult && (
+                  <p className="text-xs text-hh-pos">
+                    Read <Num>{boardResult.rows}</Num> entries, <Num>{boardResult.alive}</Num> still alive.
+                    {boardResult.unreadable > 0
+                      ? ` ${boardResult.unreadable} pick${boardResult.unreadable === 1 ? "" : "s"} could not be identified, so check those rows.`
+                      : ""}
+                  </p>
+                )}
+                {boardError && (
+                  <p className="flex items-center gap-1.5 text-xs text-hh-neg">
+                    <AlertTriangle size={12} aria-hidden />
+                    {boardError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {report.field.weeksLogged > 0 && !report.board && (
+              <div className="grid gap-4 border-t border-hh-line pt-3 sm:grid-cols-3">
+                <Fig
+                  label="Entries left"
+                  value={report.field.entriesAlive.toLocaleString()}
+                  hint="Derived from the picks you logged and the results, not typed in."
+                />
+                <Fig
+                  label="Chalk factor"
+                  value={`${report.calibration.alpha.toFixed(2)}x`}
+                  tone={report.calibration.alpha > 1.15 ? "accent" : "default"}
+                  hint="Above 1 means your pool crowds the favourite harder than the public does."
+                />
+                <Fig
+                  label="Fit confidence"
+                  value={report.calibration.confidence}
+                  hint={`Based on ${report.calibration.weeks} logged week(s).`}
+                />
+              </div>
+            )}
+
+            {burnedByField.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-hh-line pt-3">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-hh-muted">
+                  What the field has burned
+                </span>
+                <ul className="flex flex-wrap gap-1.5">
+                  {burnedByField.map(([team, share]) => (
+                    <li
+                      key={team}
+                      className="inline-flex items-center gap-1.5 rounded-[4px] border border-hh-line px-2 py-1"
+                    >
+                      <Logo abbr={team} size={16} />
+                      <span className="text-[11px] font-semibold text-hh-ink">{team}</span>
+                      <Num className="text-[11px] text-hh-muted">{pct(share, 0)}</Num>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs leading-relaxed text-hh-ink-2">
+                  These are unavailable to that share of the surviving field. If
+                  you still hold one for a week it is a big favourite, most of the
+                  pool cannot follow you.
+                </p>
+              </div>
+            )}
+          </div>
+        </Disclosure>
+      </Section>
 
       {/* Plan */}
       {report.plan.length > 1 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Path from here
-            </h2>
-            <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-              {pct(report.planSurvival)} to survive all {report.plan.length} weeks
-            </span>
-          </div>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        <Disclosure
+          summary={
+            <>
+              Path from here: <Num>{pct(report.planSurvival)}</Num> to survive all{" "}
+              <Num>{report.plan.length}</Num> weeks
+            </>
+          }
+        >
+          <ul className="grid grid-cols-2 gap-x-4 sm:grid-cols-4 lg:grid-cols-8">
             {report.plan.map((p) => (
               <li
                 key={p.week}
-                className={`flex flex-col gap-1.5 rounded-xl border p-3 ${
-                  p.week === report.week
-                    ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20"
-                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+                className={`flex flex-col gap-1.5 border-b py-3 ${
+                  p.week === report.week ? "border-hh-accent" : "border-hh-line"
                 }`}
               >
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Week {p.week}
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider ${
+                    p.week === report.week ? "text-hh-accent-ink" : "text-hh-muted"
+                  }`}
+                >
+                  Week <Num>{p.week}</Num>
                 </span>
                 <div className="flex items-center gap-1.5">
                   <Logo abbr={p.team} size={20} />
-                  <span className="text-sm font-semibold">{p.team}</span>
+                  <span className="text-sm font-semibold text-hh-ink">
+                    {p.week === report.week ? <TeamName abbr={p.team} /> : p.team}
+                  </span>
                 </div>
-                <span className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400">
-                  {p.home ? "vs" : "at"} {p.opponent} &middot; {pct(p.winProb, 0)}
+                <span className="text-[11px] text-hh-muted">
+                  {p.home ? "vs" : "at"} {p.opponent} &middot; <Num>{pct(p.winProb, 0)}</Num>
                 </span>
               </li>
             ))}
           </ul>
-        </section>
+        </Disclosure>
       )}
 
       {/* Used teams */}
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Teams burned
-          </h2>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {spentSet.size} of 32 used, this week&rsquo;s pick included. Your picks
+      <Section
+        label="Teams burned"
+        aside={
+          <>
+            <Num>{spentSet.size}</Num> of <Num>32</Num> used, this week&rsquo;s pick included. Your picks
             spend themselves, so tap only to record one the tool never saw.
-          </span>
-        </div>
+          </>
+        }
+      >
         <ul className="grid grid-cols-4 gap-1.5 sm:grid-cols-8">
           {NFL_TEAMS.map((t) => {
             const isUsed = usedSet.has(t.abbr);
@@ -1100,12 +1009,12 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                         ? `Your week ${byPick} pick`
                         : undefined
                   }
-                  className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 ${
+                  className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-[6px] border px-1 py-2 transition-colors focus:outline-none focus-visible:border-hh-accent disabled:opacity-50 ${
                     isTaken
-                      ? "border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950"
+                      ? "border-hh-accent bg-hh-accent-soft"
                       : isUsed
-                        ? "border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800"
-                        : "border-zinc-200 bg-white hover:border-amber-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-800"
+                        ? "border-hh-line bg-hh-sunk"
+                        : "border-hh-line bg-hh-panel hover:border-hh-accent"
                   }`}
                 >
                   <span className={isUsed ? "opacity-30 grayscale" : ""}>
@@ -1113,29 +1022,23 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
                   </span>
                   <span
                     className={`text-[10px] font-bold ${
-                      isUsed
-                        ? "text-zinc-400 line-through dark:text-zinc-600"
-                        : "text-zinc-700 dark:text-zinc-300"
+                      isUsed ? "text-hh-muted line-through" : "text-hh-ink-2"
                     }`}
                   >
                     {t.abbr}
                   </span>
                   {isTaken && (
-                    <span className="text-[9px] font-semibold tabular-nums text-amber-700 dark:text-amber-500">
-                      W{report.week}
-                    </span>
+                    <Num className="text-[9px] font-semibold text-hh-accent-ink">W{report.week}</Num>
                   )}
                   {byPick !== undefined && (
-                    <span className="text-[9px] font-semibold tabular-nums text-amber-700 dark:text-amber-500">
-                      W{byPick}
-                    </span>
+                    <Num className="text-[9px] font-semibold text-hh-accent-ink">W{byPick}</Num>
                   )}
                 </button>
               </li>
             );
           })}
         </ul>
-      </section>
+      </Section>
       </>
       )}
     </div>
@@ -1150,58 +1053,54 @@ function OutCard({ report }: { report: SurvivorReport }) {
   const { endedBy, record } = report.status;
   const lasted = endedBy ? endedBy.week - 1 : record.length;
   return (
-    <section className="flex flex-col gap-5 rounded-2xl border border-zinc-300 bg-zinc-50 p-5 dark:border-zinc-700 dark:bg-zinc-900/60 lg:p-6">
-      <div className="flex items-center gap-2">
-        <Shield size={14} className="text-zinc-500 dark:text-zinc-400" aria-hidden />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Out of the {report.pool.name}
-        </span>
-      </div>
-
-      {endedBy && (
-        <div className="flex flex-wrap items-center gap-4">
-          <Logo abbr={endedBy.team} size={48} />
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {endedBy.team} {endedBy.result === "T" ? "tied" : "lost"}{" "}
-              <span className="tabular-nums">
-                {endedBy.teamScore}&ndash;{endedBy.oppScore}
-              </span>
-            </h2>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {endedBy.home ? "vs" : "at"} {endedBy.opponent} &middot; week {endedBy.week}
-            </p>
+    <Spotlight label={`Out of the ${report.pool.name}`}>
+      <div className="flex flex-col gap-5">
+        {endedBy && (
+          <div className="flex flex-wrap items-center gap-4">
+            <Logo abbr={endedBy.team} size={48} />
+            <div className="flex flex-col gap-0.5">
+              <p className="text-2xl font-semibold tracking-tight text-hh-ink sm:text-3xl">
+                {endedBy.team} {endedBy.result === "T" ? "tied" : "lost"}{" "}
+                <Num>
+                  {endedBy.teamScore}&ndash;{endedBy.oppScore}
+                </Num>
+              </p>
+              <p className="text-sm text-hh-ink-2">
+                {endedBy.home ? "vs" : "at"} {endedBy.opponent} &middot; week <Num>{endedBy.week}</Num>
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <ol className="flex flex-wrap gap-2" aria-label="Your picks this season">
-        {record.map((p) => (
-          <li
-            key={p.week}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs tabular-nums ${
-              p.result === "W"
-                ? "border-emerald-200 bg-white text-emerald-800 dark:border-emerald-900/60 dark:bg-zinc-900 dark:text-emerald-300"
-                : "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
-            }`}
-          >
-            <span className="font-semibold">W{p.week}</span>
-            <Logo abbr={p.team} size={16} />
-            {p.team}
-            <span className="opacity-70">
-              {p.teamScore}&ndash;{p.oppScore}
-            </span>
-          </li>
-        ))}
-      </ol>
+        <ol className="flex flex-wrap gap-2" aria-label="Your picks this season">
+          {record.map((p) => (
+            <li
+              key={p.week}
+              className={`inline-flex items-center gap-1.5 rounded-[4px] border px-2.5 py-1.5 text-xs ${
+                p.result === "W"
+                  ? "border-hh-line text-hh-pos"
+                  : "border-hh-neg bg-[var(--hh-neg-soft)] text-hh-neg"
+              }`}
+            >
+              <Num className="font-semibold">W{p.week}</Num>
+              <Logo abbr={p.team} size={16} />
+              {p.team}
+              <Num className="opacity-70">
+                {p.teamScore}&ndash;{p.oppScore}
+              </Num>
+            </li>
+          ))}
+        </ol>
 
-      <p className="max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-        Survived {lasted} week{lasted === 1 ? "" : "s"}. {report.entriesAlive.toLocaleString()} of{" "}
-        {report.pool.poolSize.toLocaleString()} entries are still going. Nothing here needs you
-        until next season: the emails and the Sunday alarm have dropped this pool, and the board
-        resets on its own in August.
-      </p>
-    </section>
+        <p className="max-w-2xl text-sm leading-relaxed text-hh-ink-2">
+          Survived <Num>{lasted}</Num> week{lasted === 1 ? "" : "s"}.{" "}
+          <Num>{report.entriesAlive.toLocaleString()}</Num> of{" "}
+          <Num>{report.pool.poolSize.toLocaleString()}</Num> entries are still going. Nothing here needs you
+          until next season: the emails and the Sunday alarm have dropped this pool, and the board
+          resets on its own in August.
+        </p>
+      </div>
+    </Spotlight>
   );
 }
 
@@ -1218,39 +1117,35 @@ function CandidateRow({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="rounded-2xl border border-zinc-200 bg-white transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700">
-      <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:gap-4">
+    <li className="border-b border-hh-line last:border-b-0">
+      <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-zinc-400 dark:text-zinc-600">
-            {rank}
-          </span>
+          <Num className="w-5 shrink-0 text-right text-xs font-semibold text-hh-muted">{rank}</Num>
           <Logo abbr={c.team} size={30} />
           <div className="flex min-w-0 flex-col">
-            <span className="text-sm font-semibold">
-              {c.team}{" "}
-              <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                {c.home ? "vs" : "at"} {c.opponent}
+            <span className="text-sm font-semibold text-hh-ink">
+              <TeamName abbr={c.team} />{" "}
+              <span className="font-normal text-hh-muted">
+                {c.home ? "vs" : "at"} <TeamName abbr={c.opponent} />
               </span>
             </span>
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              {kickoffLabel(c.kickoff)}
-            </span>
+            <span className="text-[11px] text-hh-muted">{kickoffLabel(c.kickoff)}</span>
           </div>
         </div>
 
         <div className="grid grid-cols-4 gap-3 sm:w-[420px] sm:shrink-0">
-          <Stat label="Win" value={pct(c.winProb)} />
-          <Stat
+          <Fig label="Win" value={pct(c.winProb)} />
+          <Fig
             label="Field"
             value={pct(c.ownership)}
             tone={c.ownership > c.winProb ? "bad" : "default"}
           />
-          <Stat
+          <Fig
             label="Equity"
             value={`${c.equityMultiplier.toFixed(2)}x`}
             tone={c.equityMultiplier >= 1 ? "good" : "default"}
           />
-          <Stat
+          <Fig
             label="Burn cost"
             value={c.futureCost.toFixed(3)}
             tone={c.futureCost > 0.05 ? "bad" : "default"}
@@ -1260,15 +1155,15 @@ function CandidateRow({
         <div className="flex shrink-0 items-center gap-2">
           {/* Fixed width even when empty: a candidate with no notes used to pull
               its whole stat block sideways and break the column alignment. */}
-          <div className="w-[68px] shrink-0">
+          <div className="w-[76px] shrink-0">
             {c.flags.length > 0 && (
               <button
                 type="button"
                 onClick={() => setOpen((o) => !o)}
                 aria-expanded={open}
-                className="w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-500 transition-colors hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:text-zinc-400"
+                className={`${BTN} w-full px-2 text-[11px]`}
               >
-                {c.flags.length} note{c.flags.length > 1 ? "s" : ""}
+                <Num>{c.flags.length}</Num> note{c.flags.length > 1 ? "s" : ""}
               </button>
             )}
           </div>
@@ -1276,7 +1171,7 @@ function CandidateRow({
             type="button"
             disabled={disabled}
             onClick={onTake}
-            className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-700 transition-colors hover:border-amber-400 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:text-amber-400"
+            className={`${BTN} text-[11px]`}
           >
             Took it
           </button>
@@ -1284,20 +1179,9 @@ function CandidateRow({
       </div>
 
       {open && c.flags.length > 0 && (
-        <ul className="flex flex-col gap-1.5 border-t border-zinc-200 px-3.5 py-3 dark:border-zinc-800">
-          {c.flags.map((f, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span
-                className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${FLAG_TINT[f.severity]}`}
-              >
-                {FLAG_LABEL[f.kind]}
-              </span>
-              <span className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
-                {f.text}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="border-t border-hh-line py-3 pl-8">
+          <Flags flags={c.flags} />
+        </div>
       )}
     </li>
   );
@@ -1322,92 +1206,84 @@ function PoolSettings({
   const [horizon, setHorizon] = useState(String(pool.horizon));
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold">Pool</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-xs font-semibold text-zinc-500 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:text-zinc-400"
-        >
+    <Section
+      label="Pool settings"
+      aside={
+        <button type="button" onClick={onClose} className={BTN}>
           Done
         </button>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="flex flex-col gap-1">
+            <span className={FIELD_LABEL}>Entries at start</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={poolSize}
+              onChange={(e) => setPoolSize(e.target.value)}
+              onBlur={() => {
+                const n = Number(poolSize);
+                if (n >= 1 && n !== pool.poolSize) void onPatch({ poolSize: n });
+              }}
+              className={`${INPUT} hh-num`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={FIELD_LABEL}>Still alive</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={alive}
+              placeholder={String(pool.poolSize)}
+              onChange={(e) => setAlive(e.target.value)}
+              onBlur={() => {
+                const n = alive === "" ? null : Number(alive);
+                if (n === null || n >= 1) void onPatch({ entriesAlive: n });
+              }}
+              className={`${INPUT} hh-num`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={FIELD_LABEL}>Weeks to plan</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={12}
+              value={horizon}
+              onChange={(e) => setHorizon(e.target.value)}
+              onBlur={() => {
+                const n = Number(horizon);
+                if (n >= 1 && n <= 12 && n !== pool.horizon) {
+                  void onPatch({ horizon: n });
+                }
+              }}
+              className={`${INPUT} hh-num`}
+            />
+          </label>
+        </div>
+
+        <p className="text-xs leading-relaxed text-hh-muted">
+          Update &quot;still alive&quot; as the pool thins out. Leverage is measured
+          against the entries left, not the ones that started, so the number matters
+          more in November than it does now. Future value always solves to Week 18
+          regardless of the planning window.
+        </p>
+
+        <button
+          type="button"
+          disabled={working || pool.usedTeams.length === 0}
+          onClick={() => void onPatch({ usedTeams: [] })}
+          className={`${BTN} self-start hover:!border-hh-neg hover:!text-hh-neg disabled:opacity-40`}
+        >
+          <RotateCcw size={13} aria-hidden />
+          Clear hand-burned teams
+        </button>
       </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Entries at start
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={poolSize}
-            onChange={(e) => setPoolSize(e.target.value)}
-            onBlur={() => {
-              const n = Number(poolSize);
-              if (n >= 1 && n !== pool.poolSize) void onPatch({ poolSize: n });
-            }}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:bg-zinc-950"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Still alive
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={alive}
-            placeholder={String(pool.poolSize)}
-            onChange={(e) => setAlive(e.target.value)}
-            onBlur={() => {
-              const n = alive === "" ? null : Number(alive);
-              if (n === null || n >= 1) void onPatch({ entriesAlive: n });
-            }}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:bg-zinc-950"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Weeks to plan
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={12}
-            value={horizon}
-            onChange={(e) => setHorizon(e.target.value)}
-            onBlur={() => {
-              const n = Number(horizon);
-              if (n >= 1 && n <= 12 && n !== pool.horizon) {
-                void onPatch({ horizon: n });
-              }
-            }}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:bg-zinc-950"
-          />
-        </label>
-      </div>
-
-      <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-        Update &quot;still alive&quot; as the pool thins out. Leverage is measured
-        against the entries left, not the ones that started, so the number matters
-        more in November than it does now. Future value always solves to Week 18
-        regardless of the planning window.
-      </p>
-
-      <button
-        type="button"
-        disabled={working || pool.usedTeams.length === 0}
-        onClick={() => void onPatch({ usedTeams: [] })}
-        className="inline-flex items-center gap-1.5 self-start rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:border-rose-300 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-40 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-rose-800 dark:hover:text-rose-400"
-      >
-        <RotateCcw size={13} aria-hidden />
-        Clear hand-burned teams
-      </button>
-    </section>
+    </Section>
   );
 }

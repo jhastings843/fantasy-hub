@@ -1,7 +1,8 @@
-import { AlertTriangle, BookOpen, ChevronDown, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { RESOURCES } from "@/lib/resources/data";
 import { STRATEGY_ARTICLES } from "@/lib/survivor/strategy";
 import { buildReports } from "@/lib/survivor/report";
+import { Disclosure, Section } from "@/components/hh/ui";
 import SurvivorTool from "./SurvivorTool";
 
 export const dynamic = "force-dynamic";
@@ -18,95 +19,75 @@ export default async function SurvivorPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full min-w-0 max-w-7xl break-words px-4 py-8 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex flex-col gap-10">
         {error && (
-          <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm dark:border-rose-900/60 dark:bg-rose-950/30">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
+          <div className="flex items-start gap-3 border-l-2 border-hh-neg py-1 pl-3 text-sm" role="alert">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-hh-neg" aria-hidden />
             <div>
-              <p className="font-semibold text-rose-900 dark:text-rose-200">
-                No pick this week
-              </p>
-              <p className="text-rose-800 dark:text-rose-300">{error}</p>
+              <p className="font-semibold text-hh-neg">No pick this week</p>
+              <p className="text-hh-ink-2">{error}</p>
             </div>
           </div>
         )}
 
-        {reports.length > 0 && <SurvivorTool reports={reports} />}
+        {reports.length > 0 ? (
+          <SurvivorTool reports={reports} />
+        ) : (
+          <h1 className="hh-title">Survivor</h1>
+        )}
 
-        <section className="flex flex-col gap-3">
-          <header className="flex items-center gap-2">
-            <BookOpen size={16} aria-hidden className="text-zinc-400 dark:text-zinc-500" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Strategy library
-            </h2>
-          </header>
-          <ul className="grid gap-2 lg:grid-cols-2">
-            {STRATEGY_ARTICLES.map((article) => (
-              <li key={article.id}>
-                <details className="group h-full rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-                    <div className="flex flex-1 flex-col gap-0.5">
-                      <span className="text-sm font-semibold">{article.title}</span>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {article.hook}
+        <Section label="Strategy and resources">
+          <Disclosure summary={`Strategy library (${STRATEGY_ARTICLES.length})`}>
+            <ul className="grid gap-x-8 lg:grid-cols-2">
+              {STRATEGY_ARTICLES.map((article, i) => (
+                // Two articles share the id "pool-size" in lib/survivor/strategy.ts,
+                // so the index keeps the keys unique.
+                <li key={`${article.id}-${i}`} className="border-b border-hh-line">
+                  <Disclosure
+                    summary={
+                      <span className="flex flex-col gap-0.5 py-1">
+                        <span className="text-sm font-semibold text-hh-ink">{article.title}</span>
+                        <span className="text-xs font-normal text-hh-muted">{article.hook}</span>
                       </span>
-                    </div>
-                    <ChevronDown
-                      size={16}
-                      aria-hidden
-                      className="mt-0.5 shrink-0 text-zinc-400 transition-transform group-open:rotate-180 dark:text-zinc-500"
-                    />
-                  </summary>
-                  <div className="flex flex-col gap-3 pt-3">
-                    <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-                      {article.body}
-                    </p>
-                    <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 dark:border-amber-900/60 dark:bg-amber-950/20">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                        Rule of thumb
-                      </span>
-                      <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                        {article.takeaway}
-                      </p>
-                    </div>
-                  </div>
-                </details>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {survivorTools.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              External tools
-            </h2>
-            <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {survivorTools.map((t) => (
-                <li
-                  key={t.url}
-                  className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:border-amber-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-800"
-                >
-                  <a
-                    href={t.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:text-zinc-50 dark:hover:text-amber-400"
+                    }
                   >
-                    {t.name}
-                    <ArrowUpRight size={14} aria-hidden />
-                  </a>
-                  {t.note && (
-                    <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                      {t.note}
-                    </p>
-                  )}
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm leading-relaxed text-hh-ink-2">{article.body}</p>
+                      <div className="border-l-2 border-hh-accent pl-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-hh-accent-ink">
+                          Rule of thumb
+                        </span>
+                        <p className="text-sm font-medium text-hh-ink">{article.takeaway}</p>
+                      </div>
+                    </div>
+                  </Disclosure>
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          </Disclosure>
+
+          {survivorTools.length > 0 && (
+            <Disclosure summary={`External tools (${survivorTools.length})`}>
+              <ul className="grid gap-x-8 md:grid-cols-2 lg:grid-cols-3">
+                {survivorTools.map((t) => (
+                  <li key={t.url} className="flex flex-col gap-1 border-b border-hh-line py-3">
+                    <a
+                      href={t.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-hh-ink hover:text-hh-accent-ink focus:outline-none focus-visible:underline sm:min-h-0"
+                    >
+                      {t.name}
+                      <ArrowUpRight size={14} aria-hidden />
+                    </a>
+                    {t.note && <p className="text-xs leading-relaxed text-hh-muted">{t.note}</p>}
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
+        </Section>
       </div>
     </main>
   );

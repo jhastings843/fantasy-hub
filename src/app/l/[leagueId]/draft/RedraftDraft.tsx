@@ -1,14 +1,11 @@
 import Link from "next/link";
-import {
-  ListOrdered,
-  Sparkles,
-  Target,
-  TriangleAlert,
-  Users,
-} from "lucide-react";
+import { Target, TriangleAlert } from "lucide-react";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
 import { RefreshButton } from "@/components/RefreshButton";
+import { PopLink } from "@/components/hh/PopLink";
+import { Chip, Disclosure, Empty, Num, PosBadge, Section, Spotlight } from "@/components/hh/ui";
+import { teamHref } from "@/app/picks/hrefs";
 import {
   JINGLES_CALLS,
   LAB_300_VERSION,
@@ -30,15 +27,6 @@ import {
   getLeagueRosters,
 } from "@/lib/sleeper/client";
 
-const POS_CHIP: Record<string, string> = {
-  QB: "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
-  RB: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  WR: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300",
-  TE: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  DEF: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  K: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-};
-
 /** 11 -> "11th". Draft slots read better as an ordinal. */
 function ordinal(n: number): string {
   const rem100 = n % 100;
@@ -48,14 +36,14 @@ function ordinal(n: number): string {
 }
 
 function PosChip({ position }: { position: string }) {
-  return (
-    <span
-      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${POS_CHIP[position] ?? POS_CHIP.DEF}`}
-    >
-      {position}
-    </span>
-  );
+  return <PosBadge pos={position} />;
 }
+
+/** NFL team code that opens the team pop-up. "FA" stays text. */
+function Team({ team }: { team: string | null | undefined }) {
+  return team ? <PopLink href={teamHref("nfl", team)}>{team}</PopLink> : <>FA</>;
+}
+
 
 export async function RedraftDraft({
   leagueId,
@@ -161,30 +149,32 @@ export async function RedraftDraft({
       ? remainingPicks[1].pickNo - remainingPicks[0].pickNo
       : null;
 
+
+  const topRec = board[0] ?? null;
+  const restRecs = board.slice(1);
+
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl min-w-0 break-words px-4 py-8 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2">
           <Link
             href={`/l/${leagueId}`}
-            className="text-sm text-zinc-500 dark:text-zinc-400"
+            className="inline-flex min-h-11 items-center text-sm text-hh-muted hover:text-hh-accent-ink sm:min-h-0"
           >
             ‹ League
           </Link>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                Draft board
-              </h1>
+              <h1 className="hh-title">Draft board</h1>
               {mySlot && (
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                  Pick {mySlot} of {totalTeams}
-                </span>
+                <Chip tone="accent">
+                  Pick <Num>{mySlot}</Num> of <Num>{totalTeams}</Num>
+                </Chip>
               )}
             </div>
             <RefreshButton leagueId={leagueId} />
           </div>
-          <p className="max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+          <p className="max-w-2xl text-sm leading-relaxed text-hh-ink-2">
             {profile.name} · {draft?.settings?.rounds ?? "?"}-round{" "}
             {draft?.type ?? "snake"}
             {draftStart
@@ -197,29 +187,11 @@ export async function RedraftDraft({
                 })}`
               : " · not scheduled"}
           </p>
-          <p className="max-w-2xl text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Ordered by{" "}
-            <a
-              href={lab.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
-            >
-              {lab.source === "curated" ? `the Lab 300 v${LAB_300_VERSION}` : lab.title}
-            </a>{" "}
-            ({lab.postedAt.slice(0, 10)}), his tiered half-PPR ranking, with FantasyCalc
-            value alongside and for anyone he has not ranked. Age and long-term
-            upside are ignored on purpose: the roster resets in January.
-          </p>
           {pprSkew && (
-            <p className="flex max-w-2xl items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-              <TriangleAlert
-                size={14}
-                className="mt-0.5 shrink-0"
-                aria-hidden
-              />
+            <p className="flex max-w-2xl items-start gap-2 border-l-2 border-hh-gold py-1 pl-3 text-xs leading-relaxed text-hh-ink-2">
+              <TriangleAlert size={14} className="mt-0.5 shrink-0 text-hh-gold" aria-hidden />
               <span>
-                <span className="font-semibold">
+                <span className="font-semibold text-hh-ink">
                   This league is {scoringLabel}, his ranking is half PPR.
                 </span>{" "}
                 {pprSkew} The value beside each name is priced for this
@@ -232,116 +204,111 @@ export async function RedraftDraft({
           )}
         </div>
 
+        {/* The one spotlight: the top recommendation right now. */}
+        {topRec ? (
+          <Spotlight
+            label="Take next"
+            aside={mySlot ? <>you pick <Num>{ordinal(mySlot)}</Num></> : undefined}
+          >
+            <RecLine rec={topRec} big />
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {topRec.reasoning.map((r, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-hh-ink-2">
+                  <span aria-hidden className="mt-1.5 size-1 shrink-0 rounded-full bg-hh-accent" />
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </Spotlight>
+        ) : (
+          <Section label="Top recommendations">
+            <Empty>No players available yet.</Empty>
+          </Section>
+        )}
+
         {/* Where you pick, and who should be there */}
         {myPicks.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Users
-                size={18}
-                className="text-amber-600 dark:text-amber-400"
-                aria-hidden
-              />
-              <h2 className="text-xl font-semibold tracking-tight">
-                Your picks
-              </h2>
-            </div>
-            <p className="max-w-2xl text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <Section label="Your picks">
+            <p className="max-w-2xl text-xs leading-relaxed text-hh-muted">
               You draft {ordinal(mySlot ?? 0)} of {totalTeams}
               {turnGap !== null && remainingPicks.length >= 2 ? (
                 <>
-                  , so you are up at #{remainingPicks[0].pickNo} and #
-                  {remainingPicks[1].pickNo}, {turnGap} picks apart
+                  , so you are up at <Num>#{remainingPicks[0].pickNo}</Num> and{" "}
+                  <Num>#{remainingPicks[1].pickNo}</Num>, <Num>{turnGap}</Num> picks apart
                 </>
               ) : null}
-              . Each card also names who is projected to go before you are back
+              . Each pick also names who is projected to go before you are back
               on the clock, which is the actual decision at a turn slot.
               Projections assume the room drafts straight down the Lab 300,
               which no room actually does. Treat them as the middle of a range,
               not a promise.
             </p>
             {projections.length === 0 ? (
-              <p className="rounded-2xl border border-zinc-200 bg-white px-4 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                Your picks are all in. Nothing left to project.
-              </p>
+              <Empty>Your picks are all in. Nothing left to project.</Empty>
             ) : (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="mt-2 grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
                 {projections.map((proj, i) => {
                   const top = proj.projected[0] ?? null;
                   const alts = proj.projected.slice(1);
                   return (
                     <li
                       key={proj.pick.pickNo}
-                      className={`flex flex-col gap-2 rounded-2xl border p-4 transition-colors ${
-                        i === 0
-                          ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
-                          : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-                      }`}
+                      className={`flex flex-col gap-2 border-b border-hh-line py-3 ${i === 0 ? "border-l-2 border-l-hh-accent pl-3" : ""}`}
                     >
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="flex items-baseline gap-1.5">
-                          <span className="text-lg font-bold tabular-nums tracking-tight">
-                            {proj.pick.label}
-                          </span>
+                        <span className="flex flex-wrap items-baseline gap-1.5">
+                          <Num className={`text-lg font-bold ${i === 0 ? "text-hh-accent-ink" : ""}`}>{proj.pick.label}</Num>
                           {proj.tierEndsHere && proj.tier && (
-                            <span
-                              className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                              title={`${proj.tierRemaining} left in his ${proj.tier} tier, and ${proj.picksUntilNext} picks before you are back up`}
-                            >
-                              {proj.tierRemaining} left in tier
+                            <span title={`${proj.tierRemaining} left in his ${proj.tier} tier, and ${proj.picksUntilNext} picks before you are back up`}>
+                              <Chip tone="neg">
+                                <Num>{proj.tierRemaining}</Num> left in tier
+                              </Chip>
                             </span>
                           )}
                         </span>
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                          #{proj.pick.pickNo} overall
+                        <span className="text-[11px] text-hh-muted">
+                          <Num>#{proj.pick.pickNo}</Num> overall
                         </span>
                       </div>
                       {top ? (
                         <>
                           <div className="flex items-center gap-2">
-                            <PlayerAvatar
-                              name={top.name}
-                              position={top.position}
-                              size="sm"
-                            />
+                            <PlayerAvatar name={top.name} position={top.position} size="sm" />
                             <div className="flex min-w-0 flex-col">
-                              <div className="flex items-center gap-1.5">
-                                <PlayerLink
-                                  id={top.id}
-                                  name={top.name}
-                                  className="truncate text-sm font-bold"
-                                />
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <PlayerLink id={top.id} name={top.name} className="truncate text-sm font-bold" />
                                 <PosChip position={top.position} />
                               </div>
-                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                {top.team ?? "FA"}
+                              <span className="text-[11px] text-hh-muted">
+                                <Team team={top.team} />
                                 {top.labTier ? ` · ${top.labTier}` : ""}
                               </span>
                             </div>
                           </div>
                           {alts.length > 0 && (
-                            <span className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                              or {alts.map((a) => a.name).join(", ")}
+                            <span className="text-[11px] leading-relaxed text-hh-muted">
+                              or{" "}
+                              {alts.map((a, j) => (
+                                <span key={a.id}>
+                                  {j > 0 ? ", " : ""}
+                                  <PlayerLink id={a.id} name={a.name} />
+                                </span>
+                              ))}
                             </span>
                           )}
                           {proj.goneBefore.length > 0 && proj.nextLabel && (
-                            <span className="text-[11px] leading-relaxed text-rose-700 dark:text-rose-400">
-                              <span className="font-semibold">
-                                Gone by {proj.nextLabel}:
-                              </span>{" "}
+                            <span className="text-[11px] leading-relaxed text-hh-neg">
+                              <span className="font-semibold">Gone by {proj.nextLabel}:</span>{" "}
                               {proj.goneBefore
                                 .slice(0, 3)
                                 .map((p) => p.name)
                                 .join(", ")}
-                              {proj.goneBefore.length > 3
-                                ? `, and ${proj.goneBefore.length - 3} more`
-                                : ""}
+                              {proj.goneBefore.length > 3 ? `, and ${proj.goneBefore.length - 3} more` : ""}
                             </span>
                           )}
                         </>
                       ) : (
-                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                          Past the ranked board. Stream it.
-                        </span>
+                        <span className="text-sm text-hh-muted">Past the ranked board. Stream it.</span>
                       )}
                     </li>
                   );
@@ -349,52 +316,35 @@ export async function RedraftDraft({
               </ul>
             )}
             {laterPicks.length > 0 && (
-              <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                Then{" "}
-                {laterPicks
-                  .map((p) => `${p.label} (#${p.pickNo})`)
-                  .join(", ")}
-                .
+              <p className="mt-2 text-[11px] leading-relaxed text-hh-muted">
+                Then {laterPicks.map((p) => `${p.label} (#${p.pickNo})`).join(", ")}.
               </p>
             )}
-          </section>
+          </Section>
         )}
 
         {/* Starting slots still open */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            Starting slots
-          </h2>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+        <Section label="Starting slots">
+          <ul className="grid grid-cols-3 gap-x-6 sm:grid-cols-4 lg:grid-cols-6">
             {needs.map((n) => {
               const done = n.filled >= n.required;
               const unsupported = uncoveredSlots.some((u) => u.slot === n.slot);
+              const open = !(done || unsupported);
               return (
-                <li
-                  key={n.slot}
-                  className={`flex flex-col gap-0.5 rounded-2xl border p-3 ${
-                    done || unsupported
-                      ? "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-                      : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
-                  }`}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <li key={n.slot} className="flex flex-col gap-0.5 border-b border-hh-line py-2">
+                  <span className={`text-[11px] font-semibold uppercase tracking-wider ${open ? "text-hh-accent-ink" : "text-hh-muted"}`}>
                     {n.slot}
                   </span>
-                  <span className="text-lg font-bold tabular-nums">
+                  <Num className={`text-lg font-bold ${open ? "text-hh-accent-ink" : "text-hh-ink"}`}>
                     {n.filled}/{n.required}
-                  </span>
-                  {unsupported && (
-                    <span className="text-[10px] leading-tight text-zinc-400 dark:text-zinc-500">
-                      not valued
-                    </span>
-                  )}
+                  </Num>
+                  {unsupported && <span className="text-[10px] leading-tight text-hh-muted">not valued</span>}
                 </li>
               );
             })}
           </ul>
           {uncoveredSlots.length > 0 && (
-            <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p className="mt-2 text-xs leading-relaxed text-hh-muted">
               {uncoveredSlots.map((u) => u.slot).join(", ")}{" "}
               {uncoveredSlots.length === 1 ? "is" : "are"} not in FantasyCalc&apos;s
               redraft set, so this board cannot rank{" "}
@@ -403,199 +353,117 @@ export async function RedraftDraft({
               off a streaming source.
             </p>
           )}
-        </section>
+        </Section>
 
-        {/* Recommendations */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles
-              size={18}
-              className="text-amber-600 dark:text-amber-400"
-              aria-hidden
-            />
-            <h2 className="text-xl font-semibold tracking-tight">
-              Top recommendations
-            </h2>
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            His Lab 300 rank first, weighted toward filling an open starting
-            slot, with his individual calls factored in.
-          </p>
-          {board.length === 0 ? (
-            <p className="rounded-2xl border border-zinc-200 bg-white px-4 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-              No players available yet.
-            </p>
-          ) : (
-            <ol className="flex flex-col gap-3">
-              {board.map((rec) => (
-                <li
-                  key={rec.player.id}
-                  className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <div className="flex items-center gap-4 p-4">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-xl font-black tracking-tighter text-white">
-                      {rec.rank}
-                    </span>
-                    <PlayerAvatar
-                      name={rec.player.name}
-                      position={rec.player.position}
-                      size="md"
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <PlayerLink
-                          id={rec.player.id}
-                          name={rec.player.name}
-                          className="truncate text-base font-bold"
-                        />
-                        <PosChip position={rec.player.position} />
-                        {rec.fillsNeed && (
-                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                            Need
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {rec.player.team ?? "FA"} ·{" "}
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                          {rec.headline}
-                        </span>
-                      </span>
-                    </div>
-                    <span className="flex shrink-0 flex-col items-end">
-                      {rec.player.labRank !== null && (
-                        <span className="text-lg font-bold tabular-nums">
-                          #{rec.player.labRank}
-                        </span>
-                      )}
-                      {rec.player.labTier && (
-                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                          {rec.player.labTier}
-                        </span>
-                      )}
-                      {rec.player.labRank === null && (
-                        <span className="text-lg font-bold tabular-nums">
-                          {rec.player.value.toLocaleString()}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <ul className="flex flex-col gap-1.5 border-t border-zinc-200/60 bg-zinc-50/50 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/40">
-                    {rec.reasoning.map((r, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300"
-                      >
-                        <span
-                          aria-hidden
-                          className="mt-1.5 size-1 shrink-0 rounded-full bg-amber-500"
-                        />
-                        <span>{r}</span>
-                      </li>
-                    ))}
-                  </ul>
+        {/* Recommendations after the top one */}
+        {restRecs.length > 0 && (
+          <Section
+            label="Also in range"
+            aside="His Lab 300 rank first, weighted toward filling an open starting slot, with his individual calls factored in."
+          >
+            <ol className="flex flex-col">
+              {restRecs.map((rec) => (
+                <li key={rec.player.id} className="border-b border-hh-line py-2.5 last:border-b-0">
+                  <RecLine rec={rec} />
+                  <Disclosure summary="Why">
+                    <ul className="flex flex-col gap-1.5">
+                      {rec.reasoning.map((r, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-hh-ink-2">
+                          <span aria-hidden className="mt-1.5 size-1 shrink-0 rounded-full bg-hh-accent" />
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Disclosure>
                 </li>
               ))}
             </ol>
-          )}
-        </section>
+          </Section>
+        )}
 
         {/* Jingles ADP calls */}
         {(jinglesTargets.length > 0 || jinglesFades.length > 0) && (
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-xl font-semibold tracking-tight">
-                Jingles Labs vs ADP
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                pulled {LAST_UPDATED}
-              </span>
-            </div>
-            <p className="max-w-2xl text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <Section label="Jingles Labs vs ADP" aside={<>pulled {LAST_UPDATED}</>}>
+            <p className="max-w-2xl text-xs leading-relaxed text-hh-muted">
               His individual calls on players still available, showing the ADP he
               quoted against his own rank. Separate from the Lab 300: these are
               players he has written about specifically.
             </p>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <CallList
-                title="Taking at this price"
-                icon="target"
-                calls={jinglesTargets}
-              />
-              <CallList
-                title="Letting someone else have"
-                icon="fade"
-                calls={jinglesFades}
-              />
+            <div className="mt-3 grid gap-x-8 gap-y-6 lg:grid-cols-2">
+              <CallList title="Taking at this price" icon="target" calls={jinglesTargets} />
+              <CallList title="Letting someone else have" icon="fade" calls={jinglesFades} />
             </div>
-          </section>
+          </Section>
         )}
 
         {/* Best available */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <ListOrdered
-              size={18}
-              className="text-zinc-500 dark:text-zinc-400"
-              aria-hidden
-            />
-            <h2 className="text-xl font-semibold tracking-tight">
-              Best available
-            </h2>
-          </div>
-          <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+        <Section label="Best available">
+          <ul className="flex flex-col">
             {bestAvailable.map((p, i) => (
-              <li
-                key={p.id}
-                className="flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-              >
-                <span className="w-6 shrink-0 text-right text-xs tabular-nums text-zinc-400 dark:text-zinc-500">
-                  {i + 1}
-                </span>
+              <li key={p.id} className="flex min-h-11 items-center gap-2.5 border-b border-hh-line py-2 last:border-b-0">
+                <Num className="w-6 shrink-0 text-right text-xs text-hh-muted">{i + 1}</Num>
                 <PlayerAvatar name={p.name} position={p.position} size="sm" />
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                  <PlayerLink
-                    id={p.id}
-                    name={p.name}
-                    className="truncate text-sm font-medium"
-                  />
+                  <PlayerLink id={p.id} name={p.name} className="truncate text-sm font-medium" />
                   <PosChip position={p.position} />
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {p.team ?? "FA"} · {p.position}
+                  <span className="text-xs text-hh-muted">
+                    <Team team={p.team} /> · {p.position}
                     {displayPositionRank(p)}
                   </span>
-                  {p.jingles && (
-                    <span
-                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                        p.jingles.verdict === "fade"
-                          ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                      }`}
-                    >
-                      {p.jingles.verdict === "fade" ? "Fade" : "Target"}
-                    </span>
-                  )}
+                  {p.jingles && <Chip tone={p.jingles.verdict === "fade" ? "neg" : "pos"}>{p.jingles.verdict === "fade" ? "Fade" : "Target"}</Chip>}
                 </div>
-                <span className="shrink-0 text-right text-xs tabular-nums">
+                <span className="shrink-0 text-right text-xs">
                   {p.labRank !== null ? (
-                    <span className="font-semibold">#{p.labRank}</span>
+                    <Num className="font-semibold">#{p.labRank}</Num>
                   ) : (
-                    <span className="text-zinc-500 dark:text-zinc-400">
-                      {p.value.toLocaleString()}
-                    </span>
+                    <Num className="text-hh-muted">{p.value.toLocaleString()}</Num>
                   )}
-                  {p.labTier && (
-                    <span className="block text-[10px] text-zinc-400 dark:text-zinc-500">
-                      {p.labTier}
-                    </span>
-                  )}
+                  {p.labTier && <span className="block text-[10px] text-hh-muted">{p.labTier}</span>}
                 </span>
               </li>
             ))}
           </ul>
-        </section>
+        </Section>
+
+        <Disclosure summary="Sources">
+          <p className="max-w-2xl text-xs leading-relaxed text-hh-muted">
+            Ordered by{" "}
+            <a href={lab.url} target="_blank" rel="noopener noreferrer" className="font-medium text-hh-accent-ink hover:underline">
+              {lab.source === "curated" ? `the Lab 300 v${LAB_300_VERSION}` : lab.title}
+            </a>{" "}
+            ({lab.postedAt.slice(0, 10)}), his tiered half-PPR ranking, with FantasyCalc
+            value alongside and for anyone he has not ranked. Age and long-term
+            upside are ignored on purpose: the roster resets in January.
+          </p>
+        </Disclosure>
       </div>
     </main>
+  );
+}
+
+type BoardRec = Awaited<ReturnType<typeof buildLiveBoard>>["board"][number];
+
+function RecLine({ rec, big = false }: { rec: BoardRec; big?: boolean }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Num className={`w-8 shrink-0 font-bold ${big ? "text-2xl text-hh-accent-ink" : "text-lg text-hh-muted"}`}>{rec.rank}</Num>
+      <PlayerAvatar name={rec.player.name} position={rec.player.position} size={big ? "md" : "sm"} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <PlayerLink id={rec.player.id} name={rec.player.name} className={`truncate font-semibold text-hh-ink ${big ? "text-lg" : "text-base"}`} />
+          <PosChip position={rec.player.position} />
+          {rec.fillsNeed && <Chip tone="accent">Need</Chip>}
+        </div>
+        <span className="text-xs text-hh-muted">
+          <Team team={rec.player.team} /> · <span className="font-semibold text-hh-ink-2">{rec.headline}</span>
+        </span>
+      </div>
+      <span className="flex shrink-0 flex-col items-end">
+        {rec.player.labRank !== null && <Num className="text-lg font-bold">#{rec.player.labRank}</Num>}
+        {rec.player.labTier && <span className="text-[10px] text-hh-muted">{rec.player.labTier}</span>}
+        {rec.player.labRank === null && <Num className="text-lg font-bold">{rec.player.value.toLocaleString()}</Num>}
+      </span>
+    </div>
   );
 }
 
@@ -609,51 +477,40 @@ function CallList({
   calls: typeof JINGLES_CALLS;
 }) {
   const Icon = icon === "target" ? Target : TriangleAlert;
-  const tint =
-    icon === "target"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : "text-rose-600 dark:text-rose-400";
+  const tint = icon === "target" ? "text-hh-pos" : "text-hh-neg";
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex items-center gap-2 border-b border-hh-rule pb-1">
         <Icon size={15} className={tint} aria-hidden />
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          {title}
-        </h3>
-        <span className="ml-auto text-xs tabular-nums text-zinc-400 dark:text-zinc-500">
-          {calls.length}
-        </span>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-hh-muted">{title}</h3>
+        <Num className="ml-auto text-xs text-hh-muted">{calls.length}</Num>
       </div>
       {calls.length === 0 ? (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          None still available.
-        </p>
+        <Empty>None still available.</Empty>
       ) : (
-        <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
+        <ul className="flex flex-col">
           {calls.map((c) => (
-            <li key={c.sleeperId} className="flex flex-col gap-0.5 py-2">
+            <li key={c.sleeperId} className="flex flex-col gap-0.5 border-b border-hh-line py-2 last:border-b-0">
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <a
                   href={c.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-semibold hover:text-amber-700 hover:underline dark:hover:text-amber-400"
+                  className="text-sm font-semibold text-hh-ink hover:text-hh-accent-ink hover:underline"
                 >
                   {c.player}
                 </a>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {c.position} · {c.team ?? "FA"}
+                <span className="text-xs text-hh-muted">
+                  {c.position} · <Team team={c.team} />
                 </span>
               </div>
               {c.adp && (
-                <span className="text-xs tabular-nums text-zinc-600 dark:text-zinc-300">
-                  ADP {c.adp} → his rank {c.jinglesRank}
+                <span className="text-xs text-hh-ink-2">
+                  ADP <Num>{c.adp}</Num> → his rank <Num>{c.jinglesRank}</Num>
                 </span>
               )}
-              <span className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                {c.note}
-              </span>
+              <span className="text-xs leading-relaxed text-hh-muted">{c.note}</span>
             </li>
           ))}
         </ul>

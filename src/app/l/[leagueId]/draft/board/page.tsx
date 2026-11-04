@@ -21,20 +21,19 @@ import { PlayerLink } from "@/components/PlayerLink";
 import { RefreshButton } from "@/components/RefreshButton";
 import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
+import { Chip, Empty, Num, Section, type Tone } from "@/components/hh/ui";
 
 export const dynamic = "force-dynamic";
 
 function ConfigError({ message }: { message: string }) {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <Link href="/fantasy" className="text-sm text-zinc-500 dark:text-zinc-400">
+        <Link href="/fantasy" className="inline-flex min-h-11 items-center text-sm text-hh-muted hover:text-hh-accent-ink sm:min-h-0">
           ‹ Leagues
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Draft board</h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
-          {message}
-        </p>
+        <h1 className="hh-title">Draft board</h1>
+        <p className="border-l-2 border-hh-neg py-2 pl-3 text-sm text-hh-neg">{message}</p>
       </div>
     </main>
   );
@@ -91,7 +90,7 @@ interface TeamSnapshot {
 }
 
 function gradeFromPct(pct: number, picksMade: number): string {
-  if (picksMade === 0) return "—";
+  if (picksMade === 0) return "n/a";
   if (pct >= 0.3) return "A+";
   if (pct >= 0.18) return "A";
   if (pct >= 0.1) return "A-";
@@ -103,27 +102,23 @@ function gradeFromPct(pct: number, picksMade: number): string {
   return "F";
 }
 
-function gradeColor(grade: string): { tile: string; shadow: string } {
-  if (grade.startsWith("A")) {
-    return {
-      tile: "from-emerald-400 to-emerald-600",
-      shadow: "shadow-emerald-500/30",
-    };
-  }
-  if (grade.startsWith("B")) {
-    return { tile: "from-sky-400 to-sky-600", shadow: "shadow-sky-500/30" };
-  }
-  if (grade.startsWith("C")) {
-    return { tile: "from-zinc-400 to-zinc-600", shadow: "shadow-zinc-500/20" };
-  }
-  if (grade.startsWith("D")) {
-    return {
-      tile: "from-amber-400 to-orange-500",
-      shadow: "shadow-amber-500/30",
-    };
-  }
-  return { tile: "from-rose-400 to-rose-600", shadow: "shadow-rose-500/30" };
+function gradeTone(grade: string): Tone {
+  if (grade.startsWith("A")) return "pos";
+  if (grade.startsWith("B")) return "gold";
+  if (grade.startsWith("C")) return "muted";
+  if (grade.startsWith("D")) return "accent";
+  if (grade === "n/a") return "muted";
+  return "neg";
 }
+
+const GRADE_TEXT: Record<Tone, string> = {
+  accent: "text-hh-accent-ink",
+  pos: "text-hh-pos",
+  neg: "text-hh-neg",
+  gold: "text-hh-gold",
+  muted: "text-hh-muted",
+  live: "text-hh-neg",
+};
 
 export default async function DraftBoardPage({
   params,
@@ -232,31 +227,26 @@ export default async function DraftBoardPage({
   const totalPicks = totalRounds * totalTeams;
   const completePct = totalPicks > 0 ? picks.length / totalPicks : 0;
 
+  const leader = sorted.filter((t) => t.picksMade.length > 0).reduce<TeamSnapshot | null>(
+    (best, t) => (best === null || t.totalSurplus > best.totalSurplus ? t : best),
+    null,
+  );
+
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl min-w-0 break-words px-4 py-8 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2">
           <Link
             href={`/l/${leagueId}/draft`}
-            className="text-sm text-zinc-500 dark:text-zinc-400"
+            className="inline-flex min-h-11 items-center text-sm text-hh-muted hover:text-hh-accent-ink sm:min-h-0"
           >
             ‹ Draft helper
           </Link>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Draft board
-            </h1>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="hh-title">Draft board</h1>
             <div className="flex items-center gap-2">
               <RefreshButton leagueId={leagueId} />
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
-                  draft.status === "drafting"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                    : draft.status === "complete"
-                      ? "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                      : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                }`}
-              >
+              <Chip tone={draft.status === "drafting" ? "live" : "muted"}>
                 {draft.status === "pre_draft"
                   ? "Pre-draft"
                   : draft.status === "drafting"
@@ -264,145 +254,93 @@ export default async function DraftBoardPage({
                     : draft.status === "complete"
                       ? "Complete"
                       : draft.status}
-              </span>
+              </Chip>
             </div>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {league.name} · {league.season} · {picks.length} of {totalPicks}{" "}
-            picks made ({Math.round(completePct * 100)}%)
+          <p className="text-sm text-hh-muted">
+            {league.name} · {league.season} · <Num>{picks.length}</Num> of <Num>{totalPicks}</Num> picks made (
+            <Num>{Math.round(completePct * 100)}%</Num>)
           </p>
           <AutoRefresh
-            intervalMs={
-              draft.status === "drafting" ? 60_000 : 5 * 60_000
-            }
-            label={
-              draft.status === "drafting" ? "Live updates" : "Refreshes"
-            }
+            intervalMs={draft.status === "drafting" ? 60_000 : 5 * 60_000}
+            label={draft.status === "drafting" ? "Live updates" : "Refreshes"}
           />
+          {leader && (
+            <p className="mt-1 max-w-2xl text-[15px] leading-snug text-hh-ink-2">
+              <b className="font-semibold text-hh-ink">{leader.isMe ? "You lead the room" : `${leader.ownerName} leads the room`}</b>{" "}
+              at{" "}
+              <Num tone={leader.totalSurplus >= 0 ? "pos" : "neg"}>
+                {leader.totalSurplus > 0 ? "+" : ""}
+                {leader.totalSurplus.toLocaleString()}
+              </Num>{" "}
+              value over where they picked.
+            </p>
+          )}
         </div>
 
-        <ol className="flex flex-col gap-4">
+        <ol className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
           {sorted.map((t, idx) => {
             const grade = gradeFromPct(t.pctSurplus, t.picksMade.length);
-            const tint = gradeColor(grade);
-            const surplusColor =
-              t.totalSurplus > 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : t.totalSurplus < 0
-                  ? "text-rose-600 dark:text-rose-400"
-                  : "text-zinc-500 dark:text-zinc-400";
+            const surplusTone: Tone = t.totalSurplus > 0 ? "pos" : t.totalSurplus < 0 ? "neg" : "muted";
             return (
-              <li
-                key={t.rosterId}
-                className={`flex flex-col gap-3 rounded-2xl border p-5 backdrop-blur ${
-                  t.isMe
-                    ? "border-amber-300 bg-amber-50/40 dark:border-amber-800 dark:bg-amber-950/20"
-                    : "border-zinc-200/80 bg-white/80 dark:border-zinc-800/80 dark:bg-zinc-900/80"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-4">
-                  <span
-                    className={`grid size-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-sm font-black tracking-tight text-white shadow-md ${tint.tile} ${tint.shadow}`}
-                  >
-                    {grade}
-                  </span>
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-base font-bold">
-                        {t.ownerName}
-                      </span>
-                      {t.isMe && (
-                        <Trophy
-                          size={14}
-                          className="shrink-0 text-amber-600 dark:text-amber-400"
-                          aria-hidden
-                        />
-                      )}
-                    </div>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {t.picksMade.length} of {totalRounds} picks ·{" "}
-                      <span className="tabular-nums">
-                        {t.totalDrafted.toLocaleString()}
-                      </span>{" "}
-                      drafted
+              <li key={t.rosterId} className="min-w-0">
+                <Section
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={t.isMe ? "text-hh-accent-ink" : ""}>{t.ownerName}</span>
+                      {t.isMe && <Trophy size={13} className="shrink-0 text-hh-accent-ink" aria-label="Your team" />}
                     </span>
-                  </div>
-                  <div className="ml-auto flex items-baseline gap-3">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                        Surplus
-                      </span>
-                      <span
-                        className={`text-2xl font-bold tabular-nums ${surplusColor}`}
-                      >
+                  }
+                  aside={<Num>#{idx + 1}</Num>}
+                >
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className={`hh-num w-12 shrink-0 text-3xl font-bold leading-none ${GRADE_TEXT[gradeTone(grade)]}`}>{grade}</span>
+                    <span className="min-w-0 text-xs text-hh-muted">
+                      <Num>{t.picksMade.length}</Num> of <Num>{totalRounds}</Num> picks ·{" "}
+                      <Num>{t.totalDrafted.toLocaleString()}</Num> drafted
+                    </span>
+                    <div className="ml-auto flex flex-col items-end">
+                      <span className="text-[11px] text-hh-muted">Surplus</span>
+                      <Num tone={surplusTone} className="text-2xl font-bold leading-none">
                         {t.totalSurplus > 0 ? "+" : ""}
                         {t.totalSurplus.toLocaleString()}
-                      </span>
+                      </Num>
                     </div>
-                    <span className="text-xs text-zinc-400 dark:text-zinc-600">
-                      #{idx + 1}
-                    </span>
                   </div>
-                </div>
 
-                {t.picksMade.length > 0 && (
-                  <ul className="flex flex-col divide-y divide-zinc-200/60 border-t border-zinc-200/60 dark:divide-zinc-800/60 dark:border-zinc-800/60">
-                    {t.picksMade.map((pk) => (
-                      <li
-                        key={pk.pickNo}
-                        className="flex items-center gap-3 py-2"
-                      >
-                        <span className="w-12 shrink-0 text-xs font-semibold tabular-nums text-zinc-500 dark:text-zinc-400">
-                          {pk.round}.{pk.slot.toString().padStart(2, "0")}
-                        </span>
-                        <PlayerAvatar
-                          name={pk.playerName}
-                          position={pk.position}
-                          photoUrl={pk.photoUrl}
-                          size="sm"
-                        />
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                          <PlayerLink
-                            id={pk.playerId}
-                            name={pk.playerName}
-                          />
-                          <span className="ml-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                            {pk.position ?? ""}
+                  {t.picksMade.length > 0 && (
+                    <ul className="mt-2 flex flex-col border-t border-hh-line">
+                      {t.picksMade.map((pk) => (
+                        <li key={pk.pickNo} className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2 last:border-b-0">
+                          <Num className="w-12 shrink-0 text-xs font-semibold text-hh-muted">
+                            {pk.round}.{pk.slot.toString().padStart(2, "0")}
+                          </Num>
+                          <PlayerAvatar name={pk.playerName} position={pk.position} photoUrl={pk.photoUrl} size="sm" />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                            <PlayerLink id={pk.playerId} name={pk.playerName} />
+                            <span className="ml-1.5 text-xs text-hh-muted">{pk.position ?? ""}</span>
                           </span>
-                        </span>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums">
-                          {pk.playerValue.toLocaleString()}
-                        </span>
-                        {Math.abs(pk.surplus) >= 50 && (
-                          <span
-                            className={`shrink-0 w-20 text-right text-[10px] font-bold tabular-nums ${
-                              pk.surplus > 0
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-rose-600 dark:text-rose-400"
-                            }`}
-                          >
-                            {pk.surplus > 0 ? "+" : ""}
-                            {pk.surplus.toLocaleString()}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                          <Num className="shrink-0 text-sm font-semibold">{pk.playerValue.toLocaleString()}</Num>
+                          {Math.abs(pk.surplus) >= 50 && (
+                            <Num tone={pk.surplus > 0 ? "pos" : "neg"} className="w-16 shrink-0 text-right text-[10px] font-bold">
+                              {pk.surplus > 0 ? "+" : ""}
+                              {pk.surplus.toLocaleString()}
+                            </Num>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
-                {t.picksMade.length === 0 && (
-                  <p className="text-xs text-zinc-400 dark:text-zinc-600">
-                    No picks made yet.
-                  </p>
-                )}
+                  {t.picksMade.length === 0 && <Empty>No picks made yet.</Empty>}
+                </Section>
               </li>
             );
           })}
         </ol>
 
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Grades update each refresh. Surplus = sum of (player value - pick
-          value) for picks made.
+        <p className="text-xs text-hh-muted">
+          Grades update each refresh. Surplus = sum of (player value - pick value) for picks made.
         </p>
       </div>
     </main>

@@ -28,6 +28,9 @@ import type { KTCByName } from "@/lib/ktc/types";
 import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
 import { RedraftDraft } from "./RedraftDraft";
+import { Chip, Disclosure, Empty, Num, PosBadge, Section, Stat, type Tone } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { teamHref } from "@/app/picks/hrefs";
 
 export const dynamic = "force-dynamic";
 
@@ -35,20 +38,25 @@ const TRADE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
 function ConfigError({ message }: { message: string }) {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <Link
-          href="/fantasy"
-          className="text-sm text-zinc-500 dark:text-zinc-400"
-        >
+        <Link href="/fantasy" className="inline-flex min-h-11 items-center text-sm text-hh-muted hover:text-hh-accent-ink sm:min-h-0">
           ‹ Leagues
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Draft helper</h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
-          {message}
-        </p>
+        <h1 className="hh-title">Draft helper</h1>
+        <p className="border-l-2 border-hh-neg py-2 pl-3 text-sm text-hh-neg">{message}</p>
       </div>
     </main>
+  );
+}
+
+/** NFL team code that opens the team pop-up, then the position. "FA" stays text. */
+function TeamPos({ team, position }: { team?: string | null; position?: string | null }) {
+  return (
+    <span className="text-xs text-hh-muted">
+      {team ? <PopLink href={teamHref("nfl", team)}>{team}</PopLink> : "FA"}
+      {position ? ` · ${position}` : ""}
+    </span>
   );
 }
 
@@ -78,7 +86,7 @@ function slotZone(slot: number, teams: number): PickSlot {
 }
 
 function gradeFromPct(pct: number, picksMade: number): string {
-  if (picksMade === 0) return "—";
+  if (picksMade === 0) return "n/a";
   if (pct >= 0.3) return "A+";
   if (pct >= 0.18) return "A";
   if (pct >= 0.1) return "A-";
@@ -90,41 +98,22 @@ function gradeFromPct(pct: number, picksMade: number): string {
   return "F";
 }
 
-function gradeTint(grade: string): { tile: string; shadow: string; pill: string } {
-  if (grade.startsWith("A")) {
-    return {
-      tile: "from-emerald-400 to-emerald-600",
-      shadow: "shadow-emerald-500/40",
-      pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-    };
-  }
-  if (grade.startsWith("B")) {
-    return {
-      tile: "from-sky-400 to-sky-600",
-      shadow: "shadow-sky-500/30",
-      pill: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
-    };
-  }
-  if (grade.startsWith("C")) {
-    return {
-      tile: "from-zinc-400 to-zinc-600",
-      shadow: "shadow-zinc-500/20",
-      pill: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    };
-  }
-  if (grade.startsWith("D")) {
-    return {
-      tile: "from-amber-400 to-orange-500",
-      shadow: "shadow-amber-500/30",
-      pill: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-    };
-  }
-  return {
-    tile: "from-rose-400 to-rose-600",
-    shadow: "shadow-rose-500/30",
-    pill: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
-  };
+function gradeTone(grade: string): Tone {
+  if (grade.startsWith("A")) return "pos";
+  if (grade.startsWith("B")) return "gold";
+  if (grade.startsWith("C")) return "muted";
+  if (grade.startsWith("D")) return "accent";
+  return "neg";
 }
+
+const TONE_CLASS: Record<Tone, string> = {
+  accent: "text-hh-accent-ink",
+  pos: "text-hh-pos",
+  neg: "text-hh-neg",
+  gold: "text-hh-gold",
+  muted: "text-hh-muted",
+  live: "text-hh-neg",
+};
 
 function ordinal(n: number): string {
   const v = n % 100;
@@ -441,41 +430,31 @@ export default async function DraftPage({
   const surplusSum = draftedSum - expectedSum;
   const pctSurplus = expectedSum > 0 ? surplusSum / expectedSum : 0;
   const myGrade = gradeFromPct(pctSurplus, myDraftedPicks.length);
-  const myGradeTint = gradeTint(myGrade);
   const draftComplete = draft.status === "complete";
 
+  const totalSlots = totalTeams * totalRounds;
+  const zoneText = (zone: string, round: number) =>
+    `${zone.charAt(0).toUpperCase() + zone.slice(1)} ${ordinal(round)}`;
+
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl min-w-0 break-words px-4 py-8 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2">
-          <Link
-            href={`/l/${leagueId}`}
-            className="text-sm text-zinc-500 dark:text-zinc-400"
-          >
+          <Link href={`/l/${leagueId}`} className="inline-flex min-h-11 items-center text-sm text-hh-muted hover:text-hh-accent-ink sm:min-h-0">
             ‹ League
           </Link>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight">
-              {draftComplete ? "Draft recap" : "Draft helper"}
-            </h1>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="hh-title">{draftComplete ? "Draft recap" : "Draft helper"}</h1>
+            <div className="flex flex-wrap items-center gap-2">
               <RefreshButton leagueId={leagueId} />
               <Link
                 href={`/l/${leagueId}/draft/board`}
-                className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+                className="inline-flex h-11 items-center justify-center rounded-[6px] border border-hh-line bg-hh-panel px-4 text-sm font-medium text-hh-ink hover:border-hh-accent sm:h-9"
               >
                 {draftComplete ? "League grades →" : "League board →"}
               </Link>
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
-                  draft.status === "drafting"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                    : draft.status === "complete"
-                      ? "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                      : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                }`}
-              >
-                <Clock size={12} aria-hidden />
+              <Chip tone={draft.status === "drafting" ? "live" : "muted"}>
+                {draft.status !== "drafting" && <Clock size={12} aria-hidden />}
                 {draft.status === "pre_draft"
                   ? "Pre-draft"
                   : draft.status === "drafting"
@@ -483,381 +462,263 @@ export default async function DraftPage({
                     : draft.status === "complete"
                       ? "Complete"
                       : draft.status}
-              </span>
+              </Chip>
             </div>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {league.name} · {draft.season} · {totalRounds}-round {draft.type}{" "}
-            draft
+          <p className="text-sm text-hh-muted">
+            {league.name} · {draft.season} · {totalRounds}-round {draft.type} draft
             {startTime && ` · ${draftComplete ? "completed" : "starts"} ${startTime}`}
           </p>
           {!draftComplete && (
             <AutoRefresh
-              intervalMs={
-                draft.status === "drafting" ? 60_000 : 5 * 60_000
-              }
-              label={
-                draft.status === "drafting"
-                  ? "Live updates"
-                  : "Refreshes"
-              }
+              intervalMs={draft.status === "drafting" ? 60_000 : 5 * 60_000}
+              label={draft.status === "drafting" ? "Live updates" : "Refreshes"}
             />
+          )}
+          {/* Answer first: where you stand in the draft, in one line. */}
+          {!draftComplete && (
+            <p className="mt-1 max-w-2xl text-[15px] leading-snug text-hh-ink-2">
+              {nextUserPick ? (
+                userIsOnTheClock ? (
+                  <>
+                    <b className="font-semibold text-hh-pos">You are on the clock</b> at{" "}
+                    <Num>
+                      {nextUserPick.round}.{nextUserPick.slot.toString().padStart(2, "0")}
+                    </Num>
+                    .
+                  </>
+                ) : (
+                  <>
+                    <b className="font-semibold text-hh-ink">
+                      <Num>{picksUntilUserUp}</Num> pick{picksUntilUserUp === 1 ? "" : "s"} until your turn
+                    </b>{" "}
+                    at{" "}
+                    <Num>
+                      {nextUserPick.round}.{nextUserPick.slot.toString().padStart(2, "0")}
+                    </Num>
+                    . Weakest spots: {weakestPositions.join(" and ") || "none"}.
+                  </>
+                )
+              ) : (
+                "All your picks made."
+              )}
+            </p>
           )}
         </div>
 
         {draftComplete && myDraftedPicks.length > 0 && (
-          <section className="flex flex-col gap-4 rounded-3xl border border-zinc-200/80 bg-gradient-to-br from-white via-white to-emerald-50/40 p-6 backdrop-blur dark:border-zinc-800/80 dark:from-zinc-900 dark:via-zinc-900 dark:to-emerald-950/15">
-            <div className="flex flex-wrap items-center gap-5">
-              <div
-                className={`grid size-24 place-items-center rounded-2xl bg-gradient-to-br ${myGradeTint.tile} text-4xl font-black text-white shadow-lg ${myGradeTint.shadow}`}
-              >
-                {myGrade}
-              </div>
+          <Section label="Your draft grade">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+              <span className={`hh-num text-6xl font-bold leading-none ${TONE_CLASS[gradeTone(myGrade)]}`}>{myGrade}</span>
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Your draft grade
-                </span>
-                <span className="text-2xl font-bold tracking-tight">
+                <span className="text-xl font-semibold">
                   {surplusSum >= 0 ? "Won " : "Lost "}
-                  <span
-                    className={`tabular-nums ${
-                      surplusSum >= 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-rose-600 dark:text-rose-400"
-                    }`}
-                  >
+                  <Num tone={surplusSum >= 0 ? "pos" : "neg"}>
                     {surplusSum >= 0 ? "+" : ""}
                     {surplusSum.toLocaleString()}
-                  </span>{" "}
+                  </Num>{" "}
                   value over expected
                 </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {(pctSurplus * 100).toFixed(1)}% surplus across{" "}
-                  {myDraftedPicks.length} pick
-                  {myDraftedPicks.length === 1 ? "" : "s"}. See how you stack up
-                  on the league grades page.
+                <span className="text-xs text-hh-muted">
+                  <Num>{(pctSurplus * 100).toFixed(1)}%</Num> surplus across <Num>{myDraftedPicks.length}</Num> pick
+                  {myDraftedPicks.length === 1 ? "" : "s"}. See how you stack up on the league grades page.
                 </span>
               </div>
-              <div className="ml-auto flex flex-col gap-2 sm:flex-row">
-                <div className="flex flex-col rounded-xl border border-zinc-200/80 bg-white/60 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    Drafted value
-                  </span>
-                  <span className="text-lg font-bold tabular-nums">
-                    {draftedSum.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex flex-col rounded-xl border border-zinc-200/80 bg-white/60 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    Expected
-                  </span>
-                  <span className="text-lg font-bold tabular-nums text-zinc-500 dark:text-zinc-400">
-                    {expectedSum.toLocaleString()}
-                  </span>
-                </div>
+              <div className="flex gap-8 sm:ml-auto">
+                <Stat label="Drafted value" value={draftedSum.toLocaleString()} />
+                <Stat label="Expected" value={expectedSum.toLocaleString()} tone="muted" />
               </div>
             </div>
-          </section>
+          </Section>
         )}
 
         {!draftComplete && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* Next pick card */}
-          <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-white to-sky-50/30 p-5 backdrop-blur dark:border-zinc-800/80 dark:from-zinc-900 dark:to-sky-950/10">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Your next pick
-            </span>
-            {nextUserPick ? (
-              <>
-                <div className="flex items-center gap-4">
-                  <span
-                    className={`grid size-20 place-items-center rounded-2xl bg-gradient-to-br text-2xl font-black tracking-tighter text-white shadow-lg ${
-                      userIsOnTheClock
-                        ? "from-emerald-400 to-emerald-600 shadow-emerald-500/40"
-                        : "from-sky-400 to-sky-600 shadow-sky-500/30"
-                    }`}
-                  >
-                    {nextUserPick.round}.
-                    {nextUserPick.slot.toString().padStart(2, "0")}
-                  </span>
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    {userIsOnTheClock ? (
-                      <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                        On the clock
-                      </span>
-                    ) : (
-                      <span className="text-3xl font-black tracking-tight tabular-nums">
-                        {picksUntilUserUp}
-                      </span>
-                    )}
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {userIsOnTheClock
-                        ? `pick ${nextUserPick.pickNo} of ${totalTeams * totalRounds}`
-                        : `pick${picksUntilUserUp === 1 ? "" : "s"} until your turn`}
-                    </span>
-                  </div>
-                </div>
+          <Recommendations recommendations={recommendations} nextPickLabel={nextPickRef?.label ?? null} />
+        )}
 
-                {/* Detail grid */}
-                <dl className="grid grid-cols-2 gap-3 border-t border-zinc-200/60 pt-3 text-xs dark:border-zinc-800/60">
-                  <div className="flex flex-col gap-0.5">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Round / zone
-                    </dt>
-                    <dd className="font-semibold">
-                      {nextUserPick.zone.charAt(0).toUpperCase() +
-                        nextUserPick.zone.slice(1)}{" "}
-                      {ordinal(nextUserPick.round)}
-                    </dd>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Pick value
-                    </dt>
-                    <dd className="font-semibold tabular-nums">
-                      {nextUserPick.value != null
-                        ? nextUserPick.value.toLocaleString()
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Overall pick
-                    </dt>
-                    <dd className="font-semibold tabular-nums">
-                      #{nextUserPick.pickNo} of {totalTeams * totalRounds}
-                    </dd>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Source
-                    </dt>
-                    <dd className="font-semibold">
-                      {pickOriginalOwner.get(nextUserPick.pickNo) !==
-                      myRoster?.roster_id
-                        ? `via roster ${pickOriginalOwner.get(nextUserPick.pickNo)}`
-                        : "Your original"}
-                    </dd>
-                  </div>
-                </dl>
-
-                {/* Draft progress bar */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-baseline justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    <span>Draft progress</span>
-                    <span className="tabular-nums">
-                      {picks.length} / {totalTeams * totalRounds}
-                    </span>
-                  </div>
-                  <div className="relative h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                    {/* Picks made fill */}
-                    <div
-                      className="absolute inset-y-0 left-0 bg-zinc-400 dark:bg-zinc-600"
-                      style={{
-                        width: `${
-                          (picks.length / (totalTeams * totalRounds)) * 100
-                        }%`,
-                      }}
-                    />
-                    {/* User's next-pick marker */}
-                    <div
-                      className="absolute inset-y-0 w-0.5 bg-sky-500"
-                      style={{
-                        left: `calc(${
-                          ((nextUserPick.pickNo - 1) /
-                            (totalTeams * totalRounds)) *
-                          100
-                        }% - 1px)`,
-                      }}
-                      aria-label="Your next pick"
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <span className="text-sm text-zinc-400 dark:text-zinc-600">
-                All your picks made.
-              </span>
-            )}
-          </div>
-
-          {/* Picks card */}
-          <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 p-5 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Your picks
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                total{" "}
-                <span className="font-bold tabular-nums text-zinc-900 dark:text-zinc-50">
-                  {totalPickValue.toLocaleString()}
-                </span>
-              </span>
-            </div>
-            {userPicks.length === 0 ? (
-              <span className="text-sm text-zinc-400 dark:text-zinc-600">—</span>
-            ) : (
-              <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                {userPicks.map((p) => {
-                  const made = draftPickByPickNo.get(p.pickNo);
-                  const draftedPlayer = made
-                    ? players[made.player_id]
-                    : null;
-                  const draftedValue = made
-                    ? fcValues[made.player_id]?.value ?? 0
-                    : null;
-                  const originalRoster = pickOriginalOwner.get(p.pickNo);
-                  const isReceivedPick =
-                    originalRoster != null &&
-                    originalRoster !== myRoster?.roster_id;
-                  return (
-                    <li
-                      key={p.pickNo}
-                      className={`flex items-center justify-between gap-2 py-1.5 text-sm ${
-                        made ? "opacity-70" : ""
-                      }`}
-                    >
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold tabular-nums">
-                            {p.round}.{p.slot.toString().padStart(2, "0")}
-                          </span>
-                          {draftedPlayer ? (
-                            <span className="truncate text-xs font-medium text-zinc-700 dark:text-zinc-200">
-                              {draftedPlayer.full_name ??
-                                `${draftedPlayer.first_name ?? ""} ${draftedPlayer.last_name ?? ""}`.trim()}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                              {p.zone.charAt(0).toUpperCase() +
-                                p.zone.slice(1)}{" "}
-                              {ordinal(p.round)}
-                            </span>
-                          )}
-                        </div>
-                        {isReceivedPick && (
-                          <span className="text-[10px] text-zinc-500 dark:text-zinc-500">
-                            via roster {originalRoster}
-                          </span>
-                        )}
-                      </div>
-                      <span className="shrink-0 text-xs font-bold tabular-nums text-zinc-700 dark:text-zinc-300">
-                        {draftedValue != null
-                          ? draftedValue.toLocaleString()
-                          : p.value != null
-                            ? p.value.toLocaleString()
-                            : "—"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {/* Target positions card — per-position colors */}
-          <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 p-5 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Target positions
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {weakestPositions.length > 0 ? (
-                weakestPositions.map((pos) => {
-                  const positionTints: Record<
-                    string,
-                    { grad: string; shadow: string }
-                  > = {
-                    QB: {
-                      grad: "from-rose-400 to-rose-600",
-                      shadow: "shadow-rose-500/30",
-                    },
-                    RB: {
-                      grad: "from-emerald-400 to-emerald-600",
-                      shadow: "shadow-emerald-500/30",
-                    },
-                    WR: {
-                      grad: "from-sky-400 to-sky-600",
-                      shadow: "shadow-sky-500/30",
-                    },
-                    TE: {
-                      grad: "from-amber-400 to-orange-500",
-                      shadow: "shadow-amber-500/30",
-                    },
-                  };
-                  const tint = positionTints[pos] ?? {
-                    grad: "from-zinc-400 to-zinc-600",
-                    shadow: "shadow-zinc-500/20",
-                  };
-                  const filledCount = draftedByMeByPos[pos] ?? 0;
-                  return (
-                    <span
-                      key={pos}
-                      className="relative inline-flex items-center"
-                    >
-                      <span
-                        className={`rounded-xl bg-gradient-to-br ${tint.grad} ${tint.shadow} px-4 py-2 text-lg font-black tracking-tight text-white shadow-md`}
-                      >
-                        {pos}
-                      </span>
-                      {filledCount > 0 && (
-                        <span className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-white shadow-md ring-2 ring-white dark:ring-zinc-900">
-                          ✓
-                        </span>
+        {!draftComplete && (
+          <div className="grid gap-x-8 gap-y-8 md:grid-cols-3">
+            <Section label="Your next pick">
+              {nextUserPick ? (
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-end gap-4">
+                    <Num className={`text-4xl font-bold leading-none ${userIsOnTheClock ? "text-hh-pos" : "text-hh-ink"}`}>
+                      {nextUserPick.round}.{nextUserPick.slot.toString().padStart(2, "0")}
+                    </Num>
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      {userIsOnTheClock ? (
+                        <span className="text-lg font-semibold text-hh-pos">On the clock</span>
+                      ) : (
+                        <Num className="text-2xl font-bold leading-none">{picksUntilUserUp}</Num>
                       )}
-                    </span>
-                  );
-                })
+                      <span className="text-xs text-hh-muted">
+                        {userIsOnTheClock
+                          ? `pick ${nextUserPick.pickNo} of ${totalSlots}`
+                          : `pick${picksUntilUserUp === 1 ? "" : "s"} until your turn`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-3 border-t border-hh-line pt-3 text-xs">
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-hh-muted">Round / zone</dt>
+                      <dd className="font-semibold">{zoneText(nextUserPick.zone, nextUserPick.round)}</dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-hh-muted">Pick value</dt>
+                      <dd className="font-semibold">
+                        <Num>{nextUserPick.value != null ? nextUserPick.value.toLocaleString() : "n/a"}</Num>
+                      </dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-hh-muted">Overall pick</dt>
+                      <dd className="font-semibold">
+                        <Num>#{nextUserPick.pickNo}</Num> of <Num>{totalSlots}</Num>
+                      </dd>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <dt className="text-hh-muted">Source</dt>
+                      <dd className="font-semibold">
+                        {pickOriginalOwner.get(nextUserPick.pickNo) !== myRoster?.roster_id
+                          ? `via roster ${pickOriginalOwner.get(nextUserPick.pickNo)}`
+                          : "Your original"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-baseline justify-between text-xs text-hh-muted">
+                      <span>Draft progress</span>
+                      <span>
+                        <Num>{picks.length}</Num> / <Num>{totalSlots}</Num>
+                      </span>
+                    </div>
+                    <div className="relative h-1.5 overflow-hidden rounded-full bg-hh-sunk">
+                      <div className="absolute inset-y-0 left-0 bg-hh-muted" style={{ width: `${(picks.length / totalSlots) * 100}%` }} />
+                      <div
+                        className="absolute inset-y-0 w-0.5 bg-hh-accent"
+                        style={{ left: `calc(${((nextUserPick.pickNo - 1) / totalSlots) * 100}% - 1px)` }}
+                        aria-label="Your next pick"
+                      />
+                    </div>
+                  </div>
+                </div>
               ) : (
-                <span className="text-zinc-500 dark:text-zinc-400">—</span>
+                <Empty>All your picks made.</Empty>
               )}
-            </div>
-            <span className="mt-auto text-xs text-zinc-500 dark:text-zinc-400">
-              {Object.keys(draftedByMeByPos).length > 0
-                ? `Live update: ${Object.entries(draftedByMeByPos)
-                    .map(([p, n]) => `${n} ${p}${n === 1 ? "" : "s"}`)
-                    .join(" + ")} drafted`
-                : "your weakest by total roster value"}
-            </span>
+            </Section>
+
+            <Section
+              label="Your picks"
+              aside={
+                <>
+                  total <Num className="font-bold text-hh-ink">{totalPickValue.toLocaleString()}</Num>
+                </>
+              }
+            >
+              {userPicks.length === 0 ? (
+                <Empty>No picks this draft.</Empty>
+              ) : (
+                <ul className="flex flex-col">
+                  {userPicks.map((p) => {
+                    const made = draftPickByPickNo.get(p.pickNo);
+                    const draftedPlayer = made ? players[made.player_id] : null;
+                    const draftedValue = made ? (fcValues[made.player_id]?.value ?? 0) : null;
+                    const originalRoster = pickOriginalOwner.get(p.pickNo);
+                    const isReceivedPick = originalRoster != null && originalRoster !== myRoster?.roster_id;
+                    return (
+                      <li
+                        key={p.pickNo}
+                        className={`flex min-h-11 items-center justify-between gap-2 border-b border-hh-line py-1.5 text-sm last:border-b-0 ${made ? "opacity-70" : ""}`}
+                      >
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Num className="font-bold">
+                              {p.round}.{p.slot.toString().padStart(2, "0")}
+                            </Num>
+                            {draftedPlayer && made ? (
+                              <PlayerLink
+                                id={made.player_id}
+                                name={
+                                  draftedPlayer.full_name ??
+                                  `${draftedPlayer.first_name ?? ""} ${draftedPlayer.last_name ?? ""}`.trim()
+                                }
+                                className="truncate text-xs font-medium text-hh-ink-2"
+                              />
+                            ) : (
+                              <span className="text-xs text-hh-muted">{zoneText(p.zone, p.round)}</span>
+                            )}
+                          </div>
+                          {isReceivedPick && <span className="text-[10px] text-hh-muted">via roster {originalRoster}</span>}
+                        </div>
+                        <Num className="shrink-0 text-xs font-bold text-hh-ink-2">
+                          {draftedValue != null
+                            ? draftedValue.toLocaleString()
+                            : p.value != null
+                              ? p.value.toLocaleString()
+                              : "n/a"}
+                        </Num>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Section>
+
+            <Section label="Target positions">
+              <div className="flex flex-col gap-3">
+                {weakestPositions.length > 0 ? (
+                  <ul className="flex flex-col">
+                    {weakestPositions.map((pos) => {
+                      const filledCount = draftedByMeByPos[pos] ?? 0;
+                      return (
+                        <li key={pos} className="flex min-h-11 items-center justify-between gap-2 border-b border-hh-line py-1.5 last:border-b-0">
+                          <span className="text-base">
+                            <PosBadge pos={pos} />
+                          </span>
+                          {filledCount > 0 && (
+                            <Chip tone="pos">
+                              ✓ <Num>{filledCount}</Num> drafted
+                            </Chip>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <Empty>None.</Empty>
+                )}
+                <span className="text-xs text-hh-muted">
+                  {Object.keys(draftedByMeByPos).length > 0
+                    ? `Live update: ${Object.entries(draftedByMeByPos)
+                        .map(([p, n]) => `${n} ${p}${n === 1 ? "" : "s"}`)
+                        .join(" + ")} drafted`
+                    : "your weakest by total roster value"}
+                </span>
+              </div>
+            </Section>
           </div>
-        </div>
         )}
 
         {!draftComplete && (
-          <Recommendations
-            recommendations={recommendations}
-            nextPickLabel={nextPickRef?.label ?? null}
-          />
-        )}
-
-        {!draftComplete && (
-          <section className="flex flex-col gap-3">
-            <header className="flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold tracking-tight">
-                Best available rookies
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {available.length} remaining · {drafted.size} drafted
-              </span>
-            </header>
-            <RookieList
-              rookies={rookieRows}
-              weakestPositions={weakestPositions as string[]}
-              nextPick={nextPickRef}
-            />
-          </section>
+          <Section
+            label="Best available rookies"
+            aside={
+              <>
+                <Num>{available.length}</Num> remaining · <Num>{drafted.size}</Num> drafted
+              </>
+            }
+          >
+            <RookieList rookies={rookieRows} weakestPositions={weakestPositions as string[]} nextPick={nextPickRef} />
+          </Section>
         )}
 
         {(() => {
-          const myPicks = picks
-            .filter((pk) => pk.picked_by === me.user_id)
-            .sort((a, b) => a.pick_no - b.pick_no);
+          const myPicks = picks.filter((pk) => pk.picked_by === me.user_id).sort((a, b) => a.pick_no - b.pick_no);
           if (myPicks.length === 0) return null;
 
           // Compute total drafted value + surplus vs the picks I used.
-          const drafted = myPicks.reduce(
-            (s, pk) => s + (fcValues[pk.player_id]?.value ?? 0),
-            0,
-          );
+          const drafted = myPicks.reduce((s, pk) => s + (fcValues[pk.player_id]?.value ?? 0), 0);
           const expected = myPicks.reduce((s, pk) => {
             const u = userPicks.find((up) => up.pickNo === pk.pick_no);
             return s + (u?.value ?? 0);
@@ -865,132 +726,84 @@ export default async function DraftPage({
           const surplus = drafted - expected;
 
           return (
-            <section className="flex flex-col gap-3">
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-xl font-semibold tracking-tight">
-                  {draftComplete ? "Your picks" : "Your draft so far"}
-                </h2>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {myPicks.length} of {userPicks.length} picks
-                </span>
+            <Section
+              label={draftComplete ? "Your picks" : "Your draft so far"}
+              aside={
+                <>
+                  <Num>{myPicks.length}</Num> of <Num>{userPicks.length}</Num> picks
+                </>
+              }
+            >
+              <div className="flex flex-wrap gap-8 border-b border-hh-line pb-3">
+                <Stat label="Drafted value" value={drafted.toLocaleString()} />
+                <Stat label="Expected" value={expected.toLocaleString()} tone="muted" />
+                <Stat
+                  label="Surplus"
+                  value={`${surplus >= 0 ? "+" : ""}${surplus.toLocaleString()}`}
+                  tone={surplus >= 0 ? "pos" : "neg"}
+                />
               </div>
-              <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-white to-emerald-50/20 p-4 backdrop-blur dark:border-zinc-800/80 dark:from-zinc-900 dark:to-emerald-950/10">
-                <div className="flex flex-wrap items-center gap-6 border-b border-zinc-200/60 pb-3 dark:border-zinc-800/60">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Drafted value
-                    </span>
-                    <span className="text-2xl font-bold tabular-nums">
-                      {drafted.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Expected
-                    </span>
-                    <span className="text-2xl font-bold tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {expected.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Surplus
-                    </span>
-                    <span
-                      className={`text-2xl font-bold tabular-nums ${
-                        surplus >= 0
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-rose-600 dark:text-rose-400"
-                      }`}
-                    >
-                      {surplus >= 0 ? "+" : ""}
-                      {surplus.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                <ul className="flex flex-col gap-2">
-                  {myPicks.map((pk) => {
-                    const p = players[pk.player_id];
-                    const v = fcValues[pk.player_id];
-                    if (!p) return null;
-                    const u = userPicks.find((up) => up.pickNo === pk.pick_no);
-                    const playerVal = v?.value ?? 0;
-                    const expectedVal = u?.value ?? 0;
-                    const pickSurplus = playerVal - expectedVal;
-                    return (
-                      <li
-                        key={pk.pick_no}
-                        className="flex items-center gap-3"
-                      >
-                        <span className="w-14 shrink-0 text-sm font-bold tabular-nums">
-                          {pk.round}.{pk.draft_slot.toString().padStart(2, "0")}
-                        </span>
-                        <PlayerAvatar
-                          name={nameOf(p)}
-                          position={p.position ?? null}
-                          photoUrl={v?.photoUrl ?? null}
-                          size="sm"
-                        />
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <PlayerLink
-                            id={p.player_id}
-                            name={nameOf(p)}
-                            className="truncate text-sm font-semibold"
-                          />
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {[p.team ?? "FA", p.position]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </span>
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end">
-                          <span className="text-sm font-semibold tabular-nums">
-                            {playerVal.toLocaleString()}
-                          </span>
-                          {Math.abs(pickSurplus) >= 50 && (
-                            <span
-                              className={`text-[10px] font-bold tabular-nums ${
-                                pickSurplus > 0
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-rose-600 dark:text-rose-400"
-                              }`}
-                            >
+              <ul className="flex flex-col">
+                {myPicks.map((pk) => {
+                  const p = players[pk.player_id];
+                  const v = fcValues[pk.player_id];
+                  if (!p) return null;
+                  const u = userPicks.find((up) => up.pickNo === pk.pick_no);
+                  const playerVal = v?.value ?? 0;
+                  const expectedVal = u?.value ?? 0;
+                  const pickSurplus = playerVal - expectedVal;
+                  return (
+                    <li key={pk.pick_no} className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2 last:border-b-0">
+                      <Num className="w-14 shrink-0 text-sm font-bold">
+                        {pk.round}.{pk.draft_slot.toString().padStart(2, "0")}
+                      </Num>
+                      <PlayerAvatar name={nameOf(p)} position={p.position ?? null} photoUrl={v?.photoUrl ?? null} size="sm" />
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <PlayerLink id={p.player_id} name={nameOf(p)} className="truncate text-sm font-semibold" />
+                        <TeamPos team={p.team} position={p.position} />
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end">
+                        <Num className="text-sm font-semibold">{playerVal.toLocaleString()}</Num>
+                        {Math.abs(pickSurplus) >= 50 && (
+                          <span className={`text-[10px] font-bold ${pickSurplus > 0 ? "text-hh-pos" : "text-hh-neg"}`}>
+                            <Num>
                               {pickSurplus > 0 ? "+" : ""}
-                              {pickSurplus.toLocaleString()} vs pick
-                            </span>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </section>
+                              {pickSurplus.toLocaleString()}
+                            </Num>{" "}
+                            vs pick
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Section>
           );
         })()}
 
-        {!draftComplete && (
-          <RoundTargets
-            userPicks={userPicks}
-            rookies={rookieRows}
-            weakestPositions={weakestPositions as string[]}
-            draftedPickNos={picks
-              .filter((pk) => pk.picked_by === me.user_id)
-              .map((pk) => pk.pick_no)}
-          />
+        {!draftComplete && userPicks.length > 0 && (
+          <Disclosure summary="Round-by-round targets at each of your picks">
+            <div className="pt-2">
+              <RoundTargets
+                userPicks={userPicks}
+                rookies={rookieRows}
+                weakestPositions={weakestPositions as string[]}
+                draftedPickNos={picks.filter((pk) => pk.picked_by === me.user_id).map((pk) => pk.pick_no)}
+              />
+            </div>
+          </Disclosure>
         )}
 
         {!draftComplete && picks.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <header className="flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold tracking-tight">
-                Picks made
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {picks.length} of {totalRounds * totalTeams}
-              </span>
-            </header>
-            <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <Disclosure
+            summary={
+              <>
+                Picks made: <Num>{picks.length}</Num> of <Num>{totalRounds * totalTeams}</Num>
+              </>
+            }
+          >
+            <ul className="flex flex-col">
               {picks
                 .slice(-10)
                 .reverse()
@@ -1002,54 +815,29 @@ export default async function DraftPage({
                   return (
                     <li
                       key={pk.pick_no}
-                      className={`flex items-center gap-3 px-4 py-3 ${
-                        isMine ? "bg-amber-50 dark:bg-amber-950/20" : ""
-                      }`}
+                      className={`flex min-h-11 items-center gap-3 border-b border-hh-line py-2.5 last:border-b-0 ${isMine ? "border-l-2 border-l-hh-accent pl-2" : ""}`}
                     >
-                      <span className="w-12 shrink-0 text-xs font-semibold tabular-nums text-zinc-500 dark:text-zinc-400">
+                      <Num className="w-12 shrink-0 text-xs font-semibold text-hh-muted">
                         {pk.round}.{pk.draft_slot.toString().padStart(2, "0")}
-                      </span>
-                      <PlayerAvatar
-                        name={nameOf(p)}
-                        position={p.position ?? null}
-                        photoUrl={v?.photoUrl ?? null}
-                        size="sm"
-                      />
+                      </Num>
+                      <PlayerAvatar name={nameOf(p)} position={p.position ?? null} photoUrl={v?.photoUrl ?? null} size="sm" />
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <PlayerLink
-                            id={p.player_id}
-                            name={nameOf(p)}
-                            className="truncate text-sm font-medium"
-                          />
-                          {isMine && (
-                            <Trophy
-                              size={12}
-                              className="shrink-0 text-amber-600 dark:text-amber-400"
-                              aria-hidden
-                            />
-                          )}
+                          <PlayerLink id={p.player_id} name={nameOf(p)} className="truncate text-sm font-medium text-hh-ink" />
+                          {isMine && <Trophy size={12} className="shrink-0 text-hh-accent-ink" aria-label="Your pick" />}
                         </div>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {[p.team ?? "FA", p.position]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
+                        <TeamPos team={p.team} position={p.position} />
                       </div>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">
-                        {v?.value.toLocaleString() ?? "—"}
-                      </span>
+                      <Num className="shrink-0 text-sm font-semibold text-hh-ink">{v?.value.toLocaleString() ?? "n/a"}</Num>
                     </li>
                   );
                 })}
             </ul>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Showing last 10 picks. Refresh during the draft to see updates
-              (60-second cache).
+            <p className="mt-2 text-xs text-hh-muted">
+              Showing last 10 picks. Refresh during the draft to see updates (60-second cache).
             </p>
-          </section>
+          </Disclosure>
         )}
-
       </div>
     </main>
   );

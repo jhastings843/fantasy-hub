@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
+import { PopLink } from "@/components/hh/PopLink";
+import { Chip, Num } from "@/components/hh/ui";
+import { teamHref } from "@/app/picks/hrefs";
 
 export interface RookieRow {
   id: string;
@@ -75,37 +78,30 @@ export function RookieList({
               type="button"
               onClick={() => setFilter(f.key)}
               disabled={count === 0 && f.key !== "all"}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              aria-pressed={active}
+              className={`h-11 rounded-[6px] px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 ${
                 active
-                  ? "bg-amber-500 text-white"
-                  : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  ? "bg-hh-accent text-[var(--hh-on-accent)]"
+                  : "border border-hh-line bg-hh-panel text-hh-ink-2 hover:border-hh-accent"
               }`}
             >
               {f.label}{" "}
-              <span className={active ? "opacity-80" : "opacity-60"}>
-                {count}
-              </span>
+              <Num className={active ? "opacity-80" : "opacity-60"}>{count}</Num>
             </button>
           );
         })}
       </div>
 
-      <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-x-8 md:grid-cols-2 lg:grid-cols-3">
         {visible.map((p, idx) => {
           const targetMatch =
             !!p.position && weakestPositions.includes(p.position);
           return (
             <li
               key={p.id}
-              className={`flex items-center gap-3 rounded-2xl border p-3 transition-colors ${
-                targetMatch
-                  ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20"
-                  : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-              }`}
+              className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2.5"
             >
-              <span className="w-6 shrink-0 text-sm font-semibold tabular-nums text-zinc-500 dark:text-zinc-400">
-                {idx + 1}
-              </span>
+              <Num className="w-6 shrink-0 text-sm font-semibold text-hh-muted">{idx + 1}</Num>
               <PlayerAvatar
                 name={p.name}
                 position={p.position ?? null}
@@ -118,49 +114,43 @@ export function RookieList({
                   name={p.name}
                   className="truncate text-sm font-semibold"
                 />
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {[
-                    p.team ?? "FA",
-                    p.position,
-                    p.age ? `age ${p.age}` : null,
-                  ]
+                <span className="text-xs text-hh-muted">
+                  {p.team ? <PopLink href={teamHref("nfl", p.team)}>{p.team}</PopLink> : "FA"}
+                  {[p.position, p.age ? `age ${p.age}` : null]
                     .filter(Boolean)
-                    .join(" · ")}
+                    .map((x) => ` · ${x}`)
+                    .join("")}
                 </span>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className="text-sm font-semibold tabular-nums">
-                  {p.value.toLocaleString()}
-                </span>
+                <Num className="text-sm font-semibold text-hh-ink">{p.value.toLocaleString()}</Num>
                 {nextPick && (() => {
                   const surplus = p.value - nextPick.value;
                   if (surplus >= 200) {
                     return (
-                      <span className="text-[10px] font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                        +{surplus.toLocaleString()} vs {nextPick.label}
+                      <span className="text-[10px] font-bold text-hh-pos">
+                        <Num>+{surplus.toLocaleString()}</Num> vs <Num>{nextPick.label}</Num>
                       </span>
                     );
                   }
                   if (surplus <= -200) {
                     return (
-                      <span className="text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600">
-                        {surplus.toLocaleString()} vs {nextPick.label}
+                      <span className="text-[10px] text-hh-muted">
+                        <Num>{surplus.toLocaleString()}</Num> vs <Num>{nextPick.label}</Num>
                       </span>
                     );
                   }
                   return null;
                 })()}
                 {targetMatch && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-                    Fit
-                  </span>
+                  <Chip tone="accent">Fit</Chip>
                 )}
               </div>
             </li>
           );
         })}
         {visible.length === 0 && (
-          <li className="text-sm text-zinc-500 dark:text-zinc-400">
+          <li className="py-2 text-sm text-hh-muted">
             No rookies match this filter.
           </li>
         )}
