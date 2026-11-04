@@ -26,14 +26,17 @@ export function PlayerLink({
   name,
   className = "",
   stopPropagation = false,
+  leagueId: league,
 }: {
   id: string;
+  /** Needed outside /l/[leagueId] pages (Today); inside them the path supplies it. */
+  leagueId?: string;
   name: string;
   className?: string;
   stopPropagation?: boolean;
 }) {
   const pathname = usePathname() ?? "";
-  const leagueId = pathname.split("/")[2] ?? "";
+  const leagueId = league ?? pathname.split("/")[2] ?? "";
   const leagueType = useLeagueType();
 
   // Half-PPR REDRAFT research, so redraft and guillotine only. In a dynasty
@@ -46,7 +49,9 @@ export function PlayerLink({
     <span className="inline-flex items-baseline gap-1.5">
       <Link
         href={`/l/${leagueId}/player/${id}`}
-        className={`hover:text-amber-700 hover:underline dark:hover:text-amber-400 ${className}`}
+        // Opens as a pop-up over the page (app/@modal/(.)l/...); typed or shared, the full profile.
+        scroll={false}
+        className={`underline decoration-transparent underline-offset-[3px] hover:text-hh-accent-ink hover:decoration-current ${className}`}
         onClick={
           stopPropagation
             ? (e) => {
