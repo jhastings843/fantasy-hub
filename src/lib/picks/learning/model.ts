@@ -51,6 +51,12 @@ export const CRITERIA = {
   MIN_WEEKS: 3,
   /** One-sided paired t on the per-opportunity unit difference. */
   MIN_T: 1.645,
+  /**
+   * Game-bet slices (ATS and totals cuts) need this instead (Jack, 2026-11-04): up to
+   * MAX_COLLECTING ideas test at once, and at 1.645 about 1 in 20 losers passes by luck.
+   * Same bar as props (PROPS_GATE.minT). Rollbacks and rejections still use MIN_T.
+   */
+  MIN_T_CUT: 2.33,
   /** Challenger CLV may not trail the incumbent's by more than this (points). */
   CLV_MARGIN: 0.25,
   /** Challenger drawdown at most this multiple of the incumbent's (plus 1u slack). */
@@ -798,10 +804,12 @@ export function decide(h: Hypothesis, e: Evaluation, ctx: { calibration: Calibra
   if (c.weeks.length < CRITERIA.MIN_WEEKS) gaps.push(`${c.weeks.length} of ${CRITERIA.MIN_WEEKS} weeks`);
   if (h.definition.kind === "market" && c.n < SPLITS_MIN_GAMES) gaps.push(`${c.n} of ${SPLITS_MIN_GAMES} settled rule bets (splits need more)`);
   if (gaps.length) return { id: h.id, verdict: "retain", why: `insufficient evidence: ${gaps.join(", ")}` };
-  const need = Math.max(CRITERIA.MIN_T, c.tNeeded ?? 0);
+  const isCut = h.definition.kind === "ats-cut" || h.definition.kind === "totals-cut";
+  const need = Math.max(isCut ? CRITERIA.MIN_T_CUT : CRITERIA.MIN_T, c.tNeeded ?? 0);
   if (c.t < need) {
     const unit = c.tNeeded !== undefined ? ` (weekly t over ${c.weeks.length} weeks)` : "";
-    return { id: h.id, verdict: c.t <= -need ? "reject" : "retain", why: `not better on matched games: mean ${c.meanDiff}u, t=${c.t}${unit}, needs ${need}` };
+    const rejectAt = isCut ? CRITERIA.MIN_T : need;
+    return { id: h.id, verdict: c.t <= -rejectAt ? "reject" : "retain", why: `not better on matched games: mean ${c.meanDiff}u, t=${c.t}${unit}, needs ${need}` };
   }
   if (c.challenger.clv !== null && c.incumbent.clv !== null && c.challenger.clv < c.incumbent.clv - CRITERIA.CLV_MARGIN) {
     return { id: h.id, verdict: "retain", why: `wins on results but trails on closing-line value (${c.challenger.clv} vs ${c.incumbent.clv})` };

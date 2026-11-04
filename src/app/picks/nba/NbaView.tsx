@@ -642,7 +642,7 @@ function NbaResearch({ v, m }: { v: NbaPicksView; m: Market }) {
             </table>
           </div>
           <p className={`${s.notice} ${s.dim}`}>
-            {`Games first seen after each was registered. Same bar as football's review: ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and t ${CRITERIA.MIN_T}+ to go in, at most one per market a week; retired (listed last) while it trails its parent just as surely, back to collecting once it doesn't; rolled back when it trails its parent on ${CRITERIA.ROLLBACK_MIN_OPPORTUNITIES}+ games with t at or under -${CRITERIA.MIN_T}.`}
+            {`Games first seen after each was registered. Same bar as football's review: ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and t ${CRITERIA.MIN_T_CUT}+ to go in, at most one per market a week; retired (listed last) while it trails its parent just as surely, back to collecting once it doesn't; rolled back when it trails its parent on ${CRITERIA.ROLLBACK_MIN_OPPORTUNITIES}+ games with t at or under -${CRITERIA.MIN_T}.`}
           </p>
         </details>
       )}
@@ -664,7 +664,7 @@ function NbaLog({ v, m }: { v: NbaPicksView; m: Market }) {
       <Hero
         eyebrow={`NBA ${MARKET_NAME[m].toLowerCase()} · what changed, and why`}
         title={<span id="nba-log">Learner log</span>}
-        sub={`NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered, and goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks at t ${CRITERIA.MIN_T}+. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; it runs after each night's games.` : "The first review runs after the first graded night."}`}
+        sub={`NBA learns on its own games: each research cut is tested against the broader cut it narrows, on games first seen after it registered, and goes live at ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks at t ${CRITERIA.MIN_T_CUT}+. ${v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; it runs after each night's games.` : "The first review runs after the first graded night."}`}
       />
       <NbaModelRecords v={v} market={m} />
       <TrackingProgress
@@ -676,7 +676,7 @@ function NbaLog({ v, m }: { v: NbaPicksView; m: Market }) {
           needGames: CRITERIA.MIN_OPPORTUNITIES,
           weeks: h.cmp.weeks,
           needWeeks: CRITERIA.MIN_WEEKS,
-          result: h.cmp.n ? `${h.cmp.mean >= 0 ? "+" : "−"}${Math.abs(h.cmp.mean).toFixed(2)}u a game vs ${h.parentLabel.charAt(0).toLowerCase()}${h.parentLabel.slice(1)}${h.cmp.t !== null ? `, t ${h.cmp.t.toFixed(2)} of ${CRITERIA.MIN_T}` : ""}` : undefined,
+          result: h.cmp.n ? `${h.cmp.mean >= 0 ? "+" : "−"}${Math.abs(h.cmp.mean).toFixed(2)}u a game vs ${h.parentLabel.charAt(0).toLowerCase()}${h.parentLabel.slice(1)}${h.cmp.t !== null ? `, t ${h.cmp.t.toFixed(2)} of ${CRITERIA.MIN_T_CUT}` : ""}` : undefined,
           note: h.cmp.n ? undefined : "No games yet: only games after it registered count.",
         }))}
         sub={`Research cuts on Sam's NBA ${MARKET_NAME[m].toLowerCase()}, each against the broader cut it narrows. New games land every night.`}

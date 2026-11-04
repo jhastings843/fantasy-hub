@@ -460,7 +460,7 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
   const ready = next
     .filter((h) => h.status === "collecting" && !NBA_CUT.get(h.id)?.reportOnly)
     .map((h) => ({ h, c: compareCut(rows, h.id, h.registeredAt) }))
-    .filter(({ c }) => c.n >= CRITERIA.MIN_OPPORTUNITIES && c.weeks >= CRITERIA.MIN_WEEKS && c.t !== null && c.t >= CRITERIA.MIN_T)
+    .filter(({ c }) => c.n >= CRITERIA.MIN_OPPORTUNITIES && c.weeks >= CRITERIA.MIN_WEEKS && c.t !== null && c.t >= CRITERIA.MIN_T_CUT)
     .sort((a, b) => (b.c.t ?? 0) - (a.c.t ?? 0));
   // Daily reviews, one change per market per 7 days: a market with a cut that went in or came out this past week waits.
   const recent = (x?: string) => !!x && Date.parse(now) - Date.parse(x) < 7 * 86_400_000;
@@ -482,7 +482,7 @@ export function reviewNba(rows: NbaRow[], hyps: NbaHypothesis[], now: string): {
     kind: picked.length ? "review" : "retain",
     text: picked.length
       ? `Review: ${picked.length} research cut${picked.length > 1 ? "s" : ""} activated (one per market at most); ${collecting} still collecting.`
-      : `Review: no change. ${collecting} research cut${collecting === 1 ? "" : "s"} collecting; none has ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with t ${CRITERIA.MIN_T}+ yet.`,
+      : `Review: no change. ${collecting} research cut${collecting === 1 ? "" : "s"} collecting; none has ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks with t ${CRITERIA.MIN_T_CUT}+ yet.`,
   });
   return { hyps: next, journal };
 }

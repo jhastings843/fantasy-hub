@@ -12,7 +12,7 @@ const REPLAYED = { since: "2026-10-13T13:00:00Z", decisions: 20, gaps: 0, unsett
 describe("protected acceptance criteria", () => {
   it("are pinned: the review cannot weaken its own test", () => {
     expect(CRITERIA).toEqual({
-      MIN_OPPORTUNITIES: 30, MIN_WEEKS: 3, MIN_T: 1.645, CLV_MARGIN: 0.25, DRAWDOWN_RATIO: 1.25,
+      MIN_OPPORTUNITIES: 30, MIN_WEEKS: 3, MIN_T: 1.645, MIN_T_CUT: 2.33, CLV_MARGIN: 0.25, DRAWDOWN_RATIO: 1.25,
       CALIBRATION_MIN_BETS: 50, CALIBRATION_TOLERANCE: 0.05, ROLLBACK_MIN_OPPORTUNITIES: 20, MAX_COLLECTING: 24, MAX_NEW_PER_REVIEW: 2,
     });
   });
@@ -64,8 +64,8 @@ describe("rehearsal: ingest -> settle -> evaluate -> decide -> validate -> activ
     expect(r0.state.lastOutcome).toBe("no change: kept p1");
     expect(r0.decisions.find((d) => d.id === "nfl:ats:dog-band-a")?.why).toMatch(/insufficient evidence/);
 
-    // Four weeks after registration: small dogs cover 7 of 8, big dogs 1 of 4.
-    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, `2026-10-${13 + 7 * k}T21:00:00Z`.replace("10-34", "11-03").replace("10-41", "11-10"), (i) => i !== 3, (i) => i === 9));
+    // Four weeks after registration: small dogs cover 7 of 8, big dogs 0 of 4 (clears the 2.33 cut bar).
+    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, `2026-10-${13 + 7 * k}T21:00:00Z`.replace("10-34", "11-03").replace("10-41", "11-10"), (i) => i !== 3, () => false));
     const r1 = await runReview(store, inputs(good, "2026-11-11T10:00:00Z"));
     const d = r1.decisions.find((x) => x.id === "nfl:ats:dog-band-a")!;
     expect(d.verdict).toBe("promote");
@@ -90,7 +90,7 @@ describe("rehearsal: ingest -> settle -> evaluate -> decide -> validate -> activ
   it("a promotion that fails validation is retained, with the reason", async () => {
     const store = memoryStore();
     await runReview(store, inputs([], "2026-10-09T10:00:00Z"));
-    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, new Date(Date.parse("2026-10-13T21:00:00Z") + k * 7 * 86400000).toISOString(), (i) => i !== 3, (i) => i === 9));
+    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, new Date(Date.parse("2026-10-13T21:00:00Z") + k * 7 * 86400000).toISOString(), (i) => i !== 3, () => false));
     const r = await runReview(store, inputs(good, "2026-11-11T10:00:00Z", true));
     expect(r.activated).toBeUndefined();
     expect(r.journal.find((j) => j.kind === "retain")?.why).toMatch(/exceed the 15u room/);
@@ -241,7 +241,7 @@ describe("one change per part per review (2026-10-27)", () => {
   it("the review records the live change per part and reads older single-change state", async () => {
     const store = memoryStore();
     await runReview(store, inputs([], "2026-10-09T10:00:00Z"));
-    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, new Date(Date.parse("2026-10-13T21:00:00Z") + k * 7 * 86400000).toISOString(), (i) => i !== 3, (i) => i === 9));
+    const good = [6, 7, 8, 9].map((w, k) => weekOf(w, new Date(Date.parse("2026-10-13T21:00:00Z") + k * 7 * 86400000).toISOString(), (i) => i !== 3, () => false));
     const r = await runReview(store, inputs(good, "2026-11-11T10:00:00Z"));
     expect(r.activatedAll.map((a) => a.part)).toEqual(["nfl:rule"]);
     expect(r.state.activations).toEqual([expect.objectContaining({ part: "nfl:rule", hypothesis: "nfl:ats:dog-band-a", from: "p1" })]);

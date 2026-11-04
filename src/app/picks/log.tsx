@@ -74,7 +74,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
       <Hero
         eyebrow="What changed, and why"
         title={<span id="picks-log">Learner log</span>}
-        sub={`Every idea counts only games after it was first tracked. To go live it needs ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and to beat ${AGAINST_SHORT[market]} at t ${CRITERIA.MIN_T}+ (t is how sure the gain is real; ${CRITERIA.MIN_T} is about a 1-in-20 chance it's luck). One that loses to it just as clearly is dropped; a live one comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "the next slate review"}.`}
+        sub={`Every idea counts only games after it was first tracked. To go live it needs ${CRITERIA.MIN_OPPORTUNITIES}+ games over ${CRITERIA.MIN_WEEKS}+ weeks and to beat ${AGAINST_SHORT[market]} at t ${CRITERIA.MIN_T_CUT}+ for a betting slice, or ${CRITERIA.MIN_T}+ for other changes (t is how sure the gain is real; ${CRITERIA.MIN_T_CUT} is about a 1-in-100 chance it's luck, ${CRITERIA.MIN_T} about 1 in 20). One that loses to it just as clearly is dropped; a live one comes back off if it starts losing. Next review ${state ? whenEt(state.nextReviewAt) : "the next slate review"}.`}
       />
       {rep && <ModelRecords league={league} market={market} report={rep} />}
       <TrackingProgress
@@ -95,7 +95,7 @@ export async function PicksLog({ league, market }: { league: League; market: Mar
               needGames: CRITERIA.MIN_OPPORTUNITIES,
               weeks: wk,
               needWeeks: CRITERIA.MIN_WEEKS,
-              result: d.t !== undefined ? `t ${d.t.toFixed(2)} of ${CRITERIA.MIN_T}` : undefined,
+              result: d.t !== undefined ? `t ${d.t.toFixed(2)} of ${/:(ats|ou):/.test(d.id) ? CRITERIA.MIN_T_CUT : CRITERIA.MIN_T}` : undefined,
               note: inForce ? "The baseline: every other way of picking winners is measured against this one." : counted ? undefined : plainWhy(d.why, AGAINST_SHORT[market]),
             };
           })}
