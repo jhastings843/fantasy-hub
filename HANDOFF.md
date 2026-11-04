@@ -1,5 +1,5 @@
 # 2026-11-03 late night: Hobby Hub redesign, phase 1 (branch redesign/hobby-hub, NOT merged)
-- STOPPED for Jack's approval. Preview: https://fantasy-9w42wmawp-jhastings843s-projects.vercel.app (Vercel login). Review page with screenshots + open questions: https://claude.ai/artifact/UdnsSLLREG2JuojisX9srW
+- STOPPED for Jack's approval. Preview: https://fantasy-356bavhu6-jhastings843s-projects.vercel.app (Vercel login). Review page with screenshots + open questions: https://claude.ai/artifact/UdnsSLLREG2JuojisX9srW
 - Plan and hub map: docs/redesign/plan.md. Route inventory (Astra): docs/redesign/inventory.md.
 - Look: light = C3 (paper #f5f2e9, ink, rust #b5562b, Barlow caps titles/nav, Geist body, Geist Mono numbers, 1.5px ink rules, ONE spotlight box). Dark = teal terminal (#0e1116, teal #5eead4, JetBrains Mono). Theme follows system + toggle (localStorage hh-theme); was forced dark before.
 - Tokens: globals.css (--hh-*, on :root/.hh-light and :root.dark/.hh-dark). ledger-look.css is GENERATED from a ramp table (generator lives only in the session scratchpad; regenerate by editing ramps) and repoints every Tailwind family per theme: amber/orange = accent, yellow + blue families = gold, emerald = wins, rose/red = losses. picks.module.css and bracket.module.css local vars now point at --hh-*.
