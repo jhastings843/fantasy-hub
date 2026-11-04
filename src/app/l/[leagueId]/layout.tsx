@@ -7,24 +7,24 @@ import { getMyLeagues, resolveLeague } from "@/lib/league/discover";
 import { leaguePath, toolsFor } from "@/lib/league/tools";
 import { valueSourceFor } from "@/lib/values";
 import { LEAGUE_TYPE_LABEL, type LeagueProfile } from "@/lib/league/types";
+import { Section } from "@/components/hh/ui";
 
 function ManualLeagueNotice({ name }: { name: string }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex max-w-2xl flex-col gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">{name}</h1>
-        <p className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-sm leading-relaxed text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          This league is declared manually, so there is no live roster, scoring,
-          or waiver data behind it. The tools here need a connected league to
-          compute anything. The written playbook for this format is on the{" "}
-          <Link
-            href="/strategy"
-            className="font-medium text-amber-700 hover:underline dark:text-amber-400"
-          >
-            strategy page
-          </Link>
-          .
-        </p>
+      <div className="flex max-w-2xl flex-col gap-4">
+        <h1 className="hh-title">{name}</h1>
+        <Section label="Manual league">
+          <p className="text-sm leading-relaxed text-hh-ink-2">
+            This league is declared manually, so there is no live roster, scoring,
+            or waiver data behind it. The tools here need a connected league to
+            compute anything. The written playbook for this format is on the{" "}
+            <Link href="/strategy" className="font-medium text-hh-accent-ink underline-offset-[3px] hover:underline">
+              strategy page
+            </Link>
+            .
+          </p>
+        </Section>
       </div>
     </main>
   );
@@ -59,10 +59,13 @@ export default async function LeagueLayout({
 
   return (
     <>
-      <div className="border-b border-zinc-200/60 bg-white/50 backdrop-blur dark:border-zinc-800/60 dark:bg-zinc-950/50">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-4 sm:px-6 lg:px-8">
+      <div className="border-b border-hh-line bg-hh-bg">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 pt-2 sm:flex-row sm:items-center sm:gap-4 sm:px-6 sm:pt-0 lg:px-8">
           <LeagueSwitcher leagues={leagues} current={league} />
-          <div className="-mx-1 flex flex-wrap items-center gap-x-1 gap-y-1 sm:mx-0">
+          <nav
+            aria-label={`${league.name} tools`}
+            className="-mx-3 flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:mx-0 [&::-webkit-scrollbar]:hidden"
+          >
             {tools.map((t) => (
               <NavLink
                 key={t.key}
@@ -71,19 +74,19 @@ export default async function LeagueLayout({
                 exact={t.segment === ""}
               />
             ))}
-          </div>
+          </nav>
           {/* Dynasty and redraft values are genuinely different sets, so name
               which one is on screen rather than leaving it implied. */}
           <span
             title={valueSource.note}
-            className="text-xs text-zinc-500 sm:ml-auto dark:text-zinc-400"
+            className="pb-2 text-xs text-hh-muted sm:ml-auto sm:shrink-0 sm:pb-0"
           >
             {LEAGUE_TYPE_LABEL[league.type]} values via{" "}
             <a
               href={valueSource.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
+              className="font-medium text-hh-accent-ink underline-offset-[3px] hover:underline"
             >
               {valueSource.label}
             </a>

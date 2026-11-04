@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Calendar, CheckCircle2, Circle, Compass, Target } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
+import { Chip, Disclosure, Num, Section, Spotlight, Stat, type Tone } from "@/components/hh/ui";
 import {
   getRosterGrades,
 } from "@/lib/rosteraudit/client";
@@ -31,17 +32,12 @@ export const dynamic = "force-dynamic";
 
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
-const TRAJECTORY_TINT: Record<Trajectory, string> = {
-  contender:
-    "bg-amber-500 text-white dark:bg-amber-500",
-  compete:
-    "bg-emerald-500 text-white dark:bg-emerald-500",
-  reload:
-    "bg-sky-500 text-white dark:bg-sky-500",
-  transition:
-    "bg-zinc-500 text-white dark:bg-zinc-500",
-  rebuild:
-    "bg-rose-500 text-white dark:bg-rose-500",
+const TRAJECTORY_TONE: Record<Trajectory, Tone> = {
+  contender: "accent",
+  compete: "pos",
+  reload: "gold",
+  transition: "muted",
+  rebuild: "neg",
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -56,24 +52,22 @@ function GoalRow({ g }: { g: AutoGoal }) {
   const Icon = g.status === "done" ? CheckCircle2 : Circle;
   const iconCls =
     g.status === "done"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-hh-pos"
       : g.status === "in_progress"
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-zinc-400 dark:text-zinc-600";
+        ? "text-hh-accent-ink"
+        : "text-hh-muted";
   return (
-    <li className="flex items-start gap-3 py-3">
+    <li className="flex min-h-11 items-start gap-3 border-b border-hh-line py-3 last:border-b-0">
       <Icon size={18} className={`mt-0.5 shrink-0 ${iconCls}`} aria-hidden />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
           className={`text-sm ${
-            g.status === "done"
-              ? "text-zinc-500 line-through dark:text-zinc-500"
-              : "text-zinc-900 dark:text-zinc-50"
+            g.status === "done" ? "text-hh-muted line-through" : "text-hh-ink"
           }`}
         >
           {g.text}
         </span>
-        <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex flex-wrap items-center gap-x-2 text-xs text-hh-muted">
           <span className="font-semibold uppercase tracking-wider">
             {CATEGORY_LABEL[g.category] ?? g.category}
           </span>
@@ -89,16 +83,11 @@ function ConfigError({ message }: { message: string }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <Link
-          href="/fantasy"
-          className="text-sm text-zinc-500 dark:text-zinc-400"
-        >
+        <Link href="/fantasy" className="inline-flex min-h-11 items-center text-sm text-hh-muted hover:text-hh-ink">
           ‹ Leagues
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Season plan</h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
-          {message}
-        </p>
+        <h1 className="hh-title">Season plan</h1>
+        <p className="border-l-2 border-hh-neg py-1 pl-3 text-sm text-hh-neg">{message}</p>
       </div>
     </main>
   );
@@ -244,24 +233,29 @@ export default async function SeasonPlanPage({
       (t) => t.rosterId === myTeam.rosterId,
     ) + 1;
 
+  // The one action: the phase you are in, and the first goal still open.
+  const openGoals = autoGoals.filter((g) => g.status !== "done");
+  const doneGoals = autoGoals.filter((g) => g.status === "done");
+  const topGoal = openGoals[0] ?? null;
+  const sortedDates = [...dates].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const nextDate = sortedDates.find((d) => d.date.getTime() >= now.getTime()) ?? null;
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2">
           <Link
             href={`/l/${leagueId}`}
-            className="text-sm text-zinc-500 dark:text-zinc-400"
+            className="inline-flex min-h-11 items-center self-start text-sm text-hh-muted hover:text-hh-ink"
           >
             ‹ League
           </Link>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Season plan
-            </h1>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="hh-title">Season plan</h1>
             <RefreshButton leagueId={leagueId} />
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {league.name} · {league.season} · {rosters.length}-team{" "}
+          <p className="text-sm text-hh-muted">
+            {league.name} · <Num>{league.season}</Num> · <Num>{rosters.length}</Num>-team{" "}
             {profile.superflex ? "superflex" : "one QB"} ·{" "}
             {profile.ppr === 1
               ? "PPR"
@@ -270,227 +264,185 @@ export default async function SeasonPlanPage({
                 : "standard"}
             {profile.tePremium > 0 ? " with TE premium" : ""}
           </p>
+          {/* How this format is played. The goals below follow from it. */}
+          <p className="max-w-2xl text-[15px] leading-relaxed text-hh-ink-2">
+            {STRATEGY_SUMMARY[profile.type]}
+          </p>
         </div>
 
-        {/* How this format is played. The goals below follow from it. */}
-        <p className="max-w-2xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-          {STRATEGY_SUMMARY[profile.type]}
-        </p>
+        {/* The one spotlight: the phase you are in, and the top goal still open. */}
+        <Spotlight
+          label="Current phase"
+          aside={
+            nextDate ? (
+              <>
+                Next: {nextDate.label}, <Num>{formatDate(nextDate.date)}</Num>
+              </>
+            ) : undefined
+          }
+        >
+          <p className="font-display text-2xl font-bold uppercase tracking-wide text-hh-ink">
+            {phase.label}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-hh-ink-2">{phase.blurb}</p>
+          {topGoal && (
+            <p className="mt-3 text-[15px] leading-snug text-hh-ink-2">
+              <b className="font-semibold text-hh-ink">Top goal:</b> {topGoal.text}
+              {topGoal.current ? <span className="text-hh-muted"> (current: {topGoal.current}{topGoal.target ? `, target: ${topGoal.target}` : ""})</span> : null}
+            </p>
+          )}
+        </Spotlight>
 
-        {/* Trajectory + phase hero. Trajectory is a dynasty concept: it reads
-            RosterAudit's dynasty grades and age curves, neither of which means
-            anything in a league that resets each year. */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {profile.type === "dynasty" && (
-          <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center gap-3">
-              <Compass
-                size={18}
-                className="shrink-0 text-zinc-500 dark:text-zinc-400"
-                aria-hidden
-              />
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Team trajectory
-              </span>
-            </div>
-            <div className="flex items-baseline gap-3">
-              <span
-                className={`rounded-lg px-3 py-1.5 text-sm font-bold uppercase tracking-wide ${TRAJECTORY_TINT[trajectory]}`}
-              >
-                {trajectoryLabel(trajectory)}
-              </span>
+        {/* Trajectory is a dynasty concept: it reads RosterAudit's dynasty
+            grades and age curves, neither of which means anything in a league
+            that resets each year. */}
+        {profile.type === "dynasty" && (
+          <Section label="Team trajectory">
+            <div className="flex flex-wrap items-center gap-3">
+              <Chip tone={TRAJECTORY_TONE[trajectory]}>
+                <span className="uppercase tracking-wide">{trajectoryLabel(trajectory)}</span>
+              </Chip>
               {grade && (
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Dynasty {grade.dynastyGrade} · Contender{" "}
-                  {grade.contenderGrade} · age{" "}
-                  {grade.avgStarterAge.toFixed(1)}
+                <span className="text-xs text-hh-muted">
+                  Dynasty {grade.dynastyGrade} · Contender {grade.contenderGrade} · age{" "}
+                  <Num>{grade.avgStarterAge.toFixed(1)}</Num>
                 </span>
               )}
             </div>
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-hh-ink-2">
               {trajectoryBlurb(trajectory)}
             </p>
-          </div>
-          )}
+          </Section>
+        )}
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center gap-3">
-              <Calendar
-                size={18}
-                className="shrink-0 text-zinc-500 dark:text-zinc-400"
-                aria-hidden
-              />
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Current phase
-              </span>
-            </div>
-            <span className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-bold uppercase tracking-wide text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 self-start">
-              {phase.label}
-            </span>
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              {phase.blurb}
-            </p>
-          </div>
-        </div>
-
-        {/* Live progress */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Live progress</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="flex flex-col gap-0.5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Team value
-              </span>
-              <span className="text-2xl font-semibold tabular-nums">
-                {rosterEmpty ? "—" : myTeam.totalValue.toLocaleString()}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {rosterEmpty
-                  ? "empty until the draft"
-                  : `rank #${myStandingRank} of ${rosters.length}`}
-              </span>
-            </div>
+        <Section label="Live progress">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
+            <Stat
+              label="Team value"
+              value={rosterEmpty ? "None" : myTeam.totalValue.toLocaleString()}
+              sub={rosterEmpty ? "empty until the draft" : <>rank <Num>#{myStandingRank}</Num> of <Num>{rosters.length}</Num></>}
+            />
             {/* RosterAudit grades dynasty rosters only, so a redraft league
-                would show a permanent em dash here. Before its draft the
+                would show a permanent blank here. Before its draft the
                 useful number is where you pick; after it, your record. */}
             {profile.type === "dynasty" ? (
-              <div className="flex flex-col gap-0.5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Dynasty rank
-                </span>
-                <span className="text-2xl font-semibold tabular-nums">
-                  {grade ? `#${grade.dynastyRank}` : "—"}
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {grade ? grade.dynastyGrade : "via RosterAudit"}
-                </span>
-              </div>
+              <Stat
+                label="Dynasty rank"
+                value={grade ? `#${grade.dynastyRank}` : "None"}
+                sub={grade ? grade.dynastyGrade : "via RosterAudit"}
+              />
             ) : profile.status === "pre_draft" ? (
-              <div className="flex flex-col gap-0.5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Draft slot
-                </span>
-                <span className="text-2xl font-semibold tabular-nums">
-                  {draftSlot ? `#${draftSlot}` : "TBD"}
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {draftStart
+              <Stat
+                label="Draft slot"
+                value={draftSlot ? `#${draftSlot}` : "TBD"}
+                sub={
+                  draftStart
                     ? draftStart.toLocaleDateString("en-US", {
                         weekday: "short",
                         month: "short",
                         day: "numeric",
                       })
-                    : "not scheduled"}
-                </span>
-              </div>
+                    : "not scheduled"
+                }
+              />
             ) : (
-              <div className="flex flex-col gap-0.5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Record
-                </span>
-                <span className="text-2xl font-semibold tabular-nums">
-                  {record.wins}-{record.losses}
-                  {record.ties > 0 ? `-${record.ties}` : ""}
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  #{standingRank} of {rosters.length} ·{" "}
-                  {record.pointsFor.toFixed(1)} PF
-                </span>
-              </div>
+              <Stat
+                label="Record"
+                value={`${record.wins}-${record.losses}${record.ties > 0 ? `-${record.ties}` : ""}`}
+                sub={
+                  <>
+                    <Num>#{standingRank}</Num> of <Num>{rosters.length}</Num> · <Num>{record.pointsFor.toFixed(1)}</Num> PF
+                  </>
+                }
+              />
             )}
-            <div className="flex flex-col gap-0.5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Weakest spot
-              </span>
-              <span className="text-2xl font-semibold">
-                {rosterEmpty ? "—" : weakestPositions[0]}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {rosterEmpty
-                  ? "nothing drafted yet"
-                  : `#${myTeam.positionRanks[weakestPositions[0]] ?? "—"} of ${rosters.length}`}
-              </span>
-            </div>
-            <div className="flex flex-col gap-0.5 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Strongest spot
-              </span>
-              <span className="text-2xl font-semibold">
-                {rosterEmpty ? "—" : strongestPositions[0]}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {rosterEmpty
-                  ? "nothing drafted yet"
-                  : `#${myTeam.positionRanks[strongestPositions[0]] ?? "—"} of ${rosters.length}`}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Auto goals */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <Target
-              size={18}
-              className="text-zinc-500 dark:text-zinc-400"
-              aria-hidden
+            <Stat
+              label="Weakest spot"
+              value={rosterEmpty ? "None" : weakestPositions[0]}
+              tone={rosterEmpty ? undefined : "neg"}
+              sub={
+                rosterEmpty ? "nothing drafted yet" : (
+                  <>
+                    <Num>#{myTeam.positionRanks[weakestPositions[0]] ?? "?"}</Num> of <Num>{rosters.length}</Num>
+                  </>
+                )
+              }
             />
-            <h2 className="text-xl font-semibold tracking-tight">
-              Auto goals
-            </h2>
+            <Stat
+              label="Strongest spot"
+              value={rosterEmpty ? "None" : strongestPositions[0]}
+              tone={rosterEmpty ? undefined : "pos"}
+              sub={
+                rosterEmpty ? "nothing drafted yet" : (
+                  <>
+                    <Num>#{myTeam.positionRanks[strongestPositions[0]] ?? "?"}</Num> of <Num>{rosters.length}</Num>
+                  </>
+                )
+              }
+            />
           </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
-              {autoGoals.map((g) => (
+        </Section>
+
+        <Section
+          label="Auto goals"
+          aside={
+            <>
+              <Num>{openGoals.length}</Num> open · <Num>{doneGoals.length}</Num> done
+            </>
+          }
+        >
+          {openGoals.length > 0 ? (
+            <ul className="flex flex-col">
+              {openGoals.map((g) => (
                 <GoalRow key={g.id} g={g} />
               ))}
             </ul>
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          ) : (
+            <p className="py-2 text-sm text-hh-muted">Every auto goal is done.</p>
+          )}
+          {doneGoals.length > 0 && (
+            <Disclosure summary={<>Completed (<Num>{doneGoals.length}</Num>)</>} className="mt-2">
+              <ul className="flex flex-col">
+                {doneGoals.map((g) => (
+                  <GoalRow key={g.id} g={g} />
+                ))}
+              </ul>
+            </Disclosure>
+          )}
+          <p className="mt-2 text-xs text-hh-muted">
             {profile.type === "dynasty"
               ? "Auto goals derive from your trajectory + RosterAudit data and update every page load."
               : "Auto goals derive from this league's standings, roster, and draft state, and update every page load."}
           </p>
-        </section>
+        </Section>
 
-        {/* Custom goals */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Custom goals</h2>
+        <Section label="Custom goals">
           <CustomGoals />
-        </section>
+        </Section>
 
-        {/* Key dates */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Key dates</h2>
-          <ol className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-            {dates
-              .sort((a, b) => a.date.getTime() - b.date.getTime())
-              .map((d) => {
-                const past = d.date.getTime() < now.getTime();
-                return (
-                  <li
-                    key={d.label}
-                    className={`flex items-center gap-3 px-4 py-3 ${
-                      past ? "opacity-60" : ""
-                    }`}
-                  >
-                    <span className="w-44 shrink-0 text-xs font-semibold tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {formatDate(d.date)}
-                    </span>
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-sm font-medium">{d.label}</span>
-                      {d.blurb && (
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {d.blurb}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
+        <Disclosure summary={<>Key dates (<Num>{sortedDates.length}</Num>)</>}>
+          <ol className="flex flex-col">
+            {sortedDates.map((d) => {
+              const past = d.date.getTime() < now.getTime();
+              return (
+                <li
+                  key={d.label}
+                  className={`flex min-h-11 flex-col gap-1 border-b border-hh-line py-2.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-3 ${
+                    past ? "opacity-60" : ""
+                  }`}
+                >
+                  <Num className="shrink-0 text-xs font-semibold text-hh-muted sm:w-44">
+                    {formatDate(d.date)}
+                  </Num>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-medium text-hh-ink">{d.label}</span>
+                    {d.blurb && <span className="text-xs text-hh-muted">{d.blurb}</span>}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
-        </section>
-
+        </Disclosure>
       </div>
     </main>
   );

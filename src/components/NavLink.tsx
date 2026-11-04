@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// A league tool tab. Same look as the hub sub-tabs (HubNav SubTabs): plain text,
+// muted until active, a 2px ink underline on the one you're on, 44px tall.
 export function NavLink({
   href,
   label,
@@ -24,19 +26,13 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className={`relative whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-colors ${
-        active
-          ? "text-zinc-900 dark:text-zinc-50"
-          : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+      aria-current={active ? "page" : undefined}
+      className={`relative flex min-h-11 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors ${
+        active ? "text-hh-ink" : "text-hh-muted hover:text-hh-ink"
       }`}
     >
       {label}
-      {active && (
-        <span
-          aria-hidden
-          className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500"
-        />
-      )}
+      {active && <span aria-hidden className="absolute inset-x-3 bottom-0 h-[2px] bg-hh-ink" />}
     </Link>
   );
 }

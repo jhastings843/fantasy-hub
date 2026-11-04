@@ -29,6 +29,10 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
 import { RefreshButton } from "@/components/RefreshButton";
 import { AlertTriangle, ArrowDown, ArrowUp } from "lucide-react";
+import { Chip, Disclosure, Empty, Num, PageHead, Section, Stat, type Tone } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { TeamEdge } from "@/components/hh/team";
+import { teamHref } from "@/app/picks/hrefs";
 import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
 import {
@@ -71,17 +75,18 @@ function record(r: SleeperRoster): string {
   return t > 0 ? `${w}-${l}-${t}` : `${w}-${l}`;
 }
 
+
 // One line under a guillotine team: where it finished in its last live week
 // and how far clear of the chop, or the week it went.
 function ChopLine({ row }: { row: GuillotineRow }) {
   const last = row.last;
   if (row.choppedWeek !== null) {
     return (
-      <span className="text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-400">
-        Chopped wk {row.choppedWeek}
+      <span className="text-xs font-semibold text-hh-neg">
+        Chopped wk <Num>{row.choppedWeek}</Num>
         {last ? (
-          <span className="font-normal text-zinc-500 dark:text-zinc-400">
-            {" "}({last.score.toFixed(1)})
+          <span className="font-normal text-hh-muted">
+            {" "}(<Num>{last.score.toFixed(1)}</Num>)
           </span>
         ) : null}
       </span>
@@ -91,40 +96,36 @@ function ChopLine({ row }: { row: GuillotineRow }) {
   const ord = (n: number) =>
     `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
   return (
-    <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-      Wk {last.week}: {last.score.toFixed(1)}, {ord(last.rank)} of {last.teams}
-      <span
-        className={
-          last.rank >= last.teams - 2
-            ? " font-semibold text-amber-600 dark:text-amber-400"
-            : " font-semibold text-emerald-600 dark:text-emerald-400"
-        }
-      >
-        {" "}+{last.margin.toFixed(1)}
-      </span>
+    <span className="text-xs text-hh-muted">
+      Wk <Num>{last.week}</Num>: <Num>{last.score.toFixed(1)}</Num>, <Num>{ord(last.rank)}</Num> of <Num>{last.teams}</Num>{" "}
+      <Num tone={last.rank >= last.teams - 2 ? "gold" : "pos"} className="font-semibold">
+        +{last.margin.toFixed(1)}
+      </Num>
     </span>
   );
 }
 
 function statusBadge(
   status: string | null | undefined,
-): { label: string; className: string } | null {
+): { label: string; tone: Tone } | null {
   if (!status || status === "Active") return null;
-  const red = "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300";
-  const yellow = "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300";
-  const orange = "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300";
-  const gray = "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
-  const map: Record<string, { label: string; className: string }> = {
-    Out: { label: "OUT", className: red },
-    Questionable: { label: "Q", className: yellow },
-    Doubtful: { label: "D", className: orange },
-    "Injured Reserve": { label: "IR", className: red },
-    IR: { label: "IR", className: red },
-    PUP: { label: "PUP", className: gray },
-    Suspended: { label: "SUS", className: gray },
-    NA: { label: "NA", className: gray },
+  const map: Record<string, { label: string; tone: Tone }> = {
+    Out: { label: "OUT", tone: "neg" },
+    Questionable: { label: "Q", tone: "gold" },
+    Doubtful: { label: "D", tone: "accent" },
+    "Injured Reserve": { label: "IR", tone: "neg" },
+    IR: { label: "IR", tone: "neg" },
+    PUP: { label: "PUP", tone: "muted" },
+    Suspended: { label: "SUS", tone: "muted" },
+    NA: { label: "NA", tone: "muted" },
   };
-  return map[status] ?? { label: status, className: gray };
+  return map[status] ?? { label: status, tone: "muted" };
+}
+
+/** An NFL team code that opens the team pop-up; free agents stay text. */
+function TeamCode({ team }: { team: string | null | undefined }) {
+  if (!team) return <>FA</>;
+  return <PopLink href={teamHref("nfl", team)}>{team}</PopLink>;
 }
 
 function playerName(p: SleeperPlayer): string {
@@ -167,10 +168,8 @@ function ConfigError({ message }: { message: string }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">League</h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
-          {message}
-        </p>
+        <h1 className="hh-title">League</h1>
+        <p className="border-l-2 border-hh-neg py-1 pl-3 text-sm text-hh-neg">{message}</p>
       </div>
     </main>
   );
@@ -331,63 +330,57 @@ export default async function LeaguePage({
     if (typeof p.age === "number") room.ages.push(p.age);
   }
 
+  const linkBtn =
+    "inline-flex min-h-11 items-center justify-center rounded-[4px] border border-hh-line px-3 text-sm font-medium text-hh-ink transition-colors hover:border-hh-muted hover:bg-hh-sunk";
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-semibold tracking-tight">
-              {league.name}
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {league.season} season · {rosters.length} teams
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <RefreshButton leagueId={leagueId} />
-            <Link
-              href={`/l/${leagueId}/plan`}
-              className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-            >
-              Season plan
-            </Link>
-            <Link
-              href={`/l/${leagueId}/players`}
-              className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-            >
-              Players
-            </Link>
-            <Link
-              href={`/l/${leagueId}/draft`}
-              className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-            >
-              Draft
-            </Link>
-            <Link
-              href={`/l/${leagueId}/trade`}
-              className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 dark:bg-amber-500 dark:hover:bg-amber-400"
-            >
-              Trade analyzer →
-            </Link>
-          </div>
-        </div>
+        <PageHead
+          title={league.name}
+          sub={
+            <>
+              <Num>{league.season}</Num> season · <Num>{rosters.length}</Num> teams
+            </>
+          }
+          aside={
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <RefreshButton leagueId={leagueId} />
+              <Link href={`/l/${leagueId}/plan`} className={linkBtn}>
+                Season plan
+              </Link>
+              <Link href={`/l/${leagueId}/players`} className={linkBtn}>
+                Players
+              </Link>
+              <Link href={`/l/${leagueId}/draft`} className={linkBtn}>
+                Draft
+              </Link>
+              <Link
+                href={`/l/${leagueId}/trade`}
+                className="inline-flex min-h-11 items-center justify-center rounded-[4px] bg-hh-accent px-3 text-sm font-semibold text-[var(--hh-on-accent)] transition-opacity hover:opacity-90"
+              >
+                Trade analyzer →
+              </Link>
+            </div>
+          }
+        />
 
-        <div className="grid gap-8 lg:grid-cols-[3fr_2fr]">
-        <section className="flex flex-col gap-4">
-          <header className="flex flex-col gap-0.5">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              My Team
-            </h2>
-            <p className="text-lg font-semibold">
-              {myRoster ? ownerName(myRoster, usersById) : "—"}
+        <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[3fr_2fr]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <Section
+            label="My team"
+            aside={
+              myRoster ? (
+                <>
+                  <Num>{recordFor(myRoster)}</Num>{isGuillotine ? " all-play" : ""} · <Num>{totalFpts(myRoster).toFixed(2)}</Num> PF ·{" "}
+                  <Num>{teamValue(myRoster).toLocaleString()}</Num> value
+                </>
+              ) : undefined
+            }
+          >
+            <p className="font-display text-2xl font-semibold leading-tight text-hh-ink">
+              {myRoster ? ownerName(myRoster, usersById) : "None"}
             </p>
-            {myRoster && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {recordFor(myRoster)}{isGuillotine ? " all-play" : ""} · {totalFpts(myRoster).toFixed(2)} PF ·{" "}
-                {teamValue(myRoster).toLocaleString()} value
-              </p>
-            )}
-          </header>
 
           {myRoster && grades[myRoster.roster_id] && (() => {
             const g = grades[myRoster.roster_id];
@@ -400,125 +393,53 @@ export default async function LeaguePage({
               .map((id) => rosters.find((r) => String(r.roster_id) === id))
               .filter((r): r is SleeperRoster => Boolean(r))
               .map((r) => ownerName(r, usersById));
-            const tileTint =
-              gradeKey === "A"
-                ? {
-                    tile: "from-emerald-400 to-emerald-600",
-                    shadow: "shadow-emerald-500/30",
-                    bg: "to-emerald-50/40 dark:to-emerald-950/10",
-                    eyebrow: "text-emerald-700 dark:text-emerald-400",
-                  }
-                : gradeKey === "B"
-                  ? {
-                      tile: "from-sky-400 to-sky-600",
-                      shadow: "shadow-sky-500/30",
-                      bg: "to-sky-50/40 dark:to-sky-950/10",
-                      eyebrow: "text-sky-700 dark:text-sky-400",
-                    }
-                  : gradeKey === "C"
-                    ? {
-                        tile: "from-zinc-400 to-zinc-600",
-                        shadow: "shadow-zinc-500/20",
-                        bg: "to-zinc-100/40 dark:to-zinc-800/30",
-                        eyebrow: "text-zinc-600 dark:text-zinc-400",
-                      }
-                    : gradeKey === "D"
-                      ? {
-                          tile: "from-amber-400 to-orange-500",
-                          shadow: "shadow-amber-500/30",
-                          bg: "to-amber-50/40 dark:to-amber-950/10",
-                          eyebrow: "text-amber-700 dark:text-amber-400",
-                        }
-                      : {
-                          tile: "from-rose-400 to-rose-600",
-                          shadow: "shadow-rose-500/30",
-                          bg: "to-rose-50/40 dark:to-rose-950/10",
-                          eyebrow: "text-rose-700 dark:text-rose-400",
-                        };
+            const gradeTone: Tone =
+              gradeKey === "A" ? "pos" : gradeKey === "B" ? "gold" : gradeKey === "C" ? "muted" : gradeKey === "D" ? "accent" : "neg";
             return (
-              <div
-                className={`relative flex flex-col gap-4 overflow-hidden rounded-3xl border border-zinc-200/80 bg-gradient-to-br from-white via-white p-5 shadow-sm dark:border-zinc-800/80 dark:from-zinc-900 dark:via-zinc-900 ${tileTint.bg}`}
-              >
-                <div className="flex flex-wrap items-center gap-5">
-                  <div className="flex items-center gap-4">
-                    <span
-                      className={`grid size-20 place-items-center rounded-2xl bg-gradient-to-br text-4xl font-black tracking-tighter text-white shadow-lg ${tileTint.tile} ${tileTint.shadow}`}
-                    >
-                      {g.dynastyGrade || "—"}
-                    </span>
-                    <div className="flex flex-col gap-0.5">
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider ${tileTint.eyebrow}`}
-                      >
-                        Dynasty grade
+              <div className="mt-4 flex flex-col gap-4">
+                <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+                  <Stat label="Dynasty grade" value={g.dynastyGrade || "None"} tone={gradeTone} />
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="text-xs text-hh-muted">Dynasty rank</span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-[26px] font-semibold leading-none text-hh-ink">
+                        <Num>#{g.dynastyRank}</Num> <span className="text-base font-normal text-hh-muted">of <Num>{rosters.length}</Num></span>
                       </span>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-2xl font-bold tracking-tight">
-                          #{g.dynastyRank} of {rosters.length}
-                        </span>
-                        {move && (
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                              move.delta < 0
-                                ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                            }`}
-                            title={`Was #${move.previous} on ${formatSnapshotDate(move.previousDate)}`}
-                          >
-                            {move.delta < 0 ? (
-                              <ArrowDown className="size-3" />
-                            ) : (
-                              <ArrowUp className="size-3" />
-                            )}
-                            {Math.abs(move.delta)} since{" "}
-                            {formatSnapshotDate(move.previousDate)}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                        Contender{" "}
-                        <span className="font-semibold">
-                          {g.contenderGrade || "—"}
-                        </span>
-                        {" · "}power #{g.powerRank}
-                        {" · "}
-                        <span className="tabular-nums">
-                          {g.projectedPpg.toFixed(1)}
-                        </span>{" "}
-                        ppg
-                      </span>
-                      {move && move.delta < 0 && movedPast.length > 0 && (
-                        <span className="text-xs text-zinc-500 dark:text-zinc-500">
-                          {movedPast.slice(0, 2).join(", ")}
-                          {movedPast.length > 2
-                            ? ` and ${movedPast.length - 2} more`
-                            : ""}{" "}
-                          moved past you
+                      {move && (
+                        <span title={`Was #${move.previous} on ${formatSnapshotDate(move.previousDate)}`}>
+                          <Chip tone={move.delta < 0 ? "neg" : "pos"}>
+                            {move.delta < 0 ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3" aria-hidden />}
+                            <Num>{Math.abs(move.delta)}</Num> since {formatSnapshotDate(move.previousDate)}
+                          </Chip>
                         </span>
                       )}
-                    </div>
+                    </span>
+                    <span className="text-xs text-hh-ink-2">
+                      Contender <b className="font-semibold">{g.contenderGrade || "None"}</b>
+                      {" · "}power <Num>#{g.powerRank}</Num>
+                      {" · "}<Num>{g.projectedPpg.toFixed(1)}</Num> ppg
+                    </span>
+                    {move && move.delta < 0 && movedPast.length > 0 && (
+                      <span className="text-xs text-hh-muted">
+                        {movedPast.slice(0, 2).join(", ")}
+                        {movedPast.length > 2 ? ` and ${movedPast.length - 2} more` : ""} moved past you
+                      </span>
+                    )}
                   </div>
                   {g.weakness && (
-                    <span className="ml-auto rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
-                      {g.weakness}
+                    <span className="sm:ml-auto">
+                      <Chip tone="neg">{g.weakness}</Chip>
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 border-t border-hh-line sm:grid-cols-4">
                   {(["QB", "RB", "WR", "TE"] as const).map((pos) => {
                     const room = localRooms[pos];
                     if (!room || room.count === 0) {
                       return (
-                        <div
-                          key={pos}
-                          className="flex flex-col gap-0.5 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800"
-                        >
-                          <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                            {pos}
-                          </span>
-                          <span className="text-sm text-zinc-400 dark:text-zinc-600">
-                            —
-                          </span>
+                        <div key={pos} className="flex flex-col gap-0.5 border-b border-hh-line py-2 pr-3">
+                          <span className="hh-label">{pos}</span>
+                          <span className="text-sm text-hh-muted">None</span>
                         </div>
                       );
                     }
@@ -527,19 +448,12 @@ export default async function LeaguePage({
                         ? room.ages.reduce((a, b) => a + b, 0) / room.ages.length
                         : 0;
                     return (
-                      <div
-                        key={pos}
-                        className="flex flex-col gap-0.5 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800"
-                      >
-                        <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                          {pos}
-                        </span>
-                        <span className="text-sm font-semibold tabular-nums">
-                          {room.value.toLocaleString()}
-                        </span>
-                        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                          {room.count} player{room.count === 1 ? "" : "s"}
-                          {avgAge > 0 ? ` · age ${avgAge.toFixed(1)}` : ""}
+                      <div key={pos} className="flex flex-col gap-0.5 border-b border-hh-line py-2 pr-3">
+                        <span className="hh-label">{pos}</span>
+                        <Num className="text-sm font-semibold text-hh-ink">{room.value.toLocaleString()}</Num>
+                        <span className="text-[11px] text-hh-muted">
+                          <Num>{room.count}</Num> player{room.count === 1 ? "" : "s"}
+                          {avgAge > 0 ? <> · age <Num>{avgAge.toFixed(1)}</Num></> : ""}
                         </span>
                       </div>
                     );
@@ -550,31 +464,76 @@ export default async function LeaguePage({
           })()}
 
           {!myRoster && (
-            <p className="rounded-xl bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300">
+            <p className="mt-3 border-l-2 border-hh-gold py-1 pl-3 text-sm text-hh-gold">
               No roster found in this league for {username}. Check that
               SLEEPER_USERNAME matches an owner in the league.
             </p>
           )}
 
           {myRoster && myGroups.length === 0 && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No players on this roster yet.
-            </p>
+            <Empty>No players on this roster yet.</Empty>
+          )}
+          </Section>
+
+          {conflicts.length > 0 && (
+            <Disclosure
+              summary={
+                <span className="inline-flex items-center gap-2">
+                  <AlertTriangle size={15} className="text-hh-neg" aria-hidden />
+                  <span className="font-semibold text-hh-neg">
+                    Roster conflicts (<Num>{conflicts.length}</Num>)
+                  </span>
+                  <span className="text-hh-muted">same NFL team, same position</span>
+                </span>
+              }
+            >
+              <p className="text-xs text-hh-muted">Drop the lower-value one.</p>
+              <div className="mt-2 grid gap-x-8 md:grid-cols-2">
+                {conflicts.map((c) => (
+                  <div key={`${c.team}-${c.position}`} className="border-b border-hh-line py-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-semibold text-hh-ink">
+                        <TeamCode team={c.team} /> · {c.position}
+                      </span>
+                      <span className="text-xs text-hh-muted">
+                        <Num>{c.players.length}</Num> players
+                      </span>
+                    </div>
+                    <ul className="mt-1 flex flex-col">
+                      {c.players.map((p) => {
+                        const isDrop = p.id === c.dropCandidate.id;
+                        return (
+                          <li key={p.id} className="flex min-h-11 items-center gap-2 py-1">
+                            <PlayerAvatar name={p.name} position={p.position} photoUrl={p.photoUrl} size="sm" />
+                            <PlayerLink id={p.id} name={p.name} className="flex-1 truncate text-sm font-medium text-hh-ink" />
+                            <Num className="shrink-0 text-xs font-semibold">{p.value.toLocaleString()}</Num>
+                            {isDrop && <Chip tone="neg">Drop</Chip>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-hh-muted">
+                Rule: avoid two players on the same NFL team at the same
+                position. They split work or compete for the same job.
+              </p>
+            </Disclosure>
           )}
 
           {myGroups.map(([pos, list]) => (
-            <div key={pos} className="flex flex-col gap-2">
-              <div className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                {pos} · {list.length}
-              </div>
-              <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            <Section key={pos} label={pos} aside={<><Num>{list.length}</Num> rostered</>}>
+              <ul className="flex flex-col">
                 {list.map((p) => {
                   const badge = statusBadge(p.status);
                   const v = fcValues[p.player_id];
                   return (
-                    <li
-                      key={p.player_id}
-                      className="flex items-center gap-3 px-4 py-3"
+                    <li key={p.player_id}>
+                    <TeamEdge
+                      league="nfl"
+                      team={p.team ?? undefined}
+                      className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2.5"
                     >
                       <PlayerAvatar
                         name={playerName(p)}
@@ -587,160 +546,112 @@ export default async function LeaguePage({
                           <PlayerLink
                             id={p.player_id}
                             name={playerName(p)}
-                            className="truncate text-base font-medium"
+                            className="truncate text-base font-medium text-hh-ink"
                           />
-                          {badge && (
-                            <span
-                              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.className}`}
-                            >
-                              {badge.label}
-                            </span>
-                          )}
-                          {v?.buyLow && (
-                            <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                              Buy
-                            </span>
-                          )}
-                          {v?.sellHigh && (
-                            <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-                              Sell
-                            </span>
-                          )}
-                          {v?.breakout && (
-                            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                              Break
-                            </span>
-                          )}
+                          {badge && <Chip tone={badge.tone}>{badge.label}</Chip>}
+                          {v?.buyLow && <Chip tone="pos">BUY</Chip>}
+                          {v?.sellHigh && <Chip tone="neg">SELL</Chip>}
+                          {v?.breakout && <Chip tone="accent">BREAK</Chip>}
                           {conflictedIds.has(p.player_id) && (
-                            <span
-                              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                dropIds.has(p.player_id)
-                                  ? "bg-rose-500 text-white"
-                                  : "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                              }`}
-                              title="Same NFL team + position duplicate"
-                            >
-                              {dropIds.has(p.player_id) ? "Drop" : "Stack"}
+                            <span title="Same NFL team + position duplicate">
+                              <Chip tone={dropIds.has(p.player_id) ? "neg" : "muted"}>
+                                {dropIds.has(p.player_id) ? "DROP" : "STACK"}
+                              </Chip>
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {[
-                            p.team ?? "FA",
-                            p.position,
-                            p.age ? `age ${p.age}` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
+                        <span className="text-xs text-hh-muted">
+                          <TeamCode team={p.team} />
+                          {p.position ? ` · ${p.position}` : ""}
+                          {p.age ? <> · age <Num>{p.age}</Num></> : null}
                         </span>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-0.5">
                         {v ? (
                           <>
-                            <span className="text-sm font-semibold tabular-nums">
-                              {v.value.toLocaleString()}
-                            </span>
-                            <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                              <span>
-                                #{v.overallRank} · {v.position}
-                                {v.positionRank}
-                              </span>
+                            <Num className="text-sm font-semibold text-hh-ink">{v.value.toLocaleString()}</Num>
+                            <span className="text-xs text-hh-muted">
+                              <Num>#{v.overallRank}</Num> · <Num>{v.position}{v.positionRank}</Num>
                               {v.trend30Day !== 0 && (
-                                <span
-                                  className={`ml-1 ${
-                                    v.trend30Day > 0
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : "text-rose-600 dark:text-rose-400"
-                                  }`}
-                                >
+                                <Num tone={v.trend30Day > 0 ? "pos" : "neg"} className="ml-1">
                                   {v.trend30Day > 0 ? "+" : ""}
                                   {v.trend30Day}
-                                </span>
+                                </Num>
                               )}
                             </span>
                           </>
                         ) : (
-                          <span className="text-xs text-zinc-400 dark:text-zinc-600">
-                            —
-                          </span>
+                          <span className="text-xs text-hh-muted">None</span>
                         )}
                       </div>
+                    </TeamEdge>
                     </li>
                   );
                 })}
               </ul>
-            </div>
+            </Section>
           ))}
-        </section>
+        </div>
 
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Standings
-            </h2>
-            {scoredWeeks >= 1 ? (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Through week {scoredWeeks}
+        <Section
+          label="Standings"
+          aside={
+            scoredWeeks >= 1 ? (
+              <>
+                Through week <Num>{scoredWeeks}</Num>
                 {isGuillotine
                   ? ". Record is all-play: a win for every live team you outscored each week"
                   : ""}
                 {medianGame ? ", two results a week: your matchup and the league median" : ""}
-              </p>
-            ) : null}
-          </div>
-          <ol className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+              </>
+            ) : undefined
+          }
+        >
+          <ol className="flex flex-col">
             {standings.map((r, i) => {
               const isMe = r.roster_id === myRoster?.roster_id;
               return (
                 <li
                   key={r.roster_id}
-                  className={`flex items-center justify-between gap-3 px-4 py-3 ${
-                    isMe ? "bg-zinc-50 dark:bg-zinc-800/50" : ""
+                  className={`flex min-h-11 items-center justify-between gap-3 border-b border-hh-line py-2.5 last:border-b-0 ${
+                    isMe ? "bg-hh-sunk -mx-2 px-2" : ""
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="w-5 shrink-0 text-sm font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {i + 1}
-                    </span>
+                    <Num className="w-5 shrink-0 text-sm text-hh-muted">{i + 1}</Num>
                     {r.owner_id ? (
                       <Link
                         href={`/l/${leagueId}/scout/${r.owner_id}`}
-                        className="truncate text-base font-medium hover:text-amber-700 hover:underline dark:hover:text-amber-400"
+                        className="truncate text-base font-medium text-hh-ink underline-offset-[3px] hover:text-hh-accent-ink hover:underline"
                       >
                         {ownerName(r, usersById)}
                         {isMe ? " (you)" : ""}
                       </Link>
                     ) : (
-                      <span className="truncate text-base font-medium">
+                      <span className="truncate text-base font-medium text-hh-ink">
                         {ownerName(r, usersById)}
                       </span>
                     )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end">
-                    <span className="text-sm font-medium tabular-nums">
-                      {recordFor(r)}
-                    </span>
-                    <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                      {isGuillotine && (r.players ?? []).length === 0
-                        ? "roster released"
-                        : `${teamValue(r).toLocaleString()} val`}
-                      {totalFpts(r) > 0 ? ` · ${totalFpts(r).toFixed(0)} PF` : ""}
+                    <Num className="text-sm font-medium text-hh-ink">{recordFor(r)}</Num>
+                    <span className="text-xs text-hh-muted">
+                      {isGuillotine && (r.players ?? []).length === 0 ? (
+                        "roster released"
+                      ) : (
+                        <><Num>{teamValue(r).toLocaleString()}</Num> val</>
+                      )}
+                      {totalFpts(r) > 0 ? <> · <Num>{totalFpts(r).toFixed(0)}</Num> PF</> : ""}
                     </span>
                     {chopRows.has(r.roster_id) ? (
                       <ChopLine row={chopRows.get(r.roster_id)!} />
                     ) : lastWeek.has(r.roster_id) ? (
-                      <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                        Wk {scoredWeeks}: {lastWeek.get(r.roster_id)!.points.toFixed(1)}
+                      <span className="text-xs text-hh-muted">
+                        Wk <Num>{scoredWeeks}</Num>: <Num>{lastWeek.get(r.roster_id)!.points.toFixed(1)}</Num>
                         {lastWeek.get(r.roster_id)!.beat === null ? "" : (
-                          <span
-                            className={
-                              lastWeek.get(r.roster_id)!.beat
-                                ? " font-semibold text-emerald-600 dark:text-emerald-400"
-                                : " font-semibold text-rose-600 dark:text-rose-400"
-                            }
-                          >
+                          <Num tone={lastWeek.get(r.roster_id)!.beat ? "pos" : "neg"} className="font-semibold">
                             {lastWeek.get(r.roster_id)!.beat ? " W" : " L"}
-                          </span>
+                          </Num>
                         )}
                       </span>
                     ) : null}
@@ -749,83 +660,8 @@ export default async function LeaguePage({
               );
             })}
           </ol>
-        </section>
+        </Section>
         </div>
-
-        {conflicts.length > 0 && (
-          <section className="flex flex-col gap-3 rounded-2xl border border-rose-200/80 bg-gradient-to-br from-rose-50/60 to-white p-5 dark:border-rose-900/60 dark:from-rose-950/30 dark:to-zinc-900">
-            <header className="flex items-center gap-2">
-              <AlertTriangle
-                size={18}
-                className="text-rose-600 dark:text-rose-400"
-                aria-hidden
-              />
-              <h2 className="text-base font-bold tracking-tight">
-                Roster conflicts ({conflicts.length})
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                same NFL team, same position — drop the lower-value one
-              </span>
-            </header>
-            <ul className="grid gap-3 md:grid-cols-2">
-              {conflicts.map((c) => (
-                <li
-                  key={`${c.team}-${c.position}`}
-                  className="flex flex-col gap-2 rounded-xl border border-rose-200/60 bg-white/80 p-3 backdrop-blur dark:border-rose-900/60 dark:bg-zinc-900/80"
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-bold">
-                      {c.team} · {c.position}
-                    </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {c.players.length} players
-                    </span>
-                  </div>
-                  <ul className="flex flex-col gap-1">
-                    {c.players.map((p) => {
-                      const isDrop = p.id === c.dropCandidate.id;
-                      return (
-                        <li
-                          key={p.id}
-                          className={`flex items-center gap-2 rounded-md px-2 py-1.5 ${
-                            isDrop
-                              ? "bg-rose-100/60 dark:bg-rose-950/30"
-                              : ""
-                          }`}
-                        >
-                          <PlayerAvatar
-                            name={p.name}
-                            position={p.position}
-                            photoUrl={p.photoUrl}
-                            size="sm"
-                          />
-                          <PlayerLink
-                            id={p.id}
-                            name={p.name}
-                            className="flex-1 truncate text-sm font-medium"
-                          />
-                          <span className="shrink-0 text-xs font-semibold tabular-nums">
-                            {p.value.toLocaleString()}
-                          </span>
-                          {isDrop && (
-                            <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                              Drop
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              Rule: avoid two players on the same NFL team at the same
-              position — they split work or compete for the same job.
-            </p>
-          </section>
-        )}
-
       </div>
     </main>
   );

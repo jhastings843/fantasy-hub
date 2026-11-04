@@ -74,8 +74,8 @@ export function CustomGoals() {
 
   if (!hydrated) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <span className="text-sm text-zinc-400 dark:text-zinc-600">
+      <div className="py-2">
+        <span className="text-sm text-hh-muted">
           Loading goals...
         </span>
       </div>
@@ -83,7 +83,7 @@ export function CustomGoals() {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex flex-col gap-3">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -96,12 +96,12 @@ export function CustomGoals() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Add a goal..."
-          className="flex-1 min-w-0 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+          className="min-h-11 min-w-0 flex-1 rounded-[4px] border border-hh-line bg-hh-panel px-3 py-2 text-base text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none sm:text-sm"
         />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm capitalize dark:border-zinc-800 dark:bg-zinc-950"
+          className="min-h-11 rounded-[4px] border border-hh-line bg-hh-panel px-3 py-2 text-sm capitalize text-hh-ink focus:border-hh-accent focus:outline-none"
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -111,7 +111,7 @@ export function CustomGoals() {
         </select>
         <button
           type="submit"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-[4px] bg-hh-accent px-4 py-2 text-sm font-semibold text-[var(--hh-on-accent)] hover:opacity-90 disabled:opacity-50"
           disabled={!text.trim()}
         >
           <Plus size={14} aria-hidden />
@@ -120,37 +120,37 @@ export function CustomGoals() {
       </form>
 
       {goals.length === 0 ? (
-        <p className="py-2 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="py-2 text-sm text-hh-muted">
           No custom goals yet. Add one above; saved locally to this browser.
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="flex flex-col">
           {goals.map((g) => (
-            <li key={g.id} className="flex items-center gap-3 py-2.5">
+            <li key={g.id} className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2.5 last:border-b-0">
               <input
                 type="checkbox"
                 checked={g.done}
                 onChange={() => toggle(g.id)}
-                className="size-4 shrink-0 rounded border-zinc-300 text-amber-600 focus:ring-amber-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="size-5 shrink-0 accent-[var(--hh-accent)]"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span
                   className={`text-sm ${
                     g.done
-                      ? "text-zinc-400 line-through dark:text-zinc-600"
-                      : ""
+                      ? "text-hh-muted line-through"
+                      : "text-hh-ink"
                   }`}
                 >
                   {g.text}
                 </span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-hh-muted">
                   {g.category}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => remove(g.id)}
-                className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400"
+                className="grid size-11 shrink-0 place-items-center rounded-[4px] text-hh-muted hover:bg-hh-sunk hover:text-hh-neg"
                 aria-label="Remove goal"
               >
                 <Trash2 size={14} aria-hidden />
@@ -159,7 +159,7 @@ export function CustomGoals() {
           ))}
         </ul>
       )}
-      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+      <p className="text-[11px] text-hh-muted">
         Custom goals are saved to this browser only. Clear browser data and
         they reset.
       </p>

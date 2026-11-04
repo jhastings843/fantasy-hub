@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { Chip, Empty, Num, PosBadge, Section } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { TeamEdge } from "@/components/hh/team";
+import { teamHref } from "@/app/picks/hrefs";
 import { moversFromValues } from "@/lib/rosteraudit/movers";
 import type { RAMover } from "@/lib/rosteraudit/types";
 import {
@@ -26,27 +30,15 @@ export const dynamic = "force-dynamic";
 
 const TRACKED_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
-const POSITION_TINT: Record<string, string> = {
-  QB: "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
-  RB: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  WR: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
-  TE: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-};
-
 function ConfigError({ message }: { message: string }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <Link
-          href="/fantasy"
-          className="text-sm text-zinc-500 dark:text-zinc-400"
-        >
+        <Link href="/fantasy" className="inline-flex min-h-11 items-center self-start text-sm text-hh-muted hover:text-hh-ink">
           ‹ Leagues
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Players</h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
-          {message}
-        </p>
+        <h1 className="hh-title">Players</h1>
+        <p className="border-l-2 border-hh-neg py-1 pl-3 text-sm text-hh-neg">{message}</p>
       </div>
     </main>
   );
@@ -57,17 +49,10 @@ function nameOf(p: SleeperPlayer): string {
   return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || p.player_id;
 }
 
-function PositionChip({ position }: { position: string }) {
-  const cls =
-    POSITION_TINT[position] ??
-    "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
-  return (
-    <span
-      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}
-    >
-      {position}
-    </span>
-  );
+/** An NFL team code that opens the team pop-up; free agents stay text. */
+function TeamCode({ team }: { team: string | null | undefined }) {
+  if (!team) return <>FA</>;
+  return <PopLink href={teamHref("nfl", team)}>{team}</PopLink>;
 }
 
 function MoverRow({
@@ -87,73 +72,44 @@ function MoverRow({
   const trend30 = m.trend30Day;
   const primaryTrend = trend7 !== 0 ? trend7 : trend30;
   const primaryLabel = trend7 !== 0 ? "7d" : "30d";
-  const trendCls =
-    primaryTrend > 0
-      ? "text-emerald-600 dark:text-emerald-400"
-      : primaryTrend < 0
-        ? "text-rose-600 dark:text-rose-400"
-        : "text-zinc-400 dark:text-zinc-600";
   return (
-    <li className="flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-      <PlayerAvatar name={m.name} position={m.position} size="sm" />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <PlayerLink
-            id={m.sleeperId}
-            name={m.name}
-            className="truncate text-sm font-medium"
-          />
-          <PositionChip position={m.position} />
-          <JinglesBadge sleeperId={m.sleeperId} leagueType={leagueType} />
-          {m.buyLow && (
-            <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-              Buy
-            </span>
-          )}
-          {m.sellHigh && (
-            <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-              Sell
-            </span>
-          )}
-          {m.breakout && (
-            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-              Break
-            </span>
-          )}
+    <li>
+      <TeamEdge league="nfl" team={m.team} className="flex min-h-11 items-center gap-2.5 border-b border-hh-line py-2">
+        <PlayerAvatar name={m.name} position={m.position} size="sm" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <PlayerLink id={m.sleeperId} name={m.name} className="truncate text-sm font-medium text-hh-ink" />
+            <PosBadge pos={m.position} />
+            <JinglesBadge sleeperId={m.sleeperId} leagueType={leagueType} />
+            {m.buyLow && <Chip tone="pos">BUY</Chip>}
+            {m.sellHigh && <Chip tone="neg">SELL</Chip>}
+            {m.breakout && <Chip tone="accent">BREAK</Chip>}
+          </div>
+          <span className="truncate text-xs text-hh-muted">
+            <TeamCode team={m.team} /> ·{" "}
+            {rostered ? (
+              <span className="font-medium text-hh-ink-2">{ownerName ?? "rostered"}</span>
+            ) : (
+              <span className="font-medium text-hh-pos">Available</span>
+            )}
+            {primaryTrend !== 0 && (
+              <>
+                {" · "}
+                <span className={`font-medium ${primaryTrend > 0 ? "text-hh-pos" : "text-hh-neg"}`}>
+                  {primaryLabel} <Num>{primaryTrend > 0 ? "+" : ""}{primaryTrend.toLocaleString()}</Num>
+                </span>
+              </>
+            )}
+            {primaryTrend === 0 && (
+              <>
+                {" · "}
+                <span>{direction === "up" ? "rising" : "falling"}</span>
+              </>
+            )}
+          </span>
         </div>
-        <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-          {m.team ?? "FA"} ·{" "}
-          {rostered ? (
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">
-              {ownerName ?? "rostered"}
-            </span>
-          ) : (
-            <span className="font-medium text-emerald-700 dark:text-emerald-400">
-              Available
-            </span>
-          )}
-          {primaryTrend !== 0 && (
-            <>
-              {" · "}
-              <span className={`font-medium tabular-nums ${trendCls}`}>
-                {primaryLabel} {primaryTrend > 0 ? "+" : ""}
-                {primaryTrend.toLocaleString()}
-              </span>
-            </>
-          )}
-          {primaryTrend === 0 && (
-            <>
-              {" · "}
-              <span className="text-zinc-400 dark:text-zinc-600">
-                {direction === "up" ? "rising" : "falling"}
-              </span>
-            </>
-          )}
-        </span>
-      </div>
-      <span className="shrink-0 text-sm font-semibold tabular-nums">
-        {m.valueSf.toLocaleString()}
-      </span>
+        <Num className="shrink-0 text-sm font-semibold text-hh-ink">{m.valueSf.toLocaleString()}</Num>
+      </TeamEdge>
     </li>
   );
 }
@@ -257,102 +213,73 @@ export default async function PlayersPage({
     .sort((a, b) => b.value - a.value)
     .slice(0, 12);
 
+  const fits = waiverFits.length > 0 ? waiverFits : topWaiversOverall;
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-1">
-          <Link
-            href={`/l/${leagueId}`}
-            className="text-sm text-zinc-500 dark:text-zinc-400"
-          >
+        <div className="flex flex-col gap-2">
+          <Link href={`/l/${leagueId}`} className="inline-flex min-h-11 items-center self-start text-sm text-hh-muted hover:text-hh-ink">
             ‹ League
           </Link>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="text-3xl font-semibold tracking-tight">Players</h1>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="hh-title">Players</h1>
             <RefreshButton leagueId={leagueId} />
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="max-w-2xl text-[15px] leading-relaxed text-hh-ink-2">
             Search the league, scout the waiver wire, and track value momentum
             across the dynasty market.
           </p>
         </div>
 
-        {/* Waiver fits */}
-        <section className="flex flex-col gap-3">
-          <header className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">
-              Waiver fits for your roster
-            </h2>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              {myWeakPositions.length > 0
-                ? `Targets ${myWeakPositions.join(" + ")} (your weak rooms)`
-                : "Top unrostered overall"}
-            </span>
-          </header>
-          {(waiverFits.length > 0 ? waiverFits : topWaiversOverall).length ===
-          0 ? (
-            <p className="rounded-2xl border border-dashed border-zinc-300 bg-white/40 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
-              No unrostered players found with value &gt; 0.
-            </p>
+        <Section
+          label="Waiver fits for your roster"
+          aside={
+            myWeakPositions.length > 0
+              ? `Targets ${myWeakPositions.join(" + ")} (your weak rooms)`
+              : "Top unrostered overall"
+          }
+        >
+          {fits.length === 0 ? (
+            <Empty>No unrostered players found with value &gt; 0.</Empty>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {(waiverFits.length > 0 ? waiverFits : topWaiversOverall).map(
-                (p) => (
-                  <li
-                    key={p.id}
-                    className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <PlayerAvatar
-                      name={p.name}
-                      position={p.position}
-                      photoUrl={p.photoUrl}
-                      size="sm"
-                    />
+            <ul className="grid gap-x-8 sm:grid-cols-2">
+              {fits.map((p) => (
+                <li key={p.id}>
+                  <TeamEdge league="nfl" team={p.team} className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2.5">
+                    <PlayerAvatar name={p.name} position={p.position} photoUrl={p.photoUrl} size="sm" />
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <PlayerLink
-                          id={p.id}
-                          name={p.name}
-                          className="truncate text-sm font-medium"
-                        />
-                        {p.position && (
-                          <PositionChip position={p.position} />
-                        )}
+                        <PlayerLink id={p.id} name={p.name} className="truncate text-sm font-medium text-hh-ink" />
+                        {p.position && <PosBadge pos={p.position} />}
                       </div>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {p.team ?? "FA"} ·{" "}
-                        <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                          Available
-                        </span>
+                      <span className="text-xs text-hh-muted">
+                        <TeamCode team={p.team} /> · <span className="font-medium text-hh-pos">Available</span>
                       </span>
                     </div>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums">
-                      {p.value.toLocaleString()}
-                    </span>
-                  </li>
-                ),
-              )}
+                    <Num className="shrink-0 text-sm font-semibold text-hh-ink">{p.value.toLocaleString()}</Num>
+                  </TeamEdge>
+                </li>
+              ))}
             </ul>
           )}
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-[11px] text-hh-muted">
             Players not currently on any league roster. Sorted by RA value
             (TE-premium adjusted). Pickups improve depth without a trade.
           </p>
-        </section>
+        </Section>
 
-        {/* Movers */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="flex flex-col gap-3">
-            <header className="flex items-baseline justify-between">
-              <h2 className="flex items-center gap-2 text-xl font-semibold">
-                <TrendingUp size={18} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
+          <Section
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <TrendingUp size={14} className="text-hh-pos" aria-hidden />
                 Risers
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {movers.risers.length} players
               </span>
-            </header>
-            <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            }
+            aside={<><Num>{movers.risers.length}</Num> players</>}
+          >
+            <ul className="flex flex-col">
               {movers.risers.map((m) => (
                 <MoverRow
                   key={m.sleeperId}
@@ -364,24 +291,21 @@ export default async function PlayersPage({
                 />
               ))}
               {movers.risers.length === 0 && (
-                <li className="px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                  No risers right now.
-                </li>
+                <li><Empty>No risers right now.</Empty></li>
               )}
             </ul>
-          </section>
+          </Section>
 
-          <section className="flex flex-col gap-3">
-            <header className="flex items-baseline justify-between">
-              <h2 className="flex items-center gap-2 text-xl font-semibold">
-                <TrendingDown size={18} className="text-rose-600 dark:text-rose-400" aria-hidden />
+          <Section
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <TrendingDown size={14} className="text-hh-neg" aria-hidden />
                 Fallers
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {movers.fallers.length} players
               </span>
-            </header>
-            <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            }
+            aside={<><Num>{movers.fallers.length}</Num> players</>}
+          >
+            <ul className="flex flex-col">
               {movers.fallers.map((m) => (
                 <MoverRow
                   key={m.sleeperId}
@@ -393,17 +317,14 @@ export default async function PlayersPage({
                 />
               ))}
               {movers.fallers.length === 0 && (
-                <li className="px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                  No fallers right now.
-                </li>
+                <li><Empty>No fallers right now.</Empty></li>
               )}
             </ul>
-          </section>
+          </Section>
         </div>
 
         {/* Search */}
         <PlayerSearch players={searchablePlayers} />
-
       </div>
     </main>
   );

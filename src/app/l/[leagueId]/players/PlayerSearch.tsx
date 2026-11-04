@@ -4,13 +4,10 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerLink } from "@/components/PlayerLink";
-
-const POSITION_TINT: Record<string, string> = {
-  QB: "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
-  RB: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  WR: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
-  TE: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-};
+import { Empty, Num, PosBadge, Section } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { TeamEdge } from "@/components/hh/team";
+import { teamHref } from "@/app/picks/hrefs";
 
 const TRACKED_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
@@ -67,45 +64,38 @@ export function PlayerSearch({ players }: { players: SearchablePlayer[] }) {
     deferredQuery.trim().length > 0 || posFilter !== "all" || waiverOnly;
 
   return (
-    <section className="flex flex-col gap-3">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-semibold tracking-tight">
-          Search all players
-        </h2>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {players.length.toLocaleString()} indexed
-        </span>
-      </header>
-
+    <Section label="Search all players" aside={<><Num>{players.length.toLocaleString()}</Num> indexed</>}>
+      <div className="flex flex-col gap-3">
       <div className="relative">
         <Search
           size={16}
           aria-hidden
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-hh-muted"
         />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Type a player name..."
-          className="w-full rounded-xl border border-zinc-200 bg-white py-3 pl-9 pr-3 text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-zinc-800 dark:bg-zinc-900"
+          className="min-h-11 w-full rounded-[4px] border border-hh-line bg-hh-panel py-2.5 pl-9 pr-3 text-base text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none"
           aria-label="Search players"
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Position">
           {(["all", ...TRACKED_POSITIONS] as PositionFilter[]).map((pos) => {
             const active = posFilter === pos;
             return (
               <button
                 key={pos}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setPosFilter(pos)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                className={`min-h-11 min-w-11 rounded-[4px] px-3 text-xs font-semibold transition-colors ${
                   active
-                    ? "bg-amber-500 text-white"
-                    : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    ? "bg-hh-ink text-hh-bg"
+                    : "border border-hh-line text-hh-ink-2 hover:bg-hh-sunk"
                 }`}
               >
                 {pos === "all" ? "All" : pos}
@@ -113,10 +103,10 @@ export function PlayerSearch({ players }: { players: SearchablePlayer[] }) {
             );
           })}
         </div>
-        <label className="ml-auto inline-flex cursor-pointer items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800">
+        <label className="ml-auto inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[4px] border border-hh-line px-3 text-xs font-medium text-hh-ink-2 hover:bg-hh-sunk">
           <input
             type="checkbox"
-            className="size-3.5 rounded border-zinc-300 text-amber-600 focus:ring-amber-500 dark:border-zinc-700 dark:bg-zinc-800"
+            className="size-4 accent-[var(--hh-accent)]"
             checked={waiverOnly}
             onChange={(e) => setWaiverOnly(e.target.checked)}
           />
@@ -124,69 +114,42 @@ export function PlayerSearch({ players }: { players: SearchablePlayer[] }) {
         </label>
       </div>
 
-      <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+      <ul className="flex flex-col">
         {results.length === 0 && (
-          <li className="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-            No players match.
-          </li>
+          <li><Empty>No players match.</Empty></li>
         )}
-        {results.map((p) => {
-          const posChip = p.position
-            ? (POSITION_TINT[p.position] ??
-              "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300")
-            : null;
-          return (
-            <li
-              key={p.id}
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-            >
-              <PlayerAvatar
-                name={p.name}
-                position={p.position}
-                photoUrl={p.photoUrl}
-                size="sm"
-              />
+        {results.map((p) => (
+          <li key={p.id}>
+            <TeamEdge league="nfl" team={p.team} className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2">
+              <PlayerAvatar name={p.name} position={p.position} photoUrl={p.photoUrl} size="sm" />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <PlayerLink
-                    id={p.id}
-                    name={p.name}
-                    className="truncate text-sm font-medium"
-                  />
-                  {posChip && (
-                    <span
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${posChip}`}
-                    >
-                      {p.position}
-                    </span>
-                  )}
+                  <PlayerLink id={p.id} name={p.name} className="truncate text-sm font-medium text-hh-ink" />
+                  {p.position && <PosBadge pos={p.position} />}
                 </div>
-                <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                  {p.team ?? "FA"} ·{" "}
+                <span className="truncate text-xs text-hh-muted">
+                  {p.team ? <PopLink href={teamHref("nfl", p.team)}>{p.team}</PopLink> : "FA"} ·{" "}
                   {p.rostered ? (
-                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                      {p.ownerName ?? "rostered"}
-                    </span>
+                    <span className="font-medium text-hh-ink-2">{p.ownerName ?? "rostered"}</span>
                   ) : (
-                    <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                      Available
-                    </span>
+                    <span className="font-medium text-hh-pos">Available</span>
                   )}
                 </span>
               </div>
-              <span className="shrink-0 text-sm font-semibold tabular-nums">
-                {p.value > 0 ? p.value.toLocaleString() : "—"}
+              <span className="shrink-0 text-sm font-semibold text-hh-ink">
+                {p.value > 0 ? <Num>{p.value.toLocaleString()}</Num> : <span className="text-hh-muted">None</span>}
               </span>
-            </li>
-          );
-        })}
+            </TeamEdge>
+          </li>
+        ))}
       </ul>
 
       {showingTotalNote && results.length === RESULT_LIMIT && (
-        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-          Showing top {RESULT_LIMIT}. Refine the search to narrow down.
+        <p className="text-[11px] text-hh-muted">
+          Showing top <Num>{RESULT_LIMIT}</Num>. Refine the search to narrow down.
         </p>
       )}
-    </section>
+      </div>
+    </Section>
   );
 }

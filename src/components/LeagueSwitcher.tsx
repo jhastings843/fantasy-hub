@@ -6,13 +6,12 @@ import { usePathname } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { TOOLS, leaguePath } from "@/lib/league/tools";
 import { LEAGUE_TYPE_LABEL, type LeagueProfile } from "@/lib/league/types";
+import { Chip, type Tone } from "@/components/hh/ui";
 
-const TYPE_CHIP: Record<string, string> = {
-  dynasty:
-    "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  redraft: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300",
-  guillotine:
-    "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
+const TYPE_TONE: Record<string, Tone> = {
+  dynasty: "accent",
+  redraft: "gold",
+  guillotine: "neg",
 };
 
 /**
@@ -67,7 +66,7 @@ export function LeagueSwitcher({
   // Nothing to switch to.
   if (leagues.length < 2) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+      <span className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-hh-ink">
         {current.name}
         <TypeChip type={current.type} />
       </span>
@@ -81,21 +80,21 @@ export function LeagueSwitcher({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-200 bg-white/70 px-3 py-1.5 text-sm font-semibold text-zinc-900 transition-colors hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-50 dark:hover:border-zinc-700"
+        className="inline-flex min-h-11 items-center gap-2 rounded-[4px] border border-hh-line bg-hh-panel px-3 py-1.5 text-sm font-semibold text-hh-ink transition-colors hover:border-hh-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hh-accent"
       >
         <span className="max-w-[10rem] truncate">{current.name}</span>
         <TypeChip type={current.type} />
         <ChevronDown
           size={14}
           aria-hidden
-          className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`text-hh-muted transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute left-0 z-50 mt-1.5 w-72 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+          className="absolute left-0 z-50 mt-1.5 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--hh-radius)] border border-hh-line bg-hh-panel shadow-lg"
         >
           {leagues.map((l) => {
             const active = l.id === current.id;
@@ -105,14 +104,14 @@ export function LeagueSwitcher({
                 href={targetPath(pathname, l)}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex min-h-11 items-center justify-between gap-3 border-b border-zinc-100 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-amber-50/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500 dark:border-zinc-800 dark:hover:bg-amber-950/20"
+                className="flex min-h-11 items-center justify-between gap-3 border-b border-hh-line px-3 py-2.5 transition-colors last:border-b-0 hover:bg-hh-sunk focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-hh-accent"
               >
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                  <span className="truncate text-sm font-semibold text-hh-ink">
                     {l.name}
                   </span>
-                  <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                    {l.teams} team {l.superflex ? "superflex" : "single QB"}
+                  <span className="text-xs text-hh-muted">
+                    <span className="hh-num">{l.teams}</span> team {l.superflex ? "superflex" : "single QB"}
                   </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5">
@@ -121,7 +120,7 @@ export function LeagueSwitcher({
                     <Check
                       size={14}
                       aria-label="Current league"
-                      className="text-amber-600 dark:text-amber-400"
+                      className="text-hh-accent-ink"
                     />
                   )}
                 </span>
@@ -136,10 +135,8 @@ export function LeagueSwitcher({
 
 function TypeChip({ type }: { type: string }) {
   return (
-    <span
-      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TYPE_CHIP[type] ?? TYPE_CHIP.dynasty}`}
-    >
+    <Chip tone={TYPE_TONE[type] ?? "accent"}>
       {LEAGUE_TYPE_LABEL[type as keyof typeof LEAGUE_TYPE_LABEL] ?? type}
-    </span>
+    </Chip>
   );
 }
