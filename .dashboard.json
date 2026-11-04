@@ -2,7 +2,7 @@
   "name": "fantasy-hub",
   "path": "/Users/jackh/Projects/fantasy-hub",
   "github_url": "https://github.com/jhastings843/fantasy-hub",
-  "status": "Redesign live. Jack's 4 audit/UI yeses committed on main, not pushed: dry-run emails skip refreshes, generic API errors on draft/faab/health, trade recap stacks on phones, clearer preview save refusal.",
+  "status": "Projected finish on league pages, Sunday-only pick'em push, Our model rows on bets boards, consensus research cuts: all live 2026-11-04.",
   "status_detail": "Multi-league fantasy football tools. Every tool lives under /l/[leagueId] with leagues auto-discovered from Sleeper and format detected from settings.type (including type 3, which is Sleeper's undocumented guillotine code). Four live leagues: Dah Dynasty League (dynasty, in season), 2026 Half PPR (redraft, drafts Sep 7), Sunday Scaries #2 (redraft, full PPR, in season), and Dah Chopped League (guillotine, 16 teams, $1000 FAAB, still pre-draft). Guillotine leagues get a weekly FAAB advisor at /l/[id]/faab, /api/faab and a Tuesday email. Written playbooks with sources at /strategy. His rankings moved off Substack to the FantasyPros platform on 2026-09-17 and are read from there by week rather than by post, per scoring, so each league finally reads a list in its own scoring. SURVIVOR is a live recommendation engine at /survivor and /api/survivor: no-vig moneylines from ESPN, real public pick percentages from Yahoo, first-place equity scoring and a season-long Hungarian assignment for future value. TWO POOLS now, 500 entries and 30, tracked apart: separate burned teams, separate logged distributions, separate chalk factors, one shared data pull. Switcher on the page, ?pool=<id>|all on the API, one labelled card per pool in the Thursday email. Each pool carries a POSTURE, computed from expected entries alive at week 18, which breaks ties toward safety in a pool that will thin to one entry and toward leverage in one that will split. Week 1 live: 500 pool takes JAX, 30 pool takes LAC. A PULSE now keeps it current: /api/pulse called every fifteen minutes by GitHub Actions, tiered by the Eastern clock (live gameday, hourly, overnight), plus five scheduled emails through one shell and a Sunday 11:45 exception alarm that stays silent when nothing is wrong.",
   "next_steps": [
     "Optional: generic error text on forecast, money and survivor pages (audit LOWs).",
@@ -16,6 +16,7 @@
   ],
   "last_worked": "2026-11-04",
   "notes": [
+    "2026-11-04 eve: Consensus research (our model as third vote with Sam/David) on NFL/CFB boards + Learning, NBA spread/total cuts; tracked only (d19664d).",
     "2026-11-04 eve: League pages get Projected finish (5,000-season sim from Sleeper projected lineups, playoff/title odds, guillotine win odds and chop week, weekly move) (9be2942). Pick'em Pushover now once, Sunday 11:00 ET, full entry + what moved. Bets board details show Our model under Sam/David on NFL, CFB, NBA (7624d7d). Both deployed Ready.",
     "2026-11-04: Jack unlocked Mac and phone at /unlock.",
     "2026-11-04: HH_SESSION_SECRET added to Preview by Jack (all branches; CLI needed an empty \"\" branch arg).",
