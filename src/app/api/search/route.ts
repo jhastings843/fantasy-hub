@@ -10,6 +10,7 @@ import { getCbbBoard } from "@/lib/models/cbb/store";
 import { getOurNbaView } from "@/lib/models/nba/store";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import { cbbGamesIndex, currentOnly, nbaGamesIndex, nbaPropsIndex } from "@/lib/search/sports";
+import { buildTeamIndex } from "@/lib/search/teams";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -50,5 +51,7 @@ export async function GET() {
     ...tag(propsSearchIndex(ov, pv, fv), (e) => `/props/player?l=nfl&t=${e.key.split("|")[0]}&n=${encodeURIComponent(e.title)}`, "NFL props"),
     ...currentOnly([...nbaGamesIndex(nbaB), ...cbbGamesIndex(cbbB), ...nbaPropsIndex(nbaV, nbaNames)]).map(strip),
   ];
-  return Response.json({ entries }, { headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" } });
+  // One row per organisation (lib/search/teams.ts): South Carolina football and hoops are one team.
+  const teams = buildTeamIndex({ nfl: nfl?.value, cfb: cfb?.value, nba: nbaB, cbb: cbbB });
+  return Response.json({ entries, teams }, { headers: { "Cache-Control": "s-maxage=120, stale-while-revalidate=600" } });
 }
