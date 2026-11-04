@@ -16,6 +16,7 @@
   ],
   "last_worked": "2026-11-04",
   "notes": [
+    "2026-11-04: /pickem CFB ATS review (research/pickem-cfb-ats-review.md): pick history not stored, so no reconstruction; pem_breaks_tie 40-50 is z -1.05 (variance); ranked games move 2.1 pts open to close and the moved-to side wins 56% at the opener. Recommends logging every slate, pool line vs market check, PEM out of tie-breaks.",
     "2026-11-04: Built Jack's 4 yeses (dry-run refresh skip, generic errors, trade recap stack, preview secret message); committed, not pushed.",
     "2026-11-04 overnight: Fantasy pages, player pop-up, team \"Ours\", remaining pop-up links and write-lock all live (fantasy-okoy3lcb2).",
     "2026-11-04 00:30: Team search live (one result per team, /team pop-up per sport). Write-lock built on branch security/write-lock.",
