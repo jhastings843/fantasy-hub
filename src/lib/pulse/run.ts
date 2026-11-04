@@ -354,6 +354,9 @@ async function picksData(everyMinutes: number): Promise<string> {
     const out = await Promise.allSettled([runPicksData("nfl"), runPicksData("cfb")]);
     const lines = out.map((o) => (o.status === "fulfilled" ? o.value : `failed: ${o.reason instanceof Error ? o.reason.message : String(o.reason)}`));
     if (out.every((o) => o.status === "rejected")) throw new Error(lines.join("; "));
+    // One league failing (or its quotes stale near kickoff, picks/freshness.ts) doesn't fail
+    // the job, so watch it on its own: three runs in a row pushes to Jack's phone.
+    await watchProblems("Picks board", out.flatMap((o) => (o.status === "rejected" ? [o.reason instanceof Error ? o.reason.message : String(o.reason)] : [])));
     return lines.join("; ");
   });
 }

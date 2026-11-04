@@ -1,4 +1,5 @@
 import "server-only";
+import { freshnessProblems } from "./freshness";
 import { redis } from "@/lib/redis/client";
 import { cachedWithFallback } from "@/lib/redis/cached";
 import {
@@ -652,7 +653,12 @@ export async function runPicksData(league: League): Promise<string> {
     totalsNew = await archiveTotals(league, r.season, r.week, meet).catch(() => 0);
     if (r.board.length) await saveSnapshot(league, r.season, r.week, r.board, r.strategies.rule?.label ?? null);
   }
-  return `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${splitsMatched} with splits, ${totalsNew} totals archived, ${settled} issued games final${cfbModel ? `; ${cfbModel}` : ""}`;
+  const summary = `${league} wk ${r.week ?? "?"}: quotes ${r.reference.priced}/${r.reference.games}${r.reference.stale ? " STALE" : ""}, ${forecasts} forecast snapshots, ${splitsMatched} with splits, ${totalsNew} totals archived, ${settled} issued games final${cfbModel ? `; ${cfbModel}` : ""}`;
+  // Old or missing quotes with a game soon fail the job (after the archive is saved),
+  // so the pulse's three-in-a-row watch pushes it to Jack's phone (freshness.ts).
+  const stale = freshnessProblems(league, r, new Date());
+  if (stale.length) throw new Error(`${stale.join("; ")} | ${summary}`);
+  return summary;
 }
 
 export type { RefLine, BoardGame };

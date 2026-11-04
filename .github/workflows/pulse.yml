@@ -46,6 +46,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Before calling: is the real heartbeat (QStash) alive? If its last
+      # receipt is over an hour old, nothing has run, so nothing could alert.
+      # Flag it, then fail the run at the end so GitHub emails Jack
+      # (Jack, 2026-11-04: watch the board and forget it).
+      - name: Check the heartbeat
+        id: heartbeat
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
+        run: |
+          last=$(curl -sS --max-time 30 "$APP_URL/api/pulse?peek=1" | jq -r '.last.at // empty')
+          if [ -z "$last" ]; then age=9999; else age=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 60 )); fi
+          echo "last pulse receipt: ${last:-none} (${age} min ago)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$age" -gt 60 ]; then echo "stale=1" >> "$GITHUB_OUTPUT"; fi
       - name: Call the pulse
         env:
           APP_URL: ${{ vars.APP_URL || 'https://fantasy-hub-tan.vercel.app' }}
@@ -77,3 +90,8 @@ jobs:
             head -c 2000 response.json
             exit 1
           fi
+      - name: Fail if the heartbeat had stopped
+        if: steps.heartbeat.outputs.stale == '1'
+        run: |
+          echo "::error::No pulse for over an hour before this backstop ran: QStash (scripts/qstash-pulse.mjs) has likely stopped. The board was not refreshing and no alerts could fire."
+          exit 1
