@@ -42,6 +42,7 @@
   --hh-neg-soft: #f8dede;
   --hh-gold: #876623;
   --hh-gold-soft: #f2e6c8;
+  --hh-david: #3f6584; /* cool slate blue: apart from Sam's rust (5.5:1 on paper) */
   --hh-live: #a3333a;
 
   /* Spotlight: the single action that matters right now */
@@ -84,6 +85,7 @@
   --hh-neg-soft: rgb(248 113 113 / 0.12);
   --hh-gold: #ecc25e;
   --hh-gold-soft: rgb(236 194 94 / 0.12);
+  --hh-david: #93b4e0;
   --hh-live: #f87171;
   --hh-spot-bg: #131820;
   --hh-spot-border: #5eead4;

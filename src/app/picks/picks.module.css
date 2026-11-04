@@ -764,3 +764,72 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .navBtnText span { font-size: 13px; color: var(--ink2); }
 .navBtnArrow { flex: 0 0 auto; display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 16px; line-height: 1; transition: transform .15s; }
 .navBtn:hover .navBtnArrow { transform: translateX(2px); }
+
+/* ======================================================================
+   C3 pass (Hobby Hub redesign, 2026-11-03). Overrides the Ledger rules above
+   for every page built on this sheet (Bets, Money, Results, Learning):
+   data sits on thin rules instead of in boxes, titles are Barlow caps,
+   numbers are mono, and .betCard is the one spotlight box per screen.
+   Delete this block to get the Ledger look back.
+   ====================================================================== */
+.page { padding-inline: max(16px, env(safe-area-inset-left, 0px)); padding-block: 24px 64px; }
+@media (min-width: 640px) { .page { padding-block: 40px 72px; padding-inline: 24px; } }
+.wrap { max-width: 1104px; gap: 40px; }
+.pageTitle, .h1, .heroH { text-transform: uppercase; letter-spacing: .01em; line-height: .95; font-weight: 700; }
+.pageTitle { font-size: clamp(34px, 7vw, 48px); }
+.pageSub, .heroSub { font-size: 15px; }
+.pageAsof { font-size: 12px; }
+
+/* Section heads: a 1.5px ink rule ABOVE, the title small and quiet under it. */
+.secHead { border-bottom: 0; border-top: var(--hh-rule-w) solid var(--hh-rule); padding: 10px 0 0; }
+.secTitle { font-size: 20px; text-transform: uppercase; letter-spacing: .02em; }
+
+/* Labels: Geist small caps, not mono (mono is for numbers only). */
+.eyebrow, .table th, .gHead, .stats dt, .strip dt, .tab, .subnav a, .pill { font-family: var(--font-plex), system-ui, sans-serif; }
+.eyebrow, .table th, .gHead, .stats dt, .strip dt { letter-spacing: .06em; font-weight: 600; }
+
+/* No boxes on data. */
+.board, .gtable, .details, .card, .tile, .suCard, .closeCard, .srCard, .calm, .bg, .edgeCard {
+  background: transparent; border: 0; border-radius: 0; box-shadow: none;
+}
+.board { padding: 0; }
+.gtable { border-top: var(--hh-rule-w) solid var(--hh-rule); }
+.card, .tile, .suCard, .closeCard, .edgeCard { border-top: 1px solid var(--rule); padding: 12px 0; }
+.cards, .tiles { gap: 0 28px; }
+.cardBet { border-left: 3px solid var(--hh-accent); padding-left: 12px; }
+.cardEarly { border-left: 3px dashed var(--hh-gold); padding-left: 12px; }
+.srCard { border-top: 1px solid var(--rule); }
+.srCard > summary, .srCard > :not(summary) { padding-inline: 0; }
+.calm { padding: 8px 0; color: var(--mute); }
+.details { border-top: 1px solid var(--rule); }
+.details summary, .bg > summary { padding: 12px 0; min-height: 44px; display: flex; align-items: center; color: var(--hh-accent-ink); font-weight: 600; }
+.detailsBody { padding: 0 0 12px; }
+.bg { border-top: 1px solid var(--rule); padding: 0; }
+.bgBody { padding-bottom: 12px; }
+
+/* Stat strips: numbers on a rule, no tiles. */
+.stats, .strip { background: transparent; border: 0; border-radius: 0; border-top: 1px solid var(--rule); gap: 16px 24px; padding-top: 12px; }
+.stats > div, .strip > div { background: transparent; padding: 0; }
+/* Geist, not mono: the same cell holds "+1.1u" and "Agree on road dog". Tabular figures keep digits aligned. */
+.statV { font-family: var(--font-plex), system-ui, sans-serif; font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 600; letter-spacing: -.01em; line-height: 1.15; }
+
+/* Tabs and filters: sentence case, an underline for the one you're on. */
+.tab, .subnav a { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; border-color: transparent; background: transparent; color: var(--mute); border-radius: 0; }
+.tab[aria-current="page"], .subnav a[aria-current="page"] { background: transparent; color: var(--ink); border-color: transparent; box-shadow: inset 0 -2px var(--hh-accent); }
+.tabsSoft .tab[aria-current="page"] { background: transparent; color: var(--ink); box-shadow: inset 0 -2px var(--ink); }
+.chip { border-radius: 4px; }
+
+/* The spotlight: the board's own best bet. */
+.betCard { background: var(--hh-spot-bg); border: 1px solid var(--hh-spot-border); border-radius: var(--hh-radius); box-shadow: var(--hh-spot-glow); padding: 18px; }
+
+/* Tables keep hairlines only. */
+.table td { border-bottom-color: var(--rule); }
+.gRow > summary:hover { background: color-mix(in srgb, var(--surface2) 60%, transparent); }
+
+/* Switches (sport, market, view, sort): plain text, an underline for the one you're on, 44px to tap. */
+.chips, .tabs, .sortBar { border: 0; background: transparent; padding: 0; border-radius: 0; gap: 0 4px; }
+.chips .chip, .sortBar .chip, .tabs .tab, .tabsSoft .tab { min-height: 44px; padding: 6px 10px; border-radius: 0; font-weight: 500; color: var(--mute); background: transparent; }
+.chips .chip[aria-current="page"], .sortBar .chip[aria-pressed="true"], .tabs .tab[aria-current="page"] { background: transparent; color: var(--ink); box-shadow: inset 0 -2px var(--hh-accent); font-weight: 600; }
+
+/* Sam keeps the accent; David gets a cool second colour so the two never read alike (Jack, 2026-11-03). */
+.page { --david: var(--hh-david); }
