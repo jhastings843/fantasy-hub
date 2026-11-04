@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { loadPlayer } from "@/lib/search/player";
+import { loadPlayerExtra } from "@/lib/search/player-extra";
 import { PlayerPreview } from "../PlayerPreview";
 import s from "../../picks/picks.module.css";
 
@@ -18,13 +19,14 @@ export default async function PlayerPage({ searchParams }: { searchParams: Promi
   const q = await searchParams;
   const league = q.l === "nba" ? "nba" : "nfl";
   const v = str(q.t) && str(q.n) ? await loadPlayer(league, str(q.t), str(q.n), str(q.g) || undefined).catch(() => null) : null;
+  const x = v ? await loadPlayerExtra(v) : null;
   return (
     <main className={s.page}>
       <div className={s.wrap}>
         <Link href={league === "nba" ? "/props?m=nba" : "/props"} className={s.linkA} style={{ fontSize: 14 }}>
           {`‹ ${league.toUpperCase()} props`}
         </Link>
-        {v ? <PlayerPreview v={v} /> : <p className={s.calm}>No props saved for that player right now.</p>}
+        {v ? <PlayerPreview v={v} x={x} /> : <p className={s.calm}>No props saved for that player right now.</p>}
       </div>
     </main>
   );

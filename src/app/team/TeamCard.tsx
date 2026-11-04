@@ -5,6 +5,8 @@ import { getNbaBoard, type NbaBoardGame } from "@/lib/picks/nba-store";
 import { getCbbBoard, type CbbBoardRow } from "@/lib/models/cbb/store";
 import { getOurNflView } from "@/lib/models/nfl/store";
 import { getOurNbaView } from "@/lib/models/nba/store";
+import { getCfbModelView, type CfbModelView } from "@/lib/models/cfb/store";
+import { getNbaGameModelView, type NbaGameModelView } from "@/lib/models/nba/game-store";
 import { nbaSeasonOfDate, type PropMarket } from "@/lib/props/parse";
 import type { StoredProps } from "@/lib/props/store";
 import { findGame, scoreboard, type LiveGame } from "@/lib/live/espn";
@@ -43,9 +45,9 @@ export function parseTeamKey(k: string): Parsed | null {
 
 /* -------------------------------------------------------------- bits -- */
 
-function Cell({ k, v, tone }: { k: string; v: ReactNode; tone?: string }) {
+function Cell({ k, v, tone, bg }: { k: string; v: ReactNode; tone?: string; bg?: string }) {
   return (
-    <div className="min-w-0 rounded-[4px] bg-hh-sunk px-2.5 py-2">
+    <div className={`min-w-0 rounded-[4px] px-2.5 py-2 ${bg ?? "bg-hh-sunk"}`}>
       <span className="block text-[11px] text-hh-muted">{k}</span>
       <span className={`text-[16px] font-semibold ${tone ?? "text-hh-ink"}`}>{v}</span>
     </div>
@@ -54,6 +56,26 @@ function Cell({ k, v, tone }: { k: string; v: ReactNode; tone?: string }) {
 
 const none = <span className="text-sm font-normal text-hh-muted">none</span>;
 const fmt = (v: number) => line(Math.round(v * 10) / 10);
+
+/** Our own model's cell: ink on a faint accent wash, so it reads apart from Sam (accent) and David (purple). */
+const OursCell = ({ v }: { v: number | null | undefined }) => <Cell k="Ours" v={v !== null && v !== undefined ? <Num>{fmt(v)}</Num> : none} tone="text-hh-ink" bg="bg-hh-accent-soft" />;
+
+/**
+ * Ours against the market from this team's side, in points: positive means our
+ * number likes this team more than the line does. Both lines are home based.
+ */
+function OursEdge({ market, ours, side, me, them, first = false }: { market: number | null | undefined; ours: number | null | undefined; side: "home" | "away"; me: string; them: string; first?: boolean }) {
+  if (market === null || market === undefined || ours === null || ours === undefined) return null;
+  const e = Math.round((side === "home" ? market - ours : ours - market) * 10) / 10;
+  const lead = first ? " Ours" : " · ours";
+  if (e === 0) return <>{`${lead} matches the market${first ? "." : ""}`}</>;
+  return (
+    <>
+      {`${lead} likes ${e > 0 ? me : them} by `}
+      <Num>{Math.abs(e).toFixed(1)}</Num> vs the market{first ? "." : ""}
+    </>
+  );
+}
 
 function Matchup({ league, href, at, oppName, oppAbbr, oppId, right }: { league: LogoLeague; href: string; at: boolean; oppName: string; oppAbbr?: string; oppId?: string; right: ReactNode }) {
   return (
@@ -83,7 +105,7 @@ function Score({ label, tone, away, home, awayName, homeName }: { label: string;
 
 const TIER: Record<BoardGame["tier"], string> = { t1: "Tier 1", t2: "Tier 2", wait: "Waiting on PEM", fav: "Favorite rule", pass: "Pass", split: "Models split", one: "One model only" };
 
-function FootballGame({ r, g, side, live }: { r: PicksReport; g: BoardGame; side: "home" | "away"; live?: LiveGame }) {
+function FootballGame({ r, g, side, live, ours }: { r: PicksReport; g: BoardGame; side: "home" | "away"; live?: LiveGame; ours: number | null }) {
   const n = (k: string) => r.names[k] ?? k;
   const sl = (v: number) => (side === "home" ? v : -v);
   const ref = g.ref ?? g.lastRef;
@@ -127,17 +149,21 @@ function FootballGame({ r, g, side, live }: { r: PicksReport; g: BoardGame; side
   return (
     <div className="flex flex-col gap-3 border-b border-hh-line pb-4 last:border-b-0 last:pb-0">
       <Matchup league={r.league} href={footballGameHref(r.league, g.away, g.home)} at={side === "away"} oppName={(r.league === "nfl" ? proName(`nfl:${nflAbbr(opp)}`) : null) ?? n(opp)} oppAbbr={r.league === "nfl" ? opp : undefined} oppId={oppId} right={right} />
-      <div className="grid max-w-md grid-cols-3 gap-2">
+      <div className="grid max-w-lg grid-cols-4 gap-2">
         <Cell k="Market" v={ref ? <Num>{fmt(sl(ref.line))}</Num> : none} />
         <Cell k="Sam" v={g.sam ? <Num>{fmt(sl(g.sam.model))}</Num> : none} tone="text-hh-accent-ink" />
         <Cell k="David" v={g.david ? <Num>{fmt(sl(g.david.model))}</Num> : none} tone="text-[var(--hh-david)]" />
+        <OursCell v={ours === null ? null : sl(ours)} />
       </div>
-      <p className="text-sm leading-relaxed text-hh-ink-2">{read}</p>
+      <p className="text-sm leading-relaxed text-hh-ink-2">
+        {read}
+        <OursEdge market={ref?.line} ours={ours} side={side} me={n(side === "home" ? g.home : g.away)} them={n(opp)} />
+      </p>
     </div>
   );
 }
 
-async function FootballSection({ league, report, match, label }: { league: "nfl" | "cfb"; report: PicksReport | null | "error"; match: (g: BoardGame) => "home" | "away" | null; label: string }) {
+async function FootballSection({ league, report, match, label, ours }: { league: "nfl" | "cfb"; report: PicksReport | null | "error"; match: (g: BoardGame) => "home" | "away" | null; label: string; ours: (g: BoardGame) => number | null }) {
   const word = league === "nfl" ? label : label.toLowerCase();
   if (report === "error") return <Section label={label}><Empty>The {word} board could not be read just now.</Empty></Section>;
   const games = (report?.board ?? []).flatMap((g) => {
@@ -150,16 +176,26 @@ async function FootballSection({ league, report, match, label }: { league: "nfl"
     <Section label={label} aside="Lines from this team's side">
       <div className="flex flex-col gap-4">
         {games.map(({ g, side }) => (
-          <FootballGame key={`${g.away}@${g.home}`} r={report} g={g} side={side} live={findGame(live, league, g.away, g.home)} />
+          <FootballGame key={`${g.away}@${g.home}`} r={report} g={g} side={side} live={findGame(live, league, g.away, g.home)} ours={ours(g)} />
         ))}
       </div>
     </Section>
   );
 }
 
+/**
+ * Our college ratings model's line for a board game. Its tracked games use the
+ * board's own team keys, so home and away match exactly; a game it no longer
+ * lists (final) falls back to the read saved on the board game.
+ */
+const cfbOurs = (model: CfbModelView | "error") => (g: BoardGame): number | null => {
+  const t = model === "error" ? undefined : model.ahead.find((x) => x.home === g.home && x.away === g.away);
+  return t ? t.last.proj.spread : (g.ours?.spread ?? null);
+};
+
 /* --------------------------------------------------------------- NBA -- */
 
-function NbaGameBlock({ g, me }: { g: NbaBoardGame; me: string }) {
+function NbaGameBlock({ g, me, ours }: { g: NbaBoardGame; me: string; ours: number | null }) {
   const side = nbaAbbr(g.home.abbr) === me ? "home" : "away";
   const sl = (v: number) => (side === "home" ? v : -v);
   const opp = side === "home" ? g.away : g.home;
@@ -174,9 +210,10 @@ function NbaGameBlock({ g, me }: { g: NbaBoardGame; me: string }) {
   return (
     <div className="flex flex-col gap-3 border-b border-hh-line pb-4 last:border-b-0 last:pb-0">
       <Matchup league="nba" href={nbaGameHref(g.id)} at={side === "away"} oppName={opp.name} oppAbbr={opp.abbr} right={right} />
-      <div className="grid max-w-md grid-cols-3 gap-2">
+      <div className="grid max-w-lg grid-cols-4 gap-2">
         <Cell k="Market" v={g.line ? <Num>{fmt(sl(g.line.home))}</Num> : none} />
         <Cell k="Sam" v={r ? <Num>{fmt(sl(r.model))}</Num> : none} tone="text-hh-accent-ink" />
+        <OursCell v={ours === null ? null : sl(ours)} />
         <Cell k="Total" v={g.total ? <Num>{g.total.points}</Num> : none} />
       </div>
       <p className="text-sm leading-relaxed text-hh-ink-2">
@@ -193,12 +230,20 @@ function NbaGameBlock({ g, me }: { g: NbaBoardGame; me: string }) {
         ) : (
           "No Sam read on this game yet."
         )}
+        <OursEdge market={g.line?.home} ours={ours} side={side} me={(side === "home" ? g.home : g.away).short} them={opp.short} first={!(r && samTeam && g.line)} />
       </p>
     </div>
   );
 }
 
-function NbaSection({ board, me }: { board: Awaited<ReturnType<typeof getNbaBoard>> | "error"; me: string }) {
+/** Our NBA game model's latest home spread for a board game: by ESPN event id, else by the two teams on the same day. */
+function nbaOurs(model: NbaGameModelView | "error", g: NbaBoardGame): number | null {
+  if (model === "error") return null;
+  const t = model.games.find((x) => x.event === g.id) ?? model.games.find((x) => nbaAbbr(x.home) === nbaAbbr(g.home.abbr) && nbaAbbr(x.away) === nbaAbbr(g.away.abbr) && x.tip.slice(0, 10) === (g.tip ?? "").slice(0, 10));
+  return t ? t.last.ours.spread : null;
+}
+
+function NbaSection({ board, me, model }: { board: Awaited<ReturnType<typeof getNbaBoard>> | "error"; me: string; model: NbaGameModelView | "error" }) {
   if (board === "error") return <Section label="NBA"><Empty>The NBA board could not be read just now.</Empty></Section>;
   const seen = new Set<string>();
   const games = [...(board.yesterday?.games ?? []), ...board.days.flatMap((d) => d.games)].filter(
@@ -212,7 +257,7 @@ function NbaSection({ board, me }: { board: Awaited<ReturnType<typeof getNbaBoar
     <Section label="NBA" aside="Lines from this team's side">
       <div className="flex flex-col gap-4">
         {show.map((g) => (
-          <NbaGameBlock key={g.id} g={g} me={me} />
+          <NbaGameBlock key={g.id} g={g} me={me} ours={nbaOurs(model, g)} />
         ))}
       </div>
     </Section>
@@ -369,38 +414,38 @@ export default async function TeamCard({ k }: { k: string }) {
     return (
       <Shell>
         <Header name={proName(`nfl:${p.abbr}`) ?? p.abbr} sports={["NFL"]} league="nfl" abbr={p.abbr} />
-        <FootballSection league="nfl" label="NFL" report={report} match={(g) => (nflAbbr(g.home) === p.abbr ? "home" : nflAbbr(g.away) === p.abbr ? "away" : null)} />
+        <FootballSection league="nfl" label="NFL" report={report} match={(g) => (nflAbbr(g.home) === p.abbr ? "home" : nflAbbr(g.away) === p.abbr ? "away" : null)} ours={(g) => g.ours?.spread ?? null} />
         <PropsSection league="nfl" board={view === "error" ? "error" : view.board} me={p.abbr} />
       </Shell>
     );
   }
 
   if (p.kind === "nba") {
-    const [board, view] = await Promise.all([safe(getNbaBoard(now)), safe(getOurNbaView(nbaSeasonOfDate(now), now))]);
+    const [board, view, model] = await Promise.all([safe(getNbaBoard(now)), safe(getOurNbaView(nbaSeasonOfDate(now), now)), safe(getNbaGameModelView(nbaSeasonOfDate(now)))]);
     return (
       <Shell>
         <Header name={proName(`nba:${p.abbr}`) ?? p.abbr} sports={["NBA"]} league="nba" abbr={p.abbr} />
-        <NbaSection board={board} me={p.abbr} />
+        <NbaSection board={board} me={p.abbr} model={model} />
         <PropsSection league="nba" board={view === "error" ? "error" : view.board} me={p.abbr} />
       </Shell>
     );
   }
 
   if (p.kind === "cfb") {
-    const rep = await safe(getPicksReport("cfb"));
+    const [rep, cfbModel] = await Promise.all([safe(getPicksReport("cfb")), safe(getCfbModelView(seasonOf(now)))]);
     const report = rep === "error" ? "error" : rep.value;
     const name = report !== "error" ? (report?.names[p.boardKey] ?? p.boardKey) : p.boardKey;
     return (
       <Shell>
         <Header name={name} sports={["CFB"]} league="cfb" />
-        <FootballSection league="cfb" label="College football" report={report} match={(g) => (g.home === p.boardKey ? "home" : g.away === p.boardKey ? "away" : null)} />
+        <FootballSection league="cfb" label="College football" report={report} match={(g) => (g.home === p.boardKey ? "home" : g.away === p.boardKey ? "away" : null)} ours={cfbOurs(cfbModel)} />
       </Shell>
     );
   }
 
   // College: one ESPN id across football and hoops.
   const id = p.id;
-  const [rep, cbb] = await Promise.all([safe(getPicksReport("cfb")), safe(getCbbBoard(now, 1))]);
+  const [rep, cbb, cfbModel] = await Promise.all([safe(getPicksReport("cfb")), safe(getCbbBoard(now, 1)), safe(getCfbModelView(seasonOf(now)))]);
   const report = rep === "error" ? "error" : rep.value;
   const ids = (g: BoardGame) => g.ref ?? g.lastRef;
   const cfbMatch = (g: BoardGame) => (ids(g)?.homeId === id ? "home" : ids(g)?.awayId === id ? "away" : null);
@@ -411,7 +456,7 @@ export default async function TeamCard({ k }: { k: string }) {
   return (
     <Shell>
       <Header name={cbbTeam?.name ?? cfbName ?? "College team"} sports={sports.length ? sports : ["CFB", "CBB"]} league="cfb" espnId={id} />
-      <FootballSection league="cfb" label="College football" report={report} match={cfbMatch} />
+      <FootballSection league="cfb" label="College football" report={report} match={cfbMatch} ours={cfbOurs(cfbModel)} />
       <CbbSection board={cbb} id={id} />
     </Shell>
   );
