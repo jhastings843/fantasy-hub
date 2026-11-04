@@ -30,6 +30,8 @@ const HOBBY_TABS = [
   { href: "/props", label: "Props", owns: (p: string) => under(p, "/props") },
   { href: "/records", label: "Records", owns: (p: string) => under(p, "/records") },
   { href: "/money", label: "Money", owns: (p: string) => under(p, "/money") },
+  // Every section's learner plus the go-live forecast (Jack, 2026-11-03: "is there a tab?").
+  { href: "/learning", label: "Learning", owns: (p: string) => under(p, "/learning") },
 ];
 export const isHobby = (p: string) => HOBBY_TABS.some((t) => t.owns(p));
 

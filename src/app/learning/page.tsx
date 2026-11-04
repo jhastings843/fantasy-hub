@@ -207,7 +207,10 @@ export default async function LearningPage() {
             loses after that.
           </p>
           <p className={s.p}>
-            <Link href="/learning/forecast">Go-live forecast</Link>: when each slice meets its sample, and its estimated chance of going live this season.
+            <Link href="/learning/forecast" style={{ fontWeight: 600 }}>
+              Go-live forecast →
+            </Link>{" "}
+            When each slice meets its sample, and its estimated chance of going live this season.
           </p>
         </header>
         {groups.map((g) => (
