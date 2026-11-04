@@ -1,3 +1,14 @@
+# 2026-11-04 overnight: EVERYTHING LIVE (deploy fantasy-okoy3lcb2)
+Shipped tonight, all in production on main:
+- Write-lock (POST /api/survivor/*, /api/refresh need the device cookie from /unlock; reads open). HH_SESSION_SECRET is set for Production only, NOT Preview (preview saves are refused).
+- Team pop-up now has our model's number ("Ours" cell: NFL spread model, CFB ratings model, NBA game model) and the edge vs market.
+- Player pop-up (/props/player, from search and every player name): this week, last 5 games per prop with over/under strip and our grade, NFL touchdowns, NBA first basket and King of the Court, our last 5 bets on him; full cards behind a tap. Data: src/lib/search/player-extra.ts (new, read only).
+- Fantasy on C3: league home, Plan, Players, player profile, Scout, FAAB, Draft (+board), Trade, Survivor, Strategy, Resources, league tabs and switcher. Trade offers fixed for phone width.
+- Pop-up links everywhere in docs/redesign/popups.md except: Today staked rows (href built in src/lib, needs OK), RecordsTable settled rows, lotto players (rungs have no team), names inside buttons, past-week game links (pop-ups read the current board; team pop-up used instead).
+Built by 4 Claude subagents in worktrees, merged and checked by Claude: tsc clean, eslint 0 errors (eslint now ignores .claude/**), 1845 tests, build, 375px overflow check on 17 pages, visual check of trade, player pop-up, team card.
+Not exercised: interactive clicks (trade builder, survivor save and its /unlock redirect, rookie draft live view, CustomGoals), Survivor recommended-pick state (pool is eliminated).
+Known data notes: First TD bets on a player who sat count as losses in "our bets on him"; NBA position not shown (no source); lib/survivor/strategy.ts has a duplicate id "pool-size" (key fixed in the page).
+
 # 2026-11-04 ~12:30am: team search LIVE (5748e9a, deploy fantasy-f3d5yn4p7); write-lock READY on branch security/write-lock
 - Search: lib/search/teams.ts (one entry per team; college merged on ESPN school id; exact name match shows only that team), /api/search adds `teams`, HeaderSearch team rows first (game rows hidden when a team matches), /team + @modal/(.)team (TeamCard: per-sport game, lines, our read, props with edges). Built by a subagent, reviewed and fixed by Claude (exact-match filter, game rows hidden, "Pass Pass").
 - Write-lock (Jack chose passphrase login): branch security/write-lock = src/proxy.ts (POST /api/survivor/*, /api/refresh need signed hh_session cookie, fails closed), /unlock page, lib/auth/session.ts (+tests), Survivor/Refresh send locked devices to /unlock. NOT merged: needs Jack to add HH_SESSION_SECRET and HH_PASSPHRASE (production + preview) in Vercel first, or every save is refused. Then merge + push, and unlock each device once.
