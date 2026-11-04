@@ -15,6 +15,7 @@ import { stakedNbaToday, stakedPropsToday, type StakedBet } from "@/lib/props/st
 import { checkNote } from "@/lib/props/staked-core";
 import { loadProducts } from "../props/top";
 import type { ModelRow } from "../picks/board";
+import { playerPropHref } from "../picks/hrefs";
 import { LEAGUE_NAME, kickoffEt, line, price, rec } from "../picks/ui";
 import { Call, Chip, Disclosure, Empty, Num, PageHead, Section, Spotlight, Stat, type Tone } from "@/components/hh/ui";
 import { Meter, Sparkline } from "@/components/hh/charts";
@@ -148,7 +149,8 @@ function stakedSlips(bets: StakedBet[], now: number): Slip[] {
     const league: LogoLeague = b.sport === "NBA" ? "nba" : "nfl";
     return {
       key: `staked-${b.id}`,
-      href: b.href,
+      // A one-player bet opens that player's pop-up; tickets and spreads open their board.
+      href: b.player && b.team ? playerPropHref(league, b.team, b.player) : b.href,
       logos: { league, teams: home ? [{ team: away }, { team: home }] : [] },
       league: b.sport,
       pick: b.pick,
@@ -216,7 +218,7 @@ function BetRow({ x }: { x: Slip }) {
       <TeamEdge league={x.logos.league} team={edgeTeam}>
         {x.href ? (
           // The whole row opens the game pop-up (Jack, 2026-10-31: "click a bet from any sport and get the full picture").
-          <Link href={x.href} scroll={false} aria-label={`${x.pick}: open the game`} className="block rounded-[4px] transition-colors hover:bg-hh-sunk/60">
+          <Link href={x.href} scroll={false} aria-label={`${x.pick}: ${x.href.startsWith("/props/player") ? "open the player" : "open the game"}`} className="block rounded-[4px] transition-colors hover:bg-hh-sunk/60">
             {body}
           </Link>
         ) : (

@@ -44,7 +44,7 @@ export const STRATEGY_ARTICLES: StrategyArticle[] = [
     takeaway: "A high burn cost means the team is load-bearing later. Spend something else.",
   },
   {
-    id: "pool-size",
+    id: "pool-size-leverage",
     title: "Pool size decides how much safety you can sell.",
     hook: "At 500 entries, leverage is real. At 20 it mostly is not.",
     body: "In a 20-entry pool the season usually ends before anyone runs out of teams, so survival is almost the whole game and giving up more than about three points of win probability is a bad trade. At 500 entries, entries survive the season often enough that pure survival finishes you mid-pack, and giving up five to eight points for genuine leverage becomes correct. Two things change as the pool thins: leverage is measured against the entries still alive, not the ones that started, and public pick percentages get less reliable as the field shrinks toward a handful of people whose habits you actually know. Keep the 'still alive' number current, because it is an input, not decoration.",

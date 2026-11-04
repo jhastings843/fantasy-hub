@@ -40,10 +40,8 @@ export default async function SurvivorPage() {
         <Section label="Strategy and resources">
           <Disclosure summary={`Strategy library (${STRATEGY_ARTICLES.length})`}>
             <ul className="grid gap-x-8 lg:grid-cols-2">
-              {STRATEGY_ARTICLES.map((article, i) => (
-                // Two articles share the id "pool-size" in lib/survivor/strategy.ts,
-                // so the index keeps the keys unique.
-                <li key={`${article.id}-${i}`} className="border-b border-hh-line">
+              {STRATEGY_ARTICLES.map((article) => (
+                <li key={article.id} className="border-b border-hh-line">
                   <Disclosure
                     summary={
                       <span className="flex flex-col gap-0.5 py-1">

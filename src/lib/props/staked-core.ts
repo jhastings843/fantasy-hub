@@ -71,6 +71,8 @@ export interface StakedBet {
   chance?: { p: number; price: number };
   /** Page path that shows it. */
   href: string;
+  /** The player's team code, when the bet is on one player (opens the player pop-up on Today). */
+  team?: string;
   /**
    * Where the fresh pre-lock quote for it is read (lib/props/fresh.ts), on
    * sections whose edge can be re-judged at a new price: our NFL and NBA
@@ -179,6 +181,7 @@ function propBet(input: { section: string; sectionName: string; sport: Sport; hr
     sport: input.sport,
     game: `${b.away ?? b.game.away} at ${b.home ?? b.game.home}`,
     player: m.player,
+    team: m.team,
     pick: `${m.player} ${sideWord(side)} ${line} ${stat}`,
     market: stat,
     line,
@@ -253,6 +256,7 @@ function davidBet(input: { section: string; sectionName: string; sport: Sport; h
     sport: input.sport,
     game: `${away} at ${home}`,
     player: p.player,
+    team: p.team,
     pick: `${p.player} ${sideWord(side)} ${p.line} ${stat}`,
     market: stat,
     line: p.line,
@@ -278,6 +282,7 @@ function ftdBet(section: string, sectionName: string, g: FtdBoard, p: { name: st
     sport: "NFL",
     game: `${g.game.away} at ${g.game.home}`,
     player: p.name,
+    team: p.team,
     pick: `${p.name} (${p.team}) first TD`,
     market: "First TD",
     side: "Yes",
@@ -343,6 +348,7 @@ export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: strin
           sport: "NFL",
           game: `${g.game.away} at ${g.game.home}`,
           player: r.name,
+          team: r.team,
           pick: `${r.name} (${r.team}) anytime TD`,
           market: "Anytime TD",
           side: "Yes",
@@ -384,6 +390,7 @@ export function fbStaked(input: { boards: (OurStoredProps | (StoredProps & { fb?
           sport: "NBA",
           game: `${g.away} at ${g.home}`,
           player: x.name,
+          team: x.team,
           pick: `${x.name} (${x.team}) first basket`,
           market: "First Basket",
           side: "Yes",
@@ -476,6 +483,7 @@ export function kotcStaked(input: { night: KotcNight | null; boards: OurStoredPr
         sport: "NBA",
         game: `${t.board.away} at ${t.board.home}`,
         player: row.name,
+        team: t.m.team,
         pick: `${row.name} ${sideWord(t.side)} ${t.m.line} ${stat}`,
         market: stat,
         line: t.m.line,

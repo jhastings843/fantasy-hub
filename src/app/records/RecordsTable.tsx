@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import s from "../picks/picks.module.css";
 
 // The settled issued recommendations, sortable from the buttons or the column
@@ -11,6 +11,8 @@ export interface IssuedRow {
   league: string;
   week: number;
   position: string;
+  /** The position with each team name opening its pop-up; `position` stays the plain text. */
+  node?: ReactNode;
   kind: string;
   tier: string;
   stake: number;
@@ -111,7 +113,7 @@ export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
                 <td className={s.num}>{r.week}</td>
                 <td>{r.league}</td>
                 <td>
-                  <b>{r.position}</b>
+                  <b>{r.node ?? r.position}</b>
                   {r.kind !== "Spread" && <span className={s.muted}>{` · ${r.kind}`}</span>}
                 </td>
                 <td>{r.tier}</td>

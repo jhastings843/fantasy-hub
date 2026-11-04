@@ -12,6 +12,7 @@ import { getOurNflView } from "@/lib/models/nfl/store";
 import { attdGraded, getOurFtdView } from "@/lib/models/nfl/ftd-store";
 import { attdEdges } from "@/lib/models/nfl/anytime";
 import { bestCost, ftdEdge } from "@/lib/models/nfl/ftd-price";
+import { appeared } from "@/lib/models/nfl/ftd-void";
 import { stakedPropsToday } from "@/lib/props/staked";
 import { getPicksReport } from "@/lib/picks/report";
 import { getAllPlayers } from "@/lib/sleeper/client";
@@ -269,7 +270,10 @@ async function nflExtra(v: PlayerView, now: Date): Promise<PlayerExtra> {
           const b = bestCost(g, p.name);
           if (!b || b.cost >= 1 || !ftdEdge(p.p, b.cost)) return [];
           const won = done && "result" in g && g.result ? g.result.key === p.key : false;
-          return [{ at: g.kickoff ?? g.capturedAt ?? null, market: "First TD", pick: "First TD", price: b.where, result: done ? (won ? ("W" as const) : ("L" as const)) : ("open" as const), net: done ? (won ? r2((1 - b.cost) / b.cost) : -1) : null }];
+          // He didn't take the field: the books void it (ftd-void.ts), so it is not a loss.
+          const sat = done && !won && appeared("played" in g ? g.played : undefined, p.team, p.name) === false;
+          const result = !done ? ("open" as const) : won ? ("W" as const) : sat ? ("void" as const) : ("L" as const);
+          return [{ at: g.kickoff ?? g.capturedAt ?? null, market: "First TD", pick: "First TD", price: b.where, result, net: !done ? null : won ? r2((1 - b.cost) / b.cost) : sat ? 0 : -1 }];
         });
 
   // Anytime TD edges at DK (anytime.ts attdEdges), graded only: the open board's prices move until kickoff.

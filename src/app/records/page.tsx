@@ -16,6 +16,7 @@ import s from "../picks/picks.module.css";
 import { Fragment, type ReactNode } from "react";
 import { PopLink } from "@/components/hh/PopLink";
 import { footballGameHref } from "../picks/hrefs";
+import { boardTeamHref } from "../picks/ats";
 
 // Records (the Ledger redesign, 2026-10-22). Two books that never mix:
 // recommendations the picks emails issued with a saved price and stake, and
@@ -44,11 +45,15 @@ function position(b: BetRow, names: PicksReport["names"]): string {
   return b.legs.map(leg).join(" + ");
 }
 
-/** position() with each team name opening its game pop-up: open bets are this week's, still on the board. */
-function positionNode(b: BetRow, r: PicksReport): ReactNode {
+/**
+ * position() with each team name a pop-up link. Open bets are this week's, still
+ * on the board, so a name opens the game; a settled bet's game is gone from the
+ * board, so a name opens that team.
+ */
+function positionNode(b: BetRow, r: PicksReport, settled = false): ReactNode {
   const n = (k: string) => r.names[k] ?? k;
   return b.legs.map((l, i) => {
-    const t = (k: string) => <PopLink href={footballGameHref(r.league, l.away, l.home)}>{n(k)}</PopLink>;
+    const t = (k: string) => <PopLink href={settled ? boardTeamHref(r, k) : footballGameHref(r.league, l.away, l.home)}>{n(k)}</PopLink>;
     return (
       <Fragment key={i}>
         {i ? " + " : ""}
@@ -108,7 +113,7 @@ export default async function RecordsPage() {
         };
         if (b.unstaked) return;
         if (b.result === undefined) open.push({ ...row, node: positionNode(b, r) });
-        else settled.push({ ...row, result: b.result, net: b.net ?? 0 });
+        else settled.push({ ...row, node: positionNode(b, r, true), result: b.result, net: b.net ?? 0 });
       });
   }
   const net = settled.reduce((a, b) => a + b.net, 0);
