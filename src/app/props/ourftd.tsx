@@ -14,6 +14,8 @@ import { whenEt } from "../picks/ui";
 import { Tile } from "./ournba";
 import { LearningBlock } from "./learning";
 import s from "../picks/picks.module.css";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref, playerPropHref } from "../picks/hrefs";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
@@ -39,7 +41,7 @@ function Card({ g }: { g: OurFtdStored }) {
       <details className={s.ftdGame}>
         <summary className={s.ftdSum}>
           <span className={s.ftdWhen}>
-            <b>{`${g.game.away} at ${g.game.home}`}</b>
+            <b><PopLink href={footballGameHref("nfl", g.game.away, g.game.home)}>{`${g.game.away} at ${g.game.home}`}</PopLink></b>
             <span className={s.dim}>{g.kickoff ? whenEt(g.kickoff) : ""}</span>
           </span>
           <span className={s.ftdPick}>
@@ -70,7 +72,7 @@ function Card({ g }: { g: OurFtdStored }) {
                 {rows.map(({ p, cost, dk, value }) => (
                   <tr key={p.key}>
                     <td>
-                      {`${p.name} `}
+                      <PopLink href={playerPropHref("nfl", p.team, p.name, g.espnId ?? g.game.slug)}>{p.name}</PopLink>{" "}
                       <span className={s.dim}>{p.team}</span>
                     </td>
                     <td className={s.num}>{pct(p.p)}</td>
@@ -188,7 +190,10 @@ export async function OurFtdResults({ season }: { season: number }) {
                           {bets.length ? (
                             bets.map((b, i) => (
                               <tr key={`${b.pl.key}|${i}`}>
-                                <td>{`${b.pl.name} ${b.pl.team}`}</td>
+                                <td>
+                                  <PopLink href={playerPropHref("nfl", b.pl.team, b.pl.name, x.game.slug)}>{b.pl.name}</PopLink>
+                                  {` ${b.pl.team}`}
+                                </td>
                                 <td className={s.num}>{pct(b.pl.p)}</td>
                                 <td className={s.num}>{b.c.where}</td>
                                 <td className={s.num}><b className={b.win ? s.pos : s.neg}>{b.win ? `Won ${u(b.net)}` : "Lost −1.0u"}</b></td>

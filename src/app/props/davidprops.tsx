@@ -12,6 +12,8 @@ import { Tile } from "./ournba";
 import { updated } from "./updated";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref, playerPropHref, teamHref } from "../picks/hrefs";
 
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
@@ -38,7 +40,7 @@ function davidLearning(v: SectionView): SectionView {
   return { ...v, entries: v.entries.filter((e) => isDavidOnly(e.id)), journal: v.journal.filter((j) => !/\bSam\b/.test(j.text)) };
 }
 
-function DavidRow({ p, result, hits }: { p: DavidProp; result: DavidGraded | undefined; hits: string[] }) {
+function DavidRow({ p, result, hits, game }: { p: DavidProp; result: DavidGraded | undefined; hits: string[]; /** The saved game id, for the player pop-up. */ game?: string }) {
   const side = davidSide(p)!;
   const price = side === "over" ? p.over : p.under;
   const out = result?.outcome;
@@ -46,7 +48,7 @@ function DavidRow({ p, result, hits }: { p: DavidProp; result: DavidGraded | und
     <li className={`${s.ppRow} ${hits.length ? s.ppSys : ""}`}>
       <div className={s.ppMain}>
         <span className={s.ppWho}>
-          {`${p.player} `}
+          <PopLink href={playerPropHref("nfl", p.team, p.player, game)}>{p.player}</PopLink>{" "}
           <span className={s.dim}>{p.team}</span>
         </span>
         <span className={s.ppBet}>{`${sideWord(side)} ${p.line} ${dShort[p.market]}`}</span>
@@ -82,7 +84,20 @@ function DavidCard({ g, active }: { g: DavidGame; active: string[] }) {
       <details className={s.ftdGame}>
         <summary className={s.ftdSum}>
           <span className={s.ftdWhen}>
-            <b>{`${away} at ${home}`}</b>
+            {/* Ungraded: the game pop-up; graded games are off the board, so each team opens its own. */}
+            <b>
+              {!away || !home ? (
+                `${away} at ${home}`
+              ) : !g.result ? (
+                <PopLink href={footballGameHref("nfl", away, home)}>{`${away} at ${home}`}</PopLink>
+              ) : (
+                <>
+                  <PopLink href={teamHref("nfl", away)}>{away}</PopLink>
+                  {" at "}
+                  <PopLink href={teamHref("nfl", home)}>{home}</PopLink>
+                </>
+              )}
+            </b>
             <span className={s.dim}>{whenEt(g.kickoff)}</span>
           </span>
           <span className={s.ftdPick}>
@@ -101,7 +116,7 @@ function DavidCard({ g, active }: { g: DavidGame; active: string[] }) {
           {plays.length ? (
             <ol className={s.ppList}>
               {plays.map((p) => (
-                <DavidRow key={p.id} p={p} result={res.get(p.id)} hits={hits(p)} />
+                <DavidRow key={p.id} p={p} result={res.get(p.id)} hits={hits(p)} game={g.gameId} />
               ))}
             </ol>
           ) : (
@@ -126,7 +141,7 @@ function DavidCard({ g, active }: { g: DavidGame; active: string[] }) {
                     return (
                       <tr key={p.id}>
                         <td>
-                          {`${p.player} `}
+                          <PopLink href={playerPropHref("nfl", p.team, p.player, g.gameId)}>{p.player}</PopLink>{" "}
                           <span className={s.dim}>{p.team}</span>
                         </td>
                         <td>{dShort[p.market]}</td>
@@ -210,7 +225,10 @@ export async function DavidResults({ season }: { season: number }) {
                     return (
                       <tr key={`${week}|${p.id}`}>
                         <td className={s.num}>{week}</td>
-                        <td>{`${p.player} (${p.team})`}</td>
+                        <td>
+                          <PopLink href={playerPropHref("nfl", p.team, p.player)}>{p.player}</PopLink>
+                          {` (${p.team})`}
+                        </td>
                         <td>{`${sideWord(bet.side)} ${p.line} ${dShort[p.market]}`}</td>
                         <td className={s.num}>{price !== null ? `${am(price)} DK` : "–"}</td>
                         <td className={s.num}>{actual}</td>

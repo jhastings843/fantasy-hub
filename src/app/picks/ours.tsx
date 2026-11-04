@@ -1,6 +1,8 @@
 import { loadForecasts } from "@/lib/picks/forecasts";
 import { closingLines } from "@/lib/picks/closing-store";
 import { GATE, SIGNALS, signalRecords, trackedGames } from "@/lib/models/nfl/spread-track";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref } from "./hrefs";
 import s from "./picks.module.css";
 
 // Our own NFL spread model, a collapsed panel on the NFL research view.
@@ -77,7 +79,9 @@ export async function OurSpreadCard({ season }: { season: number }) {
               <tbody>
                 {ahead.map((g) => (
                   <tr key={`${g.week}|${g.home}`}>
-                    <td>{`${g.away} at ${g.home}`}</td>
+                    <td>
+                      <PopLink href={footballGameHref("nfl", g.away, g.home)}>{`${g.away} at ${g.home}`}</PopLink>
+                    </td>
                     <td className={s.num}>{`${g.home} ${sp(g.line)}`}</td>
                     <td className={s.num}>{`${g.home} ${sp(Math.round(g.ours * 10) / 10)}`}</td>
                     <td>{g.signals.filter((x) => x.id !== "lean").map((x) => `${label(x.id)}: ${x.side === "home" ? g.home : g.away}`).join(" · ") || "lean only"}</td>

@@ -1,5 +1,7 @@
 import { getCfbModelView } from "@/lib/models/cfb/store";
 import { signalOf } from "@/lib/models/cfb/track";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref } from "./hrefs";
 import s from "./picks.module.css";
 
 // Our college model, a collapsed panel on the college research view, next to
@@ -116,7 +118,10 @@ export async function CfbModelCard({ season }: { season: number }) {
                   const lean = sig ? `${sig.side === "home" ? g.home : g.away} by ${sig.edge.toFixed(1)}` : "on the line";
                   return (
                     <tr key={`${g.week}|${g.home}|${g.away}`}>
-                      <td>{`${g.away} at ${g.home}${g.neutral ? " (neutral)" : ""}`}</td>
+                      <td>
+                        <PopLink href={footballGameHref("cfb", g.away, g.home)}>{`${g.away} at ${g.home}`}</PopLink>
+                        {g.neutral ? " (neutral)" : ""}
+                      </td>
                       <td className={s.num}>{`${Math.round(p.awayPts)}-${Math.round(p.homePts)} · ${g.home} ${pct(p.homeWin)}`}</td>
                       <td className={s.num}>{`${g.home} ${sp(p.spread)}`}</td>
                       <td className={s.num}>{`${g.home} ${sp(g.last.line)}`}</td>

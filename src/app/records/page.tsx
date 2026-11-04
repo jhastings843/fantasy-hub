@@ -13,6 +13,9 @@ import { Sparkline } from "@/components/hh/charts";
 import { LEAGUE_NAME, line } from "../picks/ui";
 import RecordsTable, { type IssuedRow } from "./RecordsTable";
 import s from "../picks/picks.module.css";
+import { Fragment, type ReactNode } from "react";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref } from "../picks/hrefs";
 
 // Records (the Ledger redesign, 2026-10-22). Two books that never mix:
 // recommendations the picks emails issued with a saved price and stake, and
@@ -41,6 +44,39 @@ function position(b: BetRow, names: PicksReport["names"]): string {
   return b.legs.map(leg).join(" + ");
 }
 
+/** position() with each team name opening its game pop-up: open bets are this week's, still on the board. */
+function positionNode(b: BetRow, r: PicksReport): ReactNode {
+  const n = (k: string) => r.names[k] ?? k;
+  return b.legs.map((l, i) => {
+    const t = (k: string) => <PopLink href={footballGameHref(r.league, l.away, l.home)}>{n(k)}</PopLink>;
+    return (
+      <Fragment key={i}>
+        {i ? " + " : ""}
+        {l.side === "over" || l.side === "under" ? (
+          <>
+            {`${l.side === "over" ? "Over" : "Under"} ${l.line} · `}
+            {t(l.away)}
+            {" at "}
+            {t(l.home)}
+          </>
+        ) : l.side === "home" ? (
+          <>
+            {t(l.home)}
+            {` ${line(l.line)} vs `}
+            {t(l.away)}
+          </>
+        ) : (
+          <>
+            {t(l.away)}
+            {` ${line(-l.line)} at `}
+            {t(l.home)}
+          </>
+        )}
+      </Fragment>
+    );
+  });
+}
+
 export default async function RecordsPage() {
   const season = seasonOf(new Date());
   const [nfl, cfb, nbaProps, nflProps, ftd, nbaPicks] = await Promise.all([
@@ -54,7 +90,7 @@ export default async function RecordsPage() {
   const reports = [nfl?.value, cfb?.value].filter((r): r is PicksReport => !!r);
 
   const settled: IssuedRow[] = [];
-  const open: { key: string; league: string; week: number; position: string; tier: string; stake: number; price: number | null }[] = [];
+  const open: { key: string; league: string; week: number; position: string; node: ReactNode; tier: string; stake: number; price: number | null }[] = [];
   let unstaked = 0;
   for (const r of reports) {
     unstaked += r.units.unstaked;
@@ -71,7 +107,7 @@ export default async function RecordsPage() {
           price: b.price ?? null,
         };
         if (b.unstaked) return;
-        if (b.result === undefined) open.push(row);
+        if (b.result === undefined) open.push({ ...row, node: positionNode(b, r) });
         else settled.push({ ...row, result: b.result, net: b.net ?? 0 });
       });
   }
@@ -152,7 +188,7 @@ export default async function RecordsPage() {
                       <td className={s.num}>{r.week}</td>
                       <td>{r.league}</td>
                       <td>
-                        <b>{r.position}</b>
+                        <b>{r.node}</b>
                       </td>
                       <td>{r.tier}</td>
                       <td className={`${s.num} ${s.tdNum}`}>{`${r.stake}u`}</td>

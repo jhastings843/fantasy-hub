@@ -2,6 +2,8 @@ import { getNbaGameModelView } from "@/lib/models/nba/game-store";
 import { GATE, SIGNALS, signalsOf } from "@/lib/models/nba/game-track";
 import { projectedScore } from "@/lib/models/cfb/model";
 import { kickoffEt } from "../ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { nbaGameHref } from "../hrefs";
 import s from "../picks.module.css";
 
 // Our own NBA game model (spreads and totals), a collapsed panel on the NBA
@@ -78,7 +80,7 @@ export async function NbaGameModelCard({ season }: { season: number }) {
                 {ahead.map((g) => (
                   <tr key={g.event}>
                     <td>
-                      {`${g.away} at ${g.home}`}
+                      <PopLink href={nbaGameHref(g.event)}>{`${g.away} at ${g.home}`}</PopLink>
                       <div className={s.dim}>{kickoffEt(g.tip)}</div>
                     </td>
                     <td className={s.num}>{`${g.home} ${sp(g.first.spread)}`}</td>

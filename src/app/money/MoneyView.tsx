@@ -11,6 +11,8 @@ import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 import { Term } from "./Term";
 import { IntradayHero, IntradayTab } from "./IntradayTab";
+import { PopLink } from "@/components/hh/PopLink";
+import { teamHref } from "../picks/hrefs";
 
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
 // paper stock books, all paper or unit-based. Bets live in this app;
@@ -67,12 +69,14 @@ function betChart(bets: Awaited<ReturnType<typeof getMoneyView>>["summary"], hei
 }
 
 function BetRow({ b }: { b: MoneyBet }) {
+  // Logged bets can be from any week, so a team opens its own pop-up (NFL abbreviations; college names stay text).
+  const team = (x: string) => (b.sport === "nfl" ? <PopLink href={teamHref("nfl", x)}>{x}</PopLink> : x);
   return (
     <tr>
       <td>
         <div className={s.play}>{b.label}</div>
         <div className={m.why}>
-          {b.away} at {b.home} · {new Date(`${b.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          {team(b.away)} at {team(b.home)} · {new Date(`${b.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           {b.source ? ` · ${b.source}` : ""}
           {b.result?.actual ? ` · ${b.result.actual}` : ""}
         </div>

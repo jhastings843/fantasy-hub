@@ -622,7 +622,7 @@ export function propGradedRows(graded: GradedPropsGame[], league: "nfl" | "nba")
                 return (
                   <tr key={r.id}>
                     <td>
-                      <b>{m.player}</b>
+                      <b>{m.team ? <PopLink href={playerPropHref(league, m.team, m.player, g.slug)}>{m.player}</PopLink> : m.player}</b>
                       <span className={s.dim}>{` ${m.team} · ${m.line} ${SHORT[m.stat ?? ""] ?? m.statLabel}`}</span>
                     </td>
                     <td className={s.num}>{m.model}</td>
@@ -643,7 +643,7 @@ export function propGradedRows(graded: GradedPropsGame[], league: "nfl" | "nba")
 /* ------------------------------------------------------- first basket --- */
 
 /** Every starter on one First Basket board: ours against DraftKings, and who scored first once graded. */
-export function FbTable({ b }: { b: FbBoard }) {
+export function FbTable({ b, game }: { b: FbBoard; /** ESPN id or slug, for the player pop-up. */ game?: string }) {
   const res = b.result;
   return (
     <div className={s.tw}>
@@ -663,7 +663,7 @@ export function FbTable({ b }: { b: FbBoard }) {
             const hit = res?.player === x.id;
             return (
               <tr key={x.id} className={hit ? s.rowHit : x.edge ? s.rowEdge : undefined}>
-                <td>{`${x.name} `}<span className={s.dim}>{x.team}</span>{hit && <b className={s.pos}> · first basket</b>}</td>
+                <td><PopLink href={playerPropHref("nba", x.team, x.name, game)}>{x.name}</PopLink>{" "}<span className={s.dim}>{x.team}</span>{hit && <b className={s.pos}> · first basket</b>}</td>
                 <td className={s.num}>{pct(x.p)}</td>
                 <td className={s.num}>{x.fair !== null ? pct(x.fair) : "·"}</td>
                 <td className={s.num}>{x.price !== null ? am(x.price) : "·"}</td>
@@ -698,7 +698,7 @@ export function fbGradedRows(graded: OurNbaView["fb"]["graded"]): GameRowData[] 
         ["First basket", scorer],
       ],
       read: !g.bets.length ? ["No edges", s.readPass] : [`${record} · ${u(units)}`, units > 0 ? s.readW : units < 0 ? s.readL : s.readPass],
-      body: <FbTable b={g.board} />,
+      body: <FbTable b={g.board} game={g.event} />,
     };
   });
 }
@@ -750,7 +750,7 @@ async function FirstBasketWeek({ season }: { season: number }) {
     return {
       key: g.game.slug,
       title: `${g.away} at ${g.home}`,
-      match: { league: "nba", away: b.away, home: b.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
+      match: { league: "nba", away: b.away, home: b.home, tv: g.espnId ? tv.get(g.espnId) : undefined, href: g.espnId ? nbaGameHref(g.espnId) : undefined },
       when: g.kickoff,
       live: started(g.kickoff, undefined),
       final: ended.has(g.game.slug),
@@ -760,7 +760,7 @@ async function FirstBasketWeek({ season }: { season: number }) {
         ["Edges", `${e.length}`],
       ],
       read: e.length ? [`${e.length} tracked · no stake`, s.readTrack] : ["No edges", s.readPass],
-      body: <FbTable b={b} />,
+      body: <FbTable b={b} game={g.espnId ?? g.game.slug} />,
     };
   });
   return (
@@ -891,7 +891,7 @@ async function FirstTdWeek({ season }: { season: number }) {
     return {
       key: g.game.slug,
       title: `${g.game.away} at ${g.game.home}`,
-      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
+      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined, href: footballGameHref("nfl", g.game.away, g.game.home) },
       when: g.kickoff,
       live: started(g.kickoff, r),
       final: ended.has(g.game.slug),
@@ -922,7 +922,7 @@ async function FirstTdWeek({ season }: { season: number }) {
                 return (
                   // Player keys are team + initial + surname, so two "ATL_B.Robinson"s collide; the index keeps rows distinct.
                   <tr key={`${p.key}|${i}`}>
-                    <td>{`${p.name} `}<span className={s.dim}>{p.team}</span>{r?.key === p.key && <b className={s.pos}> · scored first</b>}</td>
+                    <td><PopLink href={playerPropHref("nfl", p.team, p.name, g.espnId ?? g.game.slug)}>{p.name}</PopLink>{" "}<span className={s.dim}>{p.team}</span>{r?.key === p.key && <b className={s.pos}> · scored first</b>}</td>
                     <td className={s.num}>{pct(p.p)}</td>
                     <td className={s.num}>{k !== null ? `${Math.round(k * 100)}¢` : "·"}</td>
                     <td className={s.num}>{d !== null ? am(d) : "·"}</td>

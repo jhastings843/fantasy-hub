@@ -2,6 +2,8 @@ import Image from "next/image";
 import { getPoolView, type PoolView } from "@/lib/picks/pool-store";
 import { logoUrl } from "@/lib/survivor/teams";
 import { kickoffEt } from "./ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { teamHref } from "./hrefs";
 import s from "./picks.module.css";
 
 // The weekly pick'em pool entry: best chance to finish first, not the most
@@ -92,7 +94,9 @@ export async function PoolCard() {
         <ul className={s.cards}>
           {r.upsets.map((u) => (
             <li key={u.key} className={`${s.card} ${s.cardBet}`}>
-              <div className={s.cardPick}>{`Take ${u.team}`}</div>
+              <div className={s.cardPick}>
+                Take <PopLink href={teamHref("nfl", u.team)}>{u.team}</PopLink>
+              </div>
               <div
                 className={s.cardMeta}
               >{`Wins ${pct(u.pWin)} of the time; ${pct(1 - u.publicOn)} of the field is on the other side${v.fieldSource === "estimate" ? " (estimated)" : ""}. When it hits, you pass most of the pool.`}</div>
@@ -133,9 +137,9 @@ export async function PoolCard() {
                   <div className={s.poolTop}>
                     <Logo abbr={team} size={36} />
                     <div className={s.poolWho}>
-                      <span className={s.poolTeam}>{team}</span>
+                      <span className={s.poolTeam}><PopLink href={teamHref("nfl", team)}>{team}</PopLink></span>
                       <span className={s.poolOpp}>
-                        {home ? "vs" : "at"} <Logo abbr={opp} size={16} /> {opp}
+                        {home ? "vs" : "at"} <Logo abbr={opp} size={16} /> <PopLink href={teamHref("nfl", opp)}>{opp}</PopLink>
                       </span>
                     </div>
                     <div className={s.poolPct}>
