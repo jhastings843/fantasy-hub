@@ -199,7 +199,21 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
         origin: "Jack, 2026-11-04: test a blend (our model agreeing with Sam and David) beside our own model, tracked only",
       };
     });
-    return [...totals, ...su, ...sources, ...market, ...consensus];
+    // Split, home team (Jack, 2026-11-04): found in-sample (college 80-57-5), so it is judged
+    // only on games after registration, against not betting. Report only: the live board
+    // can't stake a split on the home team yet, so a pass is a note for a person.
+    const splitHome = all.find((x) => x.id === "split-home")!;
+    const split: Hypothesis = {
+      id: `${league}:ats:split-home`,
+      kind: "ats-cut",
+      league,
+      definition: { kind: "ats-cut", cutId: splitHome.id, label: splitHome.label, test: splitHome.test, parentId: "none", parentTest: {} },
+      actionable: false,
+      registeredAt,
+      status: "collecting",
+      origin: "Jack, 2026-11-04: when Sam and David split, does the home team beat not betting? Found in-sample, so forward games only",
+    };
+    return [...totals, ...su, ...sources, ...market, ...consensus, split];
   });
   return [
     {
@@ -292,12 +306,14 @@ const none: Scored = { bet: false, units: 0, risked: 0 };
 export function scoreCut(test: CutTest, s: ForecastSnapshot, o: Opportunity, stake = 1): Scored {
   if (!s.sam || !s.david || !s.ref || !o.final) return none;
   const r = readAt(s.ref.line, s.sam, s.david, s.pem, s.ours?.model);
-  if (!matches(r, test) || !r.side) return none;
+  if (!matches(r, test)) return none;
+  const side = test.splitHome ? "home" : r.side;
+  if (!side) return none;
   const homeLine = s.ref.line;
-  const pr = r.side === "home" ? s.ref.homePrice : s.ref.awayPrice;
+  const pr = side === "home" ? s.ref.homePrice : s.ref.awayPrice;
   if (pr === undefined) return none;
-  const res = grade(o.final, homeLine, r.side);
-  return { bet: true, units: payout(res, stake, pr), risked: stake, result: res, clv: o.close != null ? clvPoints(r.side, homeLine, o.close) : undefined };
+  const res = grade(o.final, homeLine, side);
+  return { bet: true, units: payout(res, stake, pr), risked: stake, result: res, clv: o.close != null ? clvPoints(side, homeLine, o.close) : undefined };
 }
 
 export interface Comparison {
@@ -648,7 +664,8 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
   const d = h.definition;
   switch (d.kind) {
     case "ats-cut":
-      return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: scoreCut(d.parentTest, o.first, o) }))) };
+      // parentId "none": the challenger is judged against not betting at all.
+      return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: d.parentId === "none" ? none : scoreCut(d.parentTest, o.first, o) }))) };
     case "source": {
       const t = x.ruleTest.cfb;
       if (!t) return { id: h.id, note: "no rule in force" };

@@ -23,3 +23,15 @@ describe("split-home slice (Jack, 2026-11-04)", () => {
     for (const c of cutsFor("cfb", true).filter((x) => x.group === "PEM, third model")) expect(c.candidate).toBe(false);
   });
 });
+
+describe("split-home on the learner", () => {
+  it("is registered for both leagues, report only, judged against not betting", async () => {
+    const { laterHypotheses } = await import("./learning/model");
+    const hs = laterHypotheses("2026-11-05T00:00:00Z").filter((h) => h.id.endsWith(":ats:split-home"));
+    expect(hs.map((h) => h.league).sort()).toEqual(["cfb", "nfl"]);
+    for (const h of hs) {
+      expect(h.actionable).toBe(false);
+      expect(h.definition).toMatchObject({ parentId: "none", test: { splitHome: true } });
+    }
+  });
+});
