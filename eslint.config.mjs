@@ -7,6 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Agent worktrees are full copies of the repo (Claude Code, .claude/worktrees): never lint them as site code.
+    ".claude/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
