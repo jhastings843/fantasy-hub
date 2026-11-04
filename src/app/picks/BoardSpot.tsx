@@ -34,7 +34,7 @@ export function BoardSpot({ r }: { r: PicksReport }) {
   const href = `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`;
   return (
     <Spotlight label={g.issued ? "Best bet this week" : "Best bet · sized, not sent"} aside={`${LEAGUE_NAME[r.league]} · ${kickoffEt(ref?.kickoff)}`}>
-      <Link href={href} scroll={false} className="group flex items-center gap-3">
+      <Link href={href} scroll={false} className="group flex items-center gap-3" data-first-pick>
         <TeamLogo league={r.league} team={team} espnId={side === "home" ? ref?.homeId : ref?.awayId} size={40} />
         <div className="min-w-0">
           <p className="font-display text-[30px] font-bold uppercase leading-none text-hh-ink group-hover:text-hh-accent-ink">{pick}</p>
