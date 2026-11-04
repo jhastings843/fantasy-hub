@@ -70,7 +70,10 @@ export function HobbyTabs() {
   if (!isHobby(p)) return null;
   return (
     <div className="border-b border-zinc-200/60 bg-white/60 backdrop-blur dark:border-zinc-800/60 dark:bg-zinc-950/60">
-      <nav aria-label="Hobby" className="mx-auto flex w-full max-w-6xl items-center justify-center gap-1 overflow-x-auto px-3 py-2 sm:px-5 lg:px-7">
+      <nav
+        aria-label="Hobby"
+        className="mx-auto flex w-full max-w-6xl items-center justify-start gap-0 overflow-x-auto px-1.5 py-2 [scrollbar-width:none] min-[400px]:justify-center sm:gap-1 sm:px-5 lg:px-7 [&::-webkit-scrollbar]:hidden"
+      >
         {HOBBY_TABS.map((t) => {
           const active = t.owns(p);
           return (
@@ -78,7 +81,7 @@ export function HobbyTabs() {
               key={t.href}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+              className={`whitespace-nowrap rounded-full px-2 py-1.5 text-[13px] font-semibold transition-colors sm:px-3.5 sm:text-sm ${
                 active ? "bg-zinc-50 text-zinc-900" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-50"
               }`}
             >
