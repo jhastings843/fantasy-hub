@@ -147,6 +147,8 @@ export interface CutTest {
   pem?: "agree" | "disagree";
   /** Sam and David split; back whichever side PEM takes. */
   pemSplit?: boolean;
+  /** Sam and David split; back the home team (Jack, 2026-11-04: tracked research, never a tier on its own). */
+  splitHome?: boolean;
   /** Our own model on the same side as Sam and David, or against them (consensus research, Jack 2026-11-04). */
   ours?: "agree" | "disagree";
 }
@@ -169,6 +171,7 @@ export function needsPem(t: CutTest): boolean {
 
 export function matches(r: Read, t: CutTest): boolean {
   if (t.pemSplit) return !r.agree && !!r.pemSide;
+  if (t.splitHome) return !r.agree && (r.samSide === "home" || r.davidSide === "home");
   if (!r.agree || r.line === undefined) return false;
   if (t.pem === "agree" && (!r.pemSide || r.pemSide !== r.side)) return false;
   if (t.pem === "disagree" && (!r.pemSide || r.pemSide === r.side)) return false;
@@ -292,13 +295,16 @@ export function cutsFor(league: "nfl" | "cfb", withPem = false): Cut[] {
     c("flip", "Both models pick the dog to win outright", "Line size", { flip: true }),
     ...(withPem
       ? [
-          c("pem-agree", "All three agree (with PEM)", "PEM, third model", { pem: "agree" }),
-          c("pem-agree-dog", "All three agree on the dog", "PEM, third model", { pem: "agree", side: "dog" }),
-          c("pem-agree-fav", "All three agree on the favorite", "PEM, third model", { pem: "agree", side: "fav" }),
-          c("pem-disagree", "Sam + David agree, PEM disagrees", "PEM, third model", { pem: "disagree" }),
-          c("pem-split", "Sam and David split: PEM's side", "PEM, third model", { pemSplit: true }),
+          c("pem-agree", "All three agree (with PEM)", "PEM, third model", { pem: "agree" }, false),
+          c("pem-agree-dog", "All three agree on the dog", "PEM, third model", { pem: "agree", side: "dog" }, false),
+          c("pem-agree-fav", "All three agree on the favorite", "PEM, third model", { pem: "agree", side: "fav" }, false),
+          c("pem-disagree", "Sam + David agree, PEM disagrees", "PEM, third model", { pem: "disagree" }, false),
+          c("pem-split", "Sam and David split: PEM's side", "PEM, third model", { pemSplit: true }, false),
         ]
       : []),
+    // Found 2026-11-04 by comparing tiebreaks on that season's splits (home team
+    // 80-57-5 in college), so its record so far is in-sample. Tracked, not a candidate.
+    c("split-home", "Sam and David split: home team", "Splits", { splitHome: true }, false),
     ...researchCuts(league),
     ...OURS_CUTS,
   ];
@@ -348,6 +354,8 @@ export interface GradedGame extends Game {
   davidResult: Result;
   /** On a split, the result of whichever model PEM sided with. */
   pemSplitResult?: Result;
+  /** On a split, the result of whichever model took the home team. */
+  splitHomeResult?: Result;
   /** PEM alone, at its card's line (or the average market line). */
   pemResult?: Result;
 }
@@ -373,6 +381,13 @@ export function gradeGame(g: Game & { final: { home: number; away: number }; sam
           : grade(g.final, g.david.market, davidSide)
         : undefined,
     pemResult: g.pem ? pemAlone(g.final, g.pem, r.avgMarket) : undefined,
+    splitHomeResult: r.agree
+      ? undefined
+      : samSide === "home"
+        ? grade(g.final, g.sam.market, "home")
+        : davidSide === "home"
+          ? grade(g.final, g.david.market, "home")
+          : undefined,
   };
 }
 
@@ -419,6 +434,7 @@ export interface StrategyBoard {
 /** The result a cut gives one game, or undefined when the cut does not bet it. */
 export function cutResult(g: GradedGame, cut: Cut): Result | undefined {
   if (cut.test.pemSplit) return matches(g.read, cut.test) ? g.pemSplitResult : undefined;
+  if (cut.test.splitHome) return matches(g.read, cut.test) ? g.splitHomeResult : undefined;
   return g.read.agree && g.result && matches(g.read, cut.test) ? g.result : undefined;
 }
 

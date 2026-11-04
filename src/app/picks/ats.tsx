@@ -1093,6 +1093,11 @@ function ruleChecks(rd: NonNullable<BoardGame["read"]>, t: CutTest, name: (side:
     out.push({ label: `PEM takes a side${rd.pemSide ? ` (${name(rd.pemSide)})` : ""}`, pass: !!rd.pemSide });
     return out;
   }
+  if (t.splitHome) {
+    out.push({ label: "Sam and David split", pass: !rd.agree });
+    out.push({ label: `Back the home team (${name("home")})`, pass: !rd.agree });
+    return out;
+  }
   out.push({ label: rd.agree && rd.side ? `Sam and David on the same side (${name(rd.side)})` : "Sam and David on the same side", pass: rd.agree });
   if (!rd.agree || rd.line === undefined) return out;
   if (t.pem) out.push({ label: `PEM ${t.pem === "agree" ? "agrees" : "disagrees"}`, pass: !!rd.pemSide && (t.pem === "agree" ? rd.pemSide === rd.side : rd.pemSide !== rd.side) });

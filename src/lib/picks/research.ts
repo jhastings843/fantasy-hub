@@ -41,6 +41,10 @@ export interface ResearchRow {
 function pickAt(g: GradedGame, cut: Cut): { side: "home" | "away"; homeLine: number } | null {
   const r = g.read;
   if (cut.test.pemSplit) return r.pemSide ? { side: r.pemSide, homeLine: pemSplitLine(g) } : null;
+  if (cut.test.splitHome) {
+    if (r.agree || (r.samSide !== "home" && r.davidSide !== "home")) return null;
+    return { side: "home", homeLine: r.samSide === "home" ? g.sam.market : g.david.market };
+  }
   if (!r.side || r.line === undefined) return null;
   return { side: r.side, homeLine: r.side === "home" ? r.line : -r.line };
 }
