@@ -786,7 +786,6 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
           </div>
           {view !== "week" && stats}
         </header>
-        {v && view === "week" && <ModelLineup title={`Who decides NBA ${MARKET_NAME[m].toLowerCase()}`} aside={m === "su" ? "No stakes in straight up." : v.gate.live && m === "ats" ? "The tier rule sets stakes under NBA's own limits." : "Nothing here sets a stake yet."} models={lineup(v, m)} />}
 
         {view !== "week" ? (
           !v ? (
@@ -833,6 +832,7 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
             </Background>
           </section>
         )}
+        {v && view === "week" && <ModelLineup title={`Who decides NBA ${MARKET_NAME[m].toLowerCase()}`} aside={m === "su" ? "No stakes in straight up." : v.gate.live && m === "ats" ? "The tier rule sets stakes under NBA's own limits." : "Nothing here sets a stake yet."} models={lineup(v, m)} />}
 
         <footer className={s.footer}>
           <span>

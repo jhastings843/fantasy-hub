@@ -90,7 +90,6 @@ export default async function PropsView({
           </div>
         </header>
 
-        {shown === "week" && <PropsLineup tab={market} season={season} />}
         {shown === "week" && market !== "kotc" && market !== "lotto" && market !== "attd" && market !== "kotez" && <PropTabWeek tab={market} season={season} />}
         {shown === "log" && market !== "kotc" && market !== "lotto" && market !== "attd" && market !== "kotez" && <PropsLog tab={market} season={season} />}
         {market === "kotez" && shown === "week" && <KotezWeek season={season} />}
@@ -106,6 +105,8 @@ export default async function PropsView({
         {market === "kotc" && shown === "week" && <KotcWeek season={season} />}
         {market === "kotc" && shown === "results" && <KotcResults season={season} />}
         {market === "pp" && shown === "results" && <OurNflResults season={season} />}
+        {/* Who decides follows the board: edges and games lead, the drivers come after (redesign, 2026-11-03). */}
+        {shown === "week" && <PropsLineup tab={market} season={season} />}
         {/* David's board is research only (Jack, 2026-10-22), folded into the view it belongs to (2026-10-27): his board on Board, his record on Results, his trends on Research. */}
         {market === "pp" && shown === "week" && (
           <Background title="David Sasser's board this week · research only">

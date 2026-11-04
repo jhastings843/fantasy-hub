@@ -833,3 +833,6 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 
 /* Sam keeps the accent; David gets a cool second colour so the two never read alike (Jack, 2026-11-03). */
 .page { --david: var(--hh-david); }
+
+/* Stat captions are words: the text face. */
+.statK { font-family: var(--font-plex), system-ui, sans-serif; font-variant-numeric: tabular-nums; font-size: 13px; }

@@ -258,7 +258,7 @@ function BetSpot({ x }: { x: Slip }) {
           ].map((c, i) => (
             <div key={c.k} className={`rounded-[4px] px-2.5 py-2 ${i === 0 ? "bg-hh-sunk" : "bg-hh-accent-soft"}`}>
               <span className="block text-[11px] text-hh-muted">{c.k}</span>
-              <Num className={`text-[17px] font-semibold ${i === 0 ? "text-hh-ink" : "text-hh-accent-ink"}`}>{c.v}</Num>
+              <Num className={`text-[17px] font-semibold ${i === 0 ? "text-hh-ink" : i === 1 ? "text-hh-accent-ink" : "text-[var(--hh-david)]"}`}>{c.v}</Num>
             </div>
           ))}
         </div>

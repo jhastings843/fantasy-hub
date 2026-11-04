@@ -23,7 +23,8 @@ const SWATCHES: { name: string; v: string; use: string }[] = [
   { name: "Accent", v: "--hh-accent", use: "The one thing to act on" },
   { name: "Win", v: "--hh-pos", use: "Wins, plus units" },
   { name: "Loss", v: "--hh-neg", use: "Losses, live" },
-  { name: "Gold", v: "--hh-gold", use: "David, caution, not sent" },
+  { name: "Gold", v: "--hh-gold", use: "Caution, not sent" },
+  { name: "David", v: "--hh-david", use: "David's numbers (Sam uses the accent)" },
 ];
 
 // Sample curve for the sparkline demo (illustrative).
@@ -50,7 +51,7 @@ function Board() {
 
       <section className="flex flex-col gap-3">
         <h2 className="hh-label">Colour tokens</h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {SWATCHES.map((s) => (
             <div key={s.v} className="flex flex-col gap-1">
               <span className="h-10 rounded-[4px] border border-hh-line" style={{ background: `var(${s.v})` }} />

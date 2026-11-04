@@ -17,6 +17,7 @@ import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
 import { scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { PicksLog } from "./log";
+import { BoardSpot } from "./BoardSpot";
 import { marketOf } from "./learning";
 import { redisStore } from "@/lib/picks/learning/store";
 import s from "./picks.module.css";
@@ -114,6 +115,7 @@ export default async function PicksView({ league, market: asked, view }: { leagu
           {view !== "week" && <TopStats r={r} market={market} testing={testing} logHref={href(league, market, "log")} />}
         </header>
         {/* The picks first on every board view (phone check: first pick within 900px); who decides, the pool entry and the records follow. */}
+        {market === "ats" && view === "week" && <BoardSpot r={r} />}
         {market === "ats" && view === "week" && <AtsWeek r={r} live={live} />}
         {market === "ats" && view === "results" && <AtsResults r={r} />}
         {market === "ats" && view === "research" && <AtsResearch r={r} panel={league === "cfb" ? <><HarrisCard /><CfbModelCard season={r.season} /></> : <OurSpreadCard season={r.season} />} />}
