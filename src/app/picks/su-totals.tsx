@@ -6,6 +6,7 @@ import type { PoolTrack } from "@/lib/picks/pool-store";
 import type { TotalsBoardGame } from "@/lib/picks/totals";
 import { totalsForwardNote, totalsHoldText } from "@/lib/picks/forward";
 import { TeamLogo } from "@/components/TeamLogo";
+import { PopLink } from "@/components/hh/PopLink";
 import Link from "next/link";
 import { GameCell, href, kickoffEt, price, rec, units } from "./ui";
 import { priceWithBook } from "@/lib/picks/shop";
@@ -69,12 +70,12 @@ export function SuWeek({ r, poolShares, finishedOnly = false }: { r: PicksReport
           return (
             <li key={`${x.g.away}@${x.g.home}`} className={s.finRow}>
               <div className={s.finScore}>
-                <span className={f.away > f.home ? s.finWinner : undefined}>{`${name(x.g.away)} ${f.away}`}</span>
+                <span className={f.away > f.home ? s.finWinner : undefined}><PopLink href={footballGameHref(r.league, x.g.away, x.g.home)}>{name(x.g.away)}</PopLink>{` ${f.away}`}</span>
                 <span className={s.muted}> at </span>
-                <span className={f.home > f.away ? s.finWinner : undefined}>{`${name(x.g.home)} ${f.home}`}</span>
+                <span className={f.home > f.away ? s.finWinner : undefined}><PopLink href={footballGameHref(r.league, x.g.away, x.g.home)}>{name(x.g.home)}</PopLink>{` ${f.home}`}</span>
               </div>
               <div className={s.finCall}>
-                <span className={s.finPick}>{`${name(x.side === "home" ? x.g.home : x.g.away)} to win`}</span>
+                <span className={s.finPick}><PopLink href={footballGameHref(r.league, x.g.away, x.g.home)}>{name(x.side === "home" ? x.g.home : x.g.away)}</PopLink> to win</span>
                 <span className={`${s.resChip} ${res === "W" ? s.resW : res === "L" ? s.resL : s.resP}`}>{res}</span>
               </div>
               {(() => {
@@ -113,14 +114,14 @@ export function SuWeek({ r, poolShares, finishedOnly = false }: { r: PicksReport
                     <span className={s.matchCell}>
                       <span className={s.matchTeam}>
                         <TeamLogo league={r.league === "nfl" ? "nfl" : "cfb"} team={pick} espnId={side === "home" ? (g.ref ?? g.lastRef)?.homeId : (g.ref ?? g.lastRef)?.awayId} size={18} />
-                        <span className={s.matchName}>{name(pick)}</span>
+                        <span className={s.matchName}><PopLink href={footballGameHref(r.league, g.away, g.home)}>{name(pick)}</PopLink></span>
                         {live && <span className={s.gLive}>Live</span>}
                       </span>
                       <span className={s.matchTeam}>
                         <TeamLogo league={r.league === "nfl" ? "nfl" : "cfb"} team={side === "home" ? g.away : g.home} espnId={side === "home" ? (g.ref ?? g.lastRef)?.awayId : (g.ref ?? g.lastRef)?.homeId} size={18} />
                         <span className={s.matchName}>
                           <span className={s.matchAt}>over </span>
-                          {name(side === "home" ? g.away : g.home)}
+                          <PopLink href={footballGameHref(r.league, g.away, g.home)}>{name(side === "home" ? g.away : g.home)}</PopLink>
                         </span>
                       </span>
                       <span className={s.matchWhen} style={{ whiteSpace: "normal" }}>{`${live ? "In progress" : `${kickoffEt(g.ref?.kickoff)}${g.ref?.tv ? ` · ${g.ref.tv}` : ""}`}${

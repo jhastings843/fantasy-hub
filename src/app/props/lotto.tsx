@@ -13,6 +13,7 @@ import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
 import { StakingBlock } from "./learning";
+import { nbaGameHref } from "../picks/hrefs";
 
 const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
 const am = (p: number) => (p > 0 ? `+${p.toLocaleString("en-US")}` : `${p}`);
@@ -189,7 +190,7 @@ export async function LottoToday({ season }: { season: number }) {
       return {
         key: rs[0].game,
         title: rs[0].matchup.replace("@", " at "),
-        ...(rs[0].matchup.includes("@") ? { match: { league: "nba" as const, away: rs[0].matchup.split("@")[0].trim(), home: rs[0].matchup.split("@")[1].trim() } } : {}),
+        ...(rs[0].matchup.includes("@") ? { match: { league: "nba" as const, away: rs[0].matchup.split("@")[0].trim(), home: rs[0].matchup.split("@")[1].trim(), href: rs[0].game ? nbaGameHref(rs[0].game) : undefined } } : {}),
         when: rs[0].at,
         live: Date.parse(rs[0].at) <= now && rs.every((r) => r.hit === null),
         cells: [
@@ -210,7 +211,7 @@ export async function LottoToday({ season }: { season: number }) {
         {t ? (
           <ul className={s.edgeGrid} data-first-pick>
             {t.legs.map((r, i) => (
-              <EdgeCard key={`leg${i}`} e={{ ...rungEdge(r, `leg ${i + 1}`), staked: ticketBet }} />
+              <EdgeCard key={`leg${i}`} e={{ ...rungEdge(r, `leg ${i + 1}`), gameHref: r.game ? nbaGameHref(r.game) : undefined, staked: ticketBet }} />
             ))}
           </ul>
         ) : (
@@ -222,7 +223,7 @@ export async function LottoToday({ season }: { season: number }) {
         {best.length ? (
           <ul className={s.edgeGrid}>
             {best.map((r) => (
-              <EdgeCard key={`${r.game}|${r.id}|${r.line}`} e={{ ...rungEdge(r), staked: rungStaked(learning.entries, r) }} />
+              <EdgeCard key={`${r.game}|${r.id}|${r.line}`} e={{ ...rungEdge(r), gameHref: r.game ? nbaGameHref(r.game) : undefined, staked: rungStaked(learning.entries, r) }} />
             ))}
           </ul>
         ) : (

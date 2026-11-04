@@ -12,6 +12,8 @@ import { GameCell, pieces, StrategyRow, TierChip, drawdown, href, kickoffEt, lin
 import { Background, Curve, Hero, MarketKey, MarketLine, SecHead } from "./board";
 import { findGame, type LiveGame } from "@/lib/live/espn";
 import { GameStats } from "./game/GameStats";
+import { PopLink } from "@/components/hh/PopLink";
+import { collegeTeamHref, teamHref } from "./hrefs";
 import s from "./picks.module.css";
 
 export type Status = "sent" | "early" | "bet" | "priced" | "budget" | "wait" | "noquote" | "started" | "final" | "pass";
@@ -144,6 +146,21 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
 export const gameHref = (r: PicksReport, g: BoardGame) => `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`;
 
 /**
+ * A board team's own pop-up, for rows with no current game (past weeks): NFL by
+ * abbreviation; college by the ESPN id on this week's quote, else its board key
+ * (the same keys the header search uses).
+ */
+export function boardTeamHref(r: PicksReport, k: string): string {
+  if (r.league === "nfl") return teamHref("nfl", k);
+  for (const g of r.board) {
+    const ref = g.ref ?? g.lastRef;
+    if (g.home === k && ref?.homeId) return collegeTeamHref(ref.homeId);
+    if (g.away === k && ref?.awayId) return collegeTeamHref(ref.awayId);
+  }
+  return `/team?k=${encodeURIComponent(`cfb:${k}`)}`;
+}
+
+/**
  * One game's read chip and the small line under it (the Ledger redesign).
  * Solid only once a bet is sent; sized-not-sent and early looks are dashed;
  * close calls are tracked; a pass is plain text.
@@ -224,7 +241,13 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
                 {live && <span className={s.scoreLine}>{pieces(`${live.away.abbr} ${live.away.score}, ${live.home.abbr} ${live.home.score} · ${live.detail}`)}</span>}
               </>
             ) : g.final ? (
-              `Final ${name(g.away)} ${g.final.away}, ${home} ${g.final.home}`
+              <span style={{ whiteSpace: "nowrap" }}>
+                {"Final "}
+                <PopLink href={gameHref(r, g)}>{name(g.away)}</PopLink>
+                {` ${g.final.away}, `}
+                <PopLink href={gameHref(r, g)}>{home}</PopLink>
+                {` ${g.final.home}`}
+              </span>
             ) : undefined
           }
         />
@@ -233,12 +256,12 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
           {g.ref ? (
             <>
               {line(g.ref.line)}
-              <small className={s.mktTeam}>{home}</small>
+              <small className={s.mktTeam}><PopLink href={gameHref(r, g)}>{home}</PopLink></small>
             </>
           ) : g.lastRef ? (
             <>
               {line(g.lastRef.line)}
-              <small className={s.mktTeam}>{`${home}, closed`}</small>
+              <small className={s.mktTeam}><PopLink href={gameHref(r, g)}>{home}</PopLink>, closed</small>
             </>
           ) : st === "started" || st === "final" ? "Closed" : "·"}
         </span>
@@ -291,9 +314,9 @@ function FinishedRow({ g, r }: { g: BoardGame; r: PicksReport }) {
   return (
     <li className={s.finRow}>
       <div className={s.finScore}>
-        <span className={!homeWon ? s.finWinner : undefined}>{`${name(g.away)} ${f.away}`}</span>
+        <span className={!homeWon ? s.finWinner : undefined}><PopLink href={gameHref(r, g)}>{name(g.away)}</PopLink>{` ${f.away}`}</span>
         <span className={s.muted}> at </span>
-        <span className={homeWon ? s.finWinner : undefined}>{`${name(g.home)} ${f.home}`}</span>
+        <span className={homeWon ? s.finWinner : undefined}><PopLink href={gameHref(r, g)}>{name(g.home)}</PopLink>{` ${f.home}`}</span>
       </div>
       <div className={s.finCall}>
         <span className={s.finPick}>
@@ -626,7 +649,7 @@ export function WeekBets({ r, kind }: { r: PicksReport; kind: "spread" | "total"
                   {staked.map((b, j) => (
                     <li key={j} className={s.betRow}>
                       <span className={`${s.tier} ${b.tier === "t1" ? s.t1 : b.tier === "t2" ? s.t2 : s.tPass}`}>{b.kind === "spread" ? (b.tier === "t1" ? "Tier 1" : "Tier 2") : "Total"}</span>
-                      <span className={s.betPick}>{betText(b, (k) => r.names[k] ?? k)}</span>
+                      <span className={s.betPick}>{betNode(b, r)}</span>
                       <span className={`${s.num} ${s.betStake}`}>{`${amt(b.units)} at ${b.price !== undefined ? price(b.price) : `${b.decimal?.toFixed(2)}x`}`}</span>
                       <span className={`${s.num} ${s.betNet} ${RES_CLASS[b.result!]}`}>{`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${amt(Math.abs(b.net ?? 0))}`}</span>
                     </li>
@@ -643,13 +666,29 @@ export function WeekBets({ r, kind }: { r: PicksReport; kind: "spread" | "total"
   );
 }
 
-/** "BYU -11", "Over 47.5 (Iowa State at BYU)", or a parlay's legs joined. */
-function betText(b: BetRow, name: (k: string) => string): string {
-  const leg = (l: BetRow["legs"][number]) =>
-    l.side === "over" || l.side === "under"
-      ? `${l.side === "over" ? "Over" : "Under"} ${l.line} (${name(l.away)} at ${name(l.home)})`
-      : `${name(l.side === "home" ? l.home : l.away)} ${line(bettable(l.side === "home" ? l.line : -l.line, "home"))}`;
-  return b.legs.map(leg).join(" + ");
+/** "BYU -11", "Over 47.5 (Iowa State at BYU)", or a parlay's legs joined, each team name opening its team pop-up (past weeks: the game pop-up only knows this week). */
+function betNode(b: BetRow, r: PicksReport): React.ReactNode {
+  const name = (k: string) => r.names[k] ?? k;
+  const team = (k: string) => <PopLink href={boardTeamHref(r, k)}>{name(k)}</PopLink>;
+  return b.legs.map((l, i) => (
+    <Fragment key={i}>
+      {i ? " + " : ""}
+      {l.side === "over" || l.side === "under" ? (
+        <>
+          {`${l.side === "over" ? "Over" : "Under"} ${l.line} (`}
+          {team(l.away)}
+          {" at "}
+          {team(l.home)}
+          {")"}
+        </>
+      ) : (
+        <>
+          {team(l.side === "home" ? l.home : l.away)}
+          {` ${line(bettable(l.side === "home" ? l.line : -l.line, "home"))}`}
+        </>
+      )}
+    </Fragment>
+  ));
 }
 
 export function AtsResults({ r }: { r: PicksReport }) {
@@ -893,7 +932,7 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
         </details>
       )}
       {panel}
-      {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} />}
+      {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} r={r} />}
       <details className={s.details}>
         <summary>{`Game log: all ${r.graded.length} graded games`}</summary>
         <div className={s.tw}>
@@ -915,14 +954,17 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
                   <tr key={`${g.week}:${g.away}@${g.home}`}>
                     <td className={s.num}>{g.week}</td>
                     <td className={s.game}>
-                      {name(g.away)} @ {name(g.home)}
+                      <PopLink href={boardTeamHref(r, g.away)}>{name(g.away)}</PopLink> @ <PopLink href={boardTeamHref(r, g.home)}>{name(g.home)}</PopLink>
                     </td>
                     <td className={s.num}>
                       {g.final.away}–{g.final.home}
                     </td>
                     <td>
                       {g.read.agree && g.read.line !== undefined ? (
-                        `${name(g.read.side === "home" ? g.home : g.away)} ${line(g.read.line)}`
+                        <>
+                          <PopLink href={boardTeamHref(r, g.read.side === "home" ? g.home : g.away)}>{name(g.read.side === "home" ? g.home : g.away)}</PopLink>
+                          {` ${line(g.read.line)}`}
+                        </>
                       ) : (
                         <span className={s.dim}>{`Split: Sam ${g.samResult}, David ${g.davidResult}`}</span>
                       )}
@@ -1173,7 +1215,7 @@ export function GameDetail({ g, r }: { g: BoardGame; r: PicksReport }) {
 
 
 /** Tracked only: every tier pick at -115 or better, 1u flat, bet or not (price-shadow.ts). */
-function PriceShadowPanel({ x, name }: { x: NonNullable<PicksReport["priceShadow"]>; name: (k: string) => string }) {
+function PriceShadowPanel({ x, name, r }: { x: NonNullable<PicksReport["priceShadow"]>; name: (k: string) => string; r: PicksReport }) {
   const tone = (u: number) => (u > 0 ? s.pos : u < 0 ? s.neg : undefined);
   const tiles: [string, typeof x.all][] = [
     [`Every tier pick, ${x.cap} or better`, x.all],
@@ -1210,7 +1252,8 @@ function PriceShadowPanel({ x, name }: { x: NonNullable<PicksReport["priceShadow
                 <tr key={`${g.week}:${g.away}@${g.home}`}>
                   <td className={s.num}>{g.week}</td>
                   <td>
-                    {`${name(g.side === "home" ? g.home : g.away)} ${line(g.side === "home" ? g.homeLine : -g.homeLine)}`}
+                    <PopLink href={boardTeamHref(r, g.side === "home" ? g.home : g.away)}>{name(g.side === "home" ? g.home : g.away)}</PopLink>
+                    {` ${line(g.side === "home" ? g.homeLine : -g.homeLine)}`}
                     <div className={s.thin}>{`${g.tier === "t1" ? "Tier 1" : "Tier 2"}${g.bet ? " · bet" : " · not bet"}`}</div>
                   </td>
                   <td className={`${s.num} ${s.nw}`}>{price(g.price)}</td>

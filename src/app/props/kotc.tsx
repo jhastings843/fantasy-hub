@@ -18,6 +18,8 @@ import { GameTable, type GameRowData } from "./week";
 import s from "../picks/picks.module.css";
 import { StakingBlock } from "./learning";
 import k from "./props.module.css";
+import { PopLink } from "@/components/hh/PopLink";
+import { nbaGameHref, playerPropHref } from "../picks/hrefs";
 
 const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
@@ -192,7 +194,7 @@ export async function KotcWeek({ season }: { season: number }) {
                   <span className={k.kRank}>{`#${j + 1} pick`}</span>
                   <span className={k.kMeta}>{`${x.r.team} · our #${x.i + 1} to be king`}</span>
                 </div>
-                <div className={k.kWho}>{x.r.name}</div>
+                <div className={k.kWho}><PopLink href={playerPropHref("nba", x.r.team, x.r.name, x.r.game)}>{x.r.name}</PopLink></div>
                 <div className={k.kTag}>
                   {tagText(x.t!)} <span className={k.kPrice}>{am(x.t!.price)}</span>
                 </div>
@@ -244,8 +246,11 @@ export async function KotcWeek({ season }: { season: number }) {
                   <tr key={x.r.id} className={hot ? k.kHot : undefined}>
                     <td className={s.num}>{x.i + 1}</td>
                     <td>
-                      <b>{x.r.name}</b>
-                      <div className={s.dim}>{`${x.r.team}${g ? ` · ${g.away} at ${g.home}` : ""}`}</div>
+                      <b><PopLink href={playerPropHref("nba", x.r.team, x.r.name, x.r.game)}>{x.r.name}</PopLink></b>
+                      <div className={s.dim}>
+                        {x.r.team}
+                        {g ? <>{" · "}<PopLink href={nbaGameHref(g.id)}>{`${g.away} at ${g.home}`}</PopLink></> : null}
+                      </div>
                     </td>
                     <td>
                       <KingBars ours={x.r.p} crowd={x.crowd} top={scale} />
@@ -335,7 +340,7 @@ function nightRow(x: KotcNight, boards: OurStoredProps[]): GameRowData {
               <tr key={y.row.id}>
                 <td className={s.num}>{y.i + 1}</td>
                 <td>
-                  {y.row.name}
+                  <PopLink href={playerPropHref("nba", y.row.team, y.row.name, y.row.game)}>{y.row.name}</PopLink>
                   {r.kings.some((kk) => kk.id === y.row.id) && <b className={s.pos}> · king</b>}
                 </td>
                 <td className={s.num}>{pct(y.row.p)}</td>

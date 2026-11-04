@@ -16,6 +16,8 @@ import { Tile } from "./ournba";
 import { tvByEvent } from "@/lib/live/espn";
 import s from "../picks/picks.module.css";
 import { StakingBlock } from "./learning";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref, playerPropHref } from "../picks/hrefs";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
@@ -55,7 +57,12 @@ function Explainer() {
 type SavedParlay = Awaited<ReturnType<typeof loadAttdParlays>>[number];
 
 /** A ticket's legs: price, our chance, Venom's, the blend and DK's break-even. */
-function ParlayLegs({ p }: { p: AttdParlay }) {
+/** `current`: this week's open ticket, so each leg's game opens its pop-up (past games have none). */
+function ParlayLegs({ p, current = false }: { p: AttdParlay; current?: boolean }) {
+  const gameHref = (slug: string) => {
+    const [away, home] = slug.split("_").slice(2);
+    return current && away && home ? footballGameHref("nfl", away, home) : undefined;
+  };
   return (
     <div className={s.tw}>
       <table className={s.table}>
@@ -72,9 +79,10 @@ function ParlayLegs({ p }: { p: AttdParlay }) {
           {p.legs.map((l) => (
             <tr key={l.key}>
               <td>
-                {`${l.name} ${l.team}`}
+                <PopLink href={playerPropHref("nfl", l.team, l.name, l.slug)}>{l.name}</PopLink>
+                {` ${l.team}`}
                 <br />
-                <span className={s.dim}>{l.game}</span>
+                <span className={s.dim}>{gameHref(l.slug) ? <PopLink href={gameHref(l.slug)!}>{l.game}</PopLink> : l.game}</span>
               </td>
               <td className={s.num}>{am(l.price)}</td>
               <td className={s.num}>{pct(l.ours)}</td>
@@ -132,7 +140,7 @@ async function NightToday({ season, week }: { season: number; week: number | nul
         cur.map(({ parlay: p, outcome: o }) => (
           <div key={p.slate}>
             <p className={s.thin}>{`${SLATE_LABEL[p.slate ?? "sun"]} · 2 legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${p.ev >= 0 ? "+" : "−"}${Math.abs(p.ev).toFixed(2)}u per 1u · ${outcomeText(o)}${p.voided ? `: ${p.voided}` : ""}`}</p>
-            <ParlayLegs p={p} />
+            <ParlayLegs p={p} current />
           </div>
         ))
       ) : (
@@ -289,13 +297,13 @@ function gradedRowsOf(graded: Awaited<ReturnType<typeof attdGraded>>, venom: Map
           ["Scored", `${scorers} of ${g.rows.length}`],
         ],
         read: !bets.length ? ["No edges", s.readPass] : [`${record} · ${u(units)}`, units > 0 ? s.readW : units < 0 ? s.readL : s.readPass],
-        body: <PlayerTable rows={g.rows} result={g.result} venom={venom.get(g.week)} />,
+        body: <PlayerTable rows={g.rows} result={g.result} venom={venom.get(g.week)} game={g.slug} />,
       };
     });
 }
 
 /** Every player on a board, ours against DK, as the game row's body. */
-function PlayerTable({ rows, result, venom }: { rows: AttdRow[]; result?: { [key: string]: number | null }; venom?: Map<string, number> }) {
+function PlayerTable({ rows, result, venom, game }: { rows: AttdRow[]; result?: { [key: string]: number | null }; venom?: Map<string, number>; /** ESPN id or slug, for the player pop-up. */ game?: string }) {
   const v = venom?.size ? venom : null;
   return (
     <div className={s.tw}>
@@ -318,7 +326,7 @@ function PlayerTable({ rows, result, venom }: { rows: AttdRow[]; result?: { [key
             return (
               <tr key={`${r.team}|${r.key}`} className={e.length > 0 ? s.rowEdge : undefined}>
                 <td>
-                  {`${r.name} `}
+                  <PopLink href={playerPropHref("nfl", r.team, r.name, game)}>{r.name}</PopLink>{" "}
                   <span className={s.dim}>{r.team}</span>
                   {e.length > 0 && <b className={s.pos}>{` · edge ${e.map((x) => `${x.side === "two" ? "2+" : "ATTD"} +${Math.round(x.gap * 100)}`).join(", ")}`}</b>}
                 </td>
@@ -366,6 +374,8 @@ export async function AttdWeek({ season }: { season: number }) {
             key: `${g.game.slug}|${r.key}|${x.side}`,
             player: `${r.name} ${r.team}`,
             game: `${g.game.away} at ${g.game.home}`,
+            playerHref: playerPropHref("nfl", r.team, r.name, g.espnId ?? g.game.slug),
+            gameHref: footballGameHref("nfl", g.game.away, g.game.home),
             when: g.kickoff,
             bet: x.side === "two" ? "2+ TDs" : "Anytime TD",
             ours: x.ours,
@@ -393,7 +403,7 @@ export async function AttdWeek({ season }: { season: number }) {
     return {
       key: g.game.slug,
       title: `${g.game.away} at ${g.game.home}`,
-      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
+      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined, href: footballGameHref("nfl", g.game.away, g.game.home) },
       when: g.kickoff,
       live: !!g.kickoff && Date.parse(g.kickoff) <= now,
       final: ended.has(g.game.slug),
@@ -403,7 +413,7 @@ export async function AttdWeek({ season }: { season: number }) {
         ["Edges", priced(g.attd!.rows) ? `${e.length}` : "no prices"],
       ],
       read: e.length ? [`${e.length} edge${e.length === 1 ? "" : "s"}`, s.readTrack] : ["No edge", s.readPass],
-      body: <PlayerTable rows={g.attd!.rows} venom={venom} />,
+      body: <PlayerTable rows={g.attd!.rows} venom={venom} game={g.espnId ?? g.game.slug} />,
     };
   });
   const anytime = summarizeAttd(graded).edges.bySide.anytime;

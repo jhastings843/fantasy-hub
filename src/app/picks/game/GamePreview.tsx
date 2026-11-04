@@ -11,7 +11,8 @@ import { FootballOurStats } from "./FootballOurStats";
 import { NflGameProps } from "./GameProps";
 import { MarketLine } from "../board";
 import { picksSearchIndex } from "../search";
-import { gameHref, statusOf, suWhy } from "../ats";
+import { boardTeamHref, gameHref, statusOf, suWhy } from "../ats";
+import { PopLink } from "@/components/hh/PopLink";
 import { kickoffEt, line, price } from "../ui";
 import s from "../picks.module.css";
 import p from "./preview.module.css";
@@ -66,7 +67,9 @@ export function GamePreview({ g, r }: { g: BoardGame; r: PicksReport }) {
         {(["away", "home"] as const).map((side) => (
           <div key={side} className={`${p.team} ${side === "home" ? p.teamHome : ""}`}>
             <TeamLogo league={lg} team={g[side]} espnId={side === "home" ? q?.homeId : q?.awayId} size={64} />
-            <span className={p.teamName}>{name(g[side])}</span>
+            <span className={p.teamName}>
+              <PopLink href={boardTeamHref(r, g[side])}>{name(g[side])}</PopLink>
+            </span>
             {f ? (
               <span className={`${p.score} ${s.num} ${f[side] > f[side === "home" ? "away" : "home"] ? "" : p.scoreLose}`}>{f[side]}</span>
             ) : proj ? (

@@ -6,6 +6,8 @@ import { etDate } from "@/lib/props/parse";
 import { whenEt } from "../picks/ui";
 import { Stats } from "../picks/board";
 import s from "../picks/picks.module.css";
+import { PopLink } from "@/components/hh/PopLink";
+import { nbaGameHref, playerPropHref } from "../picks/hrefs";
 
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -32,7 +34,8 @@ function Moves({ e }: { e: NewsEvent }) {
             return (
               <tr key={a.id}>
                 <td>
-                  {`${a.player} ${a.side} ${a.line} ${SHORT[a.stat] ?? a.stat}`} {a.edge && <strong>· edge</strong>}
+                  <PopLink href={playerPropHref("nba", a.team, a.player, e.game)}>{a.player}</PopLink>
+                  {` ${a.side} ${a.line} ${SHORT[a.stat] ?? a.stat}`} {a.edge && <strong>· edge</strong>}
                 </td>
                 <td className={s.num}>{`${a.before} → ${a.after}`}</td>
                 <td className={s.num}>{a.price !== null ? `${am(a.price)}${a.fair !== null ? ` (${pct(a.fair)} no vig)` : ""}` : "·"}</td>
@@ -66,7 +69,12 @@ export async function NbaNewsToday({ season }: { season: number }) {
       {mine.length ? (
         mine.map((e) => (
           <details key={e.id} className={s.details} open={mine.length <= 2}>
-            <summary>{`${e.news.name} (${e.news.team}) ${e.news.change === "out" ? "ruled out" : "back"} · ${e.away} at ${e.home} · ${whenEt(e.at)} · ${e.affected.filter((a) => a.edge).length} edges`}</summary>
+            <summary>
+              <PopLink href={playerPropHref("nba", e.news.team, e.news.name, e.game)}>{e.news.name}</PopLink>
+              {` (${e.news.team}) ${e.news.change === "out" ? "ruled out" : "back"} · `}
+              <PopLink href={nbaGameHref(e.game)}>{`${e.away} at ${e.home}`}</PopLink>
+              {` · ${whenEt(e.at)} · ${e.affected.filter((a) => a.edge).length} edges`}
+            </summary>
             <div className={s.detailsBody}>
               <p className={s.p}>{e.news.comment}</p>
               <Moves e={e} />

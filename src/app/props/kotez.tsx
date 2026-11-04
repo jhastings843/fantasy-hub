@@ -13,13 +13,15 @@ import { backers, payoutLine, type KotezPayout } from "@/lib/models/nfl/kotez-pa
 import { nameKey } from "@/lib/props/grade";
 import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
+import { PopLink } from "@/components/hh/PopLink";
+import { footballGameHref, playerPropHref } from "../picks/hrefs";
 
 const pct = (x: number) => `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const VALUE = 1.2;
 const nowMs = () => Date.now();
 
-function Table({ rows }: { rows: KotezRow[] }) {
+function Table({ rows, game }: { rows: KotezRow[]; /** ESPN id or slug, for the player pop-up. */ game?: string }) {
   return (
     <div className={s.tw}>
       <table className={s.table}>
@@ -36,7 +38,7 @@ function Table({ rows }: { rows: KotezRow[] }) {
           {rows.map((r) => (
             <tr key={`${r.team}|${r.key}`} className={r.value !== undefined && r.value >= VALUE ? s.rowEdge : undefined}>
               <td>
-                {`${r.name} `}
+                <PopLink href={playerPropHref("nfl", r.team, r.name, game)}>{r.name}</PopLink>{" "}
                 <span className={s.dim}>{r.team}</span>
               </td>
               <td className={s.num}>{pct(r.longest)}</td>
@@ -60,7 +62,7 @@ export async function KotezWeek({ season }: { season: number }) {
   const promo = saved.find((x) => x.week === v.week);
   const sims = games.map((g) => ({ g, k: kotezGame(g.attd!.rows, ATTD_PARAMS.other) }));
   const best = sims
-    .flatMap(({ g, k }) => k.rows.filter((r) => r.value !== undefined && r.value >= VALUE && r.longest >= 0.03 && r.dk !== undefined && implied(r.dk) >= 0.1).map((r) => ({ r, game: `${g.game.away} at ${g.game.home}` })))
+    .flatMap(({ g, k }) => k.rows.filter((r) => r.value !== undefined && r.value >= VALUE && r.longest >= 0.03 && r.dk !== undefined && implied(r.dk) >= 0.1).map((r) => ({ r, game: `${g.game.away} at ${g.game.home}`, gameId: g.espnId ?? g.game.slug, gameHref: footballGameHref("nfl", g.game.away, g.game.home) })))
     .sort((a, b) => b.r.value! - a.r.value!)
     .slice(0, 6);
   const rows: GameRowData[] = sims.map(({ g, k }) => {
@@ -69,7 +71,7 @@ export async function KotezWeek({ season }: { season: number }) {
     return {
       key: g.game.slug,
       title: `${g.game.away} at ${g.game.home}`,
-      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined },
+      match: { league: "nfl", away: g.game.away, home: g.game.home, tv: g.espnId ? tv.get(g.espnId) : undefined, href: footballGameHref("nfl", g.game.away, g.game.home) },
       when: g.kickoff,
       cells: [
         ["Likeliest", top ? `${top.name} ${pct(top.longest)}` : "·"],
@@ -77,7 +79,7 @@ export async function KotezWeek({ season }: { season: number }) {
         ["No TD", pct(k.noTd)],
       ],
       read: val.length ? [`${val.length} value`, s.readTrack] : ["No value", s.readPass],
-      body: <Table rows={k.rows} />,
+      body: <Table rows={k.rows} game={g.espnId ?? g.game.slug} />,
     };
   });
   return (
@@ -97,13 +99,13 @@ export async function KotezWeek({ season }: { season: number }) {
                 </tr>
               </thead>
               <tbody>
-                {best.map(({ r, game }) => (
+                {best.map(({ r, game, gameId, gameHref }) => (
                   <tr key={`${game}|${r.key}`}>
                     <td>
-                      {`${r.name} `}
+                      <PopLink href={playerPropHref("nfl", r.team, r.name, gameId)}>{r.name}</PopLink>{" "}
                       <span className={s.dim}>{r.team}</span>
                       <br />
-                      <span className={s.dim}>{game}</span>
+                      <span className={s.dim}><PopLink href={gameHref}>{game}</PopLink></span>
                     </td>
                     <td className={s.num}>{pct(r.longest)}</td>
                     <td className={s.num}>{pct(r.crowd!)}</td>
@@ -181,7 +183,7 @@ export async function KotezResults({ season }: { season: number }) {
       body: (
         <>
           {x.payout && <BackersCheck payout={x.payout} />}
-          <Table rows={x.rows} />
+          <Table rows={x.rows} game={x.slug} />
         </>
       ),
     };
