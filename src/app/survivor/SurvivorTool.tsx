@@ -253,6 +253,11 @@ export default function SurvivorTool({ reports }: { reports: SurvivorReport[] })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      // Locked device (security audit, 2026-11-04): send it to the unlock page.
+      if (res.status === 401) {
+        router.push("/unlock");
+        return;
+      }
       if (!res.ok) throw new Error(await res.text());
       startTransition(() => router.refresh());
     } finally {

@@ -37,6 +37,11 @@ export function RefreshButton({
           all ? { all: true } : leagueId ? { leagueId } : {},
         ),
       });
+      // Locked device (security audit, 2026-11-04): send it to the unlock page.
+      if (res.status === 401) {
+        router.push("/unlock");
+        return;
+      }
       if (!res.ok) throw new Error(await res.text());
       router.refresh();
       setState("done");
