@@ -3,21 +3,23 @@
    weekly version reads the same. Tokens on the wrapper, redefined for dark. */
 
 .page {
-  --bg: #f5f2e9;
-  --surface: #fcfaf4;
-  --surface2: #eae5da;
-  --ink: #302d29;
-  --ink2: #4f4a44;
-  --mute: #706a61;
-  --rule: #d7d1c5;
-  --accent: #812f40;
-  --accent-soft: #efe0e1;
-  --pos: #32664e;
-  --neg: #a14135;
-  --gold: #87601e;
-  --gold-soft: #f2e7ce;
-  --track: #eae5da;
-  --ci: #e0eade;
+  --bg: var(--hh-bg);
+  --surface: var(--hh-panel);
+  --surface2: var(--hh-sunk);
+  --ink: var(--hh-ink);
+  --ink2: var(--hh-ink-2);
+  --mute: var(--hh-muted);
+  --rule: var(--hh-line);
+  --accent: var(--hh-accent-ink);
+  --accent-soft: var(--hh-accent-soft);
+  --accent-ink: var(--hh-accent-ink);
+  --david: var(--hh-gold);
+  --pos: var(--hh-pos);
+  --neg: var(--hh-neg);
+  --gold: var(--hh-gold);
+  --gold-soft: var(--hh-gold-soft);
+  --track: var(--hh-track);
+  --ci: var(--hh-pos-soft);
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-plex), system-ui, -apple-system, sans-serif;
@@ -27,31 +29,7 @@
   padding-block: 28px 64px;
   flex: 1;
 }
-/* Dark always since 2026-10-19 (was prefers-color-scheme: dark). */
-@media all {
-  .page {
-    color-scheme: dark;
-    --bg: #201f1c;
-    --surface: #272622;
-    --surface2: #33312b;
-    --ink: #eee9df;
-    --ink2: #cfc8bc;
-    --mute: #a8a093;
-    --rule: #49453e;
-    /* Astra's palette since 2026-10-22 (Jack: "use astra's color schema, no blue"). Oxblood marks real stakes and
-       Sam; green and red are only wins and losses (red leans orange so it never reads as the oxblood). */
-    --accent: #efabb6;
-    --accent-soft: #422d33;
-    --accent-ink: #f5c6cd;
-    --pos: #9ac9a7;
-    --neg: #f08f78;
-    --gold: #dfc17e;
-    --gold-soft: #3e3525;
-    --david: #dfc17e;
-    --track: #33312b;
-    --ci: #2a3a30;
-  }
-}
+/* Colours follow the theme: every local name points at a Hobby Hub token (globals.css, 2026-11-03). */
 .wrap { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
 .num { font-family: var(--font-plex-mono), ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
 .muted { color: var(--mute); }

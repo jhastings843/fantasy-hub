@@ -28,7 +28,7 @@ function ConfigError({ message }: { message: string }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <Link href="/" className="text-sm text-zinc-500 dark:text-zinc-400">
+        <Link href="/fantasy" className="text-sm text-zinc-500 dark:text-zinc-400">
           ‹ Leagues
         </Link>
         <h1 className="text-3xl font-semibold tracking-tight">Draft board</h1>

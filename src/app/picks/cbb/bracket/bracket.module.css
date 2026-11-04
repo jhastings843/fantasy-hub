@@ -5,25 +5,24 @@
    the pick'em tiles. */
 
 .root {
-  --bg: #f5f2e9;
-  --surface: #fcfaf4;
-  --surface2: #eae5da;
-  --ink: #302d29;
-  --ink2: #4f4a44;
-  --mute: #706a61;
-  --rule: #d7d1c5;
-  --accent: #812f40;
-  --accent-soft: #efe0e1;
-  --accent-ink: #812f40;
-  --pos: #32664e;
-  --neg: #a14135;
-  --gold: #87601e;
-  --gold-soft: #f2e7ce;
-  --track: #eae5da;
-  --ci: #e0eade;
-  --line: #c4bdb0;
-  --pubbar: #8c857a;
-  color-scheme: light;
+  --bg: var(--hh-bg);
+  --surface: var(--hh-panel);
+  --surface2: var(--hh-sunk);
+  --ink: var(--hh-ink);
+  --ink2: var(--hh-ink-2);
+  --mute: var(--hh-muted);
+  --rule: var(--hh-line);
+  --accent: var(--hh-accent-ink);
+  --accent-soft: var(--hh-accent-soft);
+  --accent-ink: var(--hh-accent-ink);
+  --pos: var(--hh-pos);
+  --neg: var(--hh-neg);
+  --gold: var(--hh-gold);
+  --gold-soft: var(--hh-gold-soft);
+  --track: var(--hh-track);
+  --ci: var(--hh-pos-soft);
+  --line: var(--hh-rule);
+  --pubbar: var(--hh-muted);
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-plex), system-ui, -apple-system, sans-serif;
@@ -33,27 +32,6 @@
   padding-block: 28px 72px;
   flex: 1;
   min-width: 0;
-}
-:global(.dark) .root {
-  color-scheme: dark;
-  --bg: #201f1c;
-  --surface: #272622;
-  --surface2: #33312b;
-  --ink: #eee9df;
-  --ink2: #cfc8bc;
-  --mute: #a8a093;
-  --rule: #49453e;
-  --accent: #efabb6;
-  --accent-soft: #422d33;
-  --accent-ink: #f5c6cd;
-  --pos: #9ac9a7;
-  --neg: #f08f78;
-  --gold: #dfc17e;
-  --gold-soft: #3e3525;
-  --track: #33312b;
-  --ci: #2a3a30;
-  --line: #5a554c;
-  --pubbar: #8c857a;
 }
 
 .crumb { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13.5px; color: var(--accent-ink); text-decoration: none; font-weight: 600; }

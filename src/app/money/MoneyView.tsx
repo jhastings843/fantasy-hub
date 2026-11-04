@@ -1720,6 +1720,8 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
     error = e instanceof Error ? e.message : String(e);
   }
   const snap = v?.snapshot;
+  // Server component on a force-dynamic page: reading the clock per request is the point.
+  // eslint-disable-next-line react-hooks/purity
   const age = snap ? (Date.now() - Date.parse(snap.generatedAt)) / 3600_000 : null;
   return (
     <main className={s.page}>

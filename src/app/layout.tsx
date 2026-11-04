@@ -1,100 +1,92 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { Trophy } from "lucide-react";
-import { FantasyTabs, HobbyTabs, SectionTabs } from "@/components/SiteNav";
+import { Barlow_Condensed, Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import HeaderSearch from "@/components/HeaderSearch";
+import { BottomTabs, HubTabs, SubTabs } from "@/components/hh/HubNav";
+import { THEME_SCRIPT, ThemeToggle } from "@/components/hh/Theme";
 import "./globals.css";
 
-// The Ledger faces are system fonts set in globals.css (2026-10-22): nothing to load.
+// Hobby Hub shell (redesign, 2026-11-03): brand, five hubs, search and the theme
+// toggle on one bar; the hub's own tabs one row down; on phones the hubs move to
+// a bottom tab bar. Hub ownership lives in components/hh/hubs.ts.
+// (components/SiteNav.tsx is the old three-section nav, no longer mounted.)
+
+const display = Barlow_Condensed({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--ff-display", display: "swap" });
+const sans = Geist({ subsets: ["latin"], variable: "--ff-sans", display: "swap" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--ff-mono", display: "swap" });
+const monoDark = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--ff-mono-dark", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Hobby Hub",
-  description: "Fantasy football, model picks and props, and the paper trading books, in one place.",
+  description: "Today's bets, claims and lineup calls, the model picks and props, and the paper books, in one place.",
 };
 
-// Sections and Fantasy's own tabs live in components/SiteNav.tsx.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f2e9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1116" },
+  ],
+};
 
-function BrandMark() {
+function Brand() {
   return (
-    <span
-      aria-hidden
-      className="grid size-7 place-items-center rounded-lg bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
-    >
-      <Trophy size={14} strokeWidth={2.5} />
-    </span>
+    <Link href="/today" className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80" aria-label="Hobby Hub, Today">
+      <svg aria-hidden viewBox="0 0 24 24" className="size-6">
+        <rect x="1" y="1" width="22" height="22" rx="5" fill="var(--hh-ink)" />
+        <path d="M7 6v12M17 6v12M7 12h10" stroke="var(--hh-bg)" strokeWidth="2.6" strokeLinecap="square" />
+        <rect x="15" y="15" width="6" height="6" rx="1.5" fill="var(--hh-accent)" />
+      </svg>
+      <span className="ledger-brand text-[24px] font-bold text-hh-ink">Hobby Hub</span>
+    </Link>
   );
 }
 
 function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200/60 bg-white/80 backdrop-blur-xl dark:border-zinc-800/60 dark:bg-zinc-950/80">
-      {/* The Ledger header (2026-10-22): brand left, sections centered, search right.
-          Phones: brand and search on one row, the sections on the next. */}
-      <nav className="mx-auto grid min-h-16 w-full max-w-6xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:py-0 lg:px-8">
-        <Link href="/" className="flex items-center gap-2.5 justify-self-start transition-opacity hover:opacity-80">
-          <BrandMark />
-          <span className="ledger-brand text-2xl font-bold">Hobby Hub</span>
-        </Link>
-        <div className="col-span-2 row-start-2 justify-self-center md:col-span-1 md:col-start-2 md:row-start-1">
-          <SectionTabs />
+    <header className="sticky top-0 z-50 border-b-2 border-hh-ink bg-hh-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur-md dark:border-b dark:border-hh-line dark:bg-[#0a0d11]/95">
+      <div className="mx-auto flex h-[var(--hh-nav-h)] w-full max-w-6xl items-center gap-3 px-4 sm:gap-5 sm:px-6 lg:px-8">
+        <Brand />
+        <div className="h-full min-w-0 flex-1">
+          <HubTabs />
         </div>
-        <div className="col-start-2 row-start-1 justify-self-end md:col-start-3">
-          <HeaderSearch />
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          <div className="hidden min-[420px]:block">
+            <HeaderSearch />
+          </div>
+          <ThemeToggle />
         </div>
-      </nav>
+      </div>
+      {/* Very narrow phones: search gets its own row so it never squeezes the brand. */}
+      <div className="px-4 pb-2.5 min-[420px]:hidden">
+        <HeaderSearch />
+      </div>
     </header>
   );
 }
 
 function SiteFooter() {
   return (
-    <footer className="border-t border-zinc-200/60 px-4 py-8 sm:px-6 lg:px-8 dark:border-zinc-800/60">
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2.5 text-xs">
-          <BrandMark />
-          <div className="flex flex-col gap-0.5">
-            <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-              Hobby Hub
-            </span>
-            <span className="text-zinc-500 dark:text-zinc-400">
-              Fantasy, picks, props and the paper books
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-          <span>
-            Values via{" "}
-            <a
-              href="https://rosteraudit.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
-            >
-              RosterAudit
-            </a>{" "}
-            and{" "}
-            <a
-              href="https://fantasycalc.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
-            >
-              FantasyCalc
-            </a>
-          </span>
-          <span aria-hidden>·</span>
-          <span>
-            League data via{" "}
-            <a
-              href="https://sleeper.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-amber-700 hover:underline dark:text-amber-400"
-            >
-              Sleeper
-            </a>
-          </span>
-        </div>
+    <footer className="mt-8 border-t-[1.5px] border-hh-rule px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 text-xs text-hh-muted sm:flex-row sm:items-center sm:justify-between">
+        <span className="ledger-brand text-base font-bold text-hh-ink">Hobby Hub</span>
+        <span>
+          Values via{" "}
+          <a href="https://rosteraudit.com" target="_blank" rel="noopener noreferrer" className="font-medium text-hh-accent-ink hover:underline">
+            RosterAudit
+          </a>{" "}
+          and{" "}
+          <a href="https://fantasycalc.com" target="_blank" rel="noopener noreferrer" className="font-medium text-hh-accent-ink hover:underline">
+            FantasyCalc
+          </a>
+          . League data via{" "}
+          <a href="https://sleeper.com" target="_blank" rel="noopener noreferrer" className="font-medium text-hh-accent-ink hover:underline">
+            Sleeper
+          </a>
+          .
+        </span>
       </div>
     </footer>
   );
@@ -109,16 +101,22 @@ export default function RootLayout({
   modal: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className="dark h-full antialiased"
-    >
-      <body className="relative flex min-h-full flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+    // The theme script sets .dark before paint, so the class differs from the server's on purpose.
+    <html lang="en" suppressHydrationWarning className={`${display.variable} ${sans.variable} ${mono.variable} ${monoDark.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="relative flex min-h-full flex-col bg-hh-bg text-hh-ink">
+        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:rounded-[6px] focus:bg-hh-panel focus:px-3 focus:py-2 focus:text-sm">
+          Skip to content
+        </a>
         <SiteHeader />
-        <FantasyTabs />
-        <HobbyTabs />
-        <div className="flex-1">{children}</div>
+        <SubTabs />
+        <div id="main" className="flex-1">
+          {children}
+        </div>
         <SiteFooter />
+        <BottomTabs />
         {modal}
       </body>
     </html>

@@ -14,5 +14,7 @@ export default async function NflPicksPage({ searchParams }: { searchParams: Pro
   const q = await searchParams;
   // First TD moved to the Props page; old links land there.
   if (q.m === "ftd") redirect(`/props?m=ftd${typeof q.v === "string" && q.v !== "week" ? `&v=${q.v}` : ""}`);
+  // NBA links built as /picks?l=nba (go-live push, staked NBA bets) belong on the NBA board.
+  if (q.l === "nba") redirect(`/picks/nba${typeof q.v === "string" && q.v !== "week" ? `?v=${q.v}` : ""}`);
   return <PicksView league="nfl" market={parseMarket(q.m)} view={parseView(q.v)} />;
 }

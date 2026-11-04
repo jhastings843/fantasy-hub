@@ -30,7 +30,7 @@ function ConfigError({ message }: { message: string }) {
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
         <Link
-          href="/"
+          href="/fantasy"
           className="text-sm text-zinc-500 dark:text-zinc-400"
         >
           ‹ Leagues
@@ -89,8 +89,10 @@ export default async function TradePage({
   let jingles: JinglesBlendInfo | null = null;
   // His season list prices trades only while it is current (two weeks). The
   // Sep 5 Lab 300 was still moving week 4 trade values by half.
+  // Server component on a force-dynamic page: reading the clock per request is the point.
   const labCurrent =
     !!lab && lab.list.length > 0 && !!lab.postedAt &&
+    // eslint-disable-next-line react-hooks/purity
     Date.now() - new Date(lab.postedAt).getTime() < 14 * 24 * 60 * 60 * 1000;
   if (lab && (labCurrent || hisDrops.size > 0)) {
     const blend = blendWithJingles(
