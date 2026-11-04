@@ -1,3 +1,12 @@
+# 2026-11-04 ~9:30am: Jack's 4 yeses BUILT AND COMMITTED, NOT PUSHED (Atlas session; next desk session pushes)
+Jack answered yes to open questions 1 to 4 below. Done on main, committed, not pushed, not deployed:
+1. Dry runs no longer refresh anything. /api/midweek-email?dry=1 skips refreshFlock (no Gmail IMAP login) as it already skipped refreshJinglesBeforeSend. /api/picks-email?dry=1 (both the Tuesday card and ?update=day) reads the cached board via getPicksReport instead of refreshPicks, so no cache drop and no forced quote read; a dry run now costs what a page view costs. Still open to anyone without CRON_SECRET (by design, for phone previews). src/lib/midweek/run.ts, src/lib/picks/run.ts (composeToday gained a `refresh` flag; the late-add path still refreshes).
+2. /api/draft and /api/faab 502s say "Could not read that league from Sleeper / Could not build the report. Try again in a minute." and console.error the cause. /api/health lists a failed job as "job: failed" without its error text (the full receipt is still in Redis via lastPulse).
+3. Trade builder recap ("X receives" columns) stacks below 400px (min-[400px]:grid-cols-2). Not visually checked at 375px this session. The trade-idea cards (Send/Receive) still sit side by side; not part of the ask.
+4. HH_SESSION_SECRET on Preview: NEEDS JACK IN THE VERCEL DASHBOARD. Code cannot set it, and must not fall back to a default secret. Add HH_SESSION_SECRET and HH_PASSPHRASE for the Preview environment (Project > Settings > Environment Variables), then redeploy the preview. Code side: src/proxy.ts now answers "Saving is turned off on this deployment: HH_SESSION_SECRET isn't set for it in Vercel." when the secret is missing, instead of "unlock this device". Still fails closed.
+Checks: tsc clean, eslint 0 errors (12 old warnings), build OK. Tests: 1839 passed, 6 failed, all timing limits in src/lib/picks/pool.test.ts and src/lib/models/cbb/bracket.test.ts with the Mac at load average ~20; neither file touches this change. Rerun them on a quiet machine.
+Still open: 5 (unlock Mac and phone) and 6 (worktree cleanup) below; push this commit.
+
 # 2026-11-04 morning: follow-ups LIVE (main 1810a10). OPEN QUESTIONS FOR JACK BELOW
 Jack is on the road and answers through Atlas (Telegram). An Atlas `project_task` session opened from his reply starts here. Such a session may commit but never push or deploy (command-center worker rule); say so in the reply, and the next desk session pushes.
 Shipped this morning, all live:

@@ -46,7 +46,8 @@ export async function GET(request: Request) {
   try {
     league = await resolveLeague(leagueId);
   } catch (e) {
-    return Response.json({ ok: false, error: `Could not read that league: ${(e as Error).message}` }, { status: 502 });
+    console.error("/api/draft: could not read league", leagueId, e);
+    return Response.json({ ok: false, error: "Could not read that league from Sleeper. Try again in a minute." }, { status: 502 });
   }
   if (!league) return Response.json({ ok: false, error: `No league ${leagueId}.` }, { status: 404 });
 

@@ -28,8 +28,9 @@ export async function GET(request: Request) {
   try {
     report = await buildWeeklyReport(leagueId);
   } catch (e) {
+    console.error("/api/faab: could not build the report", e);
     return Response.json(
-      { ok: false, error: `Could not build the report: ${(e as Error).message}` },
+      { ok: false, error: "Could not build the report. Try again in a minute." },
       { status: 502 },
     );
   }

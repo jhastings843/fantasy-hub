@@ -50,8 +50,11 @@ async function runMidweekEmailLocked(options: MidweekOptions = {}): Promise<Resp
   const all = await getMyLeagues();
   const sleeper = all.filter((l) => l.source !== "manual");
   // Flock's waiver email, the backup on a week Jingles does not post. Read
-  // once here so the league builds below read it from Redis.
-  const flockRefreshed = await refreshFlock(String(sleeper[0]?.season ?? new Date().getFullYear()));
+  // once here so the league builds below read it from Redis. Skipped for a
+  // dry run too: it logs into Gmail, and anyone can request a dry run, so a
+  // loop of them could get the app password rate-limited. A preview reads
+  // whatever the last real run stored.
+  const flockRefreshed = dry ? null : await refreshFlock(String(sleeper[0]?.season ?? new Date().getFullYear()));
   const guillotineLeague = sleeper.find((l) => l.type === "guillotine") ?? null;
 
   // The guillotine league is excluded from the waiver run: its wire is the

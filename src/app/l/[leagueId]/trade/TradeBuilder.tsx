@@ -1115,7 +1115,8 @@ export default function TradeBuilder({
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 sm:gap-6">
+              {/* Stacked on phones: side by side, each column is ~150px and long names cut off. */}
+              <div className="grid gap-4 min-[400px]:grid-cols-2 sm:gap-6">
                 <RecapColumn
                   name={myTeam?.ownerName ?? "You"}
                   items={myReceiveItems}

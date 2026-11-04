@@ -22,7 +22,11 @@ export async function GET() {
           window: last.window,
           ok: last.ok,
           ms: last.ms,
-          jobs: last.jobs.map((j) => `${j.job}: ${j.ok ? "ok" : `failed, ${j.error}`}`),
+          // Open to anyone, so a failed job is named but its error text is
+          // not echoed (it can carry hostnames or upstream messages). The
+          // full receipt, error included, is still stored (lastPulse in
+          // lib/pulse/run.ts) for a desk session to read.
+          jobs: last.jobs.map((j) => `${j.job}: ${j.ok ? "ok" : "failed"}`),
           sends: last.sends.map((s) => `${s.id}: ${s.status}`),
           // Minutes rather than a timestamp to read: the question is always
           // "is it still running", and 14 answers it faster than an ISO string.

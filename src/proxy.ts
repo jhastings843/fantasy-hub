@@ -8,6 +8,11 @@ import { SESSION_COOKIE, validToken } from "@/lib/auth/session";
 export async function proxy(req: NextRequest) {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return NextResponse.next();
   if (process.env.NODE_ENV === "development" && !process.env.HH_SESSION_SECRET) return NextResponse.next();
+  // Not set on this deployment (Preview, until it is added in Vercel): still
+  // refused, but say why, so it doesn't read as "unlock this device".
+  if (!process.env.HH_SESSION_SECRET) {
+    return NextResponse.json({ error: "Saving is turned off on this deployment: HH_SESSION_SECRET isn't set for it in Vercel." }, { status: 401 });
+  }
   if (await validToken(process.env.HH_SESSION_SECRET, req.cookies.get(SESSION_COOKIE)?.value)) return NextResponse.next();
   return NextResponse.json({ error: "This device isn't unlocked. Open /unlock on Hobby Hub, enter the passphrase, then try again." }, { status: 401 });
 }

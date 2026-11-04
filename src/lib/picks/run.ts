@@ -2,7 +2,7 @@ import "server-only";
 import { sendEmail } from "@/lib/guillotine/send";
 import { alreadySent, clearSent, recordSent, withSendLock } from "@/lib/email/sent-log";
 import { etClock } from "@/lib/pulse/tempo";
-import { getPicksCore, refreshPicks } from "./report";
+import { getPicksCore, getPicksReport, refreshPicks } from "./report";
 import { refreshShop } from "./shop-store";
 import { saveDecisions } from "./decisions-store";
 import { type DecisionRecord, toDecision } from "./learning/replay";
@@ -60,10 +60,14 @@ async function runLocked({ dry = false, resend = false, test = false }: PicksEma
   // two cards together stay inside the cross-sport caps. Held NFL plays are
   // left out: college already sees them as rivals (heldCandidates), and
   // reserving them too would count the same units twice.
-  const nfl = await refreshPicks("nfl").catch(() => null);
+  // A dry run (open to anyone) reads the cached boards the pages read; only
+  // a real send drops the cache and re-reads the lines.
+  const read = (league: "nfl" | "cfb", opts?: { reserved?: number }) =>
+    dry ? getPicksReport(league, { reserved: opts?.reserved }).then((r) => r.value) : refreshPicks(league, opts);
+  const nfl = await read("nfl").catch(() => null);
   const released = (g: { stake?: number; held?: string }) => (g.held ? 0 : (g.stake ?? 0));
   const nflCard = (nfl?.board ?? []).reduce((t, g) => t + released(g), 0) + (nfl?.totals.board ?? []).reduce((t, g) => t + released(g), 0);
-  const cfb = await refreshPicks("cfb", { reserved: nflCard }).catch(() => null);
+  const cfb = await read("cfb", { reserved: nflCard }).catch(() => null);
   const week = nfl?.week ?? null;
   const season = String(nfl?.season ?? cfb?.season ?? "");
   if (!nfl || week === null || !season) {
@@ -214,7 +218,7 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
   // yet is "not ready": until 5pm ET the run retries rather than calling the
   // day quiet (a Tuesday-morning college game appears only once the new
   // week's boards are up).
-  const { leagues, notReady, shopNotes } = await composeToday(now, date, clock.day, !dry);
+  const { leagues, notReady, shopNotes } = await composeToday(now, date, clock.day, !dry, !dry);
   // Waiting must never cost a ready sport its bets: give up waiting 90
   // minutes before today's first kickoff on any loaded board, or at 5pm.
   const firstKick = Math.min(
@@ -276,7 +280,7 @@ async function runToday({ dry = false, resend = false, test = false }: PicksEmai
  * that failed to load, has stale or missing quotes, or whose boards are not
  * up yet is listed in notReady.
  */
-async function composeToday(now: Date, date: string, weekday: number, shop: boolean): Promise<{ leagues: TodayLeague[]; notReady: string[]; shopNotes: string[] }> {
+async function composeToday(now: Date, date: string, weekday: number, shop: boolean, refresh = true): Promise<{ leagues: TodayLeague[]; notReady: string[]; shopNotes: string[] }> {
   const leagues: TodayLeague[] = [];
   const notReady: string[] = [];
   const shopNotes: string[] = [];
@@ -290,7 +294,9 @@ async function composeToday(now: Date, date: string, weekday: number, shop: bool
       const core = (await getPicksCore(league).catch(() => null))?.value;
       shopNotes.push(`${name}: ${await refreshShop(league, core ? [...new Set(core.rows.flatMap((x) => [x.home, x.away]))] : [], now)}`);
     }
-    const r = await refreshPicks(league, league === "cfb" ? { reserved } : undefined).catch(() => null);
+    // A dry run (open to anyone) reads the cached board; a send rebuilds it.
+    const opts = league === "cfb" ? { reserved } : undefined;
+    const r = await (refresh ? refreshPicks(league, opts) : getPicksReport(league, opts).then((x) => x.value)).catch(() => null);
     if (!r?.week) {
       if (playsToday) notReady.push(`${name} board unreadable`);
       continue;
