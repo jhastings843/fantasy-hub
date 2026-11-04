@@ -1,3 +1,24 @@
+# 2026-11-04 morning: follow-ups LIVE (main 1810a10). OPEN QUESTIONS FOR JACK BELOW
+Jack is on the road and answers through Atlas (Telegram). An Atlas `project_task` session opened from his reply starts here. Such a session may commit but never push or deploy (command-center worker rule); say so in the reply, and the next desk session pushes.
+Shipped this morning, all live:
+- Today: staked one-player bets (props, David, First TD, Anytime TD, First Basket, KOTC) open the player pop-up. StakedBet gained `team` (src/lib/props/staked-core.ts, data only); email links unchanged. Lottos and NBA spreads still open their board (rungs have no team).
+- Records: settled rows link each team to its team pop-up (picks/ats.tsx boardTeamHref). Issued record now lists NFL, CFB, NBA, CBB with "No bets sent yet" until a league has one; league filter has all four chips. NBA staked spread bets (nba-track stake + nbaBets ats) feed settled/open automatically. CBB has no staking path at all (models/cbb is tracked only), so CBB stays empty until one is built.
+- Our models (/models): rows rebuilt on aligned columns (model | record + win % | units | bar | chevron), "tracked" chip removed from every row (said once in the section aside), Live/Projections chips beside the name, CLV moved into the meta line. EdgeBar gained showValue/className props.
+- Player pop-up: First TD bets on a player who did not play now grade void, not a loss (ftd-void appeared()).
+- API: /api/refresh and /api/survivor 500s return a generic message; cause goes to console.error.
+- lib/survivor/strategy.ts: second "pool-size" article renamed "pool-size-leverage".
+- Plan: custom goal input has an aria-label.
+- Click-tested: trade builder (load offer, add/remove, QB filter, add pick, FAAB, counter Add, Clear, 375px), custom goals (add, tick, reload, remove; localStorage only), survivor save on production while locked -> 401 -> /unlock, nothing written. NOT testable: rookie draft live view (Sleeper rookie draft completed May 1; live view only while status is drafting).
+- Note: a "Checkpoint from the Morning Rundown" commit (15ea9cf) swept in half of these edits mid-session and was pushed; contents verified.
+
+OPEN QUESTIONS (need Jack's yes before building; they change API/cron routes or src/lib):
+1. Security audit (src/app/api, 2026-11-04, all LOW): /api/midweek-email?dry=1 and /api/picks-email?dry=1 skip CRON_SECRET and still run refreshes. midweek dry run logs into Jack's Gmail over IMAP (refreshFlock) with GMAIL_APP_PASSWORD, so a stranger looping it could get the app password rate-limited. picks dry run forces a picks cache rebuild. Fix: skip refreshFlock / refreshPicks when dry (as refreshJinglesBeforeSend already is). Recommended.
+2. Same audit: /api/draft, /api/faab return raw error text on 502; /api/health echoes failed-job error text. Fix: generic message, log the cause.
+3. Trade builder at 375px: the two narrow "receives" columns cut names with "..." (cosmetic). Fix by stacking the two sides under 400px?
+4. HH_SESSION_SECRET is Production only; Preview saves are refused. Jack adds it in Vercel if he wants preview saves.
+5. Unlock Mac and phone at /unlock (Jack).
+6. Optional cleanup: delete agent worktrees under .claude/worktrees and their branches (deleting needs Jack's OK).
+
 # 2026-11-04 overnight: EVERYTHING LIVE (deploy fantasy-okoy3lcb2)
 Shipped tonight, all in production on main:
 - Write-lock (POST /api/survivor/*, /api/refresh need the device cookie from /unlock; reads open). HH_SESSION_SECRET is set for Production only, NOT Preview (preview saves are refused).
