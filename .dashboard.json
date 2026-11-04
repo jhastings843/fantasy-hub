@@ -5,11 +5,9 @@
   "status": "Redesign live. Jack's 4 audit/UI yeses committed on main, not pushed: dry-run emails skip refreshes, generic API errors on draft/faab/health, trade recap stacks on phones, clearer preview save refusal.",
   "status_detail": "Multi-league fantasy football tools. Every tool lives under /l/[leagueId] with leagues auto-discovered from Sleeper and format detected from settings.type (including type 3, which is Sleeper's undocumented guillotine code). Four live leagues: Dah Dynasty League (dynasty, in season), 2026 Half PPR (redraft, drafts Sep 7), Sunday Scaries #2 (redraft, full PPR, in season), and Dah Chopped League (guillotine, 16 teams, $1000 FAAB, still pre-draft). Guillotine leagues get a weekly FAAB advisor at /l/[id]/faab, /api/faab and a Tuesday email. Written playbooks with sources at /strategy. His rankings moved off Substack to the FantasyPros platform on 2026-09-17 and are read from there by week rather than by post, per scoring, so each league finally reads a list in its own scoring. SURVIVOR is a live recommendation engine at /survivor and /api/survivor: no-vig moneylines from ESPN, real public pick percentages from Yahoo, first-place equity scoring and a season-long Hungarian assignment for future value. TWO POOLS now, 500 entries and 30, tracked apart: separate burned teams, separate logged distributions, separate chalk factors, one shared data pull. Switcher on the page, ?pool=<id>|all on the API, one labelled card per pool in the Thursday email. Each pool carries a POSTURE, computed from expected entries alive at week 18, which breaks ties toward safety in a pool that will thin to one entry and toward leverage in one that will split. Week 1 live: 500 pool takes JAX, 30 pool takes LAC. A PULSE now keeps it current: /api/pulse called every fifteen minutes by GitHub Actions, tiered by the Eastern clock (live gameday, hourly, overnight), plus five scheduled emails through one shell and a Sunday 11:45 exception alarm that stays silent when nothing is wrong.",
   "next_steps": [
-    "Jack: add HH_SESSION_SECRET to Preview (HH_PASSPHRASE already there); auto mode blocked Claude from writing it.",
     "Optional: generic error text on forecast, money and survivor pages (audit LOWs).",
     "Paste the logging section from data/pickem/README.md into ~/.claude/skills/pickem/SKILL.md (desk session; Atlas cannot open files outside the repo), so /pickem logs and grades every run.",
     "Push the 4-yeses commit from a desk session (Atlas sessions never push).",
-    "Add HH_SESSION_SECRET and HH_PASSPHRASE for Preview in Vercel if preview saves are wanted (dashboard only).",
     "Rerun pool.test.ts and bracket.test.ts on a quiet machine (timing limits failed at load ~20).",
     "Jack to answer open questions in HANDOFF.md via Atlas (dry-run auth fix, verbose errors in draft/faab/health, trade 375px names)",
     "Unlock Mac and phone at /unlock"
@@ -19,6 +17,7 @@
   ],
   "last_worked": "2026-11-04",
   "notes": [
+    "2026-11-04: HH_SESSION_SECRET added to Preview by Jack (all branches; CLI needed an empty \"\" branch arg).",
     "2026-11-04 pm: pushed c7a14ba, 615c6a0, 9f65006 (deploy fantasy-kg9o773zp Ready). /pickem skill now runs the pick logger (grade before, log after; SKILL.md backup in session scratchpad). Insecure-defaults audit of src: 3 LOW pre-existing raw error text on public pages (learning/forecast page.tsx:68, money/MoneyView.tsx:1707, survivor/page.tsx:18). Removed 4 merged agent worktrees.",
     "2026-11-04: /pickem CFB ATS review (research/pickem-cfb-ats-review.md): pick history not stored, so no reconstruction; pem_breaks_tie 40-50 is z -1.05 (variance); ranked games move 2.1 pts open to close and the moved-to side wins 56% at the opener. Recommends logging every slate, pool line vs market check, PEM out of tie-breaks.",
     "2026-11-04: Built Jack's 4 yeses (dry-run refresh skip, generic errors, trade recap stack, preview secret message); committed, not pushed.",
