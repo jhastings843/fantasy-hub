@@ -1,3 +1,9 @@
+# 2026-11-03 evening: go-live forecast (deployed 3991377)
+- /learning/forecast (src/app/learning/forecast/page.tsx), pure math in src/lib/learning/forecast.ts (+ test). Linked from /learning.
+- Inputs: every shared-engine SectionView (EntryView.ev: games, weeks, t, bets, wins, pairedT; gate bars) and football picks ReviewState.decisions (n, weeks, paired t; bar 30 games or 100 for :mkt:, 3 weeks, t 1.645). NBA picks hypotheses not included (no stored n/t on the view).
+- Chance = ESTIMATE: sd units from t and n, prior N(0, 0.08^2) per game, 4000 seeded sims, 24 checks from sample-met to season end; refinements take min(own, paired). SEASON_END dates are estimates (NFL Jan 10, CFB Jan 18, NBA Apr 11, CBB Apr 5 2027).
+- NHL parked the same day (Jack: wait); revisit props-first once a slice goes live.
+
 # 2026-11-03 late morning: props page fixes (deployed b66adf5)
 - /props/player: PlayerPreview.tsx + player.module.css. lib/search/player.ts adds PlayerMarket.history (historyOf: graded copies, last 10, that day's line, actual, our edge grade).
 - Search: nbaPropsIndex subjects are now per player (nbap:TEAM|name); currentOnly compares Date.parse. Before, tonight's game retired last night's props every morning, so NBA players were never searchable until near tip.
