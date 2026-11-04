@@ -9,14 +9,14 @@
     "Paste the logging section from data/pickem/README.md into ~/.claude/skills/pickem/SKILL.md (desk session; Atlas cannot open files outside the repo), so /pickem logs and grades every run.",
     "Push the 4-yeses commit from a desk session (Atlas sessions never push).",
     "Rerun pool.test.ts and bracket.test.ts on a quiet machine (timing limits failed at load ~20).",
-    "Jack to answer open questions in HANDOFF.md via Atlas (dry-run auth fix, verbose errors in draft/faab/health, trade 375px names)",
-    "Unlock Mac and phone at /unlock"
+    "Jack to answer open questions in HANDOFF.md via Atlas (dry-run auth fix, verbose errors in draft/faab/health, trade 375px names)"
   ],
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
   "last_worked": "2026-11-04",
   "notes": [
+    "2026-11-04: Jack unlocked Mac and phone at /unlock.",
     "2026-11-04: HH_SESSION_SECRET added to Preview by Jack (all branches; CLI needed an empty \"\" branch arg).",
     "2026-11-04 pm: pushed c7a14ba, 615c6a0, 9f65006 (deploy fantasy-kg9o773zp Ready). /pickem skill now runs the pick logger (grade before, log after; SKILL.md backup in session scratchpad). Insecure-defaults audit of src: 3 LOW pre-existing raw error text on public pages (learning/forecast page.tsx:68, money/MoneyView.tsx:1707, survivor/page.tsx:18). Removed 4 merged agent worktrees.",
     "2026-11-04: /pickem CFB ATS review (research/pickem-cfb-ats-review.md): pick history not stored, so no reconstruction; pem_breaks_tie 40-50 is z -1.05 (variance); ranked games move 2.1 pts open to close and the moved-to side wins 56% at the opener. Recommends logging every slate, pool line vs market check, PEM out of tie-breaks.",
