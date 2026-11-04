@@ -44,10 +44,11 @@ const PRESETS: { id: string; label: string; k: Key; d: 1 | -1 }[] = [
 const units = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}u`;
 const odds = (o: number | null) => (o === null ? "parlay" : o > 0 ? `+${o}` : `−${Math.abs(o)}`);
 
-export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
+export default function RecordsTable({ rows, leagues: every = [] }: { rows: IssuedRow[]; leagues?: string[] }) {
   const [sort, setSort] = useState<{ k: Key; d: 1 | -1 }>({ k: "week", d: -1 });
   // League filter above the sort (Jack, 2026-10-22): All is the default and always an option.
-  const leagues = useMemo(() => [...new Set(rows.map((r) => r.league))], [rows]);
+  // Every league the page names gets a chip, even before its first bet.
+  const leagues = useMemo(() => [...new Set([...every, ...rows.map((r) => r.league)])], [rows, every]);
   const [league, setLeague] = useState<string>("All");
   const sorted = useMemo(
     () =>
@@ -108,6 +109,11 @@ export default function RecordsTable({ rows }: { rows: IssuedRow[] }) {
             </tr>
           </thead>
           <tbody>
+            {!sorted.length && (
+              <tr>
+                <td colSpan={8} className={s.muted}>{`No ${league} bet has settled yet.`}</td>
+              </tr>
+            )}
             {sorted.map((r) => (
               <tr key={r.key}>
                 <td className={s.num}>{r.week}</td>

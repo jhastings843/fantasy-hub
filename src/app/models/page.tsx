@@ -52,16 +52,29 @@ interface ModelRow {
 const live = (v: SectionView | null | undefined) => !!v?.entries.some((e) => e.status === "active");
 const settle = <T,>(p: Promise<T>) => p.catch(() => null);
 
-function RecordCell({ r }: { r: Rec | null }) {
-  if (!r || r.w + r.l + (r.p ?? 0) === 0) return <span className="text-sm text-hh-muted">No graded games yet</span>;
-  return <Num className="text-[17px] font-semibold text-hh-ink">{`${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`}</Num>;
+const gradedCount = (r: Rec | null) => (r ? r.w + r.l + (r.p ?? 0) : 0);
+
+/** W-L(-P) over its hit rate; a model with nothing graded says so once, in the units column's place. */
+function RecordCell({ r }: { r: Rec }) {
+  const decided = r.w + r.l;
+  return (
+    <span className="flex flex-col items-start leading-tight sm:items-end">
+      <span className="sr-only">Record </span>
+      <Num className="text-[17px] font-semibold text-hh-ink">{`${r.w}-${r.l}${r.p ? `-${r.p}` : ""}`}</Num>
+      {decided > 0 && <Num className="text-xs text-hh-muted">{`${Math.round((r.w / decided) * 100)}% won`}</Num>}
+    </span>
+  );
 }
 
-const STATUS: Record<ModelRow["status"], { tone: "accent" | "muted" | "gold"; text: string }> = {
-  live: { tone: "accent", text: "Live slice betting" },
-  tracked: { tone: "muted", text: "Tracked, no stakes" },
+// Tracked is the default and is said once under each sport, not on every row
+// (Jack, 2026-11-04: "fix how this all looks"). Only the exceptions get a chip.
+const STATUS: Partial<Record<ModelRow["status"], { tone: "accent" | "gold"; text: string }>> = {
+  live: { tone: "accent", text: "Betting live" },
   projections: { tone: "gold", text: "Projections only" },
 };
+
+/** Columns, desktop: model (status chip beside the name) | record | units | bar | chevron. Shared by the header row and every model row. */
+const COLS = "sm:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_11rem_1rem]";
 
 export default async function OurModelsPage() {
   const now = new Date();
@@ -147,35 +160,62 @@ export default async function OurModelsPage() {
       </Section>
 
       {sports.map(({ sp, rows: rs }) => (
-        <Section key={sp} id={`m-${sp}`} label={SPORT_NAME[sp]} aside={<Num>{`${rs.length} models`}</Num>}>
+        <Section key={sp} id={`m-${sp}`} label={SPORT_NAME[sp]} aside={`${rs.length} models · tracked, no stakes unless marked`}>
+          {/* Column labels, desktop only: on a phone each number carries its own small label. */}
+          <div aria-hidden className={`hidden gap-x-5 border-b border-hh-line pb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-hh-muted sm:grid ${COLS}`}>
+            <span>Model</span>
+            <span className="text-right">Record</span>
+            <span className="text-right">Units</span>
+            <span />
+            <span />
+          </div>
           <ul className="flex flex-col">
-            {rs.map((r) => (
-              <li key={`${r.name}-${r.market}`} className="border-b border-hh-line last:border-b-0">
-                <Link href={r.href} className="group grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 sm:grid-cols-[minmax(0,1.6fr)_7rem_minmax(0,9rem)_minmax(0,1fr)_1rem]">
-                  <span className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-hh-muted">{`${r.sport} · ${r.market}`}</span>
-                    <span className="block font-semibold text-hh-ink group-hover:text-hh-accent-ink">{r.name}</span>
-                    <span className="block text-xs text-hh-muted">{r.basis}</span>
-                  </span>
-                  <span className="justify-self-end sm:justify-self-start">
-                    <RecordCell r={r.rec} />
-                  </span>
-                  <span className="col-span-2 sm:col-span-1">
-                    {r.rec?.units !== undefined && r.rec.w + r.rec.l + (r.rec.p ?? 0) > 0 ? (
-                      <EdgeBar value={r.rec.units} max={maxUnits} label={`${r.name}, ${r.market}, units`} format={u} />
+            {rs.map((r) => {
+              const n = gradedCount(r.rec);
+              const units = n > 0 ? r.rec?.units : undefined;
+              const st = STATUS[r.status];
+              return (
+                <li key={`${r.name}-${r.market}`} className="border-b border-hh-line last:border-b-0">
+                  <Link href={r.href} className={`group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-2 py-3.5 ${COLS}`}>
+                    <span className="col-span-2 min-w-0 sm:col-span-1">
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-semibold text-hh-ink group-hover:text-hh-accent-ink">{r.name}</span>
+                        {st && <Chip tone={st.tone}>{st.text}</Chip>}
+                      </span>
+                      <span className="block text-xs text-hh-muted">
+                        {r.market}
+                        {` · ${r.basis}`}
+                        {r.rec?.clv != null && <Num className="ml-1">{`· CLV ${r.rec.clv > 0 ? "+" : ""}${r.rec.clv.toFixed(2)} pts`}</Num>}
+                      </span>
+                    </span>
+                    {n > 0 ? (
+                      <>
+                        <span className="justify-self-start sm:justify-self-end">
+                          <RecordCell r={r.rec!} />
+                        </span>
+                        <span className="justify-self-end text-right">
+                          {units !== undefined ? (
+                            <Num className={`text-[17px] font-semibold ${units > 0 ? "text-hh-pos" : units < 0 ? "text-hh-neg" : "text-hh-ink"}`}>
+                              <span className="sr-only">Units </span>
+                              {u(units)}
+                            </Num>
+                          ) : (
+                            <span className="text-xs text-hh-muted">No price</span>
+                          )}
+                        </span>
+                        <span className="hidden sm:block">
+                          {units !== undefined && <EdgeBar value={units} max={maxUnits} label={`${r.name}, ${r.market}, units`} format={u} showValue={false} className="w-40" />}
+                        </span>
+                      </>
                     ) : (
-                      <span className="text-xs text-hh-muted">{r.rec ? "No price, record only" : ""}</span>
+                      <span className="col-span-2 text-sm text-hh-muted sm:col-span-3 sm:text-right">No graded games yet</span>
                     )}
-                  </span>
-                  <span className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1">
-                    <Chip tone={STATUS[r.status].tone}>{STATUS[r.status].text}</Chip>
-                    {r.rec?.clv != null && <Num className="text-xs text-hh-muted">{`CLV ${r.rec.clv > 0 ? "+" : ""}${r.rec.clv.toFixed(2)} pts`}</Num>}
-                  </span>
-                  <ChevronRight size={15} aria-hidden className="hidden text-hh-muted transition-transform group-hover:translate-x-0.5 sm:block" />
-                </Link>
-                {r.note && <p className="-mt-1 pb-3 text-xs text-hh-muted">{r.note}</p>}
-              </li>
-            ))}
+                    <ChevronRight size={15} aria-hidden className="hidden text-hh-muted transition-transform group-hover:translate-x-0.5 sm:block" />
+                  </Link>
+                  {r.note && <p className="-mt-1 pb-3 text-xs text-hh-muted">{r.note}</p>}
+                </li>
+              );
+            })}
           </ul>
           {!rs.length && <Empty>No models for this sport yet.</Empty>}
         </Section>

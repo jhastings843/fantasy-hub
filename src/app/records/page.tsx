@@ -15,7 +15,9 @@ import RecordsTable, { type IssuedRow } from "./RecordsTable";
 import s from "../picks/picks.module.css";
 import { Fragment, type ReactNode } from "react";
 import { PopLink } from "@/components/hh/PopLink";
-import { footballGameHref } from "../picks/hrefs";
+import { footballGameHref, nbaGameHref, teamHref } from "../picks/hrefs";
+import { nbaBets } from "@/lib/picks/nba-track";
+import { NBA_LIST, nbaAbbr } from "@/lib/search/teams";
 import { boardTeamHref } from "../picks/ats";
 
 // Records (the Ledger redesign, 2026-10-22). Two books that never mix:
@@ -29,6 +31,9 @@ export const metadata: Metadata = {
   title: "Records · Hobby Hub",
   description: "Every issued pick graded at its saved price, with the tracked-only shadow records kept apart.",
 };
+
+/** The leagues the issued record covers, in this order, whether or not one has a bet yet (Jack, 2026-11-04). */
+const LEAGUES = ["NFL", "CFB", "NBA", "CBB"];
 
 const seasonOf = (d: Date) => (d.getMonth() < 7 ? d.getFullYear() - 1 : d.getFullYear());
 const u = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}u`;
@@ -116,6 +121,50 @@ export default async function RecordsPage() {
         else settled.push({ ...row, node: positionNode(b, r, true), result: b.result, net: b.net ?? 0 });
       });
   }
+  // NBA: the spread bets the stake run sized (nba-track-store), the same ones
+  // Today and the picks push carry. None yet; they land here once one is sent.
+  for (const g of nbaPicks?.games ?? []) {
+    if (!g.stake) continue;
+    const b = nbaBets(g).find((x) => x.market === "ats");
+    if (!b) continue;
+    const mine = b.side === "home" ? g.home : g.away;
+    const nick = (k: string) => NBA_LIST[nbaAbbr(k)]?.[1] ?? k;
+    const t = (k: string) => <PopLink href={b.result === undefined ? nbaGameHref(g.id) : teamHref("nba", k)}>{nick(k)}</PopLink>;
+    const row = {
+      key: `nba-${g.id}`,
+      league: "NBA",
+      week: g.week,
+      position: `${nick(mine)} ${line(b.line)} ${b.side === "home" ? "vs" : "at"} ${nick(b.side === "home" ? g.away : g.home)}`,
+      node: (
+        <>
+          {t(mine)}
+          {` ${line(b.line)} ${b.side === "home" ? "vs" : "at"} `}
+          {t(b.side === "home" ? g.away : g.home)}
+        </>
+      ),
+      kind: "Spread",
+      tier: "NBA spread rule",
+      stake: g.stake,
+      price: b.price ?? null,
+    };
+    if (b.result === undefined) open.push(row);
+    else settled.push({ ...row, result: b.result, net: Math.round((b.net ?? 0) * g.stake * 1000) / 1000 });
+  }
+
+  // Every league the emails can issue in, shown even before its first bet.
+  const byLeague = LEAGUES.map((name) => {
+    const rows = settled.filter((b) => b.league === name);
+    return {
+      name,
+      w: rows.filter((b) => b.result === "W").length,
+      l: rows.filter((b) => b.result === "L").length,
+      p: rows.filter((b) => b.result === "P").length,
+      net: rows.reduce((a, b) => a + b.net, 0),
+      settled: rows.length,
+      open: open.filter((b) => b.league === name).length,
+    };
+  });
+
   const net = settled.reduce((a, b) => a + b.net, 0);
   // A bet's units are what it risked (units.ts); a push risks nothing in the end.
   const risked = settled.reduce((a, b) => a + (b.result === "P" ? 0 : b.stake), 0);
@@ -157,9 +206,41 @@ export default async function RecordsPage() {
             <Stat label="Return" value={`${(risked ? (net / risked) * 100 : 0).toFixed(1)}%`} sub="On settled units risked" />
             <Stat label="Open" value={open.length} sub={open.length ? `${open.reduce((a, b) => a + b.stake, 0)}u not final yet` : "nothing open"} />
           </div>
-          <p className="mt-4 text-sm text-hh-muted">Leagues: {reports.map((r) => LEAGUE_NAME[r.league]).join(" + ") || "None loaded"}. NBA has no issued picks yet.</p>
+          <div className="mt-6 min-w-0 max-w-full overflow-x-auto">
+            <table className={s.table}>
+              <caption className="sr-only">Issued record by league</caption>
+              <thead>
+                <tr>
+                  <th>League</th>
+                  <th className={s.thNum}>W-L-P</th>
+                  <th className={s.thNum}>Net</th>
+                  <th className={s.thNum}>Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byLeague.map((x) => (
+                  <tr key={x.name}>
+                    <td>
+                      <b>{x.name}</b>
+                    </td>
+                    {x.settled || x.open ? (
+                      <>
+                        <td className={`${s.num} ${s.tdNum}`}>{x.settled ? `${x.w}-${x.l}${x.p ? `-${x.p}` : ""}` : "·"}</td>
+                        <td className={`${s.num} ${s.tdNum} ${x.net > 0 ? s.pos : x.net < 0 ? s.neg : ""}`}>{x.settled ? u(x.net) : "·"}</td>
+                        <td className={`${s.num} ${s.tdNum}`}>{x.open || "·"}</td>
+                      </>
+                    ) : (
+                      <td colSpan={3} className={s.muted} style={{ textAlign: "right" }}>
+                        No bets sent yet
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <div className="mt-4">
-            <p className="mb-2 text-xs text-hh-muted">Running issued units by week number (NFL and college weeks counted together)</p>
+            <p className="mb-2 text-xs text-hh-muted">Running issued units by week number (all leagues counted together)</p>
             <Sparkline values={runningUnits} labels={weeks.map((week) => `Week ${week}`)} label="Running issued units by week" width={480} height={72} format={u} />
           </div>
           <Disclosure summary="What this record counts">
@@ -169,7 +250,7 @@ export default async function RecordsPage() {
         </Section>
 
         <Section id="rec-settled" label="Settled" aside="Graded at the saved price · sort below">
-          <RecordsTable rows={settled} />
+          <RecordsTable rows={settled} leagues={LEAGUES} />
           {unstaked > 0 && <p className={s.p}>{`${unstaked} early pick${unstaked === 1 ? " was" : "s were"} sent before stakes existed: in the win-loss record on each Picks page, not here.`}</p>}
         </Section>
 

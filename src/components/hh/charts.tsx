@@ -95,12 +95,12 @@ export function Meter({ value, label, showValue = true }: { value: number; label
  * An edge, centred on zero: positive grows right in the win colour, negative
  * grows left in the loss colour. `max` sets the scale so rows compare.
  */
-export function EdgeBar({ value, max, label, format = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}` }: { value: number; max: number; label: string; format?: (v: number) => string }) {
+export function EdgeBar({ value, max, label, format = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}`, showValue = true, className = "w-20 sm:w-24" }: { value: number; max: number; label: string; format?: (v: number) => string; /** False when the number sits in its own column. */ showValue?: boolean; /** Track width. */ className?: string }) {
   const w = Math.min(1, Math.abs(value) / (max || 1)) * 50;
   const pos = value >= 0;
   return (
     <div className="flex items-center gap-2" title={`${label}: ${format(value)}`}>
-      <div role="img" aria-label={`${label}: ${format(value)}`} className="relative h-2 w-20 shrink-0 sm:w-24">
+      <div role="img" aria-label={`${label}: ${format(value)}`} className={`relative h-2 shrink-0 ${className}`}>
         <span aria-hidden className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-hh-rule" />
         <span
           aria-hidden
@@ -108,7 +108,7 @@ export function EdgeBar({ value, max, label, format = (v: number) => `${v > 0 ? 
           style={{ left: pos ? "50%" : `${50 - w}%`, width: `${w}%`, background: pos ? "var(--hh-pos)" : "var(--hh-neg)" }}
         />
       </div>
-      <span className={`hh-num w-12 text-right text-sm ${pos ? "text-hh-pos" : "text-hh-neg"}`}>{format(value)}</span>
+      {showValue && <span className={`hh-num w-12 text-right text-sm ${pos ? "text-hh-pos" : "text-hh-neg"}`}>{format(value)}</span>}
     </div>
   );
 }
