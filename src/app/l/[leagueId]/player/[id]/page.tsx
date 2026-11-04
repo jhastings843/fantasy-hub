@@ -15,7 +15,6 @@ import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
 import type { RAValuesBySleeperId } from "@/lib/rosteraudit/types";
 import {
-  getAllPlayers,
   getLeague,
   getLeagueRosters,
   getLeagueUsers,
@@ -23,6 +22,11 @@ import {
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { JinglesCallCard } from "@/components/JinglesBadge";
 import { ValueChart } from "./ValueChart";
+import { Chip, Disclosure, Empty, Num, Section, Stat } from "@/components/hh/ui";
+import { PopLink } from "@/components/hh/PopLink";
+import { TeamEdge } from "@/components/hh/team";
+import { PlayerLink } from "@/components/PlayerLink";
+import { teamHref } from "@/app/picks/hrefs";
 
 export const dynamic = "force-dynamic";
 
@@ -30,19 +34,30 @@ function NotFound({ id }: { id: string }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex max-w-2xl flex-col gap-3">
-        <Link
-          href="/fantasy"
-          className="text-sm text-zinc-500 dark:text-zinc-400"
-        >
+        <Link href="/fantasy" className="inline-flex min-h-11 items-center self-start text-sm text-hh-muted hover:text-hh-ink">
           ‹ Leagues
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Player profile</h1>
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
-          No data found for player id {id}.
+        <h1 className="hh-title">Player profile</h1>
+        <p className="border-l-2 border-hh-neg py-1 pl-3 text-sm text-hh-neg">
+          No data found for player id <Num>{id}</Num>.
         </p>
       </div>
     </main>
   );
+}
+
+/** An NFL team code that opens the team pop-up; free agents stay text. */
+function TeamCode({ team }: { team: string | null | undefined }) {
+  if (!team) return <>FA</>;
+  return <PopLink href={teamHref("nfl", team)}>{team}</PopLink>;
+}
+
+function signed(n: number): string {
+  return `${n > 0 ? "+" : ""}${n.toLocaleString()}`;
+}
+
+function trendTone(n: number) {
+  return n > 0 ? ("pos" as const) : n < 0 ? ("neg" as const) : ("muted" as const);
 }
 
 interface RouteParams {
@@ -76,10 +91,9 @@ export default async function PlayerPage({
   const raFormat = league ? formatKeyFromLeague(league) : null;
   const ktcFormat = league && isDynasty ? ktcFormatFromLeague(league) : null;
 
-  const [rosters, users, allPlayers, raValues, ktc] = await Promise.all([
+  const [rosters, users, raValues, ktc] = await Promise.all([
     leagueId ? getLeagueRosters(leagueId) : Promise.resolve([]),
     leagueId ? getLeagueUsers(leagueId) : Promise.resolve([]),
-    getAllPlayers().catch(() => ({})),
     league
       ? getValuesForProfile(leagueProfile!, league).then((r) => r.values).catch(
           (): RAValuesBySleeperId => ({}),
@@ -157,276 +171,158 @@ export default async function PlayerPage({
       }
     : null;
 
+  const bio = [
+    profile.player.age != null ? `Age ${profile.player.age.toFixed(1)}` : null,
+    profile.player.yearsExp != null
+      ? `${profile.player.yearsExp} yr${profile.player.yearsExp === 1 ? "" : "s"} exp`
+      : null,
+    profile.player.college,
+    profile.player.height
+      ? `${Math.floor(Number(profile.player.height) / 12)}'${Number(profile.player.height) % 12}"`
+      : null,
+    profile.player.weight ? `${profile.player.weight}lb` : null,
+  ].filter(Boolean);
+  const headTrend = trend7d ?? trend30d;
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         {/* Breadcrumb */}
         <Link
           href={`/l/${leagueId}`}
-          className="text-sm text-zinc-500 dark:text-zinc-400"
+          className="inline-flex min-h-11 items-center self-start text-sm text-hh-muted hover:text-hh-ink"
         >
           ‹ League
         </Link>
 
         {/* Header */}
-        <header className="flex flex-col gap-4 rounded-3xl border border-zinc-200/80 bg-white/80 p-5 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80 sm:flex-row sm:items-center">
+        <TeamEdge league="nfl" team={profile.player.team} className="-mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
           <PlayerAvatar
             name={profile.player.name}
             position={profile.player.position}
             photoUrl={profile.player.photoUrl}
             size="lg"
           />
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {profile.player.name}
-              </h1>
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                {profile.player.team ?? "FA"} · {profile.player.position}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <h1 className="hh-title">{profile.player.name}</h1>
+            <span className="text-sm text-hh-muted">
+              <TeamCode team={profile.player.team} /> · {profile.player.position}
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
               {isDynasty && profile.value.tierLabel && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                  Tier {profile.value.tier}: {profile.value.tierLabel}
-                </span>
+                <Chip tone="accent">
+                  Tier <Num>{profile.value.tier}</Num>: {profile.value.tierLabel}
+                </Chip>
               )}
-              {profile.player.injuryStatus && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-                  {profile.player.injuryStatus}
-                </span>
-              )}
-              {isDynasty && profile.value.buyLow && (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                  Buy low
-                </span>
-              )}
-              {isDynasty && profile.value.sellHigh && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-                  Sell high
-                </span>
-              )}
-              {isDynasty && profile.value.breakout && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                  Breakout
-                </span>
-              )}
+              {profile.player.injuryStatus && <Chip tone="neg">{profile.player.injuryStatus}</Chip>}
+              {isDynasty && profile.value.buyLow && <Chip tone="pos">Buy low</Chip>}
+              {isDynasty && profile.value.sellHigh && <Chip tone="neg">Sell high</Chip>}
+              {isDynasty && profile.value.breakout && <Chip tone="gold">Breakout</Chip>}
             </div>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {[
-                profile.player.age != null
-                  ? `Age ${profile.player.age.toFixed(1)}`
-                  : null,
-                profile.player.yearsExp != null
-                  ? `${profile.player.yearsExp} yr${
-                      profile.player.yearsExp === 1 ? "" : "s"
-                    } exp`
-                  : null,
-                profile.player.college,
-                profile.player.height
-                  ? `${Math.floor(Number(profile.player.height) / 12)}'${
-                      Number(profile.player.height) % 12
-                    }"`
-                  : null,
-                profile.player.weight ? `${profile.player.weight}lb` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
           </div>
-        </header>
+        </TeamEdge>
 
         {/* Value snapshot */}
-        <section className="grid gap-3 md:grid-cols-3">
-          <div className="flex flex-col gap-1 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Value (your league)
-            </span>
-            <span className="text-3xl font-bold tabular-nums">
-              {formatValue.value.toLocaleString()}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              #{formatValue.overallRank} overall · {profile.player.position}
-              {formatValue.positionRank}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Trend
-            </span>
-            <div className="flex items-baseline gap-3">
-              <span
-                className={`text-2xl font-bold tabular-nums ${
-                  (trend7d ?? trend30d) > 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : (trend7d ?? trend30d) < 0
-                      ? "text-rose-600 dark:text-rose-400"
-                      : "text-zinc-500 dark:text-zinc-400"
-                }`}
-              >
-                {(trend7d ?? trend30d) > 0 ? "+" : ""}
-                {(trend7d ?? trend30d).toLocaleString()}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {trend7d === null ? "30d" : "7d"}
-              </span>
+        <Section label="Value">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-3">
+            <Stat
+              label="Value (your league)"
+              value={formatValue.value.toLocaleString()}
+              sub={
+                <>
+                  <Num>#{formatValue.overallRank}</Num> overall · <Num>{profile.player.position}{formatValue.positionRank}</Num>
+                </>
+              }
+            />
+            <Stat
+              label={`Trend (${trend7d === null ? "30d" : "7d"})`}
+              value={signed(headTrend)}
+              tone={trendTone(headTrend)}
+              sub={
+                isDynasty ? (
+                  <>
+                    30d: <Num tone={trend30d !== 0 ? trendTone(trend30d) : undefined}>{signed(trend30d)}</Num>
+                    {" · "}90d:{" "}
+                    <Num tone={profile.value.trend90d !== 0 ? trendTone(profile.value.trend90d) : undefined}>
+                      {signed(profile.value.trend90d)}
+                    </Num>
+                  </>
+                ) : undefined
+              }
+            />
+            <div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
+              <span className="text-xs text-hh-muted">In your league</span>
+              {ownerRoster ? (
+                <>
+                  <span className="text-lg font-semibold leading-tight text-hh-ink">{ownerName}</span>
+                  <span className="text-xs text-hh-muted">
+                    Roster <Num>#{ownerRoster.roster_id}</Num>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg font-semibold leading-tight text-hh-pos">Free agent</span>
+                  <span className="text-xs text-hh-muted">Available on waivers</span>
+                </>
+              )}
             </div>
-            {isDynasty && (
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              30d:{" "}
-              <span
-                className={
-                  trend30d > 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : trend30d < 0
-                      ? "text-rose-600 dark:text-rose-400"
-                      : ""
-                }
-              >
-                {trend30d > 0 ? "+" : ""}
-                {trend30d.toLocaleString()}
-              </span>
-              {" · "}
-              90d:{" "}
-              <span
-                className={
-                  profile.value.trend90d > 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : profile.value.trend90d < 0
-                      ? "text-rose-600 dark:text-rose-400"
-                      : ""
-                }
-              >
-                {profile.value.trend90d > 0 ? "+" : ""}
-                {profile.value.trend90d.toLocaleString()}
-              </span>
-            </span>
-            )}
           </div>
-          <div className="flex flex-col gap-1 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              In your league
-            </span>
-            {ownerRoster ? (
-              <>
-                <span className="text-base font-semibold">{ownerName}</span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Roster #{ownerRoster.roster_id}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
-                  Free agent
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Available on waivers
-                </span>
-              </>
-            )}
-          </div>
-        </section>
+
+          {/* KTC consensus. Dynasty only: KeepTradeCut publishes dynasty
+              rankings, so this is not a cross-check in a redraft league. */}
+          {isDynasty && ktcMatch && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hh-line pt-3">
+              <span className="hh-label">Cross-source check</span>
+              <span className="text-sm text-hh-ink">
+                KTC value <Num className="font-semibold">{ktcMatch.value.toLocaleString()}</Num> · rank{" "}
+                <Num>#{ktcMatch.globalRank}</Num>
+              </span>
+              <span className="text-xs text-hh-muted">
+                RA value{" "}
+                <Num className="font-semibold">
+                  {(isSuperflex ? profile.value.sf : profile.value.oneQb).toLocaleString()}
+                </Num>{" "}
+                · rank <Num>#{isSuperflex ? profile.value.rankSf : profile.value.rank1qb}</Num>
+              </span>
+              {(() => {
+                const raVal = isSuperflex ? profile.value.sf : profile.value.oneQb;
+                const delta = ktcMatch.value - raVal;
+                const pct = Math.round((delta / Math.max(raVal, 1)) * 100);
+                if (Math.abs(pct) <= 5) {
+                  return <Chip tone="pos">CONSENSUS</Chip>;
+                }
+                return (
+                  <Chip tone={delta > 0 ? "pos" : "neg"}>
+                    KTC <Num>{pct > 0 ? "+" : ""}{pct}%</Num>
+                  </Chip>
+                );
+              })()}
+            </div>
+          )}
+        </Section>
 
         {/* Jingles Labs call, when he has one on this player */}
         <JinglesCallCard sleeperId={id} leagueType={leagueProfile?.type} />
 
-        {/* KTC consensus. Dynasty only: KeepTradeCut publishes dynasty
-            rankings, so this is not a cross-check in a redraft league. */}
-        {isDynasty && ktcMatch && (
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Cross-source check
-            </span>
-            <span className="text-sm">
-              KTC value{" "}
-              <span className="font-bold tabular-nums">
-                {ktcMatch.value.toLocaleString()}
-              </span>{" "}
-              · rank #{ktcMatch.globalRank}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              RA value{" "}
-              <span className="font-semibold tabular-nums">
-                {(isSuperflex
-                  ? profile.value.sf
-                  : profile.value.oneQb
-                ).toLocaleString()}
-              </span>{" "}
-              · rank #
-              {isSuperflex ? profile.value.rankSf : profile.value.rank1qb}
-            </span>
-            {(() => {
-              const raVal = isSuperflex
-                ? profile.value.sf
-                : profile.value.oneQb;
-              const delta = ktcMatch.value - raVal;
-              const pct = Math.round((delta / Math.max(raVal, 1)) * 100);
-              if (Math.abs(pct) <= 5) {
-                return (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                    Consensus
-                  </span>
-                );
-              }
-              return (
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                    delta > 0
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                      : "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-                  }`}
-                >
-                  KTC {pct > 0 ? "+" : ""}
-                  {pct}%
-                </span>
-              );
-            })()}
-          </div>
-        )}
-
         {/* Recent news */}
         {news.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold tracking-tight">
-                Recent news
-              </h2>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                via ESPN
-              </span>
-            </div>
-            <ul className="flex flex-col divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <Section label="Recent news" aside="via ESPN">
+            <ul className="flex flex-col">
               {news.map((n) => {
                 const relTime = n.relativeTime ?? null;
                 const Content = (
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="text-sm font-semibold leading-snug">
-                      {n.headline}
-                    </span>
+                    <span className="text-sm font-semibold leading-snug text-hh-ink">{n.headline}</span>
                     {n.description && (
-                      <span className="line-clamp-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                        {n.description}
-                      </span>
+                      <span className="line-clamp-2 text-xs leading-relaxed text-hh-ink-2">{n.description}</span>
                     )}
-                    {relTime && (
-                      <span className="text-[11px] text-zinc-500 dark:text-zinc-500">
-                        {relTime}
-                      </span>
-                    )}
+                    {relTime && <span className="text-[11px] text-hh-muted">{relTime}</span>}
                   </div>
                 );
                 return (
-                  <li
-                    key={n.id}
-                    className="px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                  >
+                  <li key={n.id} className="border-b border-hh-line py-3 last:border-b-0">
                     {n.url ? (
-                      <a
-                        href={n.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
-                      >
+                      <a href={n.url} target="_blank" rel="noopener noreferrer" className="block hover:[&_span:first-child]:text-hh-accent-ink">
                         {Content}
                       </a>
                     ) : (
@@ -436,150 +332,120 @@ export default async function PlayerPage({
                 );
               })}
             </ul>
-          </section>
-        )}
-
-        {/* Value history. RosterAudit's series is dynasty value over time, so
-            it does not describe a redraft league. */}
-        {isDynasty && (
-          <ValueChart
-            history={profile.valueHistory}
-            format={isSuperflex ? "sf" : "oneQb"}
-          />
-        )}
-
-        {/* Recent stats */}
-        {stats && stats.weekly.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold tracking-tight">
-                {stats.season} season
-              </h2>
-              {seasonStat && (
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {seasonStat.games} games · avg{" "}
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">
-                    {seasonStat.avgFp.toFixed(1)}
-                  </span>{" "}
-                  fp/g · total{" "}
-                  <span className="font-semibold tabular-nums">
-                    {seasonStat.totalFp.toFixed(1)}
-                  </span>
-                </span>
-              )}
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/80 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-200 bg-zinc-50/50 text-[10px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-400">
-                    <th className="px-3 py-2 text-left">Wk</th>
-                    <th className="px-3 py-2 text-left">Opp</th>
-                    <th className="px-3 py-2 text-right">FP</th>
-                    <th className="hidden px-3 py-2 text-right sm:table-cell">
-                      {profile.player.position === "QB"
-                        ? "Pass yds"
-                        : profile.player.position === "RB"
-                          ? "Rush yds"
-                          : "Rec yds"}
-                    </th>
-                    <th className="hidden px-3 py-2 text-right sm:table-cell">
-                      TDs
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {recentWeekly.map((w) => {
-                    const yards =
-                      profile.player.position === "QB"
-                        ? w.pass ?? 0
-                        : profile.player.position === "RB"
-                          ? w.rush ?? 0
-                          : w.recy ?? 0;
-                    const tds =
-                      (w.ptd ?? 0) + (w.rtd ?? 0) + (w.retd ?? 0);
-                    return (
-                      <tr key={w.week} className="text-sm">
-                        <td className="px-3 py-2 font-semibold tabular-nums">
-                          {w.week}
-                        </td>
-                        <td className="px-3 py-2 text-zinc-500 dark:text-zinc-400">
-                          {w.opp ?? "—"}
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                          {w.fp.toFixed(1)}
-                        </td>
-                        <td className="hidden px-3 py-2 text-right tabular-nums sm:table-cell">
-                          {yards}
-                        </td>
-                        <td className="hidden px-3 py-2 text-right tabular-nums sm:table-cell">
-                          {tds}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {!stats && profile.player.yearsExp === 0 && (
-          <p className="rounded-2xl border border-dashed border-zinc-300 bg-white/40 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
-            Rookie — no NFL stats yet.
-          </p>
+          </Section>
         )}
 
         {/* Similar players */}
         {similar.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">
-              Similar value
-            </h2>
-            <ul className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-              {similar.map((s) => {
-                const sleeperPlayer = (allPlayers as Record<string, unknown>)[
-                  s.sleeperId
-                ];
-                return (
-                  <li key={s.sleeperId}>
-                    <Link
-                      href={`/l/${leagueId}/player/${s.sleeperId}`}
-                      className="group flex items-center gap-3 rounded-2xl border border-zinc-200/80 bg-white/80 p-3 backdrop-blur transition-colors hover:border-amber-300 dark:border-zinc-800/80 dark:bg-zinc-900/80 dark:hover:border-amber-800"
-                    >
-                      <PlayerAvatar
-                        name={s.name}
-                        position={s.position}
-                        photoUrl={s.photoUrl}
-                        size="sm"
-                      />
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-semibold">
-                          {s.name}
-                        </span>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {s.team ?? "FA"} · {s.position} · {sleeperPlayer
-                            ? ""
-                            : ""}#{s.overallRank}
-                        </span>
-                      </div>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">
-                        {s.value.toLocaleString()}
+          <Section label="Similar value">
+            <ul className="grid gap-x-8 md:grid-cols-2 lg:grid-cols-3">
+              {similar.map((s) => (
+                <li key={s.sleeperId}>
+                  <TeamEdge league="nfl" team={s.team} className="flex min-h-11 items-center gap-3 border-b border-hh-line py-2">
+                    <PlayerAvatar name={s.name} position={s.position} photoUrl={s.photoUrl} size="sm" />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <PlayerLink id={s.sleeperId} name={s.name} className="truncate text-sm font-semibold text-hh-ink" />
+                      <span className="text-xs text-hh-muted">
+                        <TeamCode team={s.team} /> · {s.position} · <Num>#{s.overallRank}</Num>
                       </span>
-                    </Link>
-                  </li>
-                );
-              })}
+                    </div>
+                    <Num className="shrink-0 text-sm font-semibold text-hh-ink">{s.value.toLocaleString()}</Num>
+                  </TeamEdge>
+                </li>
+              ))}
             </ul>
-          </section>
+          </Section>
         )}
 
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex flex-col">
+          {bio.length > 0 && (
+            <Disclosure summary="Bio">
+              <p className="text-sm text-hh-ink-2">{bio.join(" · ")}</p>
+            </Disclosure>
+          )}
+
+          {/* Value history. RosterAudit's series is dynasty value over time, so
+              it does not describe a redraft league. */}
+          {isDynasty && (
+            <Disclosure summary="Value history">
+              <ValueChart history={profile.valueHistory} format={isSuperflex ? "sf" : "oneQb"} />
+            </Disclosure>
+          )}
+
+          {/* Recent stats */}
+          {stats && stats.weekly.length > 0 && (
+            <Disclosure
+              summary={
+                <>
+                  <Num>{stats.season}</Num> season
+                  {seasonStat && (
+                    <span className="ml-2 font-normal text-hh-muted">
+                      avg <Num>{seasonStat.avgFp.toFixed(1)}</Num> fp/g
+                    </span>
+                  )}
+                </>
+              }
+            >
+              {seasonStat && (
+                <p className="text-xs text-hh-muted">
+                  <Num>{seasonStat.games}</Num> games · avg{" "}
+                  <Num className="font-semibold text-hh-ink">{seasonStat.avgFp.toFixed(1)}</Num> fp/g · total{" "}
+                  <Num className="font-semibold text-hh-ink">{seasonStat.totalFp.toFixed(1)}</Num>
+                </p>
+              )}
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-hh-rule text-[10px] uppercase tracking-wider text-hh-muted">
+                      <th className="px-2 py-2 text-left font-semibold">Wk</th>
+                      <th className="px-2 py-2 text-left font-semibold">Opp</th>
+                      <th className="px-2 py-2 text-right font-semibold">FP</th>
+                      <th className="hidden px-2 py-2 text-right font-semibold sm:table-cell">
+                        {profile.player.position === "QB"
+                          ? "Pass yds"
+                          : profile.player.position === "RB"
+                            ? "Rush yds"
+                            : "Rec yds"}
+                      </th>
+                      <th className="hidden px-2 py-2 text-right font-semibold sm:table-cell">TDs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentWeekly.map((w) => {
+                      const yards =
+                        profile.player.position === "QB"
+                          ? w.pass ?? 0
+                          : profile.player.position === "RB"
+                            ? w.rush ?? 0
+                            : w.recy ?? 0;
+                      const tds = (w.ptd ?? 0) + (w.rtd ?? 0) + (w.retd ?? 0);
+                      return (
+                        <tr key={w.week} className="border-b border-hh-line last:border-b-0">
+                          <td className="px-2 py-2 font-semibold text-hh-ink"><Num>{w.week}</Num></td>
+                          {/* Past weeks: opponent stays text (pop-ups read the current board only). */}
+                          <td className="px-2 py-2 text-hh-muted">{w.opp ?? "None"}</td>
+                          <td className="px-2 py-2 text-right font-semibold text-hh-ink"><Num>{w.fp.toFixed(1)}</Num></td>
+                          <td className="hidden px-2 py-2 text-right sm:table-cell"><Num>{yards}</Num></td>
+                          <td className="hidden px-2 py-2 text-right sm:table-cell"><Num>{tds}</Num></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Disclosure>
+          )}
+        </div>
+
+        {!stats && profile.player.yearsExp === 0 && <Empty>Rookie. No NFL stats yet.</Empty>}
+
+        <p className="text-xs text-hh-muted">
           Player data + values via{" "}
           <a
             href="https://rosteraudit.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-amber-700 hover:underline dark:text-amber-400"
+            className="text-hh-accent-ink underline-offset-[3px] hover:underline"
           >
             RosterAudit
           </a>{" "}

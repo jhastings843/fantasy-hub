@@ -21,7 +21,7 @@ export function ValueChart({
 
   if (points.length < 2) {
     return (
-      <div className="flex h-32 items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 text-xs text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-600">
+      <div className="flex h-32 items-center justify-center rounded-[4px] bg-hh-sunk text-xs text-hh-muted">
         Not enough history yet
       </div>
     );
@@ -77,22 +77,25 @@ export function ValueChart({
   const totalDelta = lastVal - firstVal;
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-zinc-200/80 bg-white/80 p-4 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-900/80">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+    <div className="flex flex-col gap-2 text-hh-ink">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="hh-label">
           Value over time ({format === "sf" ? "Superflex" : "1QB"})
         </span>
         <span
-          className={`text-sm font-bold tabular-nums ${
+          className={`text-sm font-semibold ${
             totalDelta > 0
-              ? "text-emerald-600 dark:text-emerald-400"
+              ? "text-hh-pos"
               : totalDelta < 0
-                ? "text-rose-600 dark:text-rose-400"
-                : "text-zinc-500 dark:text-zinc-400"
+                ? "text-hh-neg"
+                : "text-hh-muted"
           }`}
         >
-          {totalDelta > 0 ? "+" : ""}
-          {totalDelta.toLocaleString()} since {formatDateShort(xy[0].date)}
+          <span className="hh-num">
+            {totalDelta > 0 ? "+" : ""}
+            {totalDelta.toLocaleString()}
+          </span>{" "}
+          since {formatDateShort(xy[0].date)}
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-44 w-full" preserveAspectRatio="none">
@@ -122,15 +125,15 @@ export function ValueChart({
         {/* Area gradient fill */}
         <defs>
           <linearGradient id="valArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(245 158 11)" stopOpacity={0.25} />
-            <stop offset="100%" stopColor="rgb(245 158 11)" stopOpacity={0} />
+            <stop offset="0%" stopColor="var(--hh-accent)" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="var(--hh-accent)" stopOpacity={0} />
           </linearGradient>
         </defs>
         <path d={areaD} fill="url(#valArea)" />
         {/* Line */}
         <path
           d={pathD}
-          stroke="rgb(245 158 11)"
+          stroke="var(--hh-accent)"
           strokeWidth={2.5}
           fill="none"
           strokeLinejoin="round"
@@ -141,8 +144,8 @@ export function ValueChart({
           cx={xy[xy.length - 1].x}
           cy={xy[xy.length - 1].y}
           r={4}
-          fill="rgb(245 158 11)"
-          stroke="white"
+          fill="var(--hh-accent)"
+          stroke="var(--hh-bg)"
           strokeWidth={2}
         />
         {/* X axis labels */}

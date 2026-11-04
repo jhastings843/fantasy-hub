@@ -8,6 +8,7 @@ import {
   type Resource,
   type ResourceStatus,
 } from "@/lib/resources/data";
+import { Chip, Disclosure, Num, PageHead, Section, type Tone } from "@/components/hh/ui";
 
 const STATUS_LABEL: Record<ResourceStatus, string> = {
   integrated: "Integrated",
@@ -18,25 +19,23 @@ const STATUS_LABEL: Record<ResourceStatus, string> = {
   outdated: "Verify",
 };
 
-const STATUS_CLASS: Record<ResourceStatus, string> = {
-  integrated:
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  free: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  free_tier: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
-  paid: "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300",
-  scrape_required:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300",
-  outdated:
-    "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
+const STATUS_TONE: Record<ResourceStatus, Tone> = {
+  integrated: "pos",
+  free: "muted",
+  free_tier: "gold",
+  paid: "accent",
+  scrape_required: "gold",
+  outdated: "neg",
 };
+
+/** Past this many rows a category folds the rest behind a Disclosure. */
+const SHOWN = 6;
 
 function StatusBadge({ status }: { status: ResourceStatus }) {
   return (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_CLASS[status]}`}
-    >
-      {STATUS_LABEL[status]}
-    </span>
+    <Chip tone={STATUS_TONE[status]}>
+      <span className="uppercase tracking-wide">{STATUS_LABEL[status]}</span>
+    </Chip>
   );
 }
 
@@ -48,20 +47,20 @@ function hostOf(url: string): string {
   }
 }
 
-function ResourceCard({ r }: { r: Resource }) {
+function ResourceRow({ r, strong = false }: { r: Resource; strong?: boolean }) {
   return (
-    <li className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700">
+    <li className="flex min-w-0 flex-col gap-1 border-b border-hh-line py-3">
       <div className="flex items-start justify-between gap-3">
         <a
           href={r.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="min-w-0 flex-1 text-sm font-semibold text-blue-700 hover:underline dark:text-blue-400"
+          className={`min-w-0 flex-1 font-semibold underline-offset-[3px] hover:underline ${
+            strong ? "text-base text-hh-ink hover:text-hh-accent-ink" : "text-sm text-hh-accent-ink"
+          }`}
         >
           {r.name}
-          <span className="ml-1.5 text-xs text-zinc-400 dark:text-zinc-500">
-            ↗
-          </span>
+          <span className="ml-1.5 text-xs text-hh-muted">↗</span>
         </a>
         {r.status && r.status.length > 0 && (
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -71,14 +70,8 @@ function ResourceCard({ r }: { r: Resource }) {
           </div>
         )}
       </div>
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-        {hostOf(r.url)}
-      </span>
-      {r.note && (
-        <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-          {r.note}
-        </p>
-      )}
+      <span className="text-xs text-hh-muted">{hostOf(r.url)}</span>
+      {r.note && <p className="text-xs leading-relaxed text-hh-ink-2">{r.note}</p>}
     </li>
   );
 }
@@ -93,6 +86,8 @@ const FORMAT_TABS: { key: string; label: string }[] = [
 function isFormat(v: string | undefined): v is LeagueType {
   return v === "dynasty" || v === "redraft" || v === "guillotine";
 }
+
+const GRID = "grid gap-x-8 md:grid-cols-2 lg:grid-cols-3";
 
 export default async function ResourcesPage({
   searchParams,
@@ -112,177 +107,137 @@ export default async function ResourcesPage({
   const featured = visible.filter((r) => r.featured);
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Resources</h1>
-          <p className="max-w-3xl text-sm text-zinc-500 dark:text-zinc-400">
-            Rankings and strategy diverge sharply between formats, so a dynasty
-            trade value chart is actively wrong in a redraft league. Filter to
-            the format you are playing.
-          </p>
-          <div className="-mx-1 flex flex-wrap items-center gap-1 pt-1">
+      <div className="flex flex-col gap-10">
+        <div className="flex flex-col gap-3">
+          <PageHead
+            title="Resources"
+            sub="Rankings and strategy diverge sharply between formats, so a dynasty trade value chart is actively wrong in a redraft league. Filter to the format you are playing."
+          />
+          <nav aria-label="Format" className="-mx-3 flex flex-wrap items-center gap-1">
             {FORMAT_TABS.map((t) => {
-              const on =
-                t.key === "all" ? active === null : active === t.key;
+              const on = t.key === "all" ? active === null : active === t.key;
               const count =
                 t.key === "all"
                   ? RESOURCES.length + REDDITORS.length
-                  : RESOURCES.filter((r) =>
-                      r.formats.includes(t.key as LeagueType),
-                    ).length +
-                    REDDITORS.filter((u) =>
-                      u.formats.includes(t.key as LeagueType),
-                    ).length;
+                  : RESOURCES.filter((r) => r.formats.includes(t.key as LeagueType)).length +
+                    REDDITORS.filter((u) => u.formats.includes(t.key as LeagueType)).length;
               return (
                 <Link
                   key={t.key}
                   href={t.key === "all" ? "/resources" : `/resources?format=${t.key}`}
-                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                    on
-                      ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-700"
+                  aria-current={on ? "page" : undefined}
+                  className={`relative inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-medium transition-colors ${
+                    on ? "text-hh-ink" : "text-hh-muted hover:text-hh-ink"
                   }`}
                 >
                   {t.label}
-                  <span className="text-xs tabular-nums opacity-60">{count}</span>
+                  <Num className="text-xs opacity-70">{count}</Num>
+                  {on && <span aria-hidden className="absolute inset-x-3 bottom-0 h-[2px] bg-hh-ink" />}
                 </Link>
               );
             })}
-          </div>
+          </nav>
         </div>
 
         {featured.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              Use these first
-            </h2>
-            <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <Section label={<span className="text-hh-accent-ink">Use these first</span>}>
+            <ul className={GRID}>
               {featured.map((r) => (
-                <li
-                  key={r.url}
-                  className="flex flex-col gap-2 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-w-0 flex-1 text-base font-bold text-amber-900 hover:underline dark:text-amber-100"
-                    >
-                      {r.name}
-                      <span className="ml-1.5 text-xs opacity-60">↗</span>
-                    </a>
-                    {r.status && r.status.length > 0 && (
-                      <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                        {r.status.map((s) => (
-                          <StatusBadge key={s} status={s} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs text-amber-700 dark:text-amber-300">
-                    {hostOf(r.url)}
-                  </span>
-                  {r.note && (
-                    <p className="text-xs leading-relaxed text-amber-900/80 dark:text-amber-100/80">
-                      {r.note}
-                    </p>
-                  )}
-                </li>
+                <ResourceRow key={r.url} r={r} strong />
               ))}
             </ul>
-          </section>
+          </Section>
         )}
 
-        <nav className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-          {CATEGORIES.filter((c) =>
-            visible.some((r) => r.category === c.key && !r.featured),
-          ).map((c) => (
+        <nav aria-label="Categories" className="flex flex-wrap gap-x-1 gap-y-0 text-sm">
+          {CATEGORIES.filter((c) => visible.some((r) => r.category === c.key && !r.featured)).map((c) => (
             <a
               key={c.key}
               href={`#${c.key}`}
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              className="inline-flex min-h-11 items-center px-2 font-medium text-hh-ink-2 underline-offset-[3px] hover:text-hh-accent-ink hover:underline"
             >
               {c.title}
             </a>
           ))}
           <a
             href="#redditors"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+            className="inline-flex min-h-11 items-center px-2 font-medium text-hh-ink-2 underline-offset-[3px] hover:text-hh-accent-ink hover:underline"
           >
             Redditors
           </a>
         </nav>
 
         {CATEGORIES.map((cat) => {
-          const items = visible.filter(
-            (r) => r.category === cat.key && !r.featured,
-          );
+          const items = visible.filter((r) => r.category === cat.key && !r.featured);
           if (items.length === 0) return null;
+          const head = items.slice(0, SHOWN);
+          const rest = items.slice(SHOWN);
           return (
-            <section
-              key={cat.key}
-              id={cat.key}
-              className="flex scroll-mt-20 flex-col gap-3"
-            >
-              <header className="flex flex-col gap-0.5">
-                <h2 className="text-xl font-semibold">{cat.title}</h2>
-                {cat.blurb && (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {cat.blurb}
-                  </p>
+            <div key={cat.key} id={cat.key} className="scroll-mt-20">
+              <Section label={cat.title} aside={<><Num>{items.length}</Num> listed</>}>
+                {cat.blurb && <p className="text-sm text-hh-muted">{cat.blurb}</p>}
+                <ul className={GRID}>
+                  {head.map((r) => (
+                    <ResourceRow key={r.url} r={r} />
+                  ))}
+                </ul>
+                {rest.length > 0 && (
+                  <Disclosure summary={<><Num>{rest.length}</Num> more</>} className="mt-1">
+                    <ul className={GRID}>
+                      {rest.map((r) => (
+                        <ResourceRow key={r.url} r={r} />
+                      ))}
+                    </ul>
+                  </Disclosure>
                 )}
-              </header>
-              <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {items.map((r) => (
-                  <ResourceCard key={r.url} r={r} />
-                ))}
-              </ul>
-            </section>
+              </Section>
+            </div>
           );
         })}
 
         {visibleRedditors.length > 0 && (
-        <section id="redditors" className="flex scroll-mt-20 flex-col gap-3">
-          <header className="flex flex-col gap-0.5">
-            <h2 className="text-xl font-semibold">Redditors</h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              People worth following for analysis and rookie content.
-            </p>
-          </header>
-          <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {visibleRedditors.map((u) => (
-              <li
-                key={u.handle}
-                className="flex flex-col gap-2 rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <a
-                    href={u.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="min-w-0 flex-1 text-sm font-semibold text-blue-700 hover:underline dark:text-blue-400"
-                  >
-                    {u.handle}
-                    <span className="ml-1.5 text-xs text-zinc-400 dark:text-zinc-500">
-                      ↗
-                    </span>
-                  </a>
-                  {u.status && u.status.length > 0 && (
-                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                      {u.status.map((s) => (
-                        <StatusBadge key={s} status={s} />
-                      ))}
+          <div id="redditors" className="scroll-mt-20">
+            <Section label="Redditors" aside={<><Num>{visibleRedditors.length}</Num> listed</>}>
+              <p className="text-sm text-hh-muted">People worth following for analysis and rookie content.</p>
+              {(() => {
+                const row = (u: (typeof visibleRedditors)[number]) => (
+                  <li key={u.handle} className="flex min-w-0 flex-col gap-1 border-b border-hh-line py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <a
+                        href={u.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 flex-1 text-sm font-semibold text-hh-accent-ink underline-offset-[3px] hover:underline"
+                      >
+                        {u.handle}
+                        <span className="ml-1.5 text-xs text-hh-muted">↗</span>
+                      </a>
+                      {u.status && u.status.length > 0 && (
+                        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                          {u.status.map((s) => (
+                            <StatusBadge key={s} status={s} />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                  {u.posts}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+                    <p className="text-xs leading-relaxed text-hh-ink-2">{u.posts}</p>
+                  </li>
+                );
+                const head = visibleRedditors.slice(0, SHOWN);
+                const rest = visibleRedditors.slice(SHOWN);
+                return (
+                  <>
+                    <ul className={GRID}>{head.map(row)}</ul>
+                    {rest.length > 0 && (
+                      <Disclosure summary={<><Num>{rest.length}</Num> more</>} className="mt-1">
+                        <ul className={GRID}>{rest.map(row)}</ul>
+                      </Disclosure>
+                    )}
+                  </>
+                );
+              })()}
+            </Section>
+          </div>
         )}
       </div>
     </main>
