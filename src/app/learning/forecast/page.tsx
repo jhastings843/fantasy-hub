@@ -155,13 +155,28 @@ const CHIP: { [k in Outlook]: { text: string; tone?: "pos" | "neg" } } = {
 const pct = (x: number | null) => (x === null ? "" : x < 0.01 ? "under 1%" : `${Math.round(x * 100)}%`);
 const md = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-function Row({ f }: { f: Forecast }) {
+const PICKS_KIND: { [k: string]: string } = { ats: "spread", ou: "total", su: "straight up", mkt: "spread, public betting and line moves", source: "spread, outside source" };
+
+/** "NFL · spread" or "NBA · first basket, our model": which sport and bet a slice is, for lists that mix sections. */
+function kindOf(f: Forecast, g: Group): string {
+  const [league, kind] = f.id.split(":");
+  if ((league === "nfl" || league === "cfb") && PICKS_KIND[kind] && g.title.includes("picks")) return `${league.toUpperCase()} · ${PICKS_KIND[kind]}`;
+  // Engine groups are titled "NBA first basket (our model)": sport first, then the bet.
+  const m = /^(NFL|NBA|CFB|CBB)\s+(.*)$/.exec(g.title);
+  if (m && m[2].startsWith("model")) return `${m[1]} · our model`;
+  return m ? `${m[1]} · ${m[2].replace(/\s*\((.*)\)$/, ", $1")}` : g.title;
+}
+
+function Row({ f, kind }: { f: Forecast; kind?: string }) {
   const c = CHIP[f.outlook];
   const showOdds = f.chance !== null && f.outlook !== "out of time";
   return (
     <li className="flex min-w-0 flex-col gap-1.5 border-b border-hh-line py-3">
       <div className={s.cardTop}>
-        <b style={{ fontSize: 15, lineHeight: 1.3, overflowWrap: "anywhere" }}>{f.label}</b>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          {kind && <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-hh-muted">{kind}</span>}
+          <b style={{ fontSize: 15, lineHeight: 1.3, overflowWrap: "anywhere" }}>{f.label}</b>
+        </span>
         {showOdds && (
           <span className={s.stake}>
             <b className={c.tone ? s[c.tone] : undefined}>{pct(f.chance)}</b>
@@ -205,6 +220,7 @@ export default async function ForecastPage() {
   const staking = live.rows.filter((r) => r.stakes);
   const all = groups.flatMap((g) => g.rows);
   const count = (o: Outlook[]) => all.filter((f) => o.includes(f.outlook)).length;
+  const groupOf = new Map(groups.flatMap((g) => g.rows.map((f) => [f, g] as const)));
   const top = all.filter((f) => f.outlook === "likely" || f.outlook === "possible").sort(byOutlook).slice(0, 5);
   const QUIET: Outlook[] = ["no games", "out of time", "retired", "unlikely"];
 
@@ -252,7 +268,7 @@ export default async function ForecastPage() {
           {top.length ? (
             <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3">
               {top.map((f) => (
-                <Row key={f.id} f={f} />
+                <Row key={f.id} f={f} kind={groupOf.get(f) ? kindOf(f, groupOf.get(f)!) : undefined} />
               ))}
             </ul>
           ) : (
