@@ -88,6 +88,14 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
           <dd className={s.num}>{g.pem ? `${home} ${line(g.pem.model)}` : "missing"}</dd>
         </>
       )}
+      <dt>Our model</dt>
+      <dd className={s.num}>{g.ours ? `${home} ${line(Math.round(g.ours.spread * 10) / 10)}` : "no read yet"}</dd>
+      {g.ours?.power !== undefined && (
+        <>
+          <dt>Our line (play by play)</dt>
+          <dd className={s.num}>{`${home} ${line(Math.round(g.ours.power * 10) / 10)}`}</dd>
+        </>
+      )}
       <dt>Tier</dt>
       <dd>
         <TierChip t={g.tier} /> {g.read?.agree ? `avg edge ${g.read.avgEdge.toFixed(1)}` : ""}

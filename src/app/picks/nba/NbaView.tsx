@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ourNbaGameModel } from "../model-records";
+import { nbaSeasonOfDate } from "@/lib/props/parse";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard, type NbaBoardGame } from "@/lib/picks/nba-store";
 import { getNbaPicksView, type NbaPicksView } from "@/lib/picks/nba-track-store";
 import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord, type NbaRule, type NbaTracked } from "@/lib/picks/nba-track";
@@ -171,6 +173,18 @@ function readChip(x: Read, m: Market): [string, string] {
   return ["Sam's side · no stake", s.readTrack];
 }
 
+/** Our own game model's latest number for this game (tracked only, game-store.ts). */
+async function NbaOurLine({ g }: { g: NbaBoardGame }) {
+  const v = await ourNbaGameModel(nbaSeasonOfDate(new Date()));
+  const t = v?.games.find((x) => x.event === g.id);
+  return (
+    <>
+      <dt>Our model</dt>
+      <dd className={s.num}>{t ? `${g.home.short} ${line(Math.round(t.last.ours.spread * 10) / 10)}, total ${(Math.round(t.last.ours.total * 10) / 10).toFixed(1)}` : "no read yet"}</dd>
+    </>
+  );
+}
+
 /** Everything behind one game: spread, total, moneyline, Sam's numbers. */
 export function NbaWhy({ g }: { g: NbaBoardGame }) {
   const r = g.read;
@@ -194,6 +208,7 @@ export function NbaWhy({ g }: { g: NbaBoardGame }) {
           )}
         </>
       )}
+      <NbaOurLine g={g} />
       {g.tv && (
         <>
           <dt>Watch</dt>
