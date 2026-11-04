@@ -43,6 +43,8 @@ import {
   withCurrent,
 } from "@/lib/history/grades";
 import { after } from "next/server";
+import { Suspense } from "react";
+import { ProjectedStandings } from "./ProjectedStandings";
 import { seasonResults } from "@/lib/guillotine/league-state";
 import type { WeekResult } from "@/lib/guillotine/results";
 import {
@@ -593,6 +595,7 @@ export default async function LeaguePage({
           ))}
         </div>
 
+        <div className="flex min-w-0 flex-col gap-8">
         <Section
           label="Standings"
           aside={
@@ -661,6 +664,15 @@ export default async function LeaguePage({
             })}
           </ol>
         </Section>
+        <Suspense fallback={<div className="h-64 animate-pulse rounded-[4px] bg-hh-sunk" aria-label="Loading projection" />}>
+          <ProjectedStandings
+            leagueId={leagueId}
+            names={Object.fromEntries(rosters.map((r) => [r.roster_id, ownerName(r, usersById)]))}
+            myRosterId={myRoster?.roster_id ?? null}
+            chopped={chopTable.filter((c) => c.choppedWeek !== null).map((c) => [c.rosterId, c.choppedWeek!])}
+          />
+        </Suspense>
+        </div>
         </div>
       </div>
     </main>
