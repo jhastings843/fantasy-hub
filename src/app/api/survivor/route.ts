@@ -42,8 +42,10 @@ export async function GET(req: Request) {
     }
     return NextResponse.json(await buildReport(target.id));
   } catch (e) {
+    // The cause goes to the server log, not the browser (security audit, 2026-11-04).
+    console.error("[survivor] report:", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "failed to build report" },
+      { error: "failed to build report" },
       { status: 500 },
     );
   }
@@ -104,8 +106,9 @@ export async function POST(req: Request) {
     const report = await buildReport(target.id);
     return NextResponse.json(report);
   } catch (e) {
+    console.error("[survivor] save:", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "failed to save" },
+      { error: "failed to save" },
       { status: 500 },
     );
   }

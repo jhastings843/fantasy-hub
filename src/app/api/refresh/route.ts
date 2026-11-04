@@ -30,12 +30,12 @@ export async function POST(request: Request) {
 
   if (body?.all === true) {
     const result = await refreshAllLeagues();
-    const payload = result.ok
-      ? { ok: true, refreshed: result.refreshed }
-      : result.failed.length > 0
-        ? result
-        : { ok: false, error: result.error };
-    return Response.json(payload, { status: result.ok ? 200 : 500 });
+    if (result.ok) return Response.json({ ok: true, refreshed: result.refreshed });
+    // A partial failure names the leagues; anything else keeps its cause in
+    // the server log, not the browser (security audit, 2026-11-04).
+    if (result.failed.length > 0) return Response.json(result, { status: 500 });
+    console.error("[refresh] all leagues:", result.error);
+    return Response.json({ ok: false, error: "Refresh failed. Try again in a minute." }, { status: 500 });
   }
 
   const requested =
@@ -59,8 +59,9 @@ export async function POST(request: Request) {
     ]);
     return Response.json({ ok: true, leagueId });
   } catch (e) {
+    console.error(`[refresh] ${leagueId}:`, e);
     return Response.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
+      { ok: false, error: "Refresh failed. Try again in a minute." },
       { status: 500 },
     );
   }

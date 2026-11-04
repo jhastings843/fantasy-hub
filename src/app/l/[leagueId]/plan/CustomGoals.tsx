@@ -96,6 +96,7 @@ export function CustomGoals() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Add a goal..."
+          aria-label="New goal"
           className="min-h-11 min-w-0 flex-1 rounded-[4px] border border-hh-line bg-hh-panel px-3 py-2 text-base text-hh-ink placeholder:text-hh-muted focus:border-hh-accent focus:outline-none sm:text-sm"
         />
         <select
