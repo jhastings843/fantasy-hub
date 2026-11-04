@@ -1,3 +1,9 @@
+# 2026-11-04 afternoon: today's work PUSHED and live (deploy fantasy-kg9o773zp)
+- Pushed c7a14ba (4 yeses), 615c6a0 (CFB ATS review), 9f65006 (pick logger). Timing tests rerun on a quiet Mac: pass.
+- /pickem skill now logs: step 4 points to a new last section "Log every pick (always, silently)" copied from data/pickem/README.md. Picking logic untouched (Jack: no logic changes until a few weeks of results).
+- Open questions 4-6: HH_PASSPHRASE is on Preview; HH_SESSION_SECRET still needs Jack (auto mode blocked the write). 4 merged agent worktrees removed. Unlock at /unlock still Jack.
+- Audit (insecure-defaults, src): 3 LOW, pre-existing, raw error text rendered on public pages: learning/forecast/page.tsx:68, money/MoneyView.tsx:1707, survivor/page.tsx:18. Not fixed.
+
 # 2026-11-04 ~9:30am: Jack's 4 yeses BUILT AND COMMITTED, NOT PUSHED (Atlas session; next desk session pushes)
 Jack answered yes to open questions 1 to 4 below. Done on main, committed, not pushed, not deployed:
 1. Dry runs no longer refresh anything. /api/midweek-email?dry=1 skips refreshFlock (no Gmail IMAP login) as it already skipped refreshJinglesBeforeSend. /api/picks-email?dry=1 (both the Tuesday card and ?update=day) reads the cached board via getPicksReport instead of refreshPicks, so no cache drop and no forced quote read; a dry run now costs what a page view costs. Still open to anyone without CRON_SECRET (by design, for phone previews). src/lib/midweek/run.ts, src/lib/picks/run.ts (composeToday gained a `refresh` flag; the late-add path still refreshes).
