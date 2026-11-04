@@ -16,6 +16,7 @@
   ],
   "last_worked": "2026-11-04",
   "notes": [
+    "2026-11-04 eve: League pages get Projected finish (5,000-season sim from Sleeper projected lineups, playoff/title odds, guillotine win odds and chop week, weekly move) (9be2942). Pick'em Pushover now once, Sunday 11:00 ET, full entry + what moved. Bets board details show Our model under Sam/David on NFL, CFB, NBA (7624d7d). Both deployed Ready.",
     "2026-11-04: Jack unlocked Mac and phone at /unlock.",
     "2026-11-04: HH_SESSION_SECRET added to Preview by Jack (all branches; CLI needed an empty \"\" branch arg).",
     "2026-11-04 pm: pushed c7a14ba, 615c6a0, 9f65006 (deploy fantasy-kg9o773zp Ready). /pickem skill now runs the pick logger (grade before, log after; SKILL.md backup in session scratchpad). Insecure-defaults audit of src: 3 LOW pre-existing raw error text on public pages (learning/forecast page.tsx:68, money/MoneyView.tsx:1707, survivor/page.tsx:18). Removed 4 merged agent worktrees.",
