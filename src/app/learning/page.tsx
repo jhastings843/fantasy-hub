@@ -206,12 +206,15 @@ export default async function LearningPage() {
             the same everywhere: a change is tested on games after it was first tracked, goes live only when it clears its section&apos;s bar, and is rolled back if it
             loses after that.
           </p>
-          <p className={s.p}>
-            <Link href="/learning/forecast" style={{ fontWeight: 600 }}>
-              Go-live forecast →
-            </Link>{" "}
-            When each slice meets its sample, and its estimated chance of going live this season.
-          </p>
+          <Link href="/learning/forecast" className={s.navBtn}>
+            <span className={s.navBtnText}>
+              <b>Go-live forecast</b>
+              <span>When each slice meets its sample, and its chance of going live this season</span>
+            </span>
+            <span className={s.navBtnArrow} aria-hidden>
+              →
+            </span>
+          </Link>
         </header>
         {groups.map((g) => (
           <section key={g.title} className={s.section}>
