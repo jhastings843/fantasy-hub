@@ -329,6 +329,11 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // Tuesday review.
   j.graded = [...j.graded, ...(week ? gradeFinished(week - 1, lastRows, finals, j.graded) : [])];
   j.graded = [...j.graded, ...gradeFinished(week, rows, finals, j.graded)];
+  // Our model's pregame read on every graded game, the third vote in the consensus research cuts (engine.ts OURS_CUTS).
+  j.graded = j.graded.map((g) => {
+    const o = oursLast.get(key(g));
+    return o && g.ours === undefined ? gradeGame({ ...g, ours: o.model }) : g;
+  });
   // The rule and Tier 2 are set week to week: chosen on every week before
   // this one, frozen once this week's Tuesday review has run, and held until
   // the next review (rule-freeze.ts). Before the review it is provisional on

@@ -2,6 +2,7 @@ import "server-only";
 import { fetchSplits } from "./splits-feed";
 import { matchSplits, toSplits } from "./splits";
 import { redis } from "@/lib/redis/client";
+import { getNbaGameModelView } from "@/lib/models/nba/game-store";
 import { nbaSeasonOfDate, nbaWeek } from "@/lib/props/parse";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard } from "./nba-store";
 import { parseNbaScoreboard } from "./nba";
@@ -44,8 +45,13 @@ const journalKey = (season: number) => `picks:v2:nba:${season}:learning:journal`
 const stateKey = (season: number) => `picks:v2:nba:${season}:learning:state`;
 
 async function loadGames(season: number): Promise<NbaTracked[]> {
-  const h = (await redis.hgetall<{ [id: string]: NbaTracked }>(gamesKey(season))) ?? {};
-  return Object.values(h);
+  const [h, model] = await Promise.all([
+    redis.hgetall<{ [id: string]: NbaTracked }>(gamesKey(season)).then((x) => x ?? {}),
+    getNbaGameModelView(season).catch(() => null),
+  ]);
+  // Our game model's last pregame read on each game, for the consensus cuts (nba-track.ts NBA_CUTS).
+  const ours = new Map((model?.games ?? []).map((g) => [g.event, g.last.ours]));
+  return Object.values(h).map((g) => (ours.has(g.id) ? { ...g, ours: ours.get(g.id)! } : g));
 }
 async function loadHyps(season: number): Promise<NbaHypothesis[]> {
   const h = (await redis.hgetall<{ [id: string]: NbaHypothesis }>(hypKey(season))) ?? {};

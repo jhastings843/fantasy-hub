@@ -28,7 +28,7 @@
 import { MAX_KELLY_SCALE, MAX_STAKE, MIN_PRIOR_GAMES, MIN_STAKE } from "../limits";
 import { BASELINE_POLICY, SU_DEFAULT, envelopeViolations, sourceState, suInForce, type PicksPolicy, type Source, type SourceState, type StakingPolicy } from "../policy";
 import { type TotalsTest, gradeTotal, readTotal, sideFor, totalsCuts, totalsMatches } from "../totals";
-import { type CutTest, type Result, STEPPABLE, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
+import { type CutTest, type Result, OURS_CUTS, STEPPABLE, cutsFor, grade, key, matches, readAt, suPick } from "../engine";
 import type { ForecastSnapshot } from "../forecasts";
 import type { IssuedRecord } from "../issued";
 import { clvPoints } from "../closing";
@@ -184,7 +184,22 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
         origin: "Jack, 2026-10-27: splits read in the last 90 minutes, judged on 100+ rule bets; if one wins it goes live as a pre-kickoff skip alert",
       }),
     );
-    return [...totals, ...su, ...sources, ...market];
+    // Consensus with our own model (Jack, 2026-11-04): tracked research vs its parent, sample starts at registration.
+    const all = cutsFor(league, league === "cfb");
+    const consensus = OURS_CUTS.map((c): Hypothesis => {
+      const parent = all.find((x) => x.id === c.parent)!;
+      return {
+        id: `${league}:ats:${c.id}`,
+        kind: "ats-cut",
+        league,
+        definition: { kind: "ats-cut", cutId: c.id, label: c.label, test: c.test, parentId: parent.id, parentTest: parent.test },
+        actionable: true,
+        registeredAt,
+        status: "collecting",
+        origin: "Jack, 2026-11-04: test a blend (our model agreeing with Sam and David) beside our own model, tracked only",
+      };
+    });
+    return [...totals, ...su, ...sources, ...market, ...consensus];
   });
   return [
     {
@@ -276,7 +291,7 @@ const none: Scored = { bet: false, units: 0, risked: 0 };
 /** A spread cut at one snapshot, 1u risked at the quoted price. */
 export function scoreCut(test: CutTest, s: ForecastSnapshot, o: Opportunity, stake = 1): Scored {
   if (!s.sam || !s.david || !s.ref || !o.final) return none;
-  const r = readAt(s.ref.line, s.sam, s.david, s.pem);
+  const r = readAt(s.ref.line, s.sam, s.david, s.pem, s.ours?.model);
   if (!matches(r, test) || !r.side) return none;
   const homeLine = s.ref.line;
   const pr = r.side === "home" ? s.ref.homePrice : s.ref.awayPrice;

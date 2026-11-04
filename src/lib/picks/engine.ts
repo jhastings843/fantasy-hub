@@ -31,6 +31,8 @@ export interface Game {
   david?: ModelLine;
   /** Jay's PEM (college only): its home-side line and the market line on its card. */
   pem?: PemLine;
+  /** Our own model's home spread, its latest pregame read (forecasts.ts `ours`). Third vote for the consensus cuts. */
+  ours?: number;
   final?: { home: number; away: number };
 }
 
@@ -66,9 +68,11 @@ export interface Read {
   avgMarket: number;
   /** PEM's side against the average market line, when PEM covers the game. */
   pemSide?: "home" | "away";
+  /** Our own model's side against the average market line, when we have a pregame read. */
+  oursSide?: "home" | "away";
 }
 
-export function read(sam: ModelLine, david: ModelLine, pem?: PemLine): Read {
+export function read(sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: number): Read {
   const samSide: "home" | "away" = sam.model < sam.market ? "home" : "away";
   const davidSide: "home" | "away" = david.model < david.market ? "home" : "away";
   // A model sitting exactly on the number has no side; treat it as a split.
@@ -87,6 +91,7 @@ export function read(sam: ModelLine, david: ModelLine, pem?: PemLine): Read {
     avgModel,
     avgMarket,
     pemSide: pem && pem.model !== avgMarket ? (pem.model < avgMarket ? ("home" as const) : ("away" as const)) : undefined,
+    oursSide: ours !== undefined && ours !== avgMarket ? (ours < avgMarket ? ("home" as const) : ("away" as const)) : undefined,
   };
   if (!agree) return { ...base };
   const home = samSide === "home";
@@ -142,6 +147,8 @@ export interface CutTest {
   pem?: "agree" | "disagree";
   /** Sam and David split; back whichever side PEM takes. */
   pemSplit?: boolean;
+  /** Our own model on the same side as Sam and David, or against them (consensus research, Jack 2026-11-04). */
+  ours?: "agree" | "disagree";
 }
 
 export interface Cut {
@@ -165,6 +172,8 @@ export function matches(r: Read, t: CutTest): boolean {
   if (!r.agree || r.line === undefined) return false;
   if (t.pem === "agree" && (!r.pemSide || r.pemSide !== r.side)) return false;
   if (t.pem === "disagree" && (!r.pemSide || r.pemSide === r.side)) return false;
+  if (t.ours === "agree" && (!r.oursSide || r.oursSide !== r.side)) return false;
+  if (t.ours === "disagree" && (!r.oursSide || r.oursSide === r.side)) return false;
   if (t.side === "dog" && !r.dog) return false;
   if (t.side === "fav" && r.dog) return false;
   if (t.venue === "home" && r.side !== "home") return false;
@@ -213,6 +222,18 @@ const research = (id: string, label: string, parent: string, test: CutTest): Cut
  *   one-point minimum on both models, the smallest whole-point step.
  *   College favorites laying 14+ are set against dogs getting 14+.
  */
+/**
+ * Consensus with our own model (Jack, 2026-11-04): does Sam and David agreeing
+ * get better when our model agrees too? Tracked research against "Both agree";
+ * a game counts only when we saved a pregame read for it.
+ */
+const consensus = (id: string, label: string, parent: string, test: CutTest): Cut => ({ id, label, group: "Our model, third vote", test, candidate: false, parent });
+export const OURS_CUTS: Cut[] = [
+  consensus("ours-agree", "All three agree (with our model)", "agree", { ours: "agree" }),
+  consensus("ours-agree-dog", "All three agree on the dog (with our model)", "dog", { ours: "agree", side: "dog" }),
+  consensus("ours-disagree", "Sam + David agree, our model disagrees", "agree", { ours: "disagree" }),
+];
+
 export function researchCuts(league: "nfl" | "cfb"): Cut[] {
   const e = league === "nfl" ? 2 : 3;
   const bands =
@@ -279,6 +300,7 @@ export function cutsFor(league: "nfl" | "cfb", withPem = false): Cut[] {
         ]
       : []),
     ...researchCuts(league),
+    ...OURS_CUTS,
   ];
 }
 
@@ -331,7 +353,7 @@ export interface GradedGame extends Game {
 }
 
 export function gradeGame(g: Game & { final: { home: number; away: number }; sam: ModelLine; david: ModelLine }): GradedGame {
-  const r = read(g.sam, g.david, g.pem);
+  const r = read(g.sam, g.david, g.pem, g.ours);
   const samSide = g.sam.model < g.sam.market ? "home" : "away";
   const davidSide = g.david.model < g.david.market ? "home" : "away";
   return {
@@ -645,11 +667,12 @@ const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
  * actually available: Sam home -2 against his -3, David home -6 against his
  * -7, and at home -5 Sam is on the road team and David on the home team.
  */
-export function readAt(ref: number, sam: ModelLine, david: ModelLine, pem?: PemLine): Read {
+export function readAt(ref: number, sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: number): Read {
   return read(
     { market: ref, model: sam.model },
     { market: ref, model: david.model },
     pem ? { model: pem.model, market: ref } : undefined,
+    ours,
   );
 }
 
@@ -703,7 +726,7 @@ export function tierBoard(
       const at = atRef?.line ?? m.market;
       return { ...row, basis, tier: "one", play: `${only} only: ${team(m.model < at ? "home" : "away")}`, su };
     }
-    const r = atRef ? readAt(atRef.line, row.sam, row.david, row.pem) : read(row.sam, row.david, row.pem);
+    const r = atRef ? readAt(atRef.line, row.sam, row.david, row.pem, row.ours?.spread) : read(row.sam, row.david, row.pem, row.ours?.spread);
     const pemMissing = league === "cfb" && !row.pem;
     // A rule that needs PEM, on a game PEM has not covered, is undecided, not a "no".
     const waiting = (cut: CutResult | null): boolean =>

@@ -60,6 +60,8 @@ export interface NbaTracked {
   first: NbaSnap;
   last: NbaSnap;
   final?: { home: number; away: number };
+  /** Our own NBA game model's last pregame read (models/nba/game-store.ts), joined at load. Home spread and total. */
+  ours?: { spread: number; total: number };
 }
 
 export interface NbaBet {
@@ -79,6 +81,8 @@ export interface NbaBet {
   net?: number;
   /** Spread only, when the last pregame copy had public splits: which market signals point against this bet (splits.ts). */
   mkt?: { rlmAgainst: boolean; publicOurs: boolean; sharpAgainst: boolean };
+  /** Spread and total: our own game model on Sam's side or against it, when we saved a read (consensus research, 2026-11-04). */
+  ours?: "agree" | "disagree";
 }
 
 const payout = (p?: number) => (p === undefined ? 100 / 110 : p > 0 ? p / 100 : 100 / -p);
@@ -93,7 +97,8 @@ export function nbaBets(g: NbaTracked): NbaBet[] {
     const home = side === "home";
     const m = s.splits && readMarket("nba", s.splits, s.line);
     const mkt = m ? { rlmAgainst: !!m.rlm && m.rlm !== side, publicOurs: m.publicSide === side, sharpAgainst: !!m.sharpSide && m.sharpSide !== side } : undefined;
-    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0, ...(mkt ? { mkt } : {}) });
+    const ourSide = g.ours && g.ours.spread !== s.line ? (g.ours.spread < s.line ? "home" : "away") : undefined;
+    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0, ...(mkt ? { mkt } : {}), ...(ourSide ? { ours: ourSide === side ? ("agree" as const) : ("disagree" as const) } : {}) });
   }
   if (s.model !== 0) {
     const home = s.model < 0;
@@ -102,7 +107,8 @@ export function nbaBets(g: NbaTracked): NbaBet[] {
   }
   if (s.total !== undefined && s.modelTotal !== undefined && s.modelTotal !== s.total) {
     const over = s.modelTotal > s.total;
-    out.push({ market: "ou", side: over ? "over" : "under", line: s.total, price: over ? s.overPrice : s.underPrice, edge: r1(Math.abs(s.modelTotal - s.total)), dog: false });
+    const ourOver = g.ours && g.ours.total !== s.total ? g.ours.total > s.total : undefined;
+    out.push({ market: "ou", side: over ? "over" : "under", line: s.total, price: over ? s.overPrice : s.underPrice, edge: r1(Math.abs(s.modelTotal - s.total)), dog: false, ...(ourOver !== undefined ? { ours: ourOver === over ? ("agree" as const) : ("disagree" as const) } : {}) });
   }
   return g.final ? out.map((b) => settleNba(b, g.final!)) : out;
 }
@@ -154,7 +160,11 @@ export const NBA_CUTS: NbaCut[] = [
   { id: "ats:mkt-rlm", market: "ats", label: "Skip reverse line moves against Sam", research: { parent: "ats:all" }, reportOnly: true, test: (b) => !b.mkt?.rlmAgainst },
   { id: "ats:mkt-public", market: "ats", label: "Skip when the public (65%+) is on Sam's side", research: { parent: "ats:all" }, reportOnly: true, test: (b) => !b.mkt?.publicOurs },
   { id: "ats:mkt-sharp", market: "ats", label: "Skip sharp money against Sam", research: { parent: "ats:all" }, reportOnly: true, test: (b) => !b.mkt?.sharpAgainst },
+  // Consensus with our own game model (Jack, 2026-11-04): tracked research vs its parent.
+  { id: "ats:ours-agree", market: "ats", label: "Sam and our model agree", research: { parent: "ats:all" }, test: (b) => b.ours === "agree" },
+  { id: "ats:ours-disagree", market: "ats", label: "Sam's side, our model disagrees", research: { parent: "ats:all" }, test: (b) => b.ours === "disagree" },
   { id: "ou:all", market: "ou", label: "Every Sam total", test: () => true },
+  { id: "ou:ours-agree", market: "ou", label: "Sam and our model agree on the total", research: { parent: "ou:all" }, test: (b) => b.ours === "agree" },
   { id: "ou:edge3", market: "ou", label: "Total edge 3+ pts", test: (b) => b.edge >= 3 },
   { id: "ou:edge5", market: "ou", label: "Total edge 5+ pts", test: (b) => b.edge >= 5 },
   { id: "ou:over", market: "ou", label: "Sam on the over", test: (b) => b.side === "over" },
