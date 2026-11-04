@@ -1,3 +1,11 @@
+# 2026-11-04 ~1am: Hobby Hub redesign, whole-site pass IN PROGRESS (branch redesign/hobby-hub, NOT merged, NOT live)
+- Jack chose "redesign everything, then ship": finish all hubs on the branch, ONE whole-site preview, stop for OK, then insecure-defaults audit, merge, prod deploy.
+- Latest preview: https://fantasy-is2zrdd01-jhastings843s-projects.vercel.app (Vercel login).
+- Done: Today; nav; styleguide; shared picks sheet C3 block (end of picks.module.css) restyles Bets, Money, Results, Learning; best-bet spotlight on the spreads board (picks/BoardSpot.tsx); Props and NBA drivers moved below the board; David = slate blue (--hh-david); Money desks (logs, slices, settled history behind disclosures; at-risk/benched auto-open and the weather brake kept visible); Records (headline stats + running-units chart), Learning (real live status per row, detail behind tap), Forecast, Model record; Lineup (answer first, details behind taps, position marks via PosBadge with the validated dataviz palette --pos-*); Waivers (top claim spotlight, Why per row); /fantasy list.
+- NOT done (old layouts, new colours, both themes work): league home l/[id]/page.tsx, Plan, Draft (+board), Trade, Players, Player profile, Scout, FAAB, Survivor, Strategy, Resources; game/player pop-ups only have the sheet restyle. Then: Astra review of the full diff (Astra hit its Plus limit at ~11:50pm Nov 3; resets 2:53am Nov 4), final screenshots, whole-site preview, stop.
+- Lesson: never `git add -A` while Astra jobs are editing; a commit swept in partial Astra edits and had to be redone.
+- Gotchas: tabular-nums makes an element MONO site-wide (old rule); never put it on wrappers. Dev server can serve stale CSS for new :root vars; rm -rf .next and restart.
+
 # 2026-11-03 late night: Hobby Hub redesign, phase 1 (branch redesign/hobby-hub, NOT merged)
 - STOPPED for Jack's approval. Preview: https://fantasy-356bavhu6-jhastings843s-projects.vercel.app (Vercel login). Review page with screenshots + open questions: https://claude.ai/artifact/UdnsSLLREG2JuojisX9srW
 - Plan and hub map: docs/redesign/plan.md. Route inventory (Astra): docs/redesign/inventory.md.
