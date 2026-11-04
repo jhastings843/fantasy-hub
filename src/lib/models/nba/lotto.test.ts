@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { RECIPES, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
+import { LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
+import { implied } from "@/lib/props/parse";
 import { LONG_MAX, LONG_MIN, longRungs } from "./market";
 import PARAMS from "./params.json";
 import type { NbaParams } from "./props";
@@ -125,5 +126,25 @@ describe("Sam-style recipes", () => {
     const w = ticket("2026-10-27", rungs, by("sam-pts-water"))!;
     expect(w.legs.map((l) => `${l.player} ${l.line}`).sort()).toEqual(["Hardaway 14.5", "Jakucionis 14.5", "Tyson 9.5"]);
     expect(w.price).toBeLessThan(ticket("2026-10-27", rungs, by("sam-pts"))!.price);
+  });
+});
+
+describe("market check (2026-11-04)", () => {
+  it("lands between DK's de-vigged chance and our raw chance, nearer DK", () => {
+    const fair = implied(400) / LOTTO_CHECK.hold;
+    const c = checkedChance(0.25, 400);
+    expect(c).toBeGreaterThan(fair);
+    expect(c).toBeLessThan(0.25);
+    expect(c - fair).toBeLessThan(0.25 - c);
+  });
+  it("flags one rung per player-stat-night: the best checked value", () => {
+    const tip = "2026-10-27T23:10:00Z";
+    const rungs = rungsOf([board("1", tip, "Tyson", [{ line: 19.5, over: 500, ours: 0.4 }, { line: 24.5, over: 900, ours: 0.3 }], 21)]);
+    expect(rungs.every((r) => r.checkedEv > 0)).toBe(true);
+    expect(rungs.filter((r) => r.bestOfLadder).map((r) => r.line)).toEqual([24.5]);
+  });
+  it("flags nothing when no rung has checked value", () => {
+    const rungs = rungsOf([board("1", "2026-10-27T23:10:00Z", "Tyson", [{ line: 19.5, over: 500, ours: 0.12 }], 10)]);
+    expect(rungs.filter((r) => r.bestOfLadder)).toHaveLength(0);
   });
 });

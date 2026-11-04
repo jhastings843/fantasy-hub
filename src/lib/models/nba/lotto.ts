@@ -18,7 +18,7 @@
 
 import { etDate, implied, payout } from "@/lib/props/parse";
 import type { GradedGame } from "@/lib/props/grade";
-import type { LongRung, OurMarketExtra } from "./market";
+import { blend, type LongRung, type OurMarketExtra } from "./market";
 
 /** The slice of a saved board the lotto reads. */
 export interface LottoBoard {
@@ -42,6 +42,11 @@ export interface Rung extends LongRung {
   stat: string;
   /** Our chance times DK's decimal payout, less 1: the rung's value at our number. */
   ev: number;
+  /** Our raw chance checked against DK's de-vigged ladder (LOTTO_CHECK), and its value at DK's price. */
+  checked: number;
+  checkedEv: number;
+  /** The best market-checked value on this player's ladder for this stat tonight (one rung per player-stat-night). */
+  bestOfLadder: boolean;
   /** Null until graded; "void" when he didn't play. */
   hit: boolean | "void" | null;
   actual: number | null;
@@ -66,6 +71,22 @@ export const MIN_GAMES = 3;
 export const STAKE = 0.1;
 
 const dec = (american: number) => 1 + payout(american);
+
+/**
+ * The market check on long rungs (Jack, 2026-11-04, "fix lottos"). Long rungs
+ * never blended toward DK (ours == raw), and the rungs we flagged as value were
+ * the ones our raw model overshot most: 17.8% said, 11.3% hit, DK 14.4%.
+ * Fitted by scripts/fit-lotto.mts on the Oct 27-30 nights (3,584 rungs) and
+ * checked on Oct 31-Nov 2 (3,323 rungs it never saw):
+ *   hold: DK's margin on long-ladder prices; fair chance = implied(price) / hold
+ *   w:    the share of our raw model kept against that fair chance (blend)
+ * Held out, the blend matched DK's de-vigged chance (log loss 0.2943 vs 0.2942,
+ * raw 0.3008): better calibrated, but no edge over the market yet. Tracked
+ * slices only (sections.ts lotto:checked*); nothing stakes on it.
+ */
+export const LOTTO_CHECK = { hold: 1.255, w: 0.4 } as const;
+export const checkedChance = (raw: number, over: number): number =>
+  Math.round(blend(raw, Math.min(0.99, implied(over) / LOTTO_CHECK.hold), LOTTO_CHECK.w) * 1000) / 1000;
 const toAmerican = (d: number) => Math.round(d >= 2 ? (d - 1) * 100 : -100 / (d - 1));
 
 /** Every long rung on the boards, graded where the game is final. */
@@ -78,9 +99,11 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
     for (const m of b.game.markets) {
       const x = b.extra[m.id];
       if (!x?.longs?.length || (x.games ?? 0) < MIN_GAMES) continue;
+      const ladder: Rung[] = [];
       for (const r of x.longs) {
         const a = b.result ? actual.get(m.id) ?? null : null;
-        out.push({
+        const checked = checkedChance(r.raw, r.over);
+        ladder.push({
           ...r,
           date,
           at: b.kickoff,
@@ -90,10 +113,17 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
           player: m.player,
           stat: m.stat ?? m.statLabel,
           ev: Math.round((r.ours * dec(r.over) - 1) * 1000) / 1000,
+          checked,
+          checkedEv: Math.round((checked * dec(r.over) - 1) * 1000) / 1000,
+          bestOfLadder: false,
           hit: !b.result ? null : a === null ? "void" : a > r.line,
           actual: a,
         });
       }
+      // One rung per player-stat-night: the best market-checked value on the ladder, if any is positive.
+      const top = ladder.filter((r) => r.checkedEv > 0).sort((p, q) => q.checkedEv - p.checkedEv || p.over - q.over)[0];
+      if (top) top.bestOfLadder = true;
+      out.push(...ladder);
     }
   }
   return out;

@@ -119,6 +119,11 @@ export const LOTTO_SLICES: [string, string, RungKeep][] = [
   ["lotto:reb", "Rebounds rungs", (r) => r.ev > 0 && r.stat === "reb"],
   ["lotto:ast", "Assists rungs", (r) => r.ev > 0 && r.stat === "ast"],
   ["lotto:threes", "Threes rungs", (r) => r.ev > 0 && r.stat === "threes"],
+  // Market-checked (lotto.ts LOTTO_CHECK, 2026-11-04): our raw chance blended with DK's de-vigged ladder,
+  // the best rung per player-stat-night only, so one read never counts three times. Not refinements of
+  // lotto:value (a different chance), so they stand on their own.
+  ["lotto:checked", "Market-checked value, best rung per player per stat", (r) => r.checkedEv > 0 && r.bestOfLadder === true],
+  ["lotto:checked-noreb", "Market-checked value, best rung, no rebounds", (r) => r.checkedEv > 0 && r.bestOfLadder === true && r.stat !== "reb"],
 ];
 
 /** Graded rungs (with kickoff) and nightly tickets into candidates. Season sets the week numbers. */
@@ -127,7 +132,7 @@ export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number
   const rungSlices = LOTTO_SLICES.map(([id, label]): Candidate => ({
     id,
     label,
-    ...(id === "lotto:value" ? {} : { parent: "lotto:value" }),
+    ...(id === "lotto:value" || id === "lotto:checked" ? {} : { parent: id === "lotto:checked-noreb" ? "lotto:checked" : "lotto:value" }),
     bets: graded.filter((r) => inSlice(LOTTO_MEMBERS, id, r)).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1), p: r.ours, price: r.over })),
   }));
   // The ticket at its real stake: one per night, so it needs the long gate's patience.
@@ -210,10 +215,10 @@ export function attdStaked(entries: LiveEntry[], kickoff: string | undefined, ou
 }
 
 /** Every rung slice's membership test, by id (the ticket is not a rung slice). */
-export const LOTTO_MEMBERS: Map<string, (r: Pick<Rung, "over" | "ev" | "stat">) => boolean> = new Map(LOTTO_SLICES.map(([id, , keep]) => [id, (r) => keep(r as Rung)]));
+export const LOTTO_MEMBERS: Map<string, (r: Pick<Rung, "over" | "ev" | "stat"> & Partial<Pick<Rung, "checkedEv" | "bestOfLadder">>) => boolean> = new Map(LOTTO_SLICES.map(([id, , keep]) => [id, (r) => keep(r as Rung)]));
 
 /** Lottos: a live rung slice, or a live combination of two, keeps this rung. */
-export function rungStaked(entries: LiveEntry[], r: Pick<Rung, "over" | "ev" | "stat" | "at">): boolean {
+export function rungStaked(entries: LiveEntry[], r: Pick<Rung, "over" | "ev" | "stat" | "at"> & Partial<Pick<Rung, "checkedEv" | "bestOfLadder">>): boolean {
   return [...liveFor(entries, r.at)].some((id) => inSlice(LOTTO_MEMBERS, id, r));
 }
 
