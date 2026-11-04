@@ -18,9 +18,17 @@ Changes from the draft mapping, and why:
 
 - `/` now renders Today. The league list that lived there moved to the new `/fantasy` route, unchanged. The seven "‹ Leagues" back links in league pages now point at `/fantasy`. No URL was deleted; emails link to `/l/...`, `/picks`, `/survivor` and the app root, all still valid (root now lands on Today, which is the intent).
 - `/picks/model` belongs to Results (it is method and track record, not a board). Its URL is unchanged; Results claims it before Bets does.
-- Survivor stays under Fantasy as a sub-tab. Astra flagged it as a weak semantic fit (a pool, not a league); a sixth hub would break the five-tab phone bar, and it is used weekly in football season like the leagues. Revisit if you want it in Bets.
+- Survivor stays under Fantasy as a sub-tab (Jack confirmed).
 - `/picks/cbb/bracket` stays in Bets.
 - `/picks?l=nba` (built by `lib/notify/golive.ts:115` and `lib/props/staked-core.ts:525`) rendered the NFL board. `/picks` now redirects `l=nba` to `/picks/nba`, keeping `v`. The lib code is unchanged.
+
+## Decisions from Jack (2026-11-03, after the phase 1 preview)
+
+1. `/` stays Today; the league list stays at `/fantasy`.
+2. Survivor stays under Fantasy.
+3. Spotlight: from Tuesday until 3am Wednesday ET (when the waiver leagues process claims), the top claim takes the box when one exists; every bet then stays in Next up. Otherwise the biggest issued bet not started, then a ready-to-send bet, then the top claim. Built in `today/page.tsx` (`waiverWindow`).
+4. David gets a cooler second colour in the Bets pass (Sam stays rust).
+5. Previews keep sharing the live Redis and Sleeper settings.
 
 ## Design system (done this session)
 

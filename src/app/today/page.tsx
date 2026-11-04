@@ -20,7 +20,7 @@ import { Call, Chip, Disclosure, Empty, Num, PageHead, Section, Spotlight, Stat,
 import { Meter, Sparkline } from "@/components/hh/charts";
 import { TeamEdge } from "@/components/hh/team";
 import { LiveScore } from "@/components/hh/LiveScore";
-import { FantasySection, FantasySkeleton, FantasySpot } from "./fantasy";
+import { FantasySection, FantasySkeleton, FantasySpot, getFantasyNow } from "./fantasy";
 
 // Today (redesign, 2026-11-03): what to do right now. Answer first: one spotlight
 // for the single action that matters (the next bet, else the top claim), then
@@ -35,6 +35,17 @@ export const metadata: Metadata = {
   title: "Today · Hobby Hub",
   description: "What to bet, claim and change right now, and what is live.",
 };
+
+/**
+ * Waiver window: every waiver league processes claims at 3am Wednesday ET (lib/midweek/run.ts),
+ * so from Tuesday until then the top claim takes the spotlight from the next bet (Jack, 2026-11-03).
+ */
+function waiverWindow(d: Date): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(d);
+  const day = parts.find((p) => p.type === "weekday")?.value;
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  return day === "Tue" || (day === "Wed" && hour < 3);
+}
 
 const seasonOf = (d: Date) => (d.getMonth() < 7 ? d.getFullYear() - 1 : d.getFullYear());
 const u = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}u`;
@@ -284,6 +295,8 @@ const STATUS: Record<ModelRow["status"], { tone: Tone; text: string }> = {
 export default async function TodayPage() {
   const season = seasonOf(new Date());
   const nowDate = new Date();
+  // In the waiver window the claims are read alongside the bets (same cached read the sections use).
+  const fantasyFirst = waiverWindow(nowDate) ? getFantasyNow().catch(() => null) : null;
   const [nfl, cfb, board, nbaView, nflProducts, nbaProducts, stakedProps, stakedNba] = await Promise.all([
     getPicksReport("nfl").catch(() => null),
     getPicksReport("cfb").catch(() => null),
@@ -341,7 +354,10 @@ export default async function TodayPage() {
   const readyNext = next.filter((x) => x.kind === "ready");
 
   // The spotlight: the biggest issued bet not yet started (soonest breaks ties), else one ready to send.
-  const spot = [...issuedNext].sort((a, b) => (b.stake ?? 0) - (a.stake ?? 0) || a.kickoff.localeCompare(b.kickoff))[0] ?? readyNext[0] ?? null;
+  const betSpot = [...issuedNext].sort((a, b) => (b.stake ?? 0) - (a.stake ?? 0) || a.kickoff.localeCompare(b.kickoff))[0] ?? readyNext[0] ?? null;
+  // Waiver window with a claim worth making: the claim takes the box and every bet stays in Next up.
+  const claimFirst = !!(fantasyFirst && (await fantasyFirst)?.claims.length);
+  const spot = claimFirst ? null : betSpot;
   const nextRest = spot ? next.filter((x) => x.key !== spot.key) : next;
 
   // Which model drives each section, from the same data each page reads.

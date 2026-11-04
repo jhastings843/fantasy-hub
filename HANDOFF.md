@@ -10,6 +10,7 @@
 - Vercel: added Preview target to UPSTASH_REDIS_REST_URL/TOKEN, SLEEPER_USERNAME, SLEEPER_LEAGUE_ID, ROSTERAUDIT_API_KEY, ODDS_API_KEY (Jack approved). Previews share prod Redis.
 - Lint: 2 pre-existing react-hooks/purity errors (trade/page.tsx, MoneyView.tsx Date.now in server render) silenced with reasons. Checks: tsc pass, eslint 0 errors, 1834 tests pass, build pass. src/lib untouched.
 - Local dev gotcha: if Turbopack says "next/font/google queries have exactly one entry", rm -rf .next and restart.
+- Jack answered the open questions (plan.md "Decisions"): / stays Today, Survivor stays in Fantasy, claim takes the spotlight Tue until 3am Wed ET (built), David gets a cooler colour in Bets, previews keep prod Redis. Phase 1 approved to proceed.
 - Next session: Bets hub (order: Bets, Fantasy, Money, Results), each ends with a preview + stop. Known todo list in plan.md (David colour, Survivor duplicate key, Learning link mismatches, AutoRefresh buttons under 44px).
 
 # 2026-11-03 night: Week 9 midweek email empty
