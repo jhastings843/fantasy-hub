@@ -1,5 +1,4 @@
-import { Chip, Disclosure, Num, Section, Spotlight } from "@/components/hh/ui";
-import { TeamEdge } from "@/components/hh/team";
+import { Chip, Disclosure, Section, Spotlight } from "@/components/hh/ui";
 import { buildWaivers } from "@/lib/waivers/build";
 import type { SeasonTarget, StartableTarget, WaiverPlayer } from "@/lib/waivers/rank";
 import { usageText } from "@/lib/waivers/freshness";
@@ -119,22 +118,20 @@ function StartRow({ t }: { t: StartableTarget }) {
         Would start at {t.slot} this week
         {t.displaces ? `, ahead of ${t.displaces.name}` : ""}.
       </p>
-      <ResearchLine p={t.player} />
-      <JinglesLine p={t.player} />
-      <UsageLine p={t.player} />
       <BidLine price={t.price} />
-      {t.price ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-hh-muted ">
-          {t.price.reason}
-        </p>
-      ) : null}
+      <Disclosure summary="Why">
+        <ResearchLine p={t.player} />
+        <JinglesLine p={t.player} />
+        <UsageLine p={t.player} />
+        {t.price ? <p className="mt-1.5 text-xs leading-relaxed text-hh-muted">{t.price.reason}</p> : null}
+      </Disclosure>
     </div>
   );
 }
 
 function SeasonRow({ t }: { t: SeasonTarget }) {
   return (
-    <div className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+    <div className="flex flex-col gap-1.5 border-b border-hh-line py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-hh-ink ">{t.player.name}</span>
@@ -157,15 +154,13 @@ function SeasonRow({ t }: { t: SeasonTarget }) {
             His weekly list: {t.why}.
           </p>
         ) : null}
-        <ResearchLine p={t.player} />
-        <JinglesLine p={t.player} />
-        <UsageLine p={t.player} />
         <BidLine price={t.price} />
-        {t.price ? (
-          <p className="mt-1 text-xs leading-relaxed text-hh-muted ">
-            {t.price.reason}
-          </p>
-        ) : null}
+        <Disclosure summary="Why">
+          <ResearchLine p={t.player} />
+          <JinglesLine p={t.player} />
+          <UsageLine p={t.player} />
+          {t.price ? <p className="mt-1 text-xs leading-relaxed text-hh-muted">{t.price.reason}</p> : null}
+        </Disclosure>
         {t.alternative ? (
           <p className="mt-1 text-sm leading-relaxed text-hh-muted ">
             Or <span className="font-medium text-hh-ink-2 ">{t.alternative.name}</span>
@@ -192,7 +187,7 @@ export default async function WaiversPage({
   return (
     <main className="mx-auto max-w-5xl min-w-0 break-words text-hh-ink px-4 py-8 sm:px-6 lg:px-8">
       <Eyebrow>{w.week ? `Week ${w.week}` : "Waivers"}</Eyebrow>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
+      <h1 className="hh-title mt-1">
         {startable.length > 0
           ? `${startable.length} on the wire would start for you.`
           : seasonUpgrades.length > 0
@@ -244,33 +239,37 @@ export default async function WaiversPage({
         </div>
       )}
 
-      {startable.length > 0 && (
-        <div className="mt-8">
-          <Eyebrow>Would start this week</Eyebrow>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            {startable.map((t) => (
+      {/* The one spotlight: the top claim (a starter if there is one, else the best season upgrade). */}
+      {startable.length > 0 ? (
+        <Spotlight label="Top claim · would start this week" className="mt-8">
+          <StartRow t={startable[0]} />
+        </Spotlight>
+      ) : seasonUpgrades.length > 0 ? (
+        <Spotlight label="Top claim · for the season" className="mt-8">
+          <SeasonRow t={seasonUpgrades[0]} />
+        </Spotlight>
+      ) : null}
+
+      {startable.length > 1 && (
+        <Section label="Would start this week" className="mt-8">
+          <div className="grid gap-x-8 lg:grid-cols-2">
+            {startable.slice(1).map((t) => (
               <StartRow key={t.player.playerId} t={t} />
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
-      {seasonUpgrades.length > 0 && (
-        <div className="mt-8">
-          <Eyebrow>{w.source.fresh ? "Worth a claim for the season" : w.source.label}</Eyebrow>
-          <div className="mt-3 overflow-hidden border-b border-hh-line py-4">
-            <div className="divide-y divide-hh-line ">
-              {seasonUpgrades.map((t) => (
-                <SeasonRow key={t.player.playerId} t={t} />
-              ))}
-            </div>
-          </div>
-        </div>
+      {seasonUpgrades.length > (startable.length > 0 ? 0 : 1) && (
+        <Section label={w.source.fresh ? "Worth a claim for the season" : w.source.label} className="mt-8">
+          {seasonUpgrades.slice(startable.length > 0 ? 0 : 1).map((t) => (
+            <SeasonRow key={t.player.playerId} t={t} />
+          ))}
+        </Section>
       )}
 
       {dropCandidates.length > 0 && (
-        <div className="mt-8">
-          <Eyebrow>Droppable, worst first</Eyebrow>
+        <Disclosure summary={`Droppable, worst first (${dropCandidates.length})`} className="mt-8">
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-hh-muted ">
             Anyone this week&rsquo;s lineup depends on is left out of this list, however poor
             their season rank. A fill-in who is actually starting on Sunday is worth more than a
@@ -280,7 +279,7 @@ export default async function WaiversPage({
             {dropCandidates.map((d) => (
               <span
                 key={d.playerId}
-                className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-3 py-1.5 text-sm "
+                className="inline-flex items-center gap-2 rounded-[4px] border border-hh-line px-3 py-1.5 text-sm"
               >
                 <span className="text-hh-ink ">{d.name}</span>
                 <span className="text-xs text-hh-muted ">
@@ -289,10 +288,11 @@ export default async function WaiversPage({
               </span>
             ))}
           </div>
-        </div>
+        </Disclosure>
       )}
 
-      <div className="mt-10 max-w-2xl space-y-2 text-xs leading-relaxed text-hh-muted ">
+      <Disclosure summary="Sources" className="mt-6">
+      <div className="max-w-2xl space-y-2 text-xs leading-relaxed text-hh-muted">
         <p>
           This week from {w.listTitle ?? "his weekly rankings"}
           {w.listUpdatedLabel ? `, last updated ${w.listUpdatedLabel}` : ""}. Season-long from{" "}
@@ -305,6 +305,7 @@ export default async function WaiversPage({
           </p>
         )}
       </div>
+      </Disclosure>
     </main>
   );
 }

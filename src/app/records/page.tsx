@@ -83,11 +83,8 @@ export default async function RecordsPage() {
   const p = settled.filter((b) => b.result === "P").length;
 
   const weeks = [...new Set(settled.map((b) => b.week))].sort((a, b) => a - b);
-  let running = 0;
-  const runningUnits = weeks.map((week) => {
-    running += settled.filter((b) => b.week === week).reduce((sum, b) => sum + b.net, 0);
-    return running;
-  });
+  const weekNet = weeks.map((week) => settled.filter((b) => b.week === week).reduce((sum, b) => sum + b.net, 0));
+  const runningUnits = weekNet.map((_, i) => weekNet.slice(0, i + 1).reduce((sum, x) => sum + x, 0));
 
   // Shadow records: graded at the saved price with no stake. Each comes from the same function its own page uses.
   const shadow: { what: string; href: string; w: number; l: number; p: number; units: number; basis: string }[] = [];
