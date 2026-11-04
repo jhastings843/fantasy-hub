@@ -1,3 +1,22 @@
+# 2026-11-03 late night: Hobby Hub redesign, phase 1 (branch redesign/hobby-hub, NOT merged)
+- STOPPED for Jack's approval. Preview: https://fantasy-9w42wmawp-jhastings843s-projects.vercel.app (Vercel login). Review page with screenshots + open questions: https://claude.ai/artifact/UdnsSLLREG2JuojisX9srW
+- Plan and hub map: docs/redesign/plan.md. Route inventory (Astra): docs/redesign/inventory.md.
+- Look: light = C3 (paper #f5f2e9, ink, rust #b5562b, Barlow caps titles/nav, Geist body, Geist Mono numbers, 1.5px ink rules, ONE spotlight box). Dark = teal terminal (#0e1116, teal #5eead4, JetBrains Mono). Theme follows system + toggle (localStorage hh-theme); was forced dark before.
+- Tokens: globals.css (--hh-*, on :root/.hh-light and :root.dark/.hh-dark). ledger-look.css is GENERATED from a ramp table (generator lives only in the session scratchpad; regenerate by editing ramps) and repoints every Tailwind family per theme: amber/orange = accent, yellow + blue families = gold, emerald = wins, rose/red = losses. picks.module.css and bracket.module.css local vars now point at --hh-*.
+- Shell: components/hh/hubs.ts owns hub membership (Today, Bets, Fantasy, Money, Results; /picks/model is Results). HubNav.tsx = top bar, sub-tabs, phone bottom bar. components/SiteNav.tsx is no longer mounted (not deleted).
+- Components: components/hh/ui.tsx, charts.tsx (Sparkline, Meter, EdgeBar), team.tsx (team colours NFL/NBA, TeamEdge), LiveScore.tsx, Theme.tsx. /styleguide shows all, both themes.
+- Today rebuilt (app/today/page.tsx + fantasy.tsx): spotlight = biggest issued bet not started, else ready-to-send, else top claim (streamed). Claims/lineup changes come from buildWaivers + buildWeeklyLineups + mergePickups (same as league pages). Drivers behind Details.
+- Routes: / renders Today; league list moved to /fantasy; league "Leagues" back links point at /fantasy. /picks?l=nba redirects to /picks/nba.
+- Vercel: added Preview target to UPSTASH_REDIS_REST_URL/TOKEN, SLEEPER_USERNAME, SLEEPER_LEAGUE_ID, ROSTERAUDIT_API_KEY, ODDS_API_KEY (Jack approved). Previews share prod Redis.
+- Lint: 2 pre-existing react-hooks/purity errors (trade/page.tsx, MoneyView.tsx Date.now in server render) silenced with reasons. Checks: tsc pass, eslint 0 errors, 1834 tests pass, build pass. src/lib untouched.
+- Local dev gotcha: if Turbopack says "next/font/google queries have exactly one entry", rm -rf .next and restart.
+- Next session: Bets hub (order: Bets, Fantasy, Money, Results), each ends with a preview + stop. Known todo list in plan.md (David colour, Survivor duplicate key, Learning link mismatches, AutoRefresh buttons under 44px).
+
+# 2026-11-03 night: Week 9 midweek email empty
+- Jingles posted no Week 9 weekly list or waiver post; Flock Week 9 had not arrived by 8pm. Email sent 'nothing worth claiming' for all 3 leagues though research had 20+ targets.
+- Cause: waivers/rank.ts seasonByWeek. With no weekly ranks every drop is unranked, so a claim needs an unprotected healthy bench player; all were injured or market-protected. Also ignores IR-freeable spots (Love on IR in a starter slot).
+- Hand-made claims emailed (Minshew $287 Dyn, Allgeier $22 Half, Singletary $9 + Lloyd $3 Scaries). Fix not built yet.
+
 # 2026-11-03 evening: go-live forecast (deployed 3991377)
 - /learning/forecast (src/app/learning/forecast/page.tsx), pure math in src/lib/learning/forecast.ts (+ test). Linked from /learning.
 - Inputs: every shared-engine SectionView (EntryView.ev: games, weeks, t, bets, wins, pairedT; gate bars) and football picks ReviewState.decisions (n, weeks, paired t; bar 30 games or 100 for :mkt:, 3 weeks, t 1.645). NBA picks hypotheses not included (no stored n/t on the view).
