@@ -7,10 +7,12 @@ import "server-only";
 import { getOurNbaView } from "@/lib/models/nba/store";
 import { getOurNflView } from "@/lib/models/nfl/store";
 import { getOurFtdView } from "@/lib/models/nfl/ftd-store";
+import { loadVenomChances } from "@/lib/models/nfl/venom";
+import { attdEdges } from "@/lib/models/nfl/anytime";
 import { getPropsView } from "@/lib/props/store";
 import { davidSide, DAVID_LABEL } from "@/lib/props/david";
 import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
-import { nbaSeasonOfDate, type PropMarket } from "@/lib/props/parse";
+import { implied, nbaSeasonOfDate, type PropMarket } from "@/lib/props/parse";
 import { playerKey } from "@/app/props/search";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import { boxStats, nameKey, nbaBoxStats, settle, type EspnBoxTeam, type Outcome } from "@/lib/props/grade";
@@ -66,6 +68,12 @@ export interface PlayerView {
   /** NFL: David's markets we don't price (attempts, or a stat our model skipped). */
   davidOnly: { stat: string; line: number; projection: number; side: "over" | "under" | null; lower: number | null; upper: number | null; actual: number | null; outcome: Outcome | null }[];
   ftd: { p: number; pick: boolean; kalshi: number | null; scored: boolean | null } | null;
+  /**
+   * NFL Anytime TD for his game (Jack, 2026-11-05): our chance, Venom's when he
+   * picked him (his top 5 for the game), the blend of the two, DK's price and
+   * break-even, and the box-score TDs once graded (null: didn't play).
+   */
+  attd?: { ours: number; venom: number | null; blend: number | null; dk: number | null; breakEven: number | null; edge: boolean; tds: number | null | undefined } | null;
   /** ESPN's clock while the game is on ("Q3 4:12"). */
   clock: string | null;
 }
@@ -209,6 +217,29 @@ export async function loadPlayer(league: "nfl" | "nba", team: string, name: stri
       }
     }
   }
-  if (!markets.length && !davidOnly.length && !ftd) return null;
-  return liveFill({ league, name: full, team: T, opp: T === home ? away : home, home: T === home, kickoff, final: !!saved?.result, markets, davidOnly, ftd, clock: null }, saved?.espnId, now);
+  // Anytime TD: his row on this week's board, with Venom's chance beside ours.
+  let attd: PlayerView["attd"] = null;
+  for (const s of fv?.board ?? []) {
+    const r = s.attd?.rows.find((x) => playerKey(x.team, x.name) === pk);
+    if (!r) continue;
+    const venom = fv?.week ? await loadVenomChances(season, fv.week).catch(() => new Map<string, number>()) : new Map<string, number>();
+    const vp = venom.get(r.key) ?? null;
+    attd = {
+      ours: r.anytime,
+      venom: vp,
+      blend: vp === null ? null : (r.anytime + vp) / 2,
+      dk: r.dk ?? null,
+      breakEven: r.dk === undefined ? null : implied(r.dk),
+      edge: attdEdges(r).some((e) => e.side === "anytime"),
+      tds: s.attdResult ? (s.attdResult[r.key] ?? null) : undefined,
+    };
+    if (!home) {
+      home = s.game.home;
+      away = s.game.away;
+      kickoff = s.kickoff ?? null;
+    }
+    break;
+  }
+  if (!markets.length && !davidOnly.length && !ftd && !attd) return null;
+  return liveFill({ league, name: full, team: T, opp: T === home ? away : home, home: T === home, kickoff, final: !!saved?.result, markets, davidOnly, ftd, attd, clock: null }, saved?.espnId, now);
 }

@@ -20,6 +20,7 @@ import q from "./player.module.css";
 const ET = "America/New_York";
 const am = (x: number | null) => (x === null ? "·" : x > 0 ? `+${x}` : `${x}`);
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
+const pct1 = (x: number) => `${(x * 100).toFixed(1)}%`;
 const word = (x: "over" | "under") => (x === "over" ? "Over" : "Under");
 const tone = (o: string | null) => (o === "W" ? s.pos : o === "L" ? s.neg : "");
 const said = (o: string | null) => (o === "W" ? "hit" : o === "L" ? "missed" : o === "P" ? "push" : "");
@@ -487,6 +488,33 @@ export function PlayerPreview({ v, x, now = new Date() }: { v: PlayerView; x?: P
             <div>
               <dt>Result</dt>
               <dd className={v.ftd.scored ? s.pos : ""}>{v.ftd.scored === null ? wait : v.ftd.scored ? "Scored first" : "Didn't"}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
+
+      {v.attd && (
+        <section aria-label="Anytime TD">
+          <h3 className={p.h3}>Anytime TD</h3>
+          <dl className={p.stats}>
+            <div>
+              <dt>Our chance</dt>
+              <dd className={s.num}>{pct1(v.attd.ours)}</dd>
+              {v.attd.edge && <small className={p.statSub}>our edge</small>}
+            </div>
+            <div>
+              <dt>Venom</dt>
+              <dd className={s.num}>{v.attd.venom !== null ? pct1(v.attd.venom) : "·"}</dd>
+              <small className={p.statSub}>{v.attd.venom !== null ? `blend ${pct1(v.attd.blend!)}` : "not in his top 5"}</small>
+            </div>
+            <div>
+              <dt>DK</dt>
+              <dd className={s.num}>{v.attd.dk !== null ? (v.attd.dk > 0 ? `+${v.attd.dk}` : `${v.attd.dk}`) : "·"}</dd>
+              {v.attd.breakEven !== null && <small className={p.statSub}>{`needs ${pct1(v.attd.breakEven)}`}</small>}
+            </div>
+            <div>
+              <dt>Result</dt>
+              <dd className={v.attd.tds ? s.pos : ""}>{v.attd.tds === undefined ? wait : v.attd.tds === null ? "Didn't play" : v.attd.tds > 0 ? `${v.attd.tds} TD${v.attd.tds === 1 ? "" : "s"}` : "No TD"}</dd>
             </div>
           </dl>
         </section>
