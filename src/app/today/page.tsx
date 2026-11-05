@@ -336,7 +336,7 @@ export default async function TodayPage() {
         // No saved read, or a read with no side (readGame then falls back to the matchup): nothing to show, so the row is left out.
         pick: x.r && x.pick !== `${raw.away.short} at ${raw.home.short}` ? x.pick : "",
         game: `${raw.away.short} at ${raw.home.short}`,
-        score: `${raw.away.abbr} ${raw.score?.away ?? 0}, ${raw.home.abbr} ${raw.score?.home ?? 0}`,
+        score: `${raw.away.abbr} ${raw.score?.away ?? 0}, ${raw.home.abbr} ${raw.score?.home ?? 0}${raw.detail ? ` · ${raw.detail}` : ""}`,
         when: "",
         kickoff: raw.tip,
         state: "live" as const,
