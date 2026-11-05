@@ -131,11 +131,11 @@ function LineupTable({ league }: { league: LeagueLineup }) {
           <div
             key={`${s.slot}-${s.index}`}
             // Three row states, readable without reading: a slot that needs
-            // touching is washed amber and carries a left rule, a slot whose
+            // touching gets the accent wash (theme tokens, so dark mode stays dark) and a left rule, a slot whose
             // game is over is dimmed, everything else is plain.
             className={`flex flex-col gap-1.5 border-l-2 px-4 py-3 transition-colors sm:flex-row sm:items-center sm:gap-4 ${
               s.changed
-                ? "border-l-amber-400 bg-amber-50/70  "
+                ? "border-l-hh-accent bg-hh-accent-soft "
                 : s.recommended?.locked
                   ? "border-l-transparent bg-hh-sunk "
                   : "border-l-transparent"
