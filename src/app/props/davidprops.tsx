@@ -7,7 +7,7 @@ import { MIN_BETS, type Verdict } from "@/lib/props/trends";
 import { DAVID_LABEL, DAVID_PLAY_EDGE, DAVID_URL, davidEdge, davidSide, davidSliceSide, isDavidPlay, isDavidSlice, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import type { SectionView } from "@/lib/learning/engine";
 import { whenEt } from "../picks/ui";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import { Tile } from "./ournba";
 import { updated } from "./updated";
 import s from "../picks/picks.module.css";
@@ -201,6 +201,7 @@ export async function DavidResults({ season }: { season: number }) {
       {dt.games ? (
         <>
           <div className={s.tiles}>
+            <Tile {...betRecordTile(davidLearning(v.learning))} />
             <Tile value={u(dget("dplay:all")?.units ?? 0)} label={`David's plays · ${recOf(dget("dplay:all"))}`} />
             <Tile value={u(dget("dboard:all")?.units ?? 0)} label={`His projection, every prop · ${recOf(dget("dboard:all"))}`} />
             <Tile value={`${dt.props}`} label="props graded" />

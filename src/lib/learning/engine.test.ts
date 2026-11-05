@@ -264,4 +264,13 @@ describe("liveBets for the money record", () => {
     };
     expect(liveBets(st, [a, c]).map((x) => x.key)).toEqual(["p1", "p3"]);
   });
+  it("the Bet record is those live bets only, 0-0 until something goes live", () => {
+    const b = (key: string, day: number, net: number): Bet => ({ game: key, key, week: 7, at: at(day), net });
+    const a: Candidate = { id: "a", label: "a", bets: [b("p1", 1, 1), b("p2", 2, -1), b("p3", 3, 0.9)] };
+    const st = emptyState("t");
+    st.entries = { a: { id: "a", label: "a", registeredAt: T0, status: "collecting" } as never };
+    expect(sectionView(G, st, [a], []).record).toEqual({ bets: 0, w: 0, l: 0, p: 0, units: 0 });
+    st.entries = { a: { id: "a", label: "a", registeredAt: T0, status: "active", activatedAt: at(2) } as never };
+    expect(sectionView(G, st, [a], []).record).toEqual({ bets: 2, w: 1, l: 1, p: 0, units: -0.1, since: at(2) });
+  });
 });

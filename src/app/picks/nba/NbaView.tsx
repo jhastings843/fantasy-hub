@@ -770,6 +770,8 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
     <Stats
       label="NBA record, rule and learner"
       items={[
+        // Bet record (Jack, 2026-11-05): real stakes only, apart from every Sam side. Staked NBA bets settle on /records.
+        { k: "Bet record", v: v.gate.live && m === "ats" ? "Live" : "0-0", sub: v.gate.live && m === "ats" ? <Link href="/records">Settled bets on Records</Link> : m === "ats" ? "nothing live yet" : "this market never stakes" },
         { k: `${MARKET_NAME[m]}, every Sam ${m === "su" ? "winner" : "side"}`, v: all && all.w + all.l + all.p ? units(all.units) : "0-0", sub: all ? rec(all) : "nothing graded", tone: all && all.w + all.l ? (all.units >= 0 ? "up" : "down") : undefined },
         { k: "Rule in force", v: m === "su" ? "None (tracked)" : t1 ? t1.label : "None yet", sub: m === "su" ? "straight up never stakes" : t1 ? rec(t1) : "nothing clears the bar", small: true },
         { k: "Stakes", v: v.gate.live && m === "ats" ? "Live" : "Tracking", sub: v.gate.live && m === "ats" ? "NBA's own limits" : m === "ats" ? "until the go-live gate clears" : "no stakes in this market", small: true },

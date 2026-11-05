@@ -16,7 +16,7 @@ import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats } from "../picks/board";
 import { GameTable, type GameRowData } from "./week";
 import s from "../picks/picks.module.css";
-import { StakingBlock } from "./learning";
+import { StakingBlock, betRecordTile } from "./learning";
 import k from "./props.module.css";
 import { PopLink } from "@/components/hh/PopLink";
 import { nbaGameHref, playerPropHref } from "../picks/hrefs";
@@ -375,6 +375,7 @@ export async function KotcResults({ season }: { season: number }) {
       <Stats
         label="Record"
         items={[
+          { k: "Bet record", v: betRecordTile(learning).value, sub: betRecordTile(learning).label.replace(/^Bet record · /, ""), tone: learning?.record.bets ? (learning.record.units >= 0 ? "up" : "down") : undefined },
           { k: "Favorite led", v: n ? `${favWon} of ${n}` : "·", sub: n ? `we gave him ${pct(favP)} on average` : "first grade pending" },
           { k: "King in our top 5", v: n ? `${top5} of ${n}` : "·", sub: "nights" },
           { k: "Log loss", v: n ? ll.toFixed(2) : "·", sub: n ? `everyone equal would be ${flat.toFixed(2)}; lower is better` : "", small: true },

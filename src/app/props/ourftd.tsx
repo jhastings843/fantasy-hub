@@ -12,7 +12,7 @@ import { OUR_FTD_SLICES } from "@/lib/models/learn";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
 import { Tile } from "./ournba";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import s from "../picks/picks.module.css";
 import { PopLink } from "@/components/hh/PopLink";
 import { footballGameHref, playerPropHref } from "../picks/hrefs";
@@ -137,6 +137,7 @@ export async function OurFtdResults({ season }: { season: number }) {
       </div>
       {v.graded.length ? (
         <div className={s.tiles}>
+          <Tile {...betRecordTile(v.learning)} />
           {tiles.map((t) => (
             <Tile key={t.id} value={u(t.units)} label={`${t.label} · ${t.w} of ${t.n}`} />
           ))}

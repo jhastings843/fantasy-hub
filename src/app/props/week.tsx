@@ -26,7 +26,7 @@ import { bestBets, bestCost, bookPrice, ftdEdge } from "@/lib/models/nfl/ftd-pri
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
 import { Background, Hero, SecHead, Stats, type Stat } from "../picks/board";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import { Matchup, type MatchupProps } from "./matchup";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
@@ -247,6 +247,7 @@ export function PropStats({ edges, graded, learning, logHref, unit, extra }: { e
       label="Edges, record, gate and learner"
       items={[
         { k: "Edges now", v: `${edges}`, sub: unit },
+        { k: "Bet record", v: learning.record.bets ? u(learning.record.units) : "0-0", sub: betRecordTile(learning).label.replace(/^Bet record · /, ""), tone: learning.record.bets ? (learning.record.units >= 0 ? "up" : "down") : undefined },
         { k: "Every edge so far", v: n ? u(graded.units) : "0-0", sub: n ? `${graded.w}-${graded.l}${graded.p ? `-${graded.p}` : ""} at the saved price` : "first grades pending", tone: n ? (graded.units >= 0 ? "up" : "down") : undefined },
         ...(extra ? [extra] : []),
         {

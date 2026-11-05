@@ -12,7 +12,7 @@ import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } fro
 import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
 import s from "../picks/picks.module.css";
-import { StakingBlock } from "./learning";
+import { StakingBlock, betRecordTile } from "./learning";
 import { nbaGameHref } from "../picks/hrefs";
 
 const pct = (x: number) => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
@@ -265,6 +265,7 @@ export async function LottoResults({ season }: { season: number }) {
       <div className={s.pageFrame}>
         <SecHead id="lotto-results" title="Two records" aside="Since Oct 26, 2026 · the singles record is the real test; the parlay needs most of a season" />
         <div className={s.tiles}>
+          <Tile {...betRecordTile(learning)} />
           <Tile value={r.edge.n ? u(r.edge.net) : "·"} label={r.edge.n ? `Singles: every edge rung at 1u · ${r.edge.hits}-${r.edge.n - r.edge.hits}` : "Singles: every edge rung at 1u · first grades pending"} />
           <Tile value={t.n ? u(t.net) : "·"} label={t.n ? `Parlay of the day at ${STAKE}u · ${t.won}-${t.n - t.won}, we expected ${t.expected.toFixed(2)} hits` : `Parlay of the day at ${STAKE}u · first ticket pending`} />
           <Tile value={r.n ? `${r.hits} of ${r.n}` : "·"} label={r.n ? `every long rung hit · we expected ${r.ours.toFixed(0)}, DK's prices ${r.book.toFixed(0)}` : "every long rung · first grades pending"} />

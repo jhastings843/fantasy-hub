@@ -4,7 +4,7 @@ import { updated } from "./updated";
 import { getOurNflView, type OurNflView } from "@/lib/models/nfl/store";
 import { ourPropSlices, ourSliceBets, record } from "@/lib/models/learn";
 import { GameCard, Tile } from "./ournba";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import { GameTable, propGradedRows } from "./week";
 import { SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
@@ -56,6 +56,7 @@ export async function OurNflResults({ season }: { season: number }) {
       {v.graded.length ? (
         <>
           <div className={s.tiles}>
+            <Tile {...betRecordTile(v.learning)} />
             <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
           </div>
           <div className={s.pageFrame}>

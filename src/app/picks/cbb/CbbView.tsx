@@ -4,6 +4,7 @@ import { getCbbBoard, getCbbRecord, CBB_PARAMS, type CbbBoard, type CbbBoardRow,
 import { SIGNALS, signalsOf, graded, type SignalRecord } from "@/lib/models/cbb/track";
 import BACKTEST from "@/lib/models/cbb/backtest.json";
 import { GameCell, href, line, MARKETS, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
+import { betRecordTile } from "../../props/learning";
 import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress } from "../board";
 import { CBB_SLICES } from "@/lib/models/cbb/learn";
 import { nbaHref } from "../nba/NbaView";
@@ -432,6 +433,7 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
         }
         sub={m === "su" ? "Our winner on every game at the saved moneyline, 1 unit each. Tracked only." : "Graded at the DraftKings number and price we first saved, 1 unit each. Closing-line value is how far the line moved toward our side by tip; it is the gate, since it settles faster than wins."}
       />
+      <Stats label="Bet record" items={[{ k: "Bet record", v: betRecordTile(v.section).value, sub: betRecordTile(v.section).label.replace(/^Bet record · /, ""), tone: v.section.record.bets ? (v.section.record.units >= 0 ? "up" : "down") : undefined }, { k: `Every ${what.replace(/s$/, "")} we priced`, v: head && head.w + head.l ? units(head.units) : "0-0", sub: head ? rec(head) : "nothing graded" }]} />
       {m !== "su" && <SliceTable v={v} m={m} />}
       {m === "su" && (
       <div className={s.tw}>

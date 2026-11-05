@@ -13,7 +13,7 @@ import { MIN_BETS, rwSide, type PropSlice, type Verdict } from "@/lib/props/tren
 import { DAVID_LABEL, DAVID_PLAY_EDGE, DAVID_URL, agreeEdge, davidEdge, davidSide, isDavidPlay, samOn, type DavidGame, type DavidGraded, type DavidMarket, type DavidProp, type DavidSlice } from "@/lib/props/david";
 import { whenEt } from "../picks/ui";
 import { boardWeek } from "@/lib/picks/finished";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import { davidHits, systemHits } from "@/lib/props/system";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
@@ -634,6 +634,7 @@ export async function PropsResults({ season, league = "nfl" }: { season: number;
         )}
       </div>
       <div className={s.tiles}>
+        <Tile {...betRecordTile(v.learning)} />
         <Tile value={u(get("play:all")?.units ?? 0)} label={`Sam's plays · ${recOf(get("play:all"))}`} />
         {nba ? (
           <>

@@ -9,7 +9,7 @@ import { getOurNbaView, type OurNbaView, type OurStoredProps } from "@/lib/model
 import { ourSliceBets, record, ourPropSlices } from "@/lib/models/learn";
 import { noVig } from "@/lib/models/nba/market";
 import { whenEt } from "../picks/ui";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import { GameTable, fbGradedRows, propGradedRows } from "./week";
 import { SecHead } from "../picks/board";
 import s from "../picks/picks.module.css";
@@ -218,6 +218,7 @@ export async function OurNbaResults({ season }: { season: number }) {
       {v.graded.length ? (
         <>
           <div className={s.tiles}>
+            <Tile {...betRecordTile(v.learning)} />
             <Tile value={u(all.units)} label={`Every edge · ${all.w}-${all.l}${all.p ? `-${all.p}` : ""}`} />
             <Tile value={`${props}`} label="props graded" />
           </div>
@@ -369,6 +370,7 @@ export async function OurFirstBasketResults({ season }: { season: number }) {
       {v.fb.graded.length ? (
         <>
           <div className={s.tiles}>
+            <Tile {...betRecordTile(v.fb.learning)} />
             <Tile value={u(units)} label={`Every edge · ${w}-${bets.length - w}`} />
             <Tile value={`${tipRight} of ${v.fb.graded.length}`} label="games our favored team scored first" />
           </div>

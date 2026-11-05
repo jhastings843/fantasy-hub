@@ -13,6 +13,20 @@ const u = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}u`;
 const CLOSEST = 8;
 
 /**
+ * The Bet Record tile (Jack, 2026-11-05): real bets only, apart from "Every
+ * edge". Reads "0-0 · nothing live yet" until a slice goes live.
+ *   { bets: 0 }                          -> { value: "0-0", label: "Bet record · nothing live yet" }
+ *   { bets: 7, w: 4, l: 3, units: 0.62 } -> { value: "+0.6u", label: "Bet record · 4-3 since Nov 9" }
+ */
+export function betRecordTile(v: SectionView | null): { value: string; label: string } {
+  const r = v?.record;
+  if (!r) return { value: "0-0", label: "Bet record · nothing live yet" };
+  if (!r.bets) return { value: "0-0", label: r.since ? `Bet record · live since ${sinceDay(r.since)}, no graded bets yet` : "Bet record · nothing live yet" };
+  return { value: u(r.units), label: `Bet record · ${r.w}-${r.l}${r.p ? `-${r.p}` : ""}${r.since ? ` since ${sinceDay(r.since)}` : ""}` };
+}
+const sinceDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+
+/**
  * What a slice is short, in two lists (Jack, 2026-11-03): "t −1.09 (needs 2.33+) · lines moved our way 69, against us 77 (needs at least even)".
  * Games and weeks have their own columns. t is how sure the edge is real: 2.33 is about a 1-in-100 chance it's luck.
  */

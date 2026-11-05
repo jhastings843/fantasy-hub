@@ -243,7 +243,7 @@ function TopStats({ r, market, testing, logHref }: { r: PicksReport; market: Mar
     <Stats
       label={`${L} ${label.toLowerCase()}: season, this week, rule and learner`}
       items={[
-        { k: `${L} ${label.toLowerCase()}`, v: led.w + led.l + led.p ? units(led.units) : "0-0", sub: led.w + led.l + led.p ? `${rec(led)} at the price taken` : "no bets settled", tone: led.w + led.l ? (led.units >= 0 ? "up" : "down") : undefined },
+        { k: `Bet record · ${L} ${label.toLowerCase()}`, v: led.w + led.l + led.p ? units(led.units) : "0-0", sub: led.w + led.l + led.p ? `${rec(led)}, bets sent, at the price taken` : "no bets settled", tone: led.w + led.l ? (led.units >= 0 ? "up" : "down") : undefined },
         { k: "This week", v: wk && wk.w + wk.l + wk.p ? rec(wk) : "0-0", sub: finals },
         { k: "Rule in force", v: rule ? rule.label : "None yet", sub: rule ? `${rec(rule.record)} since tracking${(market === "ats" ? !tierStakes(r.strategies.rule) : !totalsStakes(r.totals.backtest.rule)) ? ", tracked until its forward check passes" : ""}` : "nothing clears the bar", small: true },
         learner,

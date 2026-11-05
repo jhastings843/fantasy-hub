@@ -556,6 +556,22 @@ export interface SectionView {
   journal: JournalLine[];
   /** Every staking scheme on the section's widest slice (absent when no saved chance to size by). */
   staking?: StakingTable;
+  /**
+   * The Bet Record (Jack, 2026-11-05): real bets only, the plays live slices
+   * staked, each once (liveBets), from the day the first slice went live.
+   * Kept apart from "Every edge". 0 bets until something goes live.
+   */
+  record: BetRecord;
+}
+
+export interface BetRecord {
+  bets: number;
+  w: number;
+  l: number;
+  p: number;
+  units: number;
+  /** When the first slice went live (absent when none has). */
+  since?: string;
 }
 
 /** What a page shows for a section, computed fresh from the saved state and today's data. */
@@ -576,7 +592,12 @@ export function sectionView(gate: Gate, s: SectionState, base: Candidate[], jour
   });
   const sb = stakingBase(base);
   const staking = sb ? stakingTable(sb, s.stake?.scheme ?? "flat", s.stake?.at) : undefined;
-  return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal, ...(staking ? { staking } : {}) };
+  const placed = liveBets(s, base);
+  const w = placed.filter((b) => b.net > 0).length;
+  const l = placed.filter((b) => b.net < 0).length;
+  const since = Object.values(s.entries).map((e) => e.activatedAt).filter((x): x is string => !!x).sort()[0];
+  const record: BetRecord = { bets: placed.length, w, l, p: placed.length - w - l, units: r2(placed.reduce((a, b) => a + b.net, 0)), ...(since ? { since } : {}) };
+  return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal, record, ...(staking ? { staking } : {}) };
 }
 
 /**

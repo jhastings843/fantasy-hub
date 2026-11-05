@@ -7,7 +7,7 @@ import { getFirstTdView, type FirstTdView, type StoredGame } from "@/lib/firsttd
 import { MIN_GAMES, kalshiCost, kalshiFor, type PriceSlice, type Slice, type Verdict } from "@/lib/firsttd/trends";
 import { whenEt } from "../picks/ui";
 import { boardWeek } from "@/lib/picks/finished";
-import { LearningBlock } from "./learning";
+import { LearningBlock, betRecordTile } from "./learning";
 import s from "../picks/picks.module.css";
 
 const SAM_FTD = "https://samthemodelman.smmodel.workers.dev/nfl/";
@@ -298,6 +298,10 @@ export async function FirstTdResults({ season }: { season: number }) {
         <p className={s.p}>Every saved game once it&apos;s final, graded against the copy saved before kickoff. Expected is the sum of Sam&apos;s own chances.</p>
       </div>
       <div className={s.tiles}>
+        <div className={s.tile}>
+          <span className={`${s.tileV} ${s.num}`}>{betRecordTile(v.learning).value}</span>
+          <span className={s.tileK}>{betRecordTile(v.learning).label}</span>
+        </div>
         <div className={s.tile}>
           <span className={`${s.tileV} ${s.num}`}>{v.graded.length}</span>
           <span className={s.tileK}>games graded</span>

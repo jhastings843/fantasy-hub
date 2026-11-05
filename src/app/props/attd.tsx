@@ -15,7 +15,7 @@ import { LearnerLogBody } from "./top";
 import { Tile } from "./ournba";
 import { tvByEvent } from "@/lib/live/espn";
 import s from "../picks/picks.module.css";
-import { StakingBlock } from "./learning";
+import { StakingBlock, betRecordTile } from "./learning";
 import { PopLink } from "@/components/hh/PopLink";
 import { footballGameHref, playerPropHref } from "../picks/hrefs";
 
@@ -459,6 +459,7 @@ export async function AttdResults({ season }: { season: number }) {
       <div className={s.pageFrame}>
         <SecHead id="attd-results" title="Record" aside="Since Oct 26, 2026 · every priced player graded against the box score" />
         <div className={s.tiles}>
+          <Tile {...betRecordTile(learning)} />
           <Tile value={e.n ? u(e.net) : "·"} label={e.n ? `Every edge, 1u · ${e.won} of ${e.n}` : "Every edge · first grades pending"} />
           <Tile value={e.bySide.anytime.n ? u(e.bySide.anytime.net) : "·"} label={`Anytime edges · ${e.bySide.anytime.won} of ${e.bySide.anytime.n}`} />
           <Tile value={e.bySide.two.n ? u(e.bySide.two.net) : "·"} label={`2+ TD edges · ${e.bySide.two.won} of ${e.bySide.two.n}`} />
