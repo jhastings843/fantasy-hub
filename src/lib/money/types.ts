@@ -56,6 +56,13 @@ export interface Grades {
   books: BookGrade[];
 }
 
+/** One weekday learner check, slimmed (trade-bot money_export.grade_log). */
+export interface GradeDay {
+  day: string;
+  through: string | null;
+  books: Pick<BookGrade, "book" | "action" | "excess">[];
+}
+
 /** One weekly learner run on the stock books (trade-bot tradebot/learnlog.py). */
 export interface LearnEntry {
   day: string;
@@ -203,6 +210,8 @@ export interface MoneySnapshot {
   learnLog?: LearnEntry[] | null;
   /** Latest weekday grade. Missing before 2026-10-19. */
   grades?: Grades | null;
+  /** The last week of daily grades, newest first, for the learner log. Missing before 2026-11-05. */
+  gradeLog?: GradeDay[] | null;
   /** The weather desk (~/Projects/weather-desk). Missing before 2026-10-19. */
   weather?: Weather | null;
   /** The trend book, tracked apart from the stock books (trade-bot tradebot/trends.py). Missing before 2026-10-21. */

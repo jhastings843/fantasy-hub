@@ -273,7 +273,7 @@ export function DeskTable({ list }: { list: Desk[] }) {
   );
 }
 
-/** Every desk's latest learning, newest first: Phil's retros, the stock learner's decisions, the weather brake and re-fit. */
+/** Every desk's latest learning, newest first: Phil's retros, the stock learner's daily checks and decisions, the weather brake, re-fit and slices. */
 export function moneyLog(v: View): LogEntry[] {
   const snap = v.snapshot;
   const out: LogEntry[] = [];
@@ -286,6 +286,41 @@ export function moneyLog(v: View): LogEntry[] {
       detail: `Over the last week the market scored ${w.brake.market.toFixed(3)} to the desk's ${w.brake.desk.toFixed(3)} across ${w.brake.n} city-days. It bets again once its week beats the market's.`,
     });
   if (w) out.push({ at: w.generatedAt, kind: "test", title: `Weather desk trusts its own forecast ${Math.round(w.trust.w * 100)}%`, detail: `Blended with the market for the rest, re-fit from ${w.trust.days} settled days.` });
+  // Weather slices: re-judged every day; changes come from its journal (Jack, 2026-11-05).
+  if (w?.slices?.length && w.sliceGate) {
+    const g = w.sliceGate;
+    const live = w.slices.filter((x) => x.status === "live").length;
+    const near = w.slices.filter((x) => x.status !== "live" && x.n > 0).sort((a, b) => b.t - a.t)[0];
+    out.push({
+      at: w.generatedAt,
+      kind: "test",
+      title: `Weather slices: reviewed, ${live} of ${w.slices.length} live`,
+      detail: near
+        ? `Closest to the bar: ${near.label}, ${near.n} bets over ${near.days} days at t ${near.t.toFixed(2)} (needs ${g.min_bets}+ bets over ${g.min_days}+ days at t ${g.min_t}).`
+        : undefined,
+    });
+  }
+  for (const j of (w?.sliceJournal ?? []).slice(0, 4))
+    out.push({ at: `${j.day}T12:00:00Z`, kind: j.kind === "live" ? "live" : "back", title: `Weather slice ${j.kind === "live" ? "went live" : "back to tracking"}: ${j.label}`, detail: j.why });
+  // Stock books: the weekday learner check (6:30am after each trading day), not only Saturday's run.
+  const pct = (x: number) => `${x >= 0 ? "+" : "-"}${Math.abs(x * 100).toFixed(1)}%`;
+  for (const g of (snap?.gradeLog ?? []).slice(0, 5)) {
+    const scored = g.books.filter((b) => b.excess !== null && b.excess !== undefined);
+    const ahead = scored.filter((b) => (b.excess ?? 0) > 0).length;
+    const best = [...scored].sort((a, b) => (b.excess ?? 0) - (a.excess ?? 0))[0];
+    const flagged = g.books.filter((b) => b.action === "retire").map((b) => b.book);
+    out.push({
+      at: `${g.day}T11:30:00Z`,
+      kind: "test",
+      title: `Stock books: daily check, ${g.books.length} books graded`,
+      detail: [
+        g.through ? `Prices through ${g.through}.` : "",
+        scored.length ? `${ahead} of ${scored.length} ahead of SPY.` : "",
+        best ? `Best: ${best.book} ${pct(best.excess ?? 0)} vs SPY.` : "",
+        flagged.length ? `Flagged to retire: ${flagged.join(", ")}.` : "No retire rule fired.",
+      ].filter(Boolean).join(" "),
+    });
+  }
   for (const [p, who] of [
     [snap?.phil, "Phil"],
     [snap?.gus, "Gus"],
