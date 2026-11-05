@@ -119,7 +119,7 @@ describe("attdStakedBets", () => {
 });
 
 describe("lottoStaked", () => {
-  const rung = (over: Partial<Rung> = {}): Rung => ({ line: 35, over: 450, ours: 0.25, raw: 0.25, date: today, at: tip, game: "401", matchup: "BOS@NYK", id: "pts|Jalen Brunson", player: "Jalen Brunson", stat: "pts", ev: 0.4, checked: 0.2, checkedEv: 0.1, bestOfLadder: false, hit: null, actual: null, ...over });
+  const rung = (over: Partial<Rung> = {}): Rung => ({ line: 35, over: 450, ours: 0.25, raw: 0.25, date: today, at: tip, game: "401", matchup: "BOS@NYK", id: "pts|Jalen Brunson", player: "Jalen Brunson", stat: "pts", ev: 0.4, checked: 0.2, checkedEv: 0.1, bestOfLadder: false, bestCheckedCapped: false, bestOursCapped: false, hit: null, actual: null, ...over });
   it("live rung slices and the ticket at its own stake", () => {
     const t: Ticket = { date: today, legs: [rung()], price: 18000, chance: 0.01, book: 0.005, outcome: null };
     const bets = lottoStaked({ rungs: [rung(), rung({ ev: -0.1, line: 30 })], ticket: t, entries: [entry("lotto:value"), entry("lotto:ticket")], now, today, section: "nba-lotto-ours" });

@@ -47,6 +47,9 @@ export interface Rung extends LongRung {
   checkedEv: number;
   /** The best market-checked value on this player's ladder for this stat tonight (one rung per player-stat-night). */
   bestOfLadder: boolean;
+  /** The same, among rungs priced CAP or shorter: best checked value, and best value at our chance. */
+  bestCheckedCapped: boolean;
+  bestOursCapped: boolean;
   /** Null until graded; "void" when he didn't play. */
   hit: boolean | "void" | null;
   actual: number | null;
@@ -71,6 +74,18 @@ export const MIN_GAMES = 3;
 export const STAKE = 0.1;
 
 const dec = (american: number) => 1 + payout(american);
+
+/**
+ * The +700 cap (Jack, 2026-11-05: "find out what the best cap would be").
+ * Graded rungs Oct 26-Nov 4 (8,688): DK's margin on the ladder steps up past
+ * +800 (a blind bettor loses about 12-28% at +250 to +799, 31-33% at +800 to
+ * +1499, 46% at +1500 to +2000). Resampling nights put the best cap for the
+ * checked model at +600 to +800 76% of the time. No cap beat DK on nights the
+ * models hadn't seen, so the capped slices are tracked only. Ticket legs are
+ * capped from CAP_FROM on; earlier tickets keep their legs so the record stands.
+ */
+export const CAP = 700;
+export const CAP_FROM = "2026-11-05";
 
 /**
  * The market check on long rungs (Jack, 2026-11-04, "fix lottos"). Long rungs
@@ -116,6 +131,8 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
           checked,
           checkedEv: Math.round((checked * dec(r.over) - 1) * 1000) / 1000,
           bestOfLadder: false,
+          bestCheckedCapped: false,
+          bestOursCapped: false,
           hit: !b.result ? null : a === null ? "void" : a > r.line,
           actual: a,
         });
@@ -123,6 +140,11 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
       // One rung per player-stat-night: the best market-checked value on the ladder, if any is positive.
       const top = ladder.filter((r) => r.checkedEv > 0).sort((p, q) => q.checkedEv - p.checkedEv || p.over - q.over)[0];
       if (top) top.bestOfLadder = true;
+      const capped = ladder.filter((r) => r.over <= CAP);
+      const topChecked = capped.filter((r) => r.checkedEv > 0).sort((p, q) => q.checkedEv - p.checkedEv || p.over - q.over)[0];
+      if (topChecked) topChecked.bestCheckedCapped = true;
+      const topOurs = capped.filter((r) => r.ev > 0).sort((p, q) => q.ev - p.ev || p.over - q.over)[0];
+      if (topOurs) topOurs.bestOursCapped = true;
       out.push(...ladder);
     }
   }
@@ -185,6 +207,7 @@ export function ticket(date: string, rungs: Rung[], recipe: Recipe = DEFAULT_REC
     if (r.date !== date || (recipe.pick === "raw" ? rawEv(r) : r.ev) <= 0) continue;
     if (recipe.stat && r.stat !== recipe.stat) continue;
     if (recipe.band && (r.over < recipe.band[0] || r.over > recipe.band[1])) continue;
+    if (date >= CAP_FROM && r.over > CAP) continue;
     const cur = best.get(r.game);
     if (!cur || by(r) > by(cur)) best.set(r.game, r);
   }

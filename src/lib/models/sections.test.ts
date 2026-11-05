@@ -49,6 +49,15 @@ describe("Lotto slices", () => {
     expect(c["lotto:checked"].parent).toBeUndefined();
     expect(c["lotto:checked-noreb"].parent).toBe("lotto:checked");
   });
+  it("capped slices keep the flagged +700-or-shorter rung", () => {
+    const rung = (game: string, checked: boolean, ours: boolean): Rung =>
+      ({ line: 19.5, over: 600, ours: 0.3, raw: 0.3, checked: 0.2, checkedEv: 0.4, bestOfLadder: false, bestCheckedCapped: checked, bestOursCapped: ours, date: "2026-10-27", at: "2026-10-27T23:00:00Z", game, matchup: "A@B", id: "pts|x", player: "x", stat: "pts", ev: 0.8, hit: false, actual: 0 }) as Rung;
+    const c = Object.fromEntries(lottoCandidates([rung("g1", true, false), rung("g2", false, true), rung("g3", true, true)], [], 2026).map((x) => [x.id, x]));
+    expect(c["lotto:checked-cap"].bets).toHaveLength(2);
+    expect(c["lotto:ours-cap"].bets).toHaveLength(2);
+    expect(c["lotto:checked-cap"].parent).toBe("lotto:checked");
+    expect(c["lotto:ours-cap"].parent).toBe("lotto:value");
+  });
 });
 
 describe("King of the Court tagged prop", () => {

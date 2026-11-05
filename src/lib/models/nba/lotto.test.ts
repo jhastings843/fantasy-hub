@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
+import { CAP, CAP_FROM, LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
 import { implied } from "@/lib/props/parse";
 import { LONG_MAX, LONG_MIN, longRungs } from "./market";
 import PARAMS from "./params.json";
@@ -146,5 +146,30 @@ describe("market check (2026-11-04)", () => {
   it("flags nothing when no rung has checked value", () => {
     const rungs = rungsOf([board("1", "2026-10-27T23:10:00Z", "Tyson", [{ line: 19.5, over: 500, ours: 0.12 }], 10)]);
     expect(rungs.filter((r) => r.bestOfLadder)).toHaveLength(0);
+  });
+});
+
+describe("+700 cap (2026-11-05)", () => {
+  const legs = (tip: string) => [
+    board("1", tip, "Tyson", [{ line: 14.5, over: 420, ours: 0.25 }, { line: 24.5, over: 1500, ours: 0.1 }], 20),
+    board("2", tip, "Hardaway", [{ line: 14.5, over: 500, ours: 0.2 }, { line: 24.5, over: 1200, ours: 0.12 }], 16),
+    board("3", tip, "Jakucionis", [{ line: 14.5, over: 630, ours: 0.16 }, { line: 24.5, over: 900, ours: 0.15 }], 10),
+  ];
+  const long = RECIPES.find((r) => r.id === "l3-long")!;
+
+  it("caps ticket legs at +700 from CAP_FROM on", () => {
+    const t = ticket(CAP_FROM, rungsOf(legs(`${CAP_FROM}T23:10:00Z`)), long)!;
+    expect(t.legs.every((l) => l.over <= CAP)).toBe(true);
+  });
+  it("leaves tickets before CAP_FROM as they were", () => {
+    const t = ticket("2026-11-04", rungsOf(legs("2026-11-04T23:10:00Z")), long)!;
+    expect(t.legs.some((l) => l.over > CAP)).toBe(true);
+  });
+  it("flags the best rung at +700 or shorter, one per ladder", () => {
+    const rungs = rungsOf(legs("2026-11-04T23:10:00Z"));
+    const ours = rungs.filter((r) => r.bestOursCapped);
+    expect(ours.map((r) => r.player).sort()).toEqual(["Hardaway", "Jakucionis", "Tyson"]);
+    expect(ours.every((r) => r.over <= CAP)).toBe(true);
+    expect(rungs.filter((r) => r.bestCheckedCapped).every((r) => r.over <= CAP)).toBe(true);
   });
 });

@@ -5,7 +5,7 @@
 // every long rung graded (do our long-shot chances beat DK's?).
 import { allBoards, getNbaSectionLearning } from "@/lib/models/nba/store";
 import { SECTIONS, rungStaked, ticketStaked } from "@/lib/models/sections";
-import { LEGS, STAKE, recipeRecords, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
+import { CAP, LEGS, STAKE, recipeRecords, rungsOf, summarize, tickets, type Rung, type Ticket } from "@/lib/models/nba/lotto";
 import { etDate, implied, payout } from "@/lib/props/parse";
 import { Background, SecHead } from "../picks/board";
 import { EdgeCard, Gate, GameTable, PropStats, type Edge, type GameRowData } from "./week";
@@ -42,7 +42,8 @@ function Explainer() {
       <p className={s.p}>
         So the real test is the rung table on Results: every long rung DraftKings posts (+250 to +2000 on the full-game ladder) graded
         against the box score, thousands a week. The nightly ticket is the fun part: the best-value rung in each game (our chance times
-        DK&apos;s payout), one per player, top {LEGS} games, {STAKE}u at the product of the prices. It is built from each game&apos;s
+        DK&apos;s payout), one per player, top {LEGS} games, {STAKE}u at the product of the prices. Since Nov 5 no leg is
+        longer than +{CAP}: DraftKings&apos; cut on the ladder jumps past +800. It is built from each game&apos;s
         last pregame read, so a late game&apos;s leg can carry news from after the first tip. Never emailed, and not a bet until its learner slice goes live.
       </p>
     </Background>
@@ -340,7 +341,7 @@ function RecipeTable({ rungs }: { rungs: Rung[] }) {
         (value rungs only). The list was fixed before any results, so the winner can&apos;t be picked after the fact. Two Sam-style
         tickets joined on Oct 28: 3 points legs at +300 to +700 picked on our raw model (near +20,000), and a watered-down copy with the
         same players on their shortest points rung. With this many recipes one will look good by luck: trust a recipe only when its hits
-        run ahead of what our chances expected over many nights.
+        run ahead of what our chances expected over many nights. From Nov 5 every recipe caps legs at +{CAP}; earlier tickets keep their legs.
       </p>
       <div className={s.tw}>
         <table className={s.table}>
