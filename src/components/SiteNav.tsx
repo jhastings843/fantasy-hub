@@ -29,9 +29,8 @@ const HOBBY_TABS = [
   { href: "/picks", label: "Picks", owns: (p: string) => under(p, "/picks") },
   { href: "/props", label: "Props", owns: (p: string) => under(p, "/props") },
   { href: "/records", label: "Records", owns: (p: string) => under(p, "/records") },
-  { href: "/money", label: "Money", owns: (p: string) => under(p, "/money") },
-  // Jack's real accounts, locked to his unlocked devices (2026-11-05).
-  { href: "/portfolio", label: "Portfolio", owns: (p: string) => under(p, "/portfolio") },
+  // Portfolio (Jack's real accounts, locked to his devices) is a section inside Money (2026-11-05).
+  { href: "/money", label: "Money", owns: (p: string) => under(p, "/money") || under(p, "/portfolio") },
   // Every section's learner plus the go-live forecast (Jack, 2026-11-03: "is there a tab?").
   { href: "/learning", label: "Learning", owns: (p: string) => under(p, "/learning") },
 ];

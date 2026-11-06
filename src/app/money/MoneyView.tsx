@@ -21,12 +21,14 @@ import { teamHref } from "../picks/hrefs";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "weather";
+export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "weather";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
 const TABS: { id: MoneyTab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  // Jack's real accounts (Jack, 2026-11-05: "make portfolio its own section of money"). Lives at /portfolio, locked to his devices.
+  { id: "portfolio", label: "Portfolio" },
   ...(SHOW_BETS ? [{ id: "bets" as const, label: "My bets" }] : []),
   { id: "phil", label: "Phil" },
   { id: "kalshi", label: "Kalshi" },
@@ -36,7 +38,20 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "weather", label: "Weather" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
-const href = (t: MoneyTab) => (t === "overview" ? "/money" : `/money?v=${t}`);
+const href = (t: MoneyTab) => (t === "overview" ? "/money" : t === "portfolio" ? "/portfolio" : `/money?v=${t}`);
+
+/** The Money section row, shared with /portfolio so Portfolio reads as one of Money's sections. */
+export function MoneyChips({ tab }: { tab: MoneyTab }) {
+  return (
+    <nav className={`${s.chips} ${m.chipVars}`} aria-label="Money section">
+      {TABS.map((x) => (
+        <Link key={x.id} href={href(x.id)} aria-current={x.id === tab ? "page" : undefined} className={s.chip}>
+          {x.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
 
 const usd = (n: number, signed = false) =>
   `${signed && n > 0 ? "+" : n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: Math.abs(n) < 100 ? 2 : 0, maximumFractionDigits: Math.abs(n) < 100 ? 2 : 0 })}`;
@@ -1719,13 +1734,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
             sub="Separate desks, each judged against its own market. Paper dollars and units never add together; no real balances here."
             asof={snap ? <span className={age !== null && age > 3 ? m.stale : ""}>{`Desks updated ${when(snap.generatedAt)}`}</span> : undefined}
           />
-          <nav className={s.chips} aria-label="Desk">
-            {TABS.map((x) => (
-              <Link key={x.id} href={href(x.id)} aria-current={x.id === tab ? "page" : undefined} className={s.chip}>
-                {x.label}
-              </Link>
-            ))}
-          </nav>
+          <MoneyChips tab={tab} />
         </header>
 
         {error && <p className={s.error}>{`The Money page could not load: ${error}`}</p>}

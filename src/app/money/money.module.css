@@ -301,3 +301,6 @@
   .deskRow { padding-inline: 0; }
   .deskBreak { padding-inline: 0; }
 }
+
+/* MoneyChips outside the Money page (/portfolio): the chip styles read these from .page. */
+.chipVars { --bg: var(--hh-bg); --surface: var(--hh-panel); --ink: var(--hh-ink); --ink2: var(--hh-ink-2); --rule: var(--hh-line); --accent: var(--hh-accent-ink); }

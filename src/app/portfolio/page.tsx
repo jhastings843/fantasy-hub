@@ -8,6 +8,7 @@ import { getPortfolio } from "@/lib/portfolio/store";
 import { isPortfolioSnapshot, type PortfolioSnapshot } from "@/lib/portfolio/types";
 import { Empty, PageHead } from "@/components/hh/ui";
 import { PortfolioView } from "./PortfolioView";
+import { MoneyChips } from "../money/MoneyView";
 
 // Jack's real balances. Every other Hobby Hub read is public, so this page
 // checks the signed hh_session cookie on the server before it touches the
@@ -43,6 +44,7 @@ export default async function PortfolioPage() {
     return (
       <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pb-16 pt-10">
         <PageHead title="Portfolio" />
+        <MoneyChips tab="portfolio" />
         <div className="hh-spot flex flex-col gap-3 p-4">
           <p className="text-[15px] text-hh-ink">This page is private. Unlock this device to see it.</p>
           <Link
@@ -66,6 +68,7 @@ export default async function PortfolioPage() {
   }
   return (
     <main className="hh-page-in mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <MoneyChips tab="portfolio" />
       {snap ? (
         <PortfolioView s={snap} />
       ) : (

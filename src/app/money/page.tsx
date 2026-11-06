@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import MoneyView, { parseMoneyTab } from "./MoneyView";
 
 export const dynamic = "force-dynamic";
@@ -10,5 +11,7 @@ export const metadata: Metadata = {
 
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const q = await searchParams;
-  return <MoneyView tab={parseMoneyTab(q.v)} />;
+  const tab = parseMoneyTab(q.v);
+  if (tab === "portfolio") redirect("/portfolio");
+  return <MoneyView tab={tab} />;
 }
