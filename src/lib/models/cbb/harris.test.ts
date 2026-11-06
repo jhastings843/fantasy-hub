@@ -153,3 +153,20 @@ describe("usable days", () => {
     expect(usableDays([{ date: "2026-11-04", verified: false }, { date: "2026-11-03", verified: true }])).toEqual({ usable: 1, total: 2, missing: ["2026-11-04"] });
   });
 });
+
+describe("matchRows with a typo row", () => {
+  it("sets the bad row aside and keeps the day clean (Nov 6 Youngstown State at Ohio State)", () => {
+    const games: BoardTeams[] = [
+      { id: "g1", tip: "2026-11-07T00:00:00Z", home: { id: "1", name: "Ohio State Buckeyes", short: "Ohio State" }, away: { id: "2", name: "Youngstown State Penguins", short: "Youngstown State" } },
+      { id: "g2", tip: "2026-11-07T00:00:00Z", home: { id: "3", name: "Minnesota Golden Gophers", short: "Minnesota" }, away: { id: "4", name: "St. Thomas Tommies", short: "St. Thomas" } },
+    ];
+    const bad = { date: "2026-11-06", away: "Youngstown State", home: "Ohio State", neutral: false, spread: -25.5, model: -24.7, confidence: 0.477, edge: -24.7, pick: "away", trigger: false };
+    const good = { date: "2026-11-06", away: "St. Thomas", home: "Minnesota", neutral: false, spread: -14.5, model: -14, confidence: 0.489, edge: 0.5, pick: "away", trigger: false };
+    const m = matchRows([bad, good] as never, games);
+    expect(m.problems).toEqual([]);
+    expect(m.setAside).toHaveLength(1);
+    expect(m.setAside[0]).toMatch(/Youngstown State at Ohio State/);
+    expect(m.rows.map((r) => r.home)).toEqual(["Minnesota"]);
+  });
+});
+

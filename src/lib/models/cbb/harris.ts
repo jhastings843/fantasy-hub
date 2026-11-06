@@ -64,6 +64,8 @@ export interface HarrisCbbDay {
   problems: string[];
   /** Rows he never priced (no Spread) that are not on our board: left out, not a problem (Nov 3 listed Incarnate Word at Tulsa, a game ESPN never had). */
   unpriced?: string[];
+  /** Rows left out because his own numbers don't add up (a sheet typo). One bad row no longer fails the day. */
+  setAside?: string[];
   at: string;
 }
 
@@ -178,12 +180,15 @@ export function checkCbbRow(r: HarrisCbbRow): string | null {
  * can call either team home at a neutral site). Matched rows get the event
  * and ids; every unmatched name and failed check is a problem.
  */
-export function matchRows(rows: HarrisCbbRow[], games: BoardTeams[]): { rows: HarrisCbbRow[]; problems: string[]; unmatched: string[]; unpriced: string[] } {
+export function matchRows(rows: HarrisCbbRow[], games: BoardTeams[]): { rows: HarrisCbbRow[]; problems: string[]; unmatched: string[]; unpriced: string[]; setAside: string[] } {
   const keys = (t: BoardTeams["home"]) => new Set([squeeze(t.name), squeeze(t.short)]);
   const board = games.map((g) => ({ g, h: keys(g.home), a: keys(g.away) }));
   const named = new Set(board.flatMap((b) => [...b.h, ...b.a]));
   const problems: string[] = [];
   const unpriced: string[] = [];
+  // A row whose own numbers don't add up (a typo in his sheet, e.g. Nov 6 Youngstown State at Ohio State) is left
+  // out on its own; it no longer fails the whole day, which used to hold back every other game and page Jack.
+  const setAside: string[] = [];
   const unmatched = new Set<string>();
   const used = new Set<string>();
   const out = rows.map((r) => {
@@ -191,7 +196,10 @@ export function matchRows(rows: HarrisCbbRow[], games: BoardTeams[]): { rows: Ha
     const ak = nameKey(r.away);
     const hit = board.find((b) => !used.has(b.g.id) && ((b.h.has(hk) && b.a.has(ak)) || (b.h.has(ak) && b.a.has(hk))));
     const bad = checkCbbRow(r);
-    if (bad) problems.push(bad);
+    if (bad) {
+      setAside.push(bad);
+      return { ...r, setAside: true } as HarrisCbbRow & { setAside?: boolean };
+    }
     if (!hit) {
       if (r.spread === null) {
         unpriced.push(`${r.away} at ${r.home}`);
@@ -205,7 +213,8 @@ export function matchRows(rows: HarrisCbbRow[], games: BoardTeams[]): { rows: Ha
     const flipped = hit.h.has(ak) && hit.a.has(hk) && !(hit.h.has(hk) && hit.a.has(ak));
     return { ...r, event: hit.g.id, homeId: flipped ? hit.g.away.id : hit.g.home.id, awayId: flipped ? hit.g.home.id : hit.g.away.id, tip: hit.g.tip };
   });
-  return { rows: out.filter((r) => r.event || r.spread !== null), problems, unmatched: [...unmatched], unpriced };
+  const kept = out.filter((r) => !(r as { setAside?: boolean }).setAside && (r.event || r.spread !== null));
+  return { rows: kept, problems, unmatched: [...unmatched], unpriced, setAside };
 }
 
 /**

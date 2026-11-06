@@ -47,6 +47,7 @@ export async function ingestHarrisCbb(date: string, now = new Date()): Promise<H
     rows: merged,
     verified: m.rows.length > 0 && m.problems.length === 0,
     problems: m.problems,
+    setAside: m.setAside,
     ...(m.unpriced.length ? { unpriced: m.unpriced } : {}),
     at,
   };
