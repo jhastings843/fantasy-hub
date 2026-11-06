@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import { Chip, Num, PageHead, Row, Section, Spotlight, type Tone } from "@/components/hh/ui";
 import type { Action, CashStep, Idea, Move, Outlook, PortfolioSnapshot, SourceLink, TrackCall, TrackRecord, WatchItem } from "@/lib/portfolio/types";
 import {
@@ -45,6 +46,20 @@ const WATCH_STATUS: Record<string, { tone: Tone; label: string }> = {
   calm: { tone: "pos", label: "Calm" },
 };
 const ACTION_TONE: Record<string, Tone | undefined> = { sell: "neg", buy: "pos", limit: "accent", wait: "gold", hold: undefined };
+
+// A group that opens and closes (Jack, 2026-11-06: "make menus such as trades expandable").
+// Native details/summary: works without JS, keyboard and screen readers included.
+function Fold({ head, open = true, children }: { head: ReactNode; open?: boolean; children: ReactNode }) {
+  return (
+    <details className="group/fold flex flex-col" open={open}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-hh-ink [&::-webkit-details-marker]:hidden">
+        <ChevronRight size={15} strokeWidth={2.2} aria-hidden className="shrink-0 text-hh-muted transition-transform duration-200 group-open/fold:rotate-90" />
+        {head}
+      </summary>
+      <div className="flex flex-col">{children}</div>
+    </details>
+  );
+}
 
 const safeUrl = (u: string | undefined) => (u && /^https?:\/\//i.test(u) ? u : undefined);
 
@@ -224,22 +239,27 @@ function Actions({ actions, moves, holdings }: { actions: Action[]; moves?: Move
   const groups = groupActions(live.rows.map((r) => r.a));
   return (
     <Section label="Moves" aside={live.placed ? `${live.placed} placed today, see Trades` : "You place every order"}>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
         {groups.map((g) => (
-          <div key={g.kind} className="flex flex-col">
-            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-hh-ink">
-              <span
-                aria-hidden
-                className="size-2 rounded-[2px]"
-                style={{ background: ACTION_TONE[g.kind] ? `var(--hh-${ACTION_TONE[g.kind]})` : "var(--hh-muted)" }}
-              />
-              {g.label}
-              <span className="text-xs font-normal text-hh-muted">{g.items.length}</span>
-            </h3>
+          <Fold
+            key={g.kind}
+            open={g.kind !== "hold"}
+            head={
+              <>
+                <span
+                  aria-hidden
+                  className="size-2 rounded-[2px]"
+                  style={{ background: ACTION_TONE[g.kind] ? `var(--hh-${ACTION_TONE[g.kind]})` : "var(--hh-muted)" }}
+                />
+                {g.label}
+                <span className="text-xs font-normal text-hh-muted">{g.items.length}</span>
+              </>
+            }
+          >
             {g.items.map((a, i) => (
               <ActionRow key={`${a.symbol}-${i}`} a={a} live={status.get(a)} />
             ))}
-          </div>
+          </Fold>
         ))}
       </div>
     </Section>
@@ -255,7 +275,7 @@ function ActionRow({ a, live }: { a: Action; live?: { status: LiveStatus; until?
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="font-semibold text-hh-ink">{a.symbol ?? "n/a"}</span>
           {chip && <Chip tone={chip.tone}>{live?.status === "held" && live.until ? `${chip.label} until ${shortDate(live.until)}` : chip.label}</Chip>}
-          {a.detail && <span className="truncate text-sm text-hh-ink-2">{a.detail}</span>}
+          {a.detail && live?.status !== "held" && <span className="truncate text-sm text-hh-ink-2">{a.detail}</span>}
         </span>
         {typeof a.amount === "number" && <Num className="shrink-0 text-[15px] font-semibold text-hh-ink">{usd(a.amount)}</Num>}
       </div>
@@ -475,16 +495,21 @@ function Holdings({ s }: { s: PortfolioSnapshot }) {
       {groups.length === 0 ? (
         <p className="py-2 text-sm text-hh-muted">No positions in this snapshot.</p>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1">
           {groups.map((g) => (
-            <div key={g.key} className="flex flex-col">
-              <h3 className="flex items-baseline justify-between gap-3 border-b border-hh-rule/40 pb-1 text-sm font-semibold text-hh-ink">
-                {g.label}
-                <span className="text-xs font-normal text-hh-muted">
-                  <Num className="text-hh-ink-2">{usd(g.value)}</Num>
-                  {s.totals.total ? <> · <Num>{pct((g.value / s.totals.total) * 100)}</Num></> : null}
-                </span>
-              </h3>
+            <Fold
+              key={g.key}
+              head={
+                <>
+                  {g.label}
+                  <span className="text-xs font-normal text-hh-muted">{g.items.length}</span>
+                  <span className="ml-auto text-xs font-normal text-hh-muted">
+                    <Num className="text-hh-ink-2">{usd(g.value)}</Num>
+                    {s.totals.total ? <> · <Num>{pct((g.value / s.totals.total) * 100)}</Num></> : null}
+                  </span>
+                </>
+              }
+            >
               {g.items.map((h, i) => (
                 <div key={`${h.symbol}-${h.account}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 border-b border-hh-line py-2.5 last:border-b-0">
                   <span className="flex min-w-0 items-baseline gap-2">
@@ -509,7 +534,7 @@ function Holdings({ s }: { s: PortfolioSnapshot }) {
                   </span>
                 </div>
               ))}
-            </div>
+            </Fold>
           ))}
           <p className="text-xs text-hh-muted">Each row: value, share of total, today&apos;s change, then gain or loss since bought.</p>
         </div>
@@ -717,18 +742,23 @@ function Trades({ moves, at }: { moves: Move[]; at?: string }) {
   const name = (m: Move) => (m.kind === "swap" && m.sell ? `${m.sell} to ${m.buy ?? "?"}` : `${m.buy ?? m.id}${m.kind === "limit" ? " limit" : m.kind === "cash" ? " (new cash)" : ""}`);
   return (
     <Section label="Trades" aside={at ? `Updated ${etTime(at)}` : undefined}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
         {TRADE_GROUPS.map((g) => {
           const items = moves.filter((m) => (m.status ?? "open") === g.status);
           if (!items.length) return null;
           const total = items.reduce((n, m) => n + (m.amount ?? 0), 0);
           return (
-            <div key={g.status} className="flex flex-col">
-              <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-hh-ink">
-                <Chip tone={g.tone}>{g.label}</Chip>
-                <span className="text-xs font-normal text-hh-muted">{items.length}</span>
-                {total > 0 && <Num className="ml-auto text-xs text-hh-muted">{usd(total)}</Num>}
-              </h3>
+            <Fold
+              key={g.status}
+              open={g.status !== "done"}
+              head={
+                <>
+                  <Chip tone={g.tone}>{g.label}</Chip>
+                  <span className="text-xs font-normal text-hh-muted">{items.length}</span>
+                  {total > 0 && <Num className="ml-auto text-xs font-normal text-hh-muted">{usd(total)}</Num>}
+                </>
+              }
+            >
               {items.map((m) => (
                 <div key={m.id} className="flex flex-col gap-0.5 border-b border-hh-line py-2 last:border-b-0">
                   <div className="flex items-baseline justify-between gap-3">
@@ -744,7 +774,7 @@ function Trades({ moves, at }: { moves: Move[]; at?: string }) {
                   </div>
                 </div>
               ))}
-            </div>
+            </Fold>
           );
         })}
       </div>
