@@ -154,6 +154,40 @@ export interface Advisor {
   disclaimer?: string;
 }
 
+export interface TrackGroup {
+  key: string;
+  label?: string;
+  scored?: number;
+  hits?: number;
+  /** Whole percent, null until something is scored. */
+  hitRate?: number | null;
+  pending?: number;
+  /** True once there are enough scored calls for a lesson. */
+  enough?: boolean;
+}
+
+export interface TrackResult {
+  date?: string;
+  group?: string;
+  label?: string;
+  symbol?: string;
+  call?: string;
+  result?: "hit" | "miss" | string;
+  detail?: string;
+}
+
+/** From learn.py on Jack's Mac (code): the advisor's past calls graded against real closes. */
+export interface TrackRecord {
+  asOf?: string;
+  minForLesson?: number;
+  logged?: number;
+  firstLogged?: string | null;
+  oldestPending?: string | null;
+  groups?: TrackGroup[];
+  recent?: TrackResult[];
+  lessons?: string[];
+}
+
 export interface PortfolioSnapshot {
   version: 1;
   asOf: string;
@@ -172,6 +206,7 @@ export interface PortfolioSnapshot {
   missingQuotes?: string[];
   history?: HistoryPoint[];
   advisor?: Advisor | null;
+  trackRecord?: TrackRecord | null;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -195,8 +230,13 @@ export function isPortfolioSnapshot(x: unknown): x is PortfolioSnapshot {
   if (!Array.isArray(x.holdings) || !x.holdings.every((h) => isObj(h) && typeof h.symbol === "string")) return false;
   for (const k of ["priceDate", "holdingsFrom", "holdingsFile"]) if (!optStr(x[k])) return false;
   for (const k of ["accounts", "cashPlan", "watch", "calendar", "missingQuotes", "history"]) if (!optArray(x[k])) return false;
-  for (const k of ["sleeve", "employer", "market", "advisor"]) if (!optObj(x[k])) return false;
+  for (const k of ["sleeve", "employer", "market", "advisor", "trackRecord"]) if (!optObj(x[k])) return false;
   if (Array.isArray(x.history) && !x.history.every((p) => isObj(p) && typeof p.date === "string" && isNum(p.total))) return false;
+  if (isObj(x.trackRecord)) {
+    const r = x.trackRecord;
+    for (const k of ["groups", "recent", "lessons"]) if (!optArray(r[k])) return false;
+    if (Array.isArray(r.groups) && !r.groups.every((g) => isObj(g) && typeof g.key === "string")) return false;
+  }
   if (isObj(x.advisor)) {
     const a = x.advisor;
     for (const k of ["marketRead", "outlook", "actions", "changes", "ideas", "sources"]) if (!optArray(a[k])) return false;

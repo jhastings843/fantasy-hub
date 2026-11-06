@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Chip, Num, PageHead, Row, Section, Spotlight, type Tone } from "@/components/hh/ui";
-import type { Action, CashStep, Idea, Outlook, PortfolioSnapshot, SourceLink, WatchItem } from "@/lib/portfolio/types";
+import type { Action, CashStep, Idea, Outlook, PortfolioSnapshot, SourceLink, TrackRecord, WatchItem } from "@/lib/portfolio/types";
 import {
   capState,
   etTime,
@@ -138,6 +138,7 @@ export function PortfolioView({ s }: { s: PortfolioSnapshot }) {
             </Section>
           )}
           {s.watch && s.watch.length > 0 && <Watch items={s.watch} />}
+          {s.trackRecord && (s.trackRecord.groups?.length ?? 0) > 0 && <Track r={s.trackRecord} />}
         </div>
       </div>
 
@@ -561,6 +562,67 @@ function Sources({ a }: { a: NonNullable<PortfolioSnapshot["advisor"]> }) {
           <SourceItem key={i} l={l} />
         ))}
       </ul>
+    </Section>
+  );
+}
+
+// The advisor's report card. Every number comes from learn.py (code), which
+// grades each call against real closes once its horizon passes. Rates under the
+// lesson minimum are shown muted: too few calls to mean much yet.
+function Track({ r }: { r: TrackRecord }) {
+  const groups = r.groups ?? [];
+  const min = r.minForLesson ?? 10;
+  const scored = groups.reduce((n, g) => n + (g.scored ?? 0), 0);
+  const pending = groups.reduce((n, g) => n + (g.pending ?? 0), 0);
+  const lessons = (r.lessons ?? []).filter(Boolean);
+  const recent = (r.recent ?? []).slice(0, 4);
+  return (
+    <Section label="Advisor track record" aside={r.firstLogged ? `Since ${shortDate(r.firstLogged)}` : undefined}>
+      <p className="pb-2 text-xs leading-snug text-hh-muted">
+        {scored === 0
+          ? `${pending} calls logged. The first grades land about a week after ${r.firstLogged ? shortDate(r.firstLogged) : "the first call"}.`
+          : `${scored} graded, ${pending} waiting. Hit rates under ${min} calls are too early to trust.`}
+      </p>
+      {groups.map((g) => {
+        const n = g.scored ?? 0;
+        const rate = typeof g.hitRate === "number" ? g.hitRate : null;
+        const firm = n >= min;
+        return (
+          <Row key={g.key}>
+            <span className="flex min-w-0 flex-col">
+              <span className="text-[15px] text-hh-ink">{g.label ?? g.key}</span>
+              <span className="text-xs text-hh-muted">
+                {n > 0 ? `${g.hits ?? 0} of ${n} right` : "Not graded yet"}
+                {(g.pending ?? 0) > 0 && ` · ${g.pending} waiting`}
+              </span>
+            </span>
+            <Num className={`shrink-0 text-[15px] font-semibold ${firm ? "text-hh-ink" : "text-hh-muted"}`}>
+              {rate === null ? "n/a" : `${rate}%`}
+            </Num>
+          </Row>
+        );
+      })}
+      {recent.length > 0 && (
+        <div className="flex flex-col gap-1.5 pt-3">
+          <span className="text-xs font-semibold text-hh-muted">Latest grades</span>
+          {recent.map((x, i) => (
+            <div key={`${x.date}-${x.symbol}-${i}`} className="flex items-start gap-2 text-sm leading-snug">
+              <Chip tone={x.result === "hit" ? "pos" : "neg"}>{x.result === "hit" ? "Right" : "Wrong"}</Chip>
+              <span className="min-w-0 text-hh-ink-2">{x.detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {lessons.length > 0 && (
+        <div className="flex flex-col gap-1.5 border-t border-hh-line pt-3 mt-3">
+          <span className="text-xs font-semibold text-hh-muted">What it has learned</span>
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm leading-snug text-hh-ink-2 marker:text-hh-muted">
+            {lessons.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Section>
   );
 }

@@ -13,6 +13,14 @@ describe("isPortfolioSnapshot", () => {
     expect(isPortfolioSnapshot({ version: 1, asOf: "2026-11-05T23:40:00Z", totals: { total: 100 }, holdings: [] })).toBe(true);
   });
 
+  it("accepts a track record from learn.py and refuses a malformed one", () => {
+    const ok = { ...fixture(), trackRecord: { groups: [{ key: "sell", scored: 2, hits: 1, hitRate: 50 }], recent: [], lessons: ["x"] } };
+    expect(isPortfolioSnapshot(ok)).toBe(true);
+    expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { groups: "sell" } })).toBe(false);
+    expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { groups: [{ label: "no key" }] } })).toBe(false);
+    expect(isPortfolioSnapshot({ ...fixture(), trackRecord: [] })).toBe(false);
+  });
+
   it("accepts a snapshot whose advisor is missing", () => {
     const s = fixture() as unknown as Record<string, unknown>;
     delete s.advisor;
