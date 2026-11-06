@@ -22,6 +22,7 @@ import { Meter, Sparkline } from "@/components/hh/charts";
 import { TeamEdge } from "@/components/hh/team";
 import { LiveScore } from "@/components/hh/LiveScore";
 import { FantasySection, FantasySkeleton, FantasySpot, getFantasyNow } from "./fantasy";
+import { PortfolioToday } from "./portfolio";
 
 // Today (redesign, 2026-11-03): what to do right now. Answer first: one spotlight
 // for the single action that matters (the next bet, else the top claim), then
@@ -450,6 +451,10 @@ export default async function TodayPage() {
         <div className="flex min-w-0 flex-col gap-8">
           <Suspense fallback={<FantasySkeleton />}>
             <FantasySection skipTop={!spot} />
+          </Suspense>
+
+          <Suspense fallback={null}>
+            <PortfolioToday />
           </Suspense>
 
           <Section id="t-record" label="Issued record" aside={<Link href="/records" className="inline-flex min-h-11 items-center gap-0.5 font-semibold text-hh-accent-ink hover:underline">All records<ChevronRight size={14} aria-hidden /></Link>}>

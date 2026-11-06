@@ -1,3 +1,4 @@
+import { sameString } from "@/lib/auth/session";
 import { savePortfolio } from "@/lib/portfolio/store";
 import { isPortfolioSnapshot } from "@/lib/portfolio/types";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 // POST only on purpose: no route reads this data back out.
 export async function POST(request: Request) {
   const secret = process.env.PORTFOLIO_INGEST_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || !sameString(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const body = await request.json().catch(() => null);
