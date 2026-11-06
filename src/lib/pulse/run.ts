@@ -35,6 +35,7 @@ import { lateCheckResting, runPicksEmail, runPicksToday, todayLogKey } from "@/l
 import { runPicksData } from "@/lib/picks/report";
 import { tracked } from "@/lib/picks/ops";
 import { reviewIfDue } from "@/lib/picks/learning/run";
+import { harrisFeedIfDue } from "@/lib/picks/harris";
 import { weekOf } from "@/lib/picks/parse";
 import { buildPoolView } from "@/lib/picks/pool-store";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
@@ -392,6 +393,8 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         // Strategy review the morning after each slate (Fri, Sun, Mon, Tue 7am ET);
         // most hours this is a cheap "not due". The rule freezes after it.
         { name: "picks-review", work: () => tracked("review", 60, () => reviewIfDue()) },
+        // John Harris's website feed (tracked only): his week's lines, every six hours at most.
+        { name: "harris-feed", work: () => harrisFeedIfDue() },
         { name: "tracker", work: () => archiveTracker() },
       ];
     case "overnight":

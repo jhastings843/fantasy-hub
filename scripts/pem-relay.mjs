@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Finds Jay's (@FansOfCFB) weekly PEM picks card on X and hands it to the app.
 // Also finds John Harris's (@jhnhrris) weekly "CONTEST PICKS" post, which the
-// app tracks but never bets on (POST /api/picks/harris).
+// app tracks but never bets on (POST /api/picks/harris). Only the post text
+// (his picks) is sent; his per-game lines come from his website feed, which
+// the app's hourly pulse reads (src/lib/picks/harris-feed.ts). The sheet
+// images are no longer read (he stopped posting the full sheet in week 8).
 //
 //   node scripts/pem-relay.mjs          check the latest posts, send any new card
 //   node scripts/pem-relay.mjs --dry    say what it would send
@@ -119,7 +122,7 @@ async function main() {
   }
 }
 
-// John Harris: the contest post's text (his picks) and every sheet image.
+// John Harris: the contest post's text (his picks). No images.
 const isHarrisPost = (text) => /contest picks/i.test(text) && !/early look/i.test(text) && !text.trim().startsWith("@");
 
 async function harris(key, sent) {
@@ -133,21 +136,20 @@ async function harris(key, sent) {
   const found = posts.filter((p) => !p.is_retweet && isHarrisPost(p.text) && !isDone(sent[`harris:${p.id}`]));
   if (!found.length) return log("no new Harris post");
   for (const p of found.reverse()) {
-    const body = { tweetId: p.id, text: p.text, postedAt: new Date(p.created_at).toISOString(), imageUrls: p.media_urls ?? [] };
+    const body = { tweetId: p.id, text: p.text, postedAt: new Date(p.created_at).toISOString() };
     if (dry) {
-      log(`would send Harris ${p.id}: ${p.text.split("\n")[0]} (${body.imageUrls.length} images)`);
+      log(`would send Harris ${p.id}: ${p.text.split("\n")[0]}`);
       continue;
     }
     const res = await fetch(`${APP_URL}/api/picks/harris`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.timeout(60_000),
     });
     const json = await res.json().catch(() => ({}));
     log(`sent Harris ${p.id}: ${res.status} ${JSON.stringify(json)}`);
-    const note = body.imageUrls.length ? `${body.imageUrls.length} image${body.imageUrls.length === 1 ? "" : "s"} on the post` : "no images on the post";
-    if (res.ok) await record(sent, `harris:${p.id}`, json, "Harris sheet", note);
+    if (res.ok) await record(sent, `harris:${p.id}`, json, "Harris picks");
   }
 }
 

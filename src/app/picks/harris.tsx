@@ -19,7 +19,7 @@ export async function HarrisCard() {
       <details className={s.details}>
         <summary>John Harris tracker</summary>
         <div className={s.detailsBody}>
-          <p className={s.calm}>No sheets on file yet. His Thursday contest post is read automatically.</p>
+          <p className={s.calm}>No sheets on file yet. His website feed is read automatically every few hours.</p>
         </div>
       </details>
     );
@@ -62,7 +62,7 @@ export async function HarrisCard() {
           <dt>Sam + David agree</dt>
           <dd className={s.num}>{`${recText(a.all)} · he agrees ${recText(a.harrisAgrees)} · he disagrees ${recText(a.harrisDisagrees)}`}</dd>
         </dl>
-        <p className={s.thin}>{`Sheet lines are the lines on his sheet when posted; picks grade at the line he listed. Not yet gradable: ${r.ungraded.rows} sheet games, ${r.ungraded.picks} picks.`}</p>
+        <p className={s.thin}>{`Sheet lines are the lines on his website (he updates them during the week); picks grade at the line he listed. Not yet gradable: ${r.ungraded.rows} sheet games, ${r.ungraded.picks} picks.`}</p>
       </div>
     </details>
   );
