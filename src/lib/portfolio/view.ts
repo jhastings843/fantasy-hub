@@ -1,4 +1,4 @@
-import type { Move, Action, Holding, HistoryPoint, Idea, PortfolioSnapshot } from "./types";
+import type { Move, PlanVsHold, Action, Holding, HistoryPoint, Idea, PortfolioSnapshot } from "./types";
 
 // Pure helpers for the Portfolio page: formatting, grouping, staleness. No I/O,
 // so they test without Redis or cookies.
@@ -206,3 +206,16 @@ export function liveActions(
   }
   return { rows, placed };
 }
+
+/** Plan vs unchanged books as two lines indexed to 100 on the first day (same start value, so the gap is the plan's effect). */
+export function planSeries(p: PlanVsHold | null | undefined): { plan: { x: number; y: number }[]; hold: { x: number; y: number }[] } {
+  const pts = (p?.series ?? [])
+    .filter((r) => isNum(r.plan) && isNum(r.hold) && !Number.isNaN(Date.parse(`${r.date}T12:00:00Z`)))
+    .map((r) => ({ ...r, x: Date.parse(`${r.date}T12:00:00Z`) }))
+    .sort((a, b) => a.x - b.x);
+  if (pts.length < 2 || !pts[0].plan || !pts[0].hold) return { plan: [], hold: [] };
+  const p0 = pts[0].plan;
+  const h0 = pts[0].hold;
+  return { plan: pts.map((r) => ({ x: r.x, y: (r.plan / p0) * 100 })), hold: pts.map((r) => ({ x: r.x, y: (r.hold / h0) * 100 })) };
+}
+

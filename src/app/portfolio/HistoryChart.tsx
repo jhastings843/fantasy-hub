@@ -12,7 +12,15 @@ const H = 300;
 const day = (x: number) => new Date(x).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const fmt = (v: number) => v.toFixed(1);
 
-export function HistoryChart({ total, spx }: { total: Pt[]; spx: Pt[] }) {
+export function HistoryChart({
+  total,
+  spx,
+  labels = { a: "Your total", b: "S&P 500" },
+}: {
+  total: Pt[];
+  spx: Pt[];
+  labels?: { a: string; b: string };
+}) {
   if (total.length < 2) return null;
   const all = [...total, ...spx];
   const x0 = Math.min(...all.map((p) => p.x));
@@ -36,7 +44,7 @@ export function HistoryChart({ total, spx }: { total: Pt[]; spx: Pt[] }) {
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
           role="img"
-          aria-label={`Your total ${fmt(last.y)} and S&P 500 ${lastS ? fmt(lastS.y) : "n/a"}, both starting at 100 on ${day(x0)}`}
+          aria-label={`${labels.a} ${fmt(last.y)} and ${labels.b} ${lastS ? fmt(lastS.y) : "n/a"}, both starting at 100 on ${day(x0)}`}
           className="absolute inset-0 block h-full w-full overflow-visible"
         >
           <line x1={0} x2={W} y1={Y(100)} y2={Y(100)} stroke="var(--hh-rule)" strokeWidth="1" strokeDasharray="2 4" opacity="0.6" vectorEffect="non-scaling-stroke" />
@@ -61,12 +69,12 @@ export function HistoryChart({ total, spx }: { total: Pt[]; spx: Pt[] }) {
       <figcaption className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-hh-ink-2">
         <span className="inline-flex items-center gap-1.5">
           <span aria-hidden className="h-[3px] w-3.5 rounded-sm bg-hh-ink" />
-          Your total <span className="hh-num font-semibold text-hh-ink">{fmt(last.y)}</span>
+          {labels.a} <span className="hh-num font-semibold text-hh-ink">{fmt(last.y)}</span>
         </span>
         {lastS && (
           <span className="inline-flex items-center gap-1.5">
             <span aria-hidden className="w-3.5 border-t-2 border-dashed border-hh-muted" />
-            S&amp;P 500 <span className="hh-num font-semibold text-hh-ink">{fmt(lastS.y)}</span>
+            {labels.b} <span className="hh-num font-semibold text-hh-ink">{fmt(lastS.y)}</span>
           </span>
         )}
         <span className="text-hh-muted">Both start at 100</span>

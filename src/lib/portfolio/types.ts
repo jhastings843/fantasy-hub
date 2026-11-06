@@ -14,6 +14,8 @@ export interface Totals {
   dayChangePct?: number | null;
   cash?: number | null;
   cashPct?: number | null;
+  /** Trades applied on top of the latest Fidelity file until the next one arrives. */
+  estimatedTrades?: number | null;
 }
 
 export interface Account {
@@ -35,6 +37,8 @@ export interface Holding {
   gainLossPct?: number | null;
   /** % of total. */
   weight?: number | null;
+  /** True when this row includes a trade made after the latest Fidelity file (priced at closes, an estimate). */
+  estimated?: boolean;
 }
 
 export interface Sleeve {
@@ -223,6 +227,23 @@ export interface Move {
   sellOrder?: string;
 }
 
+/** How far the last estimate was from the next real Fidelity file. */
+export interface EstimateCheck {
+  checkedAt?: string;
+  rows?: { symbol: string; estimated?: number; actual?: number; diffQty?: number; diffValue?: number }[];
+  totalDiff?: number | null;
+}
+
+/** Two make-believe Brokerage books from the Nov 5 holdings: every call followed vs nothing changed. Code, closes. */
+export interface PlanVsHold {
+  start?: string;
+  series?: { date: string; plan: number; hold: number }[];
+  diff?: number | null;
+  diffPct?: number | null;
+  calls?: number;
+  scope?: string;
+}
+
 export interface PortfolioSnapshot {
   version: 1;
   asOf: string;
@@ -244,6 +265,8 @@ export interface PortfolioSnapshot {
   trackRecord?: TrackRecord | null;
   moves?: Move[];
   movesAt?: string;
+  estimateCheck?: EstimateCheck | null;
+  planVsHold?: PlanVsHold | null;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -267,10 +290,15 @@ export function isPortfolioSnapshot(x: unknown): x is PortfolioSnapshot {
   if (!Array.isArray(x.holdings) || !x.holdings.every((h) => isObj(h) && typeof h.symbol === "string")) return false;
   for (const k of ["priceDate", "holdingsFrom", "holdingsFile"]) if (!optStr(x[k])) return false;
   for (const k of ["accounts", "cashPlan", "watch", "calendar", "missingQuotes", "history", "moves"]) if (!optArray(x[k])) return false;
-  for (const k of ["sleeve", "employer", "market", "advisor", "trackRecord"]) if (!optObj(x[k])) return false;
+  for (const k of ["sleeve", "employer", "market", "advisor", "trackRecord", "estimateCheck", "planVsHold"]) if (!optObj(x[k])) return false;
   if (Array.isArray(x.history) && !x.history.every((p) => isObj(p) && typeof p.date === "string" && isNum(p.total))) return false;
   if (Array.isArray(x.moves) && !x.moves.every((m) => isObj(m) && typeof m.id === "string")) return false;
   if (!optStr(x.movesAt)) return false;
+  if (isObj(x.planVsHold)) {
+    const s = x.planVsHold.series;
+    if (!optArray(s)) return false;
+    if (Array.isArray(s) && !s.every((p) => isObj(p) && typeof p.date === "string" && isNum(p.plan) && isNum(p.hold))) return false;
+  }
   if (isObj(x.trackRecord)) {
     const r = x.trackRecord;
     for (const k of ["groups", "recent", "lessons", "log"]) if (!optArray(r[k])) return false;

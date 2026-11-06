@@ -91,3 +91,13 @@ describe("liveActions", () => {
   });
 });
 
+describe("planSeries", () => {
+  it("indexes both books to 100 and needs two days", async () => {
+    const { planSeries } = await import("./view");
+    expect(planSeries({ series: [{ date: "2026-11-05", plan: 100, hold: 100 }] })).toEqual({ plan: [], hold: [] });
+    const r = planSeries({ series: [{ date: "2026-11-06", plan: 210, hold: 190 }, { date: "2026-11-05", plan: 200, hold: 200 }] });
+    expect(r.plan.map((p) => p.y)).toEqual([100, 105]);
+    expect(r.hold.map((p) => p.y)).toEqual([100, 95]);
+  });
+});
+

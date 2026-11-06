@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { Chip, Num, PageHead, Row, Section, Spotlight, type Tone } from "@/components/hh/ui";
-import type { Action, CashStep, Idea, Move, Outlook, PortfolioSnapshot, SourceLink, TrackCall, TrackRecord, WatchItem } from "@/lib/portfolio/types";
+import type { Action, CashStep, Idea, Move, PlanVsHold, Outlook, PortfolioSnapshot, SourceLink, TrackCall, TrackRecord, WatchItem } from "@/lib/portfolio/types";
 import {
   capState,
   etTime,
   groupActions,
   groupHoldings,
   indexHistory,
+  planSeries,
   liveActions,
   type LiveStatus,
   num,
@@ -102,6 +103,11 @@ export function PortfolioView({ s }: { s: PortfolioSnapshot }) {
           <MiniStat label="Cash" value={usd(t.cash)} sub={`${pct(t.cashPct)} of total`} />
           {s.holdingsFrom && <MiniStat label="Holdings file" value={shortDate(s.holdingsFrom)} sub={s.holdingsFile} />}
         </div>
+        {(t.estimatedTrades ?? 0) > 0 && (
+          <p className="rounded-[6px] bg-[var(--hh-gold-soft)] px-3 py-2 text-sm leading-snug text-hh-ink">
+            Includes {t.estimatedTrades} {t.estimatedTrades === 1 ? "trade" : "trades"} made after your last Fidelity file, priced at closing prices. An estimate until the next file.
+          </p>
+        )}
         {notes.length > 0 && (
           <ul className="flex flex-col gap-2">
             {notes.map((n) => (
@@ -128,6 +134,7 @@ export function PortfolioView({ s }: { s: PortfolioSnapshot }) {
         </div>
 
         <div className="flex min-w-0 flex-col gap-8">
+          {s.planVsHold && (s.planVsHold.series?.length ?? 0) > 0 && <PlanVsHoldCard p={s.planVsHold} />}
           {s.cashPlan && s.cashPlan.length > 0 && <CashPlan steps={s.cashPlan} />}
           {s.market && <MarketStrip m={s.market} />}
           {(s.sleeve || s.employer) && <Limits s={s} />}
@@ -518,6 +525,7 @@ function Holdings({ s }: { s: PortfolioSnapshot }) {
                 <div key={`${h.symbol}-${h.account}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 border-b border-hh-line py-2.5 last:border-b-0">
                   <span className="flex min-w-0 items-baseline gap-2">
                     <span className="font-semibold text-hh-ink">{h.symbol}</span>
+                    {h.estimated && <Chip tone="gold">estimate</Chip>}
                     {h.account && <span className="truncate text-xs text-hh-muted">{h.account}</span>}
                   </span>
                   <Num className="text-right text-[15px] text-hh-ink">{usd(h.value)}</Num>
@@ -781,6 +789,31 @@ function Trades({ moves, at }: { moves: Move[]; at?: string }) {
             </Fold>
           );
         })}
+      </div>
+    </Section>
+  );
+}
+
+// Every call followed vs nothing changed, from the Nov 5 holdings. Both books are
+// code-built from closing prices, so this is an estimate of the plan's effect,
+// not Jack's actual fills. The gap opens only after the trade day.
+function PlanVsHoldCard({ p }: { p: PlanVsHold }) {
+  const lines = planSeries(p);
+  const diff = typeof p.diff === "number" ? p.diff : null;
+  return (
+    <Section label="Plan vs doing nothing" aside={p.start ? `Since ${shortDate(p.start)}` : undefined}>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <Num tone={sign(diff)} className="text-[26px] font-semibold leading-none">
+            {diff === null ? "n/a" : usdSigned(diff)}
+          </Num>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-hh-muted">estimate</span>
+        </div>
+        <p className="text-xs leading-snug text-hh-muted">
+          {p.scope ?? "Brokerage"} if every call {p.calls ? `(${p.calls} so far) ` : ""}was made at that day&apos;s close, compared with keeping the Nov 5 holdings.
+          {lines.plan.length < 2 || Math.abs(diff ?? 0) < 0.5 ? " The two match on the trade day; the gap shows from the next close." : ""}
+        </p>
+        {lines.plan.length >= 2 && <HistoryChart total={lines.plan} spx={lines.hold} labels={{ a: "Followed the plan", b: "Changed nothing" }} />}
       </div>
     </Section>
   );
