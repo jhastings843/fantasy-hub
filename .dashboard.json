@@ -17,6 +17,7 @@
   ],
   "last_worked": "2026-11-05",
   "notes": [
+    "2026-11-05 eve: private Portfolio tab (/portfolio, under Money) and Portfolio moves on Today, both locked to unlocked devices; POST-only /api/portfolio/ingest with PORTFOLIO_INGEST_SECRET (production). Fed by ~/Projects/stocks daily run. insecure-defaults audit: no findings (50f3e0e).",
     "2026-11-05: Money tab 'Learner log, every desk' now shows the weekday stock learner checks (snapshot gradeLog) and weather's daily slice review plus slice changes (4547db1, live).",
     "2026-11-05: Bet record card on every Results page (real bets only, from liveBets; 0-0 until a slice goes live), apart from Every edge. Football's issued tile relabelled Bet record; NBA picks and CBB added (a56532a, deploy fantasy-5c0tk5tox).",
     "2026-11-05: Lotto ticket legs capped at +700 from Nov 5 (DK margin jumps past +800; no cap beat DK on unseen nights). Tracked slices lotto:checked-cap, lotto:ours-cap (47064b5).",
@@ -318,7 +319,8 @@
     "2026-11-03: Waiver research moved to the GitHub runner (428a773); redraft wk 9 filled locally. Needs 3 GitHub secrets to switch over.",
     "2026-11-03: CI sweep: Picks UI check already fixed (Nov 3 2:46am pass); refit retries dropped app connections (75e63b9); rewards-tracker weekly job disabled (site deleted).",
     "2026-11-04: morning follow-ups shipped (1810a10); security audit of src/app/api found 5 LOW pre-existing issues, waiting on Jack.",
-    "2026-11-04: /pickem pick log built (data/pickem/*.jsonl, npm run pickem -- log|grade|stats, ESPN grading with close and CLV); no past picks recoverable, starts clean; skill not yet wired."
+    "2026-11-04: /pickem pick log built (data/pickem/*.jsonl, npm run pickem -- log|grade|stats, ESPN grading with close and CLV); no past picks recoverable, starts clean; skill not yet wired.",
+    "2026-11-05: NFL player pop-up shows Anytime TD (our chance, Venom + blend, DK price and break-even, result). TNF 2-leg skipped tonight: 1 leg qualified (BTJ)."
   ],
   "tags": [
     "personal",
