@@ -53,4 +53,27 @@ describe("etDate", () => {
   it("uses the Eastern day", () => {
     expect(etDate(new Date("2026-01-14T03:00:00Z"))).toBe("2026-01-13");
   });
+
+  it("shows monitor trades: alerted and held one row each, today's placed ones folded, advisor rows for tracked names dropped", () => {
+    const s = snap({
+      moves: [
+        { id: "A", kind: "swap", sell: "AIS", buy: "VOO", amount: 700, status: "done", alertedAt: "2026-01-13 10:00" },
+        { id: "B", kind: "swap", sell: "VIS", buy: "VOO", amount: 1400, status: "done", alertedAt: "2026-01-13 10:00" },
+        { id: "C", kind: "swap", sell: "ABAT", buy: "VOO", amount: 50, status: "held", revisit: "2026-01-16", heldReason: "results due" },
+        { id: "D", kind: "cash", buy: "VOO", amount: 2253, status: "alerted", alertedAt: "2026-01-12 15:15", order: "Dollar amount" },
+        { id: "E", kind: "swap", sell: "OLD", buy: "VOO", amount: 9, status: "done", alertedAt: "2026-01-10 10:00" },
+        { id: "F", kind: "swap", sell: "WAIT", buy: "VOO", amount: 9, status: "open" },
+      ],
+      advisor: { actions: [{ kind: "sell", symbol: "VIS", amount: 1400, when: "2026-01-13", reason: "r" }, { kind: "sell", symbol: "ZZZ", amount: 5, when: "2026-01-13", reason: "r" }] },
+    } as Partial<PortfolioSnapshot>);
+    const got = todayMoves(s, "2026-01-13");
+    expect(got.map((m) => [m.status, m.symbol])).toEqual([
+      ["held", "ABAT to VOO"],
+      ["todo", "VOO"],
+      ["done", "2 placed today"],
+      [undefined, "ZZZ"],
+    ]);
+    expect(got[1].reason).toContain("on Jan 12");
+    expect(got[2].amount).toBe(2100);
+  });
 });

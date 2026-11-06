@@ -1,4 +1,4 @@
-import type { PortfolioSnapshot } from "./types";
+import type { Move, PortfolioSnapshot } from "./types";
 
 // Portfolio moves for the Today page (Jack, 2026-11-05: "add any market moves to
 // today if they come up that day, similar to waivers"). Only what is due on this
@@ -8,7 +8,9 @@ import type { PortfolioSnapshot } from "./types";
 
 export interface TodayMove {
   key: string;
-  kind: "sell" | "buy" | "limit" | "cash" | "idea";
+  kind: "sell" | "buy" | "limit" | "cash" | "idea" | "swap" | "done";
+  /** From the trade monitor: todo = alerted and not placed yet, held = waiting on purpose. */
+  status?: "todo" | "held" | "done";
   symbol: string;
   amount: number | null;
   detail: string;
@@ -22,11 +24,47 @@ export function etDate(now: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
+const moveSymbol = (m: Move) => (m.kind === "swap" && m.sell ? `${m.sell} to ${m.buy ?? "?"}` : (m.buy ?? m.sell ?? m.id));
+const moveDetail = (m: Move) =>
+  m.kind === "swap" ? `Sell all ${m.sell ?? ""}, then buy ${m.buy ?? ""} with the proceeds${m.sellOrder ? ` (${m.sellOrder})` : ""}` : (m.order ?? "");
+const md = (ymd?: string) => {
+  const d = ymd ? new Date(`${ymd}T12:00:00Z`) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : (ymd ?? "");
+};
+
+/**
+ * Trades from the Mac's monitor, as they stand right now (reposted after every
+ * monitor check and every new Fidelity file). Alerted but not placed: one row
+ * each. Held: one row each with why and when it's looked at again. Placed
+ * today: folded into one "Done today" row so a 16-swap morning stays short.
+ */
+export function monitorMoves(moves: Move[] | undefined, today: string): TodayMove[] {
+  const out: TodayMove[] = [];
+  const done: Move[] = [];
+  (moves ?? []).forEach((m, i) => {
+    if (m.status === "alerted") {
+      out.push({ key: `m${i}`, kind: m.kind === "swap" ? "swap" : m.kind === "limit" ? "limit" : "cash", status: "todo", symbol: moveSymbol(m), amount: m.amount ?? null, detail: moveDetail(m), reason: m.alertedAt ? `Alerted ${m.alertedAt.slice(11)}${m.alertedAt.slice(0, 10) === today ? "" : ` on ${md(m.alertedAt.slice(0, 10))}`}. Not placed yet.` : "Not placed yet." });
+    } else if (m.status === "held") {
+      out.push({ key: `m${i}`, kind: m.kind === "swap" ? "swap" : m.kind === "limit" ? "limit" : "cash", status: "held", symbol: moveSymbol(m), amount: m.amount ?? null, detail: m.revisit ? `Held until ${md(m.revisit)}` : "Held", reason: m.heldReason ?? "" });
+    } else if (m.status === "done" && m.alertedAt?.slice(0, 10) === today) {
+      done.push(m);
+    }
+  });
+  if (done.length) {
+    const total = done.reduce((n, m) => n + (m.amount ?? 0), 0);
+    out.push({ key: "done", kind: "done", status: "done", symbol: `${done.length} placed today`, amount: total || null, detail: done.map(moveSymbol).join(", "), reason: "" });
+  }
+  return out;
+}
+
 export function todayMoves(s: PortfolioSnapshot | null, today: string): TodayMove[] {
   if (!s) return [];
-  const out: TodayMove[] = [];
+  const out: TodayMove[] = monitorMoves(s.moves, today);
+  // Once the monitor tracks a name, its row above is the live one; skip the advisor's static row for it.
+  const tracked = new Set((s.moves ?? []).flatMap((m) => [m.sell, m.buy]).filter(Boolean) as string[]);
   (s.advisor?.actions ?? []).forEach((a, i) => {
     if (a.kind !== "sell" && a.kind !== "buy" && a.kind !== "limit") return;
+    if (a.symbol && tracked.has(a.symbol)) return;
     const when = a.when ?? "";
     // "by 2026-11-20" is a deadline, not a day to act; only an exact date counts.
     if (/^by\b/i.test(when.trim()) || DATE.exec(when)?.[1] !== today) return;

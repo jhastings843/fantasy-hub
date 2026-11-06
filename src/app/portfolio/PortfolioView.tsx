@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Chip, Num, PageHead, Row, Section, Spotlight, type Tone } from "@/components/hh/ui";
-import type { Action, CashStep, Idea, Outlook, PortfolioSnapshot, SourceLink, TrackCall, TrackRecord, WatchItem } from "@/lib/portfolio/types";
+import type { Action, CashStep, Idea, Move, Outlook, PortfolioSnapshot, SourceLink, TrackCall, TrackRecord, WatchItem } from "@/lib/portfolio/types";
 import {
   capState,
   etTime,
@@ -95,6 +95,7 @@ export function PortfolioView({ s }: { s: PortfolioSnapshot }) {
       <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
         <div className="flex min-w-0 flex-col gap-8">
           {advisor && <AdvisorBlock a={advisor} />}
+          {s.moves && s.moves.length > 0 && <Trades moves={s.moves} at={s.movesAt} />}
           {advisor?.actions && advisor.actions.length > 0 && <Actions actions={advisor.actions} />}
           {advisor && sortIdeas(advisor.ideas).length > 0 && <Ideas ideas={sortIdeas(advisor.ideas)} />}
           <Holdings s={s} />
@@ -688,5 +689,53 @@ function CallLog({ log }: { log: TrackCall[] }) {
         })}
       </ul>
     </details>
+  );
+}
+
+// Live trade status from the Mac's monitor, reposted after every check and every
+// new Fidelity file. Grouped by what Jack has to do: place it, wait, or nothing.
+const TRADE_GROUPS: { status: string; label: string; tone: Tone }[] = [
+  { status: "alerted", label: "Place these", tone: "neg" },
+  { status: "held", label: "Held on purpose", tone: "gold" },
+  { status: "open", label: "Not decided yet", tone: "muted" },
+  { status: "done", label: "Placed", tone: "pos" },
+];
+
+function Trades({ moves, at }: { moves: Move[]; at?: string }) {
+  const name = (m: Move) => (m.kind === "swap" && m.sell ? `${m.sell} to ${m.buy ?? "?"}` : `${m.buy ?? m.id}${m.kind === "limit" ? " limit" : m.kind === "cash" ? " (new cash)" : ""}`);
+  return (
+    <Section label="Trades" aside={at ? `Updated ${etTime(at)}` : undefined}>
+      <div className="flex flex-col gap-4">
+        {TRADE_GROUPS.map((g) => {
+          const items = moves.filter((m) => (m.status ?? "open") === g.status);
+          if (!items.length) return null;
+          const total = items.reduce((n, m) => n + (m.amount ?? 0), 0);
+          return (
+            <div key={g.status} className="flex flex-col">
+              <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-hh-ink">
+                <Chip tone={g.tone}>{g.label}</Chip>
+                <span className="text-xs font-normal text-hh-muted">{items.length}</span>
+                {total > 0 && <Num className="ml-auto text-xs text-hh-muted">{usd(total)}</Num>}
+              </h3>
+              {items.map((m) => (
+                <div key={m.id} className="flex flex-col gap-0.5 border-b border-hh-line py-2 last:border-b-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate font-semibold text-hh-ink">{name(m)}</span>
+                    {typeof m.amount === "number" && <Num className="shrink-0 text-[15px] text-hh-ink">{usd(m.amount)}</Num>}
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-hh-muted">
+                    {m.status === "held" && m.revisit && <span className="font-semibold text-hh-ink-2">Until {shortDate(m.revisit)}</span>}
+                    {m.status === "held" && m.heldReason && <span>{m.heldReason}</span>}
+                    {m.alertedAt && m.status !== "held" && <span>Alerted {shortDate(m.alertedAt.slice(0, 10))} {m.alertedAt.slice(11)}</span>}
+                    {m.status === "open" && m.deadline && <span>By {shortDate(m.deadline)}</span>}
+                    {taxLine(m.tax) && <span>{taxLine(m.tax)}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
   );
 }

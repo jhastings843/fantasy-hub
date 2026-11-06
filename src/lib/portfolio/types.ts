@@ -203,6 +203,26 @@ export interface TrackRecord {
   log?: TrackCall[];
 }
 
+/** A trade the Mac's monitor is timing (stocks state/monitor.json), with where it stands. */
+export interface Move {
+  id: string;
+  /** swap = sell one name and buy its replacement with the proceeds; limit = a GTC limit order; cash = new money. */
+  kind?: "swap" | "limit" | "cash" | string;
+  sell?: string;
+  buy?: string;
+  amount?: number | null;
+  tax?: number | null;
+  /** open = not decided yet, alerted = Jack was told to do it, held = waiting on purpose, done = placed. */
+  status?: "open" | "alerted" | "held" | "done" | string;
+  /** "2026-11-06 10:00" Eastern. */
+  alertedAt?: string;
+  heldReason?: string;
+  revisit?: string;
+  deadline?: string;
+  order?: string;
+  sellOrder?: string;
+}
+
 export interface PortfolioSnapshot {
   version: 1;
   asOf: string;
@@ -222,6 +242,8 @@ export interface PortfolioSnapshot {
   history?: HistoryPoint[];
   advisor?: Advisor | null;
   trackRecord?: TrackRecord | null;
+  moves?: Move[];
+  movesAt?: string;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -244,9 +266,11 @@ export function isPortfolioSnapshot(x: unknown): x is PortfolioSnapshot {
   }
   if (!Array.isArray(x.holdings) || !x.holdings.every((h) => isObj(h) && typeof h.symbol === "string")) return false;
   for (const k of ["priceDate", "holdingsFrom", "holdingsFile"]) if (!optStr(x[k])) return false;
-  for (const k of ["accounts", "cashPlan", "watch", "calendar", "missingQuotes", "history"]) if (!optArray(x[k])) return false;
+  for (const k of ["accounts", "cashPlan", "watch", "calendar", "missingQuotes", "history", "moves"]) if (!optArray(x[k])) return false;
   for (const k of ["sleeve", "employer", "market", "advisor", "trackRecord"]) if (!optObj(x[k])) return false;
   if (Array.isArray(x.history) && !x.history.every((p) => isObj(p) && typeof p.date === "string" && isNum(p.total))) return false;
+  if (Array.isArray(x.moves) && !x.moves.every((m) => isObj(m) && typeof m.id === "string")) return false;
+  if (!optStr(x.movesAt)) return false;
   if (isObj(x.trackRecord)) {
     const r = x.trackRecord;
     for (const k of ["groups", "recent", "lessons", "log"]) if (!optArray(r[k])) return false;

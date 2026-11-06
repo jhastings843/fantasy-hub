@@ -18,6 +18,13 @@ const KIND: Record<TodayMove["kind"], { label: string; tone: Tone }> = {
   limit: { label: "Set limit", tone: "accent" },
   cash: { label: "Cash plan", tone: "gold" },
   idea: { label: "New buy", tone: "pos" },
+  swap: { label: "Swap", tone: "accent" },
+  done: { label: "Done", tone: "pos" },
+};
+const STATUS: Record<NonNullable<TodayMove["status"]>, { label: string; tone: Tone } | null> = {
+  todo: { label: "Do now", tone: "neg" },
+  held: { label: "Held", tone: "gold" },
+  done: null,
 };
 
 export async function PortfolioToday({ now = new Date() }: { now?: Date }) {
@@ -52,6 +59,7 @@ export async function PortfolioToday({ now = new Date() }: { now?: Date }) {
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="hh-num text-[16px] font-semibold text-hh-ink">{m.symbol}</span>
               <Chip tone={KIND[m.kind].tone}>{KIND[m.kind].label}</Chip>
+              {m.status && STATUS[m.status] && <Chip tone={STATUS[m.status]!.tone}>{STATUS[m.status]!.label}</Chip>}
               {m.amount !== null && <span className="hh-num ml-auto text-[15px] font-semibold text-hh-ink">{usd(m.amount)}</span>}
             </div>
             {m.detail && <p className="text-[13px] text-hh-muted">{m.detail}</p>}
