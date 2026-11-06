@@ -7,6 +7,8 @@ import {
   groupActions,
   groupHoldings,
   indexHistory,
+  liveActions,
+  type LiveStatus,
   num,
   pct,
   pctSigned,
@@ -96,7 +98,7 @@ export function PortfolioView({ s }: { s: PortfolioSnapshot }) {
         <div className="flex min-w-0 flex-col gap-8">
           {advisor && <AdvisorBlock a={advisor} />}
           {s.moves && s.moves.length > 0 && <Trades moves={s.moves} at={s.movesAt} />}
-          {advisor?.actions && advisor.actions.length > 0 && <Actions actions={advisor.actions} />}
+          {advisor?.actions && advisor.actions.length > 0 && <Actions actions={advisor.actions} moves={s.moves} holdings={s.holdings} />}
           {advisor && sortIdeas(advisor.ideas).length > 0 && <Ideas ideas={sortIdeas(advisor.ideas)} />}
           <Holdings s={s} />
           {hist.total.length >= 2 && (
@@ -210,10 +212,18 @@ function OutlookRow({ o }: { o: Outlook }) {
   );
 }
 
-function Actions({ actions }: { actions: Action[] }) {
-  const groups = groupActions(actions);
+const LIVE: Record<"held" | "todo", { label: string; tone: Tone }> = {
+  todo: { label: "Do now", tone: "neg" },
+  held: { label: "Held", tone: "gold" },
+};
+
+function Actions({ actions, moves, holdings }: { actions: Action[]; moves?: Move[]; holdings?: PortfolioSnapshot["holdings"] }) {
+  // Last night's advice, minus what's already placed today (live from the monitor and the latest Fidelity file).
+  const live = liveActions(actions, moves, holdings);
+  const status = new Map(live.rows.map((r) => [r.a, r]));
+  const groups = groupActions(live.rows.map((r) => r.a));
   return (
-    <Section label="Moves" aside="You place every order">
+    <Section label="Moves" aside={live.placed ? `${live.placed} placed today, see Trades` : "You place every order"}>
       <div className="flex flex-col gap-5">
         {groups.map((g) => (
           <div key={g.kind} className="flex flex-col">
@@ -227,7 +237,7 @@ function Actions({ actions }: { actions: Action[] }) {
               <span className="text-xs font-normal text-hh-muted">{g.items.length}</span>
             </h3>
             {g.items.map((a, i) => (
-              <ActionRow key={`${a.symbol}-${i}`} a={a} />
+              <ActionRow key={`${a.symbol}-${i}`} a={a} live={status.get(a)} />
             ))}
           </div>
         ))}
@@ -236,13 +246,15 @@ function Actions({ actions }: { actions: Action[] }) {
   );
 }
 
-function ActionRow({ a }: { a: Action }) {
+function ActionRow({ a, live }: { a: Action; live?: { status: LiveStatus; until?: string } }) {
   const tax = taxLine(a.tax);
+  const chip = live?.status === "todo" || live?.status === "held" ? LIVE[live.status] : null;
   return (
     <div className="flex flex-col gap-1 border-b border-hh-line py-2.5 last:border-b-0">
       <div className="flex items-baseline justify-between gap-3">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="font-semibold text-hh-ink">{a.symbol ?? "n/a"}</span>
+          {chip && <Chip tone={chip.tone}>{live?.status === "held" && live.until ? `${chip.label} until ${shortDate(live.until)}` : chip.label}</Chip>}
           {a.detail && <span className="truncate text-sm text-hh-ink-2">{a.detail}</span>}
         </span>
         {typeof a.amount === "number" && <Num className="shrink-0 text-[15px] font-semibold text-hh-ink">{usd(a.amount)}</Num>}

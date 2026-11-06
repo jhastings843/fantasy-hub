@@ -1,4 +1,4 @@
-import type { Action, Holding, HistoryPoint, Idea, PortfolioSnapshot } from "./types";
+import type { Move, Action, Holding, HistoryPoint, Idea, PortfolioSnapshot } from "./types";
 
 // Pure helpers for the Portfolio page: formatting, grouping, staleness. No I/O,
 // so they test without Redis or cookies.
@@ -164,4 +164,45 @@ export function capState(value: number | null | undefined, cap: number | null | 
   if (value > cap) return "over";
   if (value >= cap * 0.9) return "near";
   return "ok";
+}
+
+export type LiveStatus = "placed" | "held" | "todo" | null;
+
+/**
+ * Matches the advisor's sell/buy/limit rows (written the night before) to the
+ * monitor's live trades and the latest holdings, so rows already placed drop
+ * out instead of reading as still to do. A sell also counts as placed when the
+ * name is gone from holdings. Rows nothing tracks keep status null.
+ */
+export function liveActions(
+  actions: Action[] | undefined,
+  moves: Move[] | undefined,
+  holdings: Holding[] | undefined,
+): { rows: { a: Action; status: LiveStatus; until?: string }[]; placed: number } {
+  const ms = moves ?? [];
+  const held = new Set((holdings ?? []).filter((h) => h.bucket !== "cash").map((h) => h.symbol));
+  const st = (m: Move): LiveStatus => (m.status === "done" ? "placed" : m.status === "held" ? "held" : m.status === "alerted" ? "todo" : null);
+  const rows: { a: Action; status: LiveStatus; until?: string }[] = [];
+  let placed = 0;
+  for (const a of actions ?? []) {
+    const sym = a.symbol ?? "";
+    let status: LiveStatus = null;
+    let until: string | undefined;
+    if (a.kind === "sell") {
+      const m = ms.find((x) => x.sell === sym);
+      status = m ? st(m) : null;
+      until = m?.status === "held" ? m.revisit : undefined;
+      if (!status && sym && holdings && !held.has(sym)) status = "placed";
+    } else if (a.kind === "buy" || a.kind === "limit") {
+      const mine = ms.filter((x) => x.buy === sym && (a.kind === "limit" ? x.kind === "limit" : x.kind !== "limit"));
+      if (mine.length) {
+        // Held legs have their own sell row; the buy counts as placed once every other leg is done.
+        const live = mine.filter((x) => x.status !== "held");
+        status = live.some((x) => x.status === "alerted") ? "todo" : live.length && live.every((x) => x.status === "done") ? "placed" : null;
+      }
+    }
+    if (status === "placed") placed += 1;
+    else rows.push({ a, status, until });
+  }
+  return { rows, placed };
 }

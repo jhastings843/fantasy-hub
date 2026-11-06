@@ -59,3 +59,35 @@ describe("portfolio view helpers", () => {
     expect(capState(null, 8)).toBe("unknown");
   });
 });
+
+describe("liveActions", () => {
+  it("drops placed rows, marks held and to-do, and treats a sold-out name as placed", async () => {
+    const { liveActions } = await import("./view");
+    const actions = [
+      { kind: "sell", symbol: "AIS" },
+      { kind: "sell", symbol: "ABAT" },
+      { kind: "sell", symbol: "GONE" },
+      { kind: "sell", symbol: "KEEP" },
+      { kind: "buy", symbol: "VOO", amount: 5000 },
+      { kind: "buy", symbol: "AVGO", amount: 400 },
+      { kind: "limit", symbol: "VOO", amount: 1290 },
+      { kind: "hold", symbol: "NVDA" },
+    ];
+    const moves = [
+      { id: "1", kind: "swap", sell: "AIS", buy: "VOO", status: "done" },
+      { id: "2", kind: "swap", sell: "ABAT", buy: "VOO", status: "held", revisit: "2026-11-10" },
+      { id: "3", kind: "swap", sell: "SMR", buy: "AVGO", status: "alerted" },
+      { id: "4", kind: "limit", buy: "VOO", status: "done" },
+    ];
+    const holdings = [{ symbol: "ABAT" }, { symbol: "KEEP" }, { symbol: "VOO" }, { symbol: "NVDA" }];
+    const r = liveActions(actions as never, moves as never, holdings as never);
+    expect(r.placed).toBe(4); // AIS, GONE, VOO buy (all non-held VOO swaps done), VOO limit
+    expect(r.rows.map((x) => [x.a.symbol, x.a.kind, x.status, x.until ?? null])).toEqual([
+      ["ABAT", "sell", "held", "2026-11-10"],
+      ["KEEP", "sell", null, null],
+      ["AVGO", "buy", "todo", null],
+      ["NVDA", "hold", null, null],
+    ]);
+  });
+});
+
