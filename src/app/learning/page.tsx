@@ -14,6 +14,9 @@ import { cbbSeason } from "@/lib/models/cbb/store";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import type { SectionState } from "@/lib/learning/engine";
 import type { ReviewState } from "@/lib/picks/learning/review";
+import { pemWeeks } from "@/lib/picks/pem";
+import { harrisWeeks } from "@/lib/picks/harris";
+import { usableWeeks, type UsableWeeks } from "@/lib/picks/source-weeks";
 import { whenEt } from "../picks/ui";
 import { PageHead, Section, Row as StatusRow, Chip, Disclosure, Num } from "@/components/hh/ui";
 import s from "../picks/picks.module.css";
@@ -39,6 +42,8 @@ interface Row {
   last: string | null;
   href: string;
   waiting?: boolean;
+  /** Outside sources: weeks the picks review can use (verified sheets) of weeks on file. */
+  usable?: UsableWeeks;
 }
 
 function picksMarket(state: ReviewState | null, policy: PicksPolicy, league: "nfl" | "cfb", market: "ats" | "ou" | "su"): Pick<Row, "live" | "collecting" | "last"> {
@@ -86,7 +91,7 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
   const nbaSeason = nbaSeasonOfDate(new Date());
-  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel] = await Promise.all([
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel, pemOnFile, harrisOnFile] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
@@ -100,7 +105,10 @@ export default async function LearningPage() {
     loadSection(SECTIONS.nbaKotc, nbaSeason),
     loadSection(CFB_SECTION, season),
     loadSection(CBB_SECTION, cbbSeason(new Date())),
+    pemWeeks(season),
+    harrisWeeks(season),
   ]);
+  const usable = { pem: usableWeeks(pemOnFile), harris: usableWeeks(harrisOnFile) };
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
   const PICKS = "Picks review: 7am ET after each slate (Fri, Sun, Mon, Tue), one change per part per week, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
@@ -131,6 +139,7 @@ export default async function LearningPage() {
         name: src === "pem" ? "PEM (@FansOfCFB)" : "John Harris (@jhnhrris)",
         loop: "Picks review: does skipping the rule bets it disagrees with gain? Gain at t 1.645 over 30+ bets and 3+ weeks adds it as a veto; a loss on the same bar drops it. Retested from every switch.",
         href: "/picks/cfb?v=research",
+        usable: usable[src],
         ...sourceRow(state, policy, src),
       })),
     },
@@ -228,6 +237,13 @@ export default async function LearningPage() {
                     {r.waiting && <Chip>not running</Chip>}
                   </div>
                   <p className="mt-1 text-sm text-hh-ink-2"><span className="text-hh-muted">Live: </span>{r.live}</p>
+                  {r.usable && (
+                    <p className="mt-1 text-sm text-hh-ink-2">
+                      <span className="text-hh-muted">Usable weeks: </span>
+                      <Num tone={r.usable.total && r.usable.usable < r.usable.total ? "gold" : undefined}>{`${r.usable.usable} of ${r.usable.total}`}</Num>
+                      {r.usable.missing.length > 0 && <span className="text-hh-muted">{` · no checked sheet for week${r.usable.missing.length === 1 ? "" : "s"} ${r.usable.missing.join(", ")}`}</span>}
+                    </p>
+                  )}
                   <Disclosure summary="Rules, testing and latest review">
                     <p>{r.loop}</p>
                     <p className="mt-2"><b>Testing: </b>{r.collecting}</p>

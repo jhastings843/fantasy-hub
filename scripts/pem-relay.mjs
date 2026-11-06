@@ -12,22 +12,53 @@
 // ~/Library/LaunchAgents/com.jackh.pem-relay.plist every two hours.
 //
 // Needs PEM_RELAY_SECRET in this repo's .env.local. That secret can only post
-// PEM cards; it is not the app's cron secret.
+// PEM cards; it is not the app's cron secret. Pushes go through Hobby Hub's
+// own Pushover app (PUSHOVER_APP_TOKEN, PUSHOVER_USER_KEY in .env.local).
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { afterAnswer, isDone } from "./relay-retry.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const APP_URL = process.env.APP_URL ?? "https://fantasy-hub-tan.vercel.app";
 const STATE = path.join(ROOT, ".pem-relay", "sent.json");
 const dry = process.argv.includes("--dry");
 
-function secret() {
+function envVar(name) {
   const env = path.join(ROOT, ".env.local");
   if (!existsSync(env)) return null;
-  const line = readFileSync(env, "utf8").split("\n").find((l) => l.startsWith("PEM_RELAY_SECRET="));
-  return line ? line.slice("PEM_RELAY_SECRET=".length).trim() : null;
+  const line = readFileSync(env, "utf8").split("\n").find((l) => l.startsWith(`${name}=`));
+  return line ? line.slice(name.length + 1).trim().replace(/^"(.*)"$/, "$1") : null;
+}
+const secret = () => envVar("PEM_RELAY_SECRET");
+
+/** A phone alert through Hobby Hub's Pushover app. Never throws; logs when it can't send. */
+async function push({ title, message }) {
+  const token = envVar("PUSHOVER_APP_TOKEN");
+  const user = envVar("PUSHOVER_USER_KEY");
+  if (!token || !user || dry) return log(`(no push) ${title}: ${message}`);
+  try {
+    const res = await fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, user, title, message }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    log(`pushed "${title}": ${res.status}`);
+  } catch (e) {
+    log(`push failed (${title}): ${e.message}`);
+  }
+}
+
+/** Store the app's answer for one post; push if it read nothing usable. A failed answer stores nothing (retried next run). */
+async function record(sent, id, json, label, note) {
+  const { entry, alert } = afterAnswer(sent[id], json, label, note);
+  if (!entry) return;
+  sent[id] = entry;
+  mkdirSync(path.dirname(STATE), { recursive: true });
+  writeFileSync(STATE, JSON.stringify(sent, null, 2));
+  if (alert) await push(alert);
 }
 
 function log(msg) {
@@ -64,7 +95,7 @@ async function main() {
     return;
   }
 
-  const cards = posts.filter((p) => !p.is_retweet && isPicksCard(p.text) && p.media_urls?.length && !sent[p.id]);
+  const cards = posts.filter((p) => !p.is_retweet && isPicksCard(p.text) && p.media_urls?.length && !isDone(sent[p.id]));
   if (!cards.length) return log("no new picks card");
 
   for (const p of cards.reverse()) {
@@ -81,12 +112,10 @@ async function main() {
     });
     const json = await res.json().catch(() => ({}));
     log(`sent ${p.id} (${p.text.split("\n")[0]}): ${res.status} ${JSON.stringify(json)}`);
-    // A card the app read, or deliberately skipped, is done. A failure is retried next run.
-    if (res.ok && json.ok) {
-      sent[p.id] = { at: new Date().toISOString(), result: json };
-      mkdirSync(path.dirname(STATE), { recursive: true });
-      writeFileSync(STATE, JSON.stringify(sent, null, 2));
-    }
+    // A card the app read and verified, or deliberately skipped, is done. A
+    // failure is retried next run; an ok answer that is not verified is
+    // retried up to MAX_TRIES runs, with a push to Jack (relay-retry.mjs).
+    if (res.ok) await record(sent, p.id, json, "PEM card");
   }
 }
 
@@ -101,7 +130,7 @@ async function harris(key, sent) {
     log(`couldn't read X for Harris: ${String(e.stderr ?? e.message).split("\n")[0]}`);
     return;
   }
-  const found = posts.filter((p) => !p.is_retweet && isHarrisPost(p.text) && !sent[`harris:${p.id}`]);
+  const found = posts.filter((p) => !p.is_retweet && isHarrisPost(p.text) && !isDone(sent[`harris:${p.id}`]));
   if (!found.length) return log("no new Harris post");
   for (const p of found.reverse()) {
     const body = { tweetId: p.id, text: p.text, postedAt: new Date(p.created_at).toISOString(), imageUrls: p.media_urls ?? [] };
@@ -117,11 +146,8 @@ async function harris(key, sent) {
     });
     const json = await res.json().catch(() => ({}));
     log(`sent Harris ${p.id}: ${res.status} ${JSON.stringify(json)}`);
-    if (res.ok && json.ok) {
-      sent[`harris:${p.id}`] = { at: new Date().toISOString(), result: json };
-      mkdirSync(path.dirname(STATE), { recursive: true });
-      writeFileSync(STATE, JSON.stringify(sent, null, 2));
-    }
+    const note = body.imageUrls.length ? `${body.imageUrls.length} image${body.imageUrls.length === 1 ? "" : "s"} on the post` : "no images on the post";
+    if (res.ok) await record(sent, `harris:${p.id}`, json, "Harris sheet", note);
   }
 }
 
