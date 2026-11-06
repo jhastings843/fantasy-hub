@@ -5,6 +5,7 @@ import { readCbbLine, type CbbLine, type CbbOdds } from "./lines";
 import { matchTorvik, readTorvikTeams } from "./torvik";
 import { orientTracked, signalRecords, signalsOf, type CbbSnap, type SignalRecord, type TrackedCbbGame } from "./track";
 import { CBB_SECTION, cbbCandidates, cbbWeek } from "./learn";
+import { HARRIS_PRE, type HarrisPre } from "./harris";
 import { CBB_MODEL_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { markScoresAt } from "@/lib/live/scores-at";
@@ -29,6 +30,7 @@ import SEED from "./seed.json";
 //   models:v1:cbb:{season}:torvik           last good T-Rank file, with when
 //   models:v1:cbb:teams                     ESPN team list, a week
 //   models:v1:cbb:run                       30-minute claim
+//   models:v1:cbb:{season}:harris:*         John Harris's daily sheets (harris-store.ts)
 
 const P = PARAMS as CbbParams;
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball";
@@ -39,6 +41,9 @@ const TORVIK = (s: number) => `models:v1:cbb:${s}:torvik`;
 const TEAMS = "models:v1:cbb:teams";
 const ET = "America/New_York";
 const r2 = (x: number) => Math.round(x * 100) / 100;
+
+/** John Harris's pregame numbers by event, for his slices. Empty when unreadable (his slices then just see no games). */
+const harrisPre = (season: number) => redis.hgetall<{ [event: string]: HarrisPre }>(HARRIS_PRE(season)).then((x) => x ?? {}).catch(() => ({}));
 
 /** Season start year: November through April belongs to the season that started in the fall. */
 export const cbbSeason = (now = new Date()) => (now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1);
@@ -146,7 +151,8 @@ function readBoard(d: EspnBoard, day: string): CbbBoardGame[] {
   return out.sort((x, y) => x.tip.localeCompare(y.tip));
 }
 
-async function boardFor(day: string): Promise<CbbBoardGame[]> {
+/** ESPN's Division I scoreboard for one Eastern day (yyyymmdd). */
+export async function boardFor(day: string): Promise<CbbBoardGame[]> {
   return readBoard(await getJson<EspnBoard>(`${SITE}/scoreboard?dates=${day}&groups=50&limit=500`), day);
 }
 
@@ -448,7 +454,8 @@ async function runOnce(now: Date, season: number, left: () => number): Promise<s
   // 1b. The learner: registers new slices, and once a slate (ET date) reviews them on graded games.
   let learned = "";
   if (left() > 6_000) {
-    const journal = await reviewIfDue(CBB_SECTION, season, cbbWeek(now.toISOString(), season), CBB_MODEL_GATE, cbbCandidates(Object.values(tracked), season), now).catch(() => []);
+    const harris = await harrisPre(season);
+    const journal = await reviewIfDue(CBB_SECTION, season, cbbWeek(now.toISOString(), season), CBB_MODEL_GATE, cbbCandidates(Object.values(tracked), season, harris), now).catch(() => []);
     if (journal.length) learned = `, learner: ${journal.map((j) => j.text).join(" ").slice(0, 160)}`;
   }
 
@@ -576,10 +583,10 @@ export interface CbbRecord {
 
 export async function getCbbRecord(now = new Date()): Promise<CbbRecord> {
   const season = cbbSeason(now);
-  const [raw, state, journal] = await Promise.all([redis.hgetall<{ [id: string]: TrackedCbbGame }>(TRACK(season)), loadSection(CBB_SECTION, season), loadJournal(CBB_SECTION, season, 40)]);
+  const [raw, state, journal, harris] = await Promise.all([redis.hgetall<{ [id: string]: TrackedCbbGame }>(TRACK(season)), loadSection(CBB_SECTION, season), loadJournal(CBB_SECTION, season, 40), harrisPre(season)]);
   const games = Object.values(raw ?? {}).sort((a, b) => b.tip.localeCompare(a.tip));
   const strong = { strong: P.strong, strongTotal: P.strongTotal };
-  return { season, games, records: signalRecords(games, strong), strong, section: sectionView(CBB_MODEL_GATE, state, cbbCandidates(games, season), journal) };
+  return { season, games, records: signalRecords(games, strong), strong, section: sectionView(CBB_MODEL_GATE, state, cbbCandidates(games, season, harris), journal) };
 }
 
 export { signalsOf };

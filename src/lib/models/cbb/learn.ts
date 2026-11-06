@@ -16,6 +16,7 @@
 import type { Bet, Candidate } from "@/lib/learning/engine";
 import { payout } from "./lines";
 import type { TrackedCbbGame } from "./track";
+import type { HarrisPre } from "./harris";
 
 export const CBB_SECTION = "cbb-model-ours";
 
@@ -33,6 +34,12 @@ export interface Read {
   /** Tip before Dec 15: ratings still settling, rosters new. */
   early: boolean;
   total: { side: "over" | "under"; edge: number; agree: boolean | null } | null;
+  /**
+   * John Harris's side against the same saved line, from his last read before
+   * tip (harris.ts): his home margin plus our spread, like ours. Undefined when
+   * he had no pregame number on the game (and always in the backtest).
+   */
+  harris?: { side: "home" | "away" | null; edge: number; trigger: boolean };
 }
 
 /** Everything a Read needs, from a live snapshot or a backtest row. */
@@ -78,7 +85,7 @@ export function readOf(x: ReadInput, earlyBefore = "12-15"): Read {
   return { side, edge, fav, agree, withMove, conf: x.conf, neutral: x.neutral, early: md >= "08-01" && md < earlyBefore, total };
 }
 
-type Pick = "ours" | "fade" | "total";
+type Pick = "ours" | "fade" | "total" | "harris";
 type Keep = (r: Read) => boolean;
 
 /** [id, label, parent, which bet, keep]. Thresholds fixed 2026-11-02 before any live game. */
@@ -104,11 +111,19 @@ export const CBB_SLICES: [string, string, string | undefined, Pick, Keep][] = [
   ["cbb:under", "The under when we're below the total", "cbb:total", "total", (r) => r.total?.side === "under"],
   ["cbb:over", "The over when we're above the total", "cbb:total", "total", (r) => r.total?.side === "over"],
   ["cbb:total-agree", "Our total when ours and T-Rank agree", "cbb:total", "total", (r) => r.total?.agree === true],
+  // John Harris as an outside source (added 2026-11-06, thresholds set before any graded game; they mirror ours).
+  ["cbb:harris-agree", "Our side when Harris is on it too", "cbb:lean", "ours", (r) => !!r.side && r.harris?.side === r.side],
+  ["cbb:harris-split", "Our side when Harris is on the other side", "cbb:lean", "ours", (r) => !!r.side && !!r.harris?.side && r.harris.side !== r.side],
+  ["cbb:harris", "Harris's side, any edge", undefined, "harris", (r) => !!r.harris?.side],
+  ["cbb:harris3", "Harris's side, 3+ pts off the line", "cbb:harris", "harris", (r) => !!r.harris?.side && r.harris.edge >= 3],
+  ["cbb:harris5", "Harris's side, 5+ pts off the line", "cbb:harris3", "harris", (r) => !!r.harris?.side && r.harris.edge >= 5],
+  ["cbb:harris-trigger", "Harris's side when his Trigger flag is on", "cbb:harris", "harris", (r) => !!r.harris?.side && r.harris.trigger],
 ];
 
 /** The bet a slice makes on a read: side and market, or null. */
 export function betOf(pick: Pick, r: Read): { market: "ats" | "ou"; side: "home" | "away" | "over" | "under" } | null {
   if (pick === "total") return r.total ? { market: "ou", side: r.total.side } : null;
+  if (pick === "harris") return r.harris?.side ? { market: "ats", side: r.harris.side } : null;
   if (!r.side) return null;
   return { market: "ats", side: pick === "fade" ? (r.side === "home" ? "away" : "home") : r.side };
 }
@@ -127,9 +142,20 @@ export function cbbWeek(iso: string, season: number): number {
   return Math.max(1, Math.floor((Date.parse(iso) - start.getTime()) / (7 * 86_400_000)) + 1);
 }
 
-export function liveRead(g: TrackedCbbGame): Read {
+/** Harris's side on a tracked game at its first saved line; undefined without a pregame read of his. */
+export function harrisRead(g: TrackedCbbGame, h: HarrisPre | undefined): Read["harris"] {
+  const line = g.first.spread;
+  if (!h || line === null || !(h.at < g.tip)) return undefined;
+  // His Model Prediction is the line for h.homeId; turned to the tracked game's home team.
+  const margin = (h.homeId === g.home ? -1 : h.homeId === g.away ? 1 : NaN) * h.model;
+  if (!Number.isFinite(margin)) return undefined;
+  const e = margin + line;
+  return { side: e > 0 ? "home" : e < 0 ? "away" : null, edge: r1(Math.abs(e)), trigger: h.trigger };
+}
+
+export function liveRead(g: TrackedCbbGame, h?: HarrisPre): Read {
   const s = g.first;
-  return readOf({
+  const r = readOf({
     spread: s.spread,
     openSpread: s.open.spread,
     total: s.total,
@@ -140,17 +166,19 @@ export function liveRead(g: TrackedCbbGame): Read {
     neutral: g.neutral,
     tip: g.tip,
   });
+  const hr = harrisRead(g, h);
+  return hr ? { ...r, harris: hr } : r;
 }
 
-/** Graded games into the engine's candidates, at the first saved price. */
-export function cbbCandidates(games: TrackedCbbGame[], season: number): Candidate[] {
+/** Graded games into the engine's candidates, at the first saved price. `harris` is his pregame numbers by event (harris.ts). */
+export function cbbCandidates(games: TrackedCbbGame[], season: number, harris: { [event: string]: HarrisPre } = {}): Candidate[] {
   return CBB_SLICES.map(([id, label, parent, pick, keep]) => ({
     id,
     label,
     ...(parent ? { parent } : {}),
     bets: games.flatMap((g): Bet[] => {
       if (!g.final) return [];
-      const r = liveRead(g);
+      const r = liveRead(g, harris[g.event]);
       if (!keep(r)) return [];
       const b = betOf(pick, r);
       if (!b) return [];

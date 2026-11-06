@@ -87,7 +87,7 @@ function SliceTable({ v, m }: { v: CbbRecord; m: Market }) {
           </tbody>
         </table>
       </div>
-      <p className={`${s.notice} ${s.dim}`}>2025-26 is retrospective: the model&apos;s number on a game could use results from after its line opened, and the blend&apos;s two weights were fit on that season&apos;s first half. Line-move slices need a later read, so they have no backtest.</p>
+      <p className={`${s.notice} ${s.dim}`}>2025-26 is retrospective: the model&apos;s number on a game could use results from after its line opened, and the blend&apos;s two weights were fit on that season&apos;s first half. Line-move slices need a later read, and Harris slices his daily sheet (tracked from Nov 6), so neither has a backtest.</p>
     </div>
   );
 }

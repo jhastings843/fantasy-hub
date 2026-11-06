@@ -36,6 +36,7 @@ import { runPicksData } from "@/lib/picks/report";
 import { tracked } from "@/lib/picks/ops";
 import { reviewIfDue } from "@/lib/picks/learning/run";
 import { harrisFeedIfDue } from "@/lib/picks/harris";
+import { harrisCbbIfDue } from "@/lib/models/cbb/harris-store";
 import { weekOf } from "@/lib/picks/parse";
 import { buildPoolView } from "@/lib/picks/pool-store";
 import { tempoFor, type PulseTier, type SendId, type Tempo, type TimedJobId } from "./tempo";
@@ -395,6 +396,8 @@ function jobsFor(tier: PulseTier): { name: string; work: () => Promise<string> }
         { name: "picks-review", work: () => tracked("review", 60, () => reviewIfDue()) },
         // John Harris's website feed (tracked only): his week's lines, every six hours at most.
         { name: "harris-feed", work: () => harrisFeedIfDue() },
+        // His college basketball sheet (tracked only, feeds the CBB Harris slices): today hourly, yesterday until verified.
+        { name: "harris-cbb", work: () => harrisCbbIfDue() },
         { name: "tracker", work: () => archiveTracker() },
       ];
     case "overnight":

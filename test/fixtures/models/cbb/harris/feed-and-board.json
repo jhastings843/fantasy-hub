@@ -1,0 +1,5773 @@
+{
+"feed": {
+"2026-11-03": {
+"headers": [
+"Date",
+"Away",
+"Home",
+"Neutral",
+"Spread",
+"Model Prediction",
+"Confidence",
+"Edge",
+"ATS Pick",
+"Trigger",
+"Start"
+],
+"rows": [
+[
+"2026-11-03",
+"South Dakota State",
+"Kansas State",
+"N",
+"-11.5",
+"-11.5",
+"0.501",
+"0.0",
+"Kansas State -11.5",
+"N",
+"2026-11-04T01:00:00.000Z"
+],
+[
+"2026-11-03",
+"Wagner",
+"Boston College",
+"N",
+"-19.5",
+"-21.2",
+"0.638",
+"-1.7",
+"Boston College -19.5",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"Wofford",
+"Tennessee",
+"N",
+"-25.5",
+"-31.0",
+"0.606",
+"-5.5",
+"Tennessee -25.5",
+"Y",
+"2026-11-03T23:00:00.000Z"
+],
+[
+"2026-11-03",
+"Sam Houston",
+"Alabama",
+"N",
+"-27.0",
+"-25.5",
+"0.430",
+"+1.5",
+"Sam Houston +27.0",
+"N",
+"2026-11-04T00:30:00.000Z"
+],
+[
+"2026-11-03",
+"Purdue Fort Wayne",
+"Duquesne",
+"N",
+"-10.0",
+"-10.8",
+"0.529",
+"-0.8",
+"Duquesne -10.0",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"Northern Arizona",
+"UNLV",
+"N",
+"-21.5",
+"-19.8",
+"0.448",
+"+1.7",
+"Northern Arizona +21.5",
+"N",
+"2026-11-04T03:00:00.000Z"
+],
+[
+"2026-11-03",
+"Stetson",
+"South Carolina",
+"N",
+"-19.5",
+"-18.7",
+"0.467",
+"+0.8",
+"Stetson +19.5",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"New Orleans",
+"LSU",
+"N",
+"-27.5",
+"-19.5",
+"0.426",
+"+8.0",
+"New Orleans +27.5",
+"N",
+"2026-11-04T01:00:00.000Z"
+],
+[
+"2026-11-03",
+"Manhattan",
+"Kentucky",
+"N",
+"-33.5",
+"-33.7",
+"0.508",
+"-0.2",
+"Kentucky -33.5",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"Cleveland State",
+"Missouri",
+"N",
+"-26.5",
+"-30.6",
+"0.578",
+"-4.1",
+"Missouri -26.5",
+"N",
+"2026-11-04T01:00:00.000Z"
+],
+[
+"2026-11-03",
+"Alabama State",
+"Texas A&M",
+"N",
+"-32.5",
+"-30.0",
+"0.447",
+"+2.5",
+"Alabama State +32.5",
+"N",
+"2026-11-04T01:00:00.000Z"
+],
+[
+"2026-11-03",
+"Lipscomb",
+"Iowa",
+"N",
+"-23.5",
+"-20.4",
+"0.412",
+"+3.1",
+"Lipscomb +23.5",
+"N",
+"2026-11-04T01:00:00.000Z"
+],
+[
+"2026-11-03",
+"Drexel",
+"Virginia",
+"N",
+"-31.5",
+"-27.8",
+"0.397",
+"+3.7",
+"Drexel +31.5",
+"Y",
+"2026-11-04T00:30:00.000Z"
+],
+[
+"2026-11-03",
+"Hampton",
+"Georgia Tech",
+"N",
+"-14.0",
+"-14.2",
+"0.505",
+"-0.2",
+"Georgia Tech -14.0",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"Cal State Fullerton",
+"San Diego State",
+"N",
+"-15.0",
+"-18.9",
+"0.605",
+"-3.9",
+"San Diego State -15.0",
+"Y",
+"2026-11-04T03:00:00.000Z"
+],
+[
+"2026-11-03",
+"Coppin State",
+"Virginia Tech",
+"N",
+"-31.5",
+"-34.0",
+"0.554",
+"-2.5",
+"Virginia Tech -31.5",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"Holy Cross",
+"Rhode Island",
+"N",
+"-20.5",
+"-19.3",
+"0.476",
+"+1.2",
+"Holy Cross +20.5",
+"N",
+"2026-11-04T00:00:00.000Z"
+],
+[
+"2026-11-03",
+"Incarnate Word",
+"Tulsa",
+"N",
+"",
+"-18.8",
+"0.957",
+"-18.8",
+"",
+"N",
+""
+],
+[
+"2026-11-03",
+"North Florida",
+"California Baptist",
+"N",
+"-11.5",
+"-7.7",
+"0.420",
+"+3.8",
+"North Florida +11.5",
+"N",
+"2026-11-04T03:00:00.000Z"
+]
+]
+},
+"2026-11-06+07": {
+"headers": [
+"Date",
+"Away",
+"Home",
+"Neutral",
+"Spread",
+"Model Prediction",
+"Confidence",
+"Edge",
+"ATS Pick",
+"Trigger"
+],
+"rows": [
+[
+"2026-11-06",
+"Youngstown State",
+"Ohio State",
+"N",
+"-25.5",
+"-24.6",
+"0.477",
+"+0.9",
+"Youngstown State +25.5",
+"N"
+],
+[
+"2026-11-06",
+"St. Thomas-Minnesota",
+"Minnesota",
+"N",
+"-14.5",
+"-14",
+"0.489",
+"+0.5",
+"St. Thomas-Minnesota +14.5",
+"N"
+],
+[
+"2026-11-06",
+"Wofford",
+"North Carolina",
+"N",
+"-22.5",
+"-23.9",
+"0.522",
+"-1.4",
+"North Carolina -22.5",
+"N"
+],
+[
+"2026-11-06",
+"American University",
+"Clemson",
+"N",
+"-16.5",
+"-19.6",
+"0.628",
+"-3.1",
+"Clemson -16.5",
+"Y"
+],
+[
+"2026-11-06",
+"Missouri",
+"Saint Louis",
+"Y",
+"+2.0",
+"+4.9",
+"0.397",
+"+2.9",
+"Missouri -2.0",
+"N"
+],
+[
+"2026-11-06",
+"Indiana State",
+"Ball State",
+"N",
+"-2",
+"-2.7",
+"0.516",
+"-0.7",
+"Ball State -2.0",
+"N"
+],
+[
+"2026-11-06",
+"Middle Tennessee",
+"Kansas",
+"N",
+"-30.5",
+"-28.6",
+"0.443",
+"+1.9",
+"Middle Tennessee +30.5",
+"N"
+],
+[
+"2026-11-06",
+"Southern Miss",
+"Iowa State",
+"N",
+"-30.5",
+"-29.8",
+"0.471",
+"+0.7",
+"Southern Miss +30.5",
+"N"
+],
+[
+"2026-11-06",
+"Troy",
+"Florida State",
+"N",
+"-23.5",
+"-17.8",
+"0.322",
+"+5.7",
+"Troy +23.5",
+"Y"
+],
+[
+"2026-11-06",
+"Massachusetts",
+"Boston College",
+"Y",
+"-6.5",
+"-5.6",
+"0.446",
+"+0.9",
+"Massachusetts +6.5",
+"N"
+],
+[
+"2026-11-06",
+"Eastern Michigan",
+"Xavier",
+"N",
+"-24",
+"-21.8",
+"0.403",
+"+2.2",
+"Eastern Michigan +24.0",
+"N"
+],
+[
+"2026-11-06",
+"Detroit Mercy",
+"Marquette",
+"N",
+"-32.5",
+"-28.2",
+"0.374",
+"+4.3",
+"Detroit Mercy +32.5",
+"Y"
+],
+[
+"2026-11-06",
+"Mississippi Valley State",
+"Oklahoma",
+"N",
+"-38.5",
+"-40",
+"0.544",
+"-1.5",
+"Oklahoma -38.5",
+"N"
+],
+[
+"2026-11-06",
+"Presbyterian",
+"Georgia",
+"N",
+"-25.5",
+"-22.7",
+"0.371",
+"+2.8",
+"Presbyterian +25.5",
+"N"
+],
+[
+"2026-11-06",
+"Arkansas State",
+"Alabama",
+"N",
+"-25.5",
+"-25.7",
+"0.506",
+"-0.2",
+"Alabama -25.5",
+"N"
+],
+[
+"2026-11-06",
+"New Haven",
+"Rutgers",
+"N",
+"-24.5",
+"-24.1",
+"0.489",
+"+0.4",
+"New Haven +24.5",
+"N"
+],
+[
+"2026-11-06",
+"Valparaiso",
+"Purdue",
+"N",
+"-19.5",
+"-20.2",
+"0.523",
+"-0.7",
+"Purdue -19.5",
+"N"
+],
+[
+"2026-11-06",
+"Idaho",
+"Colorado State",
+"N",
+"-16.5",
+"-18.4",
+"0.581",
+"-1.9",
+"Colorado State -16.5",
+"N"
+],
+[
+"2026-11-06",
+"West Florida",
+"Florida International",
+"N",
+"-13.5",
+"-14.1",
+"#NUM!",
+"-0.6",
+"Florida International -13.5",
+"N"
+],
+[
+"2026-11-06",
+"North Florida",
+"UCLA",
+"N",
+"-31.5",
+"-30.8",
+"0.478",
+"+0.7",
+"North Florida +31.5",
+"N"
+],
+[
+"2026-11-06",
+"Idaho State",
+"Wyoming",
+"N",
+"-18.5",
+"-17.6",
+"0.449",
+"+0.9",
+"Idaho State +18.5",
+"N"
+],
+[
+"2026-11-06",
+"Texas Southern",
+"LSU",
+"N",
+"-32.5",
+"-28.2",
+"0.437",
+"+4.3",
+"Texas Southern +32.5",
+"N"
+],
+[
+"2026-11-06",
+"James Madison",
+"Kentucky",
+"N",
+"-25.5",
+"-22.7",
+"0.403",
+"+2.8",
+"James Madison +25.5",
+"N"
+],
+[
+"2026-11-06",
+"Stetson",
+"West Virginia",
+"N",
+"-28.5",
+"-26.9",
+"0.409",
+"+1.6",
+"Stetson +28.5",
+"N"
+],
+[
+"2026-11-06",
+"Yale",
+"UCF",
+"N",
+"-9.5",
+"-11.3",
+"0.528",
+"-1.8",
+"UCF -9.5",
+"N"
+],
+[
+"2026-11-06",
+"Omaha",
+"BYU",
+"N",
+"-33",
+"-30.5",
+"0.411",
+"+2.5",
+"Omaha +33.0",
+"N"
+],
+[
+"2026-11-06",
+"Northern Colorado",
+"Arizona State",
+"N",
+"-18.5",
+"-14.5",
+"0.341",
+"+4.0",
+"Northern Colorado +18.5",
+"Y"
+],
+[
+"2026-11-06",
+"Oakland",
+"Stanford",
+"N",
+"-14",
+"-14.4",
+"0.525",
+"-0.4",
+"Stanford -14.0",
+"N"
+],
+[
+"2026-11-06",
+"Wagner",
+"Miami",
+"N",
+"-38",
+"-36.4",
+"0.452",
+"+1.6",
+"Wagner +38.0",
+"N"
+],
+[
+"2026-11-06",
+"Holy Cross",
+"Villanova",
+"N",
+"-31.5",
+"-33.6",
+"0.569",
+"-2.1",
+"Villanova -31.5",
+"N"
+],
+[
+"2026-11-06",
+"UNC Greensboro",
+"Elon",
+"N",
+"-9",
+"-6.3",
+"0.452",
+"+2.7",
+"UNC Greensboro +9.0",
+"N"
+],
+[
+"2026-11-06",
+"North Dakota State",
+"San Francisco",
+"N",
+"-9.5",
+"-8",
+"0.466",
+"+1.5",
+"North Dakota State +9.5",
+"N"
+],
+[
+"2026-11-06",
+"Southern Illinois",
+"Kansas City",
+"N",
+"2.5",
+"+4.0",
+"0.447",
+"+1.5",
+"Southern Illinois -2.5",
+"N"
+],
+[
+"2026-11-06",
+"Delaware",
+"Wisconsin",
+"N",
+"-25",
+"-24",
+"0.454",
+"+1.0",
+"Delaware +25.0",
+"N"
+],
+[
+"2026-11-06",
+"Northern Kentucky",
+"Texas A&M",
+"N",
+"-27.5",
+"-21.8",
+"0.198",
+"+5.7",
+"Northern Kentucky +27.5",
+"Y"
+],
+[
+"2026-11-06",
+"Stony Brook",
+"Northwestern",
+"N",
+"-12.5",
+"-16.9",
+"0.651",
+"-4.4",
+"Northwestern -12.5",
+"Y"
+],
+[
+"2026-11-06",
+"Eastern Illinois",
+"Iowa",
+"N",
+"-35.5",
+"-32.9",
+"0.417",
+"+2.6",
+"Eastern Illinois +35.5",
+"N"
+],
+[
+"2026-11-06",
+"Eastern Washington",
+"Oregon",
+"N",
+"-16.5",
+"-16.3",
+"0.495",
+"+0.2",
+"Eastern Washington +16.5",
+"N"
+],
+[
+"2026-11-06",
+"Michigan",
+"UConn",
+"Y",
+"-7.5",
+"-3.9",
+"0.409",
+"+3.6",
+"Michigan +7.5",
+"N"
+],
+[
+"2026-11-06",
+"Northeastern",
+"Virginia",
+"N",
+"-34.5",
+"-28.9",
+"0.343",
+"+5.6",
+"Northeastern +34.5",
+"Y"
+],
+[
+"2026-11-06",
+"California Baptist",
+"Oregon State",
+"N",
+"-18.5",
+"-15.7",
+"0.442",
+"+2.8",
+"California Baptist +18.5",
+"N"
+],
+[
+"2026-11-06",
+"Georgia Southern",
+"Georgia Tech",
+"N",
+"-18",
+"-15.1",
+"0.431",
+"+2.9",
+"Georgia Southern +18.0",
+"N"
+],
+[
+"2026-11-06",
+"Coppin State",
+"George Mason",
+"N",
+"-26.5",
+"-28.2",
+"0.544",
+"-1.7",
+"George Mason -26.5",
+"N"
+],
+[
+"2026-11-06",
+"Southern",
+"TCU",
+"N",
+"-23.5",
+"-25.1",
+"0.591",
+"-1.6",
+"TCU -23.5",
+"N"
+],
+[
+"2026-11-06",
+"Queens University",
+"Oklahoma State",
+"N",
+"-19.5",
+"-19",
+"0.484",
+"+0.5",
+"Queens University +19.5",
+"N"
+],
+[
+"2026-11-06",
+"Nicholls",
+"UAB",
+"N",
+"-15.5",
+"-12.8",
+"0.414",
+"+2.7",
+"Nicholls +15.5",
+"N"
+],
+[
+"2026-11-06",
+"East Tennessee State",
+"NC State",
+"N",
+"-17.5",
+"-19.1",
+"0.538",
+"-1.6",
+"NC State -17.5",
+"N"
+],
+[
+"2026-11-06",
+"Austin Peay",
+"Kennesaw State",
+"N",
+"-5.5",
+"-5.4",
+"0.496",
+"+0.1",
+"Austin Peay +5.5",
+"N"
+],
+[
+"2026-11-06",
+"Central Arkansas",
+"Ole Miss",
+"N",
+"-20",
+"-18",
+"0.447",
+"+2.0",
+"Central Arkansas +20.0",
+"N"
+],
+[
+"2026-11-06",
+"Tarleton State",
+"San Diego",
+"N",
+"-6",
+"-4",
+"0.47",
+"+2.0",
+"Tarleton State +6.0",
+"N"
+],
+[
+"2026-11-06",
+"Arkansas-Pine Bluff",
+"Baylor",
+"N",
+"-37.5",
+"-35.3",
+"0.395",
+"+2.2",
+"Arkansas-Pine Bluff +37.5",
+"N"
+],
+[
+"2026-11-06",
+"Florida Atlantic",
+"Wright State",
+"N",
+"-3.5",
+"-0.5",
+"0.333",
+"+3.0",
+"Florida Atlantic +3.5",
+"Y"
+],
+[
+"2026-11-06",
+"South Carolina State",
+"South Carolina Upstate",
+"N",
+"-4.5",
+"-3.5",
+"0.464",
+"+1.0",
+"South Carolina State +4.5",
+"N"
+],
+[
+"2026-11-06",
+"Boston University",
+"Brown",
+"N",
+"-1.5",
+"-4.8",
+"0.651",
+"-3.3",
+"Brown -1.5",
+"Y"
+],
+[
+"2026-11-06",
+"Loyola Maryland",
+"Mount St. Mary's",
+"N",
+"-5.5",
+"-5.9",
+"0.519",
+"-0.4",
+"Mount St. Mary's -5.5",
+"N"
+],
+[
+"2026-11-06",
+"Cal State Northridge",
+"Kansas State",
+"N",
+"-10.5",
+"-10.8",
+"0.509",
+"-0.3",
+"Kansas State -10.5",
+"N"
+],
+[
+"2026-11-06",
+"Texas A&M-Corpus Christi",
+"Louisiana",
+"N",
+"-2.5",
+"-1.4",
+"0.448",
+"+1.1",
+"Texas A&M-Corpus Christi +2.5",
+"N"
+],
+[
+"2026-11-07",
+"San JosÃ© State",
+"UC Irvine",
+"N",
+"",
+"-8.7",
+"0.741",
+"-8.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Northern Illinois",
+"Dayton",
+"N",
+"",
+"-22.7",
+"0.929",
+"-22.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Bellarmine",
+"Miami (OH)",
+"N",
+"",
+"-18",
+"0.966",
+"-18",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Colorado",
+"San Diego State",
+"Y",
+"",
+"-0.4",
+"0.513",
+"-0.4",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Maryland",
+"Georgetown",
+"N",
+"",
+"+2.3",
+"0.44",
+"+2.3",
+"",
+"N"
+],
+[
+"2026-11-07",
+"VMI",
+"UTSA",
+"N",
+"",
+"-8.8",
+"0.805",
+"-8.8",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Northern Iowa",
+"Furman",
+"N",
+"",
+"-3.4",
+"0.578",
+"-3.4",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Northwestern State",
+"Murray State",
+"N",
+"",
+"-19.7",
+"0.935",
+"-19.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Western Illinois",
+"Houston Christian",
+"Y",
+"",
+"-10.8",
+"0.802",
+"-10.8",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Old Dominion",
+"Bucknell",
+"N",
+"",
+"+5.3",
+"0.339",
+"+5.3",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Samford",
+"UNLV",
+"N",
+"",
+"-12.7",
+"0.835",
+"-12.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Northern Arizona",
+"New Mexico",
+"N",
+"",
+"-23.3",
+"0.985",
+"-23.3",
+"",
+"N"
+],
+[
+"2026-11-07",
+"North Carolina A&T",
+"Ohio",
+"N",
+"",
+"-13.2",
+"0.785",
+"-13.2",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Toledo",
+"Marshall",
+"N",
+"",
+"-1.1",
+"0.529",
+"-1.1",
+"",
+"N"
+],
+[
+"2026-11-07",
+"SE Louisiana",
+"Little Rock",
+"N",
+"",
+"-7.2",
+"0.774",
+"-7.2",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Colgate",
+"Drexel",
+"N",
+"",
+"-1",
+"0.546",
+"-1",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Monmouth",
+"Rhode Island",
+"Y",
+"",
+"-5.2",
+"0.698",
+"-5.2",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Long Island University",
+"La Salle",
+"N",
+"",
+"-5.6",
+"0.644",
+"-5.6",
+"",
+"N"
+],
+[
+"2026-11-07",
+"VCU",
+"Memphis",
+"N",
+"",
+"+0.7",
+"0.48",
+"+0.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Morehead State",
+"Louisville",
+"N",
+"",
+"-32.5",
+"0.992",
+"-32.5",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Lamar",
+"Abilene Christian",
+"N",
+"",
+"+0.6",
+"0.485",
+"+0.6",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Sacramento State",
+"Santa Clara",
+"N",
+"",
+"-16.7",
+"0.837",
+"-16.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Pacific",
+"Bradley",
+"N",
+"",
+"-2.1",
+"0.556",
+"-2.1",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Portland State",
+"Seattle U",
+"N",
+"",
+"-10.9",
+"0.786",
+"-10.9",
+"",
+"N"
+],
+[
+"2026-11-07",
+"North Dakota",
+"Winthrop",
+"N",
+"",
+"-10.8",
+"0.899",
+"-10.8",
+"",
+"N"
+],
+[
+"2026-11-07",
+"UNC Wilmington",
+"East Carolina",
+"N",
+"",
+"+3.0",
+"0.399",
+"+3.0",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Long Beach State",
+"Montana State",
+"N",
+"",
+"-10.8",
+"0.924",
+"-10.8",
+"",
+"N"
+],
+[
+"2026-11-07",
+"North Carolina Central",
+"Longwood",
+"N",
+"",
+"-14.1",
+"0.853",
+"-14.1",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Lafayette",
+"Saint Joseph's",
+"N",
+"",
+"-18.7",
+"1",
+"-18.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Cal State Fullerton",
+"South Dakota",
+"N",
+"",
+"+0.1",
+"0.496",
+"+0.1",
+"",
+"N"
+],
+[
+"2026-11-07",
+"UT Martin",
+"IU Indianapolis",
+"N",
+"",
+"-0.2",
+"0.504",
+"-0.2",
+"",
+"N"
+],
+[
+"2026-11-07",
+"SIU Edwardsville",
+"Lipscomb",
+"N",
+"",
+"-6.9",
+"0.667",
+"-6.9",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Washington State",
+"High Point",
+"N",
+"",
+"-15.2",
+"0.867",
+"-15.2",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Prairie View A&M",
+"UT Rio Grande Valley",
+"N",
+"",
+"-7.7",
+"0.661",
+"-7.7",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Western Carolina",
+"UNC Asheville",
+"N",
+"",
+"+2.6",
+"0.424",
+"+2.6",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Morgan State",
+"Niagara",
+"N",
+"",
+"-4.1",
+"0.69",
+"-4.1",
+"",
+"N"
+],
+[
+"2026-11-07",
+"St. Bonaventure",
+"Canisius",
+"N",
+"",
+"+9.5",
+"0.344",
+"+9.5",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Nebraska",
+"Providence",
+"Y",
+"",
+"+6.3",
+"0.236",
+"+6.3",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Mercer",
+"Davidson",
+"N",
+"",
+"-12.5",
+"0.949",
+"-12.5",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Bethune-Cookman",
+"Grand Canyon",
+"N",
+"",
+"-20.6",
+"0.963",
+"-20.6",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Southern Indiana",
+"Evansville",
+"N",
+"",
+"-6.8",
+"0.657",
+"-6.8",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Denver",
+"UC Riverside",
+"N",
+"",
+"-2.4",
+"0.576",
+"-2.4",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Utah Valley",
+"Weber State",
+"N",
+"",
+"+9.0",
+"0.264",
+"+9.0",
+"",
+"N"
+],
+[
+"2026-11-07",
+"Fresno State",
+"UC San Diego",
+"N",
+"",
+"-10.7",
+"0.669",
+"-10.7",
+"",
+"N"
+]
+]
+},
+"2026-11-04": {
+"headers": [
+"Date",
+"Away",
+"Home",
+"Neutral",
+"Spread",
+"Model Prediction",
+"Confidence",
+"Edge",
+"ATS Pick",
+"Trigger",
+"Start"
+],
+"rows": [
+[
+"2026-11-04",
+"Fairleigh Dickinson",
+"Butler",
+"N",
+"-26.5",
+"-26.0",
+"0.480",
+"-0.5",
+"Fairleigh Dickinson +26.5",
+"N",
+"2026-11-05T00:00:00.000Z"
+],
+[
+"2026-11-04",
+"SE Louisiana",
+"Auburn",
+"N",
+"-28.5",
+"-28.2",
+"0.485",
+"-0.3",
+"SE Louisiana +28.5",
+"N",
+"2026-11-05T01:00:00.000Z"
+],
+[
+"2026-11-04",
+"Radford",
+"California",
+"N",
+"-15.5",
+"-16.4",
+"0.522",
+"+0.9",
+"California -15.5",
+"N",
+"2026-11-05T02:00:00.000Z"
+],
+[
+"2026-11-04",
+"Milwaukee",
+"Santa Clara",
+"N",
+"-17.5",
+"-19.5",
+"0.578",
+"+2.0",
+"Santa Clara -17.5",
+"N",
+"2026-11-05T03:00:00.000Z"
+],
+[
+"2026-11-04",
+"North Dakota State",
+"Saint Mary's",
+"N",
+"-13.5",
+"-14.4",
+"0.518",
+"+0.9",
+"Saint Mary's -13.5",
+"N",
+"2026-11-05T03:00:00.000Z"
+],
+[
+"2026-11-04",
+"Maryland Eastern Shore",
+"High Point",
+"N",
+"-33.5",
+"-32.7",
+"0.482",
+"-0.8",
+"Maryland Eastern Shore +33.5",
+"N",
+"2026-11-05T00:00:00.000Z"
+],
+[
+"2026-11-04",
+"Longwood",
+"Saint Joseph's",
+"N",
+"-10.5",
+"-9.7",
+"0.467",
+"-0.8",
+"Longwood +10.5",
+"N",
+"2026-11-05T00:00:00.000Z"
+],
+[
+"2026-11-04",
+"Cal State Northridge",
+"Wichita State",
+"N",
+"-14.5",
+"-15.2",
+"0.528",
+"+0.7",
+"Wichita State -14.5",
+"N",
+"2026-11-05T00:30:00.000Z"
+],
+[
+"2026-11-04",
+"Queens University",
+"Loyola Marymount",
+"N",
+"-8.5",
+"-6.4",
+"0.431",
+"-2.1",
+"Queens University +8.5",
+"N",
+"2026-11-05T03:00:00.000Z"
+]
+]
+},
+"2026-11-05": {
+"headers": [
+"Date",
+"Away",
+"Home",
+"Neutral",
+"Spread",
+"Model Prediction",
+"Confidence",
+"Edge",
+"ATS Pick",
+"Trigger",
+"Start"
+],
+"rows": [
+[
+"2026-11-05",
+"Bellarmine",
+"Indiana",
+"N",
+"-29.5",
+"-29.1",
+"0.481",
+"+0.4",
+"Bellarmine +29.5",
+"N",
+"2026-11-05T23:00:00.000Z"
+],
+[
+"2026-11-05",
+"Pennsylvania",
+"Illinois",
+"N",
+"-30.5",
+"-26.9",
+"0.432",
+"+3.6",
+"Pennsylvania +30.5",
+"N",
+"2026-11-06T01:30:00.000Z"
+],
+[
+"2026-11-05",
+"West Georgia",
+"Loyola Chicago",
+"N",
+"-18.0",
+"-15.2",
+"0.424",
+"+2.8",
+"West Georgia +18.0",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Stonehill",
+"Fordham",
+"N",
+"-19.5",
+"-19.3",
+"0.489",
+"+0.2",
+"Stonehill +19.5",
+"N",
+"2026-11-06T00:30:00.000Z"
+],
+[
+"2026-11-05",
+"Cal Poly",
+"Arizona",
+"N",
+"-31.0",
+"-28.0",
+"0.406",
+"+3.0",
+"Cal Poly +31.0",
+"N",
+"2026-11-06T03:30:00.000Z"
+],
+[
+"2026-11-05",
+"Wake Forest",
+"Vanderbilt",
+"N",
+"-17.5",
+"-14.4",
+"0.400",
+"+3.1",
+"Wake Forest +17.5",
+"N",
+"2026-11-05T23:00:00.000Z"
+],
+[
+"2026-11-05",
+"Central Connecticut",
+"Syracuse",
+"N",
+"-23.5",
+"-23.2",
+"0.491",
+"+0.3",
+"Central Connecticut +23.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Buffalo",
+"Pittsburgh",
+"N",
+"-18.5",
+"-19.3",
+"0.523",
+"-0.8",
+"Pittsburgh -18.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Coastal Carolina",
+"Duke",
+"N",
+"-41.0",
+"-39.1",
+"0.447",
+"+1.9",
+"Coastal Carolina +41.0",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"South Florida",
+"DePaul",
+"N",
+"-6.5",
+"-4.2",
+"0.440",
+"+2.3",
+"South Florida +6.5",
+"N",
+"2026-11-06T01:30:00.000Z"
+],
+[
+"2026-11-05",
+"Le Moyne",
+"Creighton",
+"N",
+"-30.0",
+"-29.1",
+"0.470",
+"+0.9",
+"Le Moyne +30.0",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Gardner-Webb",
+"Texas",
+"N",
+"-40.5",
+"-39.0",
+"0.452",
+"+1.5",
+"Gardner-Webb +40.5",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Northwestern State",
+"Mississippi State",
+"N",
+"-21.5",
+"-22.9",
+"0.609",
+"-1.4",
+"Mississippi State -21.5",
+"N",
+"2026-11-06T00:30:00.000Z"
+],
+[
+"2026-11-05",
+"Jacksonville",
+"Florida",
+"N",
+"-35.5",
+"-35.8",
+"0.508",
+"-0.3",
+"Florida -35.5",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Georgia State",
+"Charlotte",
+"N",
+"-11.0",
+"-11.2",
+"0.504",
+"-0.2",
+"Charlotte -11.0",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Toledo",
+"Michigan State",
+"N",
+"-27.5",
+"-25.7",
+"0.407",
+"+1.8",
+"Toledo +27.5",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Howard",
+"Alcorn State",
+"N",
+"+9.5",
+"+8.6",
+"0.526",
+"-0.9",
+"Alcorn State +9.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"McNeese",
+"North Texas",
+"N",
+"+3.0",
+"+0.2",
+"0.586",
+"-2.8",
+"North Texas +3.0",
+"N",
+"2026-11-05T22:00:00.000Z"
+],
+[
+"2026-11-05",
+"Green Bay",
+"Cincinnati",
+"N",
+"-24.5",
+"-23.9",
+"0.480",
+"+0.6",
+"Green Bay +24.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Towson",
+"Utah",
+"N",
+"-8.5",
+"-11.9",
+"0.708",
+"-3.4",
+"Utah -8.5",
+"Y",
+"2026-11-06T02:00:00.000Z"
+],
+[
+"2026-11-05",
+"Bryant",
+"Quinnipiac",
+"N",
+"-6.5",
+"-7.3",
+"0.521",
+"-0.8",
+"Quinnipiac -6.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"UMass Lowell",
+"Merrimack",
+"N",
+"-9.5",
+"-8.9",
+"0.490",
+"+0.6",
+"UMass Lowell +9.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"UAlbany",
+"Manhattan",
+"N",
+"-4.5",
+"-2.3",
+"0.437",
+"+2.2",
+"UAlbany +4.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Bethune-Cookman",
+"Texas Tech",
+"N",
+"-29.0",
+"-28.0",
+"0.472",
+"+1.0",
+"Bethune-Cookman +29.0",
+"N",
+"2026-11-06T02:00:00.000Z"
+],
+[
+"2026-11-05",
+"Northern Illinois",
+"Tulsa",
+"N",
+"-14.5",
+"-17.5",
+"0.562",
+"-3.0",
+"Tulsa -14.5",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Mercer",
+"Virginia Tech",
+"N",
+"-21.5",
+"-20.6",
+"0.475",
+"+0.9",
+"Mercer +21.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Mercyhurst",
+"Notre Dame",
+"N",
+"-21.5",
+"-21.8",
+"0.515",
+"-0.3",
+"Notre Dame -21.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Long Island University",
+"Seton Hall",
+"N",
+"-17.5",
+"-20.7",
+"0.602",
+"-3.2",
+"Seton Hall -17.5",
+"Y",
+"2026-11-05T23:30:00.000Z"
+],
+[
+"2026-11-05",
+"Chicago State",
+"Incarnate Word",
+"N",
+"-8.5",
+"-6.8",
+"0.443",
+"+1.7",
+"Chicago State +8.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Jackson State",
+"Tulane",
+"N",
+"-12.0",
+"-12.7",
+"0.519",
+"-0.7",
+"Tulane -12.0",
+"N",
+"2026-11-06T00:30:00.000Z"
+],
+[
+"2026-11-05",
+"VMI",
+"SMU",
+"N",
+"-24.5",
+"-26.4",
+"0.552",
+"-1.9",
+"SMU -24.5",
+"N",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Chattanooga",
+"Penn State",
+"N",
+"-12.5",
+"-15.7",
+"0.571",
+"-3.2",
+"Penn State -12.5",
+"N",
+"2026-11-05T23:00:00.000Z"
+],
+[
+"2026-11-05",
+"Jacksonville State",
+"South Alabama",
+"N",
+"-5.0",
+"+0.2",
+"0.269",
+"+5.2",
+"Jacksonville State +5.0",
+"Y",
+"2026-11-06T01:00:00.000Z"
+],
+[
+"2026-11-05",
+"Binghamton",
+"Saint Peter's",
+"N",
+"-7.5",
+"-8.0",
+"0.529",
+"-0.5",
+"Saint Peter's -7.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Boston College",
+"Harvard",
+"N",
+"",
+"+0.1",
+"0.497",
+"+0.1",
+"",
+"N",
+""
+],
+[
+"2026-11-05",
+"Hofstra",
+"Princeton",
+"N",
+"-3.0",
+"-2.8",
+"0.487",
+"+0.2",
+"Hofstra +3.0",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Cornell",
+"Lehigh",
+"N",
+"0",
+"+1.4",
+"0.440",
+"+1.4",
+"Cornell 0.0",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Maine",
+"Sacred Heart",
+"N",
+"-5.5",
+"-4.8",
+"0.480",
+"+0.7",
+"Maine +5.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"New Hampshire",
+"Rider",
+"N",
+"-1.5",
+"+2.6",
+"0.401",
+"+4.1",
+"New Hampshire +1.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Delaware State",
+"Navy",
+"N",
+"-7.5",
+"-9.7",
+"0.569",
+"-2.2",
+"Navy -7.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"UMBC",
+"Marist",
+"N",
+"-4.5",
+"-4.8",
+"0.508",
+"-0.3",
+"Marist -4.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"NJIT",
+"Iona",
+"N",
+"-9.5",
+"-11.4",
+"0.588",
+"-1.9",
+"Iona -9.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"Vermont",
+"Fairfield",
+"N",
+"+1.5",
+"-0.9",
+"0.606",
+"-2.4",
+"Fairfield +1.5",
+"N",
+"2026-11-06T00:00:00.000Z"
+],
+[
+"2026-11-05",
+"East Texas A&M",
+"Rice",
+"N",
+"-3.0",
+"-5.1",
+"0.543",
+"-2.1",
+"Rice -3.0",
+"N",
+"2026-11-06T01:00:00.000Z"
+]
+]
+}
+},
+"board": {
+"20261103": [
+{
+"id": "401906848",
+"tip": "2026-11-03T23:00Z",
+"home": {
+"id": "2633",
+"name": "Tennessee",
+"short": "Tennessee"
+},
+"away": {
+"id": "2747",
+"name": "Wofford",
+"short": "Wofford"
+}
+},
+{
+"id": "401920422",
+"tip": "2026-11-04T00:30Z",
+"home": {
+"id": "258",
+"name": "Virginia",
+"short": "Virginia"
+},
+"away": {
+"id": "2182",
+"name": "Drexel",
+"short": "Drexel"
+}
+},
+{
+"id": "401929372",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "8",
+"name": "Arkansas",
+"short": "Arkansas"
+},
+"away": {
+"id": "2029",
+"name": "Arkansas-Pine Bluff",
+"short": "AR-Pine Bluff"
+}
+},
+{
+"id": "401906757",
+"tip": "2026-11-04T00:30Z",
+"home": {
+"id": "333",
+"name": "Alabama",
+"short": "Alabama"
+},
+"away": {
+"id": "2534",
+"name": "Sam Houston",
+"short": "Sam Houston"
+}
+},
+{
+"id": "401921801",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "96",
+"name": "Kentucky",
+"short": "Kentucky"
+},
+"away": {
+"id": "2363",
+"name": "Manhattan",
+"short": "Manhattan"
+}
+},
+{
+"id": "401926180",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "2430",
+"name": "UNC Greensboro",
+"short": "UNC Greensboro"
+},
+"away": {
+"id": "2397",
+"name": "Milligan",
+"short": "Milligan"
+}
+},
+{
+"id": "401925779",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "2184",
+"name": "Duquesne",
+"short": "Duquesne"
+},
+"away": {
+"id": "2870",
+"name": "Purdue Fort Wayne",
+"short": "Purdue FW"
+}
+},
+{
+"id": "401921819",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "2579",
+"name": "South Carolina",
+"short": "South Carolina"
+},
+"away": {
+"id": "56",
+"name": "Stetson",
+"short": "Stetson"
+}
+},
+{
+"id": "401920376",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "259",
+"name": "Virginia Tech",
+"short": "Virginia Tech"
+},
+"away": {
+"id": "2154",
+"name": "Coppin State",
+"short": "Coppin St"
+}
+},
+{
+"id": "401920304",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "59",
+"name": "Georgia Tech",
+"short": "Georgia Tech"
+},
+"away": {
+"id": "2261",
+"name": "Hampton",
+"short": "Hampton"
+}
+},
+{
+"id": "401920061",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "227",
+"name": "Rhode Island",
+"short": "Rhode Island"
+},
+"away": {
+"id": "107",
+"name": "Holy Cross",
+"short": "Holy Cross"
+}
+},
+{
+"id": "401909551",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "103",
+"name": "Boston College",
+"short": "Boston College"
+},
+"away": {
+"id": "2681",
+"name": "Wagner",
+"short": "Wagner"
+}
+},
+{
+"id": "401928621",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "2623",
+"name": "Missouri State",
+"short": "Missouri St"
+},
+"away": {
+"id": "2876",
+"name": "Lincoln (MO)",
+"short": "Lincoln (MO)"
+}
+},
+{
+"id": "401927385",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "2460",
+"name": "Northern Iowa",
+"short": "Northern Iowa"
+},
+"away": {
+"id": "2155",
+"name": "Cornell (IA)",
+"short": "Cornell (IA)"
+}
+},
+{
+"id": "401924950",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "2277",
+"name": "Houston Christian",
+"short": "Hou Christian"
+},
+"away": {
+"id": "2347",
+"name": "Louisiana Christian",
+"short": "LA Christian"
+}
+},
+{
+"id": "401921808",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "99",
+"name": "LSU",
+"short": "LSU"
+},
+"away": {
+"id": "2443",
+"name": "LSU New Orleans",
+"short": "LSU N Orleans"
+}
+},
+{
+"id": "401921165",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "142",
+"name": "Missouri",
+"short": "Missouri"
+},
+"away": {
+"id": "325",
+"name": "Cleveland State",
+"short": "Cleveland St"
+}
+},
+{
+"id": "401920806",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "245",
+"name": "Texas A&M",
+"short": "Texas A&M"
+},
+"away": {
+"id": "2011",
+"name": "Alabama State",
+"short": "Alabama St"
+}
+},
+{
+"id": "401920702",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "2294",
+"name": "Iowa",
+"short": "Iowa"
+},
+"away": {
+"id": "288",
+"name": "Lipscomb",
+"short": "Lipscomb"
+}
+},
+{
+"id": "401909796",
+"tip": "2026-11-04T01:00Z",
+"home": {
+"id": "2306",
+"name": "Kansas State",
+"short": "Kansas St"
+},
+"away": {
+"id": "2571",
+"name": "South Dakota State",
+"short": "S Dakota St"
+}
+},
+{
+"id": "401928787",
+"tip": "2026-11-04T01:30Z",
+"home": {
+"id": "166",
+"name": "New Mexico State",
+"short": "New Mexico St"
+},
+"away": {
+"id": "2703",
+"name": "Western New Mexico",
+"short": "Western NM"
+}
+},
+{
+"id": "401924920",
+"tip": "2026-11-04T01:30Z",
+"home": {
+"id": "2751",
+"name": "Wyoming",
+"short": "Wyoming"
+},
+"away": {
+"id": "2518",
+"name": "Regis University",
+"short": "Regis U"
+}
+},
+{
+"id": "401929624",
+"tip": "2026-11-04T03:00Z",
+"home": {
+"id": "300",
+"name": "UC Irvine",
+"short": "UC Irvine"
+},
+"away": {
+"id": "411",
+"name": "Chapman",
+"short": "Chapman"
+}
+},
+{
+"id": "401925914",
+"tip": "2026-11-04T03:00Z",
+"home": {
+"id": "2502",
+"name": "Portland State",
+"short": "Portland St"
+},
+"away": {
+"id": "2333",
+"name": "Lewis & Clark",
+"short": "Lewis & Clark"
+}
+},
+{
+"id": "401924911",
+"tip": "2026-11-04T03:00Z",
+"home": {
+"id": "2439",
+"name": "UNLV",
+"short": "UNLV"
+},
+"away": {
+"id": "2464",
+"name": "Northern Arizona",
+"short": "N Arizona"
+}
+},
+{
+"id": "401920343",
+"tip": "2026-11-04T03:00Z",
+"home": {
+"id": "2856",
+"name": "California Baptist",
+"short": "CA Baptist"
+},
+"away": {
+"id": "2454",
+"name": "North Florida",
+"short": "North Florida"
+}
+},
+{
+"id": "401920155",
+"tip": "2026-11-04T03:00Z",
+"home": {
+"id": "21",
+"name": "San Diego State",
+"short": "San Diego St"
+},
+"away": {
+"id": "2239",
+"name": "Cal State Fullerton",
+"short": "Fullerton"
+}
+},
+{
+"id": "401917511",
+"tip": "2026-11-04T03:00Z",
+"home": {
+"id": "279",
+"name": "Pacific",
+"short": "Pacific"
+},
+"away": {
+"id": "3246",
+"name": "Bethesda",
+"short": "Bethesda"
+}
+},
+{
+"id": "401921153",
+"tip": "2026-11-04T00:00Z",
+"home": {
+"id": "2448",
+"name": "North Carolina A&T",
+"short": "NC A&T"
+},
+"away": {
+"id": "2684",
+"name": "Warren Wilson",
+"short": "Warren Wilson"
+}
+}
+],
+"20261106": [
+{
+"id": "401909552",
+"tip": "2026-11-06T21:00Z",
+"home": {
+"id": "103",
+"name": "Boston College",
+"short": "Boston College"
+},
+"away": {
+"id": "113",
+"name": "Massachusetts",
+"short": "UMass"
+}
+},
+{
+"id": "401920423",
+"tip": "2026-11-06T22:00Z",
+"home": {
+"id": "258",
+"name": "Virginia",
+"short": "Virginia"
+},
+"away": {
+"id": "111",
+"name": "Northeastern",
+"short": "Northeastern"
+}
+},
+{
+"id": "401922248",
+"tip": "2026-11-06T22:00Z",
+"home": {
+"id": "2229",
+"name": "Florida International",
+"short": "FIU"
+},
+"away": {
+"id": "2697",
+"name": "West Florida",
+"short": "West Florida"
+}
+},
+{
+"id": "401909751",
+"tip": "2026-11-06T22:00Z",
+"home": {
+"id": "239",
+"name": "Baylor",
+"short": "Baylor"
+},
+"away": {
+"id": "2029",
+"name": "Arkansas-Pine Bluff",
+"short": "AR-Pine Bluff"
+}
+},
+{
+"id": "401920717",
+"tip": "2026-11-06T23:00Z",
+"home": {
+"id": "2483",
+"name": "Oregon",
+"short": "Oregon"
+},
+"away": {
+"id": "331",
+"name": "Eastern Washington",
+"short": "E Washington"
+}
+},
+{
+"id": "401926131",
+"tip": "2026-11-06T23:30Z",
+"home": {
+"id": "2509",
+"name": "Purdue",
+"short": "Purdue"
+},
+"away": {
+"id": "2674",
+"name": "Valparaiso",
+"short": "Valparaiso"
+}
+},
+{
+"id": "401922059",
+"tip": "2026-11-06T23:30Z",
+"home": {
+"id": "2908",
+"name": "South Carolina Upstate",
+"short": "SC Upstate"
+},
+"away": {
+"id": "2569",
+"name": "South Carolina State",
+"short": "SC State"
+}
+},
+{
+"id": "401916314",
+"tip": "2026-11-06T23:30Z",
+"home": {
+"id": "194",
+"name": "Ohio State",
+"short": "Ohio State"
+},
+"away": {
+"id": "2754",
+"name": "Youngstown State",
+"short": "Youngstown St"
+}
+},
+{
+"id": "401921802",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "96",
+"name": "Kentucky",
+"short": "Kentucky"
+},
+"away": {
+"id": "256",
+"name": "James Madison",
+"short": "James Madison"
+}
+},
+{
+"id": "401929385",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2198",
+"name": "Eastern Kentucky",
+"short": "E Kentucky"
+},
+"away": {
+"id": "111166",
+"name": "Midway",
+"short": "Midway"
+}
+},
+{
+"id": "401928840",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2309",
+"name": "Kent State",
+"short": "Kent State"
+},
+"away": {
+"id": "128531",
+"name": "Roberts Wesleyan",
+"short": "Roberts Wslyn"
+}
+},
+{
+"id": "401926813",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "232",
+"name": "Charleston",
+"short": "Charleston"
+},
+"away": {
+"id": "2444",
+"name": "Newberry",
+"short": "Newberry"
+}
+},
+{
+"id": "401926161",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2643",
+"name": "The Citadel",
+"short": "The Citadel"
+},
+"away": {
+"id": "2215",
+"name": "Erskine",
+"short": "Erskine"
+}
+},
+{
+"id": "401926135",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "164",
+"name": "Rutgers",
+"short": "Rutgers"
+},
+"away": {
+"id": "2441",
+"name": "New Haven",
+"short": "New Haven"
+}
+},
+{
+"id": "401922210",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "526",
+"name": "Florida Gulf Coast",
+"short": "FGCU"
+},
+"away": {
+"id": "128550",
+"name": "New College",
+"short": "New College"
+}
+},
+{
+"id": "401921767",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "277",
+"name": "West Virginia",
+"short": "West Virginia"
+},
+"away": {
+"id": "56",
+"name": "Stetson",
+"short": "Stetson"
+}
+},
+{
+"id": "401921754",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2116",
+"name": "UCF",
+"short": "UCF"
+},
+"away": {
+"id": "43",
+"name": "Yale",
+"short": "Yale"
+}
+},
+{
+"id": "401921285",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "222",
+"name": "Villanova",
+"short": "Villanova"
+},
+"away": {
+"id": "107",
+"name": "Holy Cross",
+"short": "Holy Cross"
+}
+},
+{
+"id": "401921166",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "325",
+"name": "Cleveland State",
+"short": "Cleveland St"
+},
+"away": {
+"id": "2391",
+"name": "Michigan Dearborn",
+"short": "UM Dearborn"
+}
+},
+{
+"id": "401921140",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2210",
+"name": "Elon",
+"short": "Elon"
+},
+"away": {
+"id": "2430",
+"name": "UNC Greensboro",
+"short": "UNC Greensboro"
+}
+},
+{
+"id": "401920920",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "116",
+"name": "Mount St. Mary's",
+"short": "Mount St Marys"
+},
+"away": {
+"id": "2352",
+"name": "Loyola Maryland",
+"short": "Loyola MD"
+}
+},
+{
+"id": "401920305",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "59",
+"name": "Georgia Tech",
+"short": "Georgia Tech"
+},
+"away": {
+"id": "290",
+"name": "Georgia Southern",
+"short": "GA Southern"
+}
+},
+{
+"id": "401920072",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2244",
+"name": "George Mason",
+"short": "George Mason"
+},
+"away": {
+"id": "2154",
+"name": "Coppin State",
+"short": "Coppin St"
+}
+},
+{
+"id": "401918956",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "152",
+"name": "NC State",
+"short": "NC State"
+},
+"away": {
+"id": "2193",
+"name": "East Tennessee State",
+"short": "ETSU"
+}
+},
+{
+"id": "401917949",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "338",
+"name": "Kennesaw State",
+"short": "Kennesaw St"
+},
+"away": {
+"id": "2046",
+"name": "Austin Peay",
+"short": "Austin Peay"
+}
+},
+{
+"id": "401913100",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "153",
+"name": "North Carolina",
+"short": "North Carolina"
+},
+"away": {
+"id": "2747",
+"name": "Wofford",
+"short": "Wofford"
+}
+},
+{
+"id": "401912208",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "228",
+"name": "Clemson",
+"short": "Clemson"
+},
+"away": {
+"id": "44",
+"name": "American University",
+"short": "American"
+}
+},
+{
+"id": "401911305",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "225",
+"name": "Brown",
+"short": "Brown"
+},
+"away": {
+"id": "104",
+"name": "Boston University",
+"short": "Boston U"
+}
+},
+{
+"id": "401911249",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "142",
+"name": "Missouri",
+"short": "Missouri"
+},
+"away": {
+"id": "139",
+"name": "Saint Louis",
+"short": "Saint Louis"
+}
+},
+{
+"id": "401911006",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2117",
+"name": "Central Michigan",
+"short": "C Michigan"
+},
+"away": {
+"id": "2800",
+"name": "Alma",
+"short": "Alma"
+}
+},
+{
+"id": "401911005",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2050",
+"name": "Ball State",
+"short": "Ball State"
+},
+"away": {
+"id": "282",
+"name": "Indiana State",
+"short": "Indiana St"
+}
+},
+{
+"id": "401909695",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "52",
+"name": "Florida State",
+"short": "Florida St"
+},
+"away": {
+"id": "2653",
+"name": "Troy",
+"short": "Troy"
+}
+},
+{
+"id": "401909542",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "2752",
+"name": "Xavier",
+"short": "Xavier"
+},
+"away": {
+"id": "2199",
+"name": "Eastern Michigan",
+"short": "E Michigan"
+}
+},
+{
+"id": "401906780",
+"tip": "2026-11-07T00:00Z",
+"home": {
+"id": "61",
+"name": "Georgia",
+"short": "Georgia"
+},
+"away": {
+"id": "2506",
+"name": "Presbyterian",
+"short": "Presbyterian"
+}
+},
+{
+"id": "401906758",
+"tip": "2026-11-07T00:30Z",
+"home": {
+"id": "333",
+"name": "Alabama",
+"short": "Alabama"
+},
+"away": {
+"id": "2032",
+"name": "Arkansas State",
+"short": "Arkansas St"
+}
+},
+{
+"id": "401925089",
+"tip": "2026-11-07T00:30Z",
+"home": {
+"id": "2617",
+"name": "Stephen F. Austin",
+"short": "SF Austin"
+},
+"away": {
+"id": "2639",
+"name": "Texas Lutheran",
+"short": "Texas Lutheran"
+}
+},
+{
+"id": "401923260",
+"tip": "2026-11-07T00:30Z",
+"home": {
+"id": "2750",
+"name": "Wright State",
+"short": "Wright St"
+},
+"away": {
+"id": "2226",
+"name": "Florida Atlantic",
+"short": "FAU"
+}
+},
+{
+"id": "401920894",
+"tip": "2026-11-07T00:30Z",
+"home": {
+"id": "275",
+"name": "Wisconsin",
+"short": "Wisconsin"
+},
+"away": {
+"id": "48",
+"name": "Delaware",
+"short": "Delaware"
+}
+},
+{
+"id": "401919015",
+"tip": "2026-11-07T00:30Z",
+"home": {
+"id": "5",
+"name": "UAB",
+"short": "UAB"
+},
+"away": {
+"id": "2447",
+"name": "Nicholls",
+"short": "Nicholls"
+}
+},
+{
+"id": "401920685",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "130",
+"name": "Michigan",
+"short": "Michigan"
+},
+"away": {
+"id": "41",
+"name": "UConn",
+"short": "UConn"
+}
+},
+{
+"id": "401909772",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "66",
+"name": "Iowa State",
+"short": "Iowa State"
+},
+"away": {
+"id": "2572",
+"name": "Southern Miss",
+"short": "Southern Miss"
+}
+},
+{
+"id": "401928823",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "82",
+"name": "UIC",
+"short": "UIC"
+},
+"away": {
+"id": "2523",
+"name": "Robert Morris",
+"short": "Robert Morris"
+}
+},
+{
+"id": "401928622",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "2623",
+"name": "Missouri State",
+"short": "Missouri St"
+},
+"away": {
+"id": "2654",
+"name": "Truman State",
+"short": "Truman St"
+}
+},
+{
+"id": "401925641",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "2010",
+"name": "Alabama A&M",
+"short": "Alabama A&M"
+},
+"away": {
+"id": "126826",
+"name": "Mississippi U for Women",
+"short": "MS for Women"
+}
+},
+{
+"id": "401925097",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "309",
+"name": "Louisiana",
+"short": "Louisiana"
+},
+"away": {
+"id": "357",
+"name": "Texas A&M-Corpus Christi",
+"short": "Texas A&M-CC"
+}
+},
+{
+"id": "401921809",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "99",
+"name": "LSU",
+"short": "LSU"
+},
+"away": {
+"id": "2640",
+"name": "Texas Southern",
+"short": "Texas Southern"
+}
+},
+{
+"id": "401920807",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "245",
+"name": "Texas A&M",
+"short": "Texas A&M"
+},
+"away": {
+"id": "94",
+"name": "Northern Kentucky",
+"short": "N Kentucky"
+}
+},
+{
+"id": "401920733",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "77",
+"name": "Northwestern",
+"short": "Northwestern"
+},
+"away": {
+"id": "2619",
+"name": "Stony Brook",
+"short": "Stony Brook"
+}
+},
+{
+"id": "401919048",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "2628",
+"name": "TCU",
+"short": "TCU"
+},
+"away": {
+"id": "2582",
+"name": "Southern",
+"short": "Southern"
+}
+},
+{
+"id": "401916304",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "135",
+"name": "Minnesota",
+"short": "Minnesota"
+},
+"away": {
+"id": "2900",
+"name": "St. Thomas",
+"short": "St Thomas"
+}
+},
+{
+"id": "401909523",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "269",
+"name": "Marquette",
+"short": "Marquette"
+},
+"away": {
+"id": "2174",
+"name": "Detroit Mercy",
+"short": "Detroit Mercy"
+}
+},
+{
+"id": "401906802",
+"tip": "2026-11-07T01:00Z",
+"home": {
+"id": "201",
+"name": "Oklahoma",
+"short": "Oklahoma"
+},
+"away": {
+"id": "2400",
+"name": "Mississippi Valley State",
+"short": "Miss Valley St"
+}
+},
+{
+"id": "401922021",
+"tip": "2026-11-07T01:30Z",
+"home": {
+"id": "2751",
+"name": "Wyoming",
+"short": "Wyoming"
+},
+"away": {
+"id": "304",
+"name": "Idaho State",
+"short": "Idaho St"
+}
+},
+{
+"id": "401920952",
+"tip": "2026-11-07T01:30Z",
+"home": {
+"id": "140",
+"name": "Kansas City",
+"short": "Kansas City"
+},
+"away": {
+"id": "79",
+"name": "Southern Illinois",
+"short": "S Illinois"
+}
+},
+{
+"id": "401920726",
+"tip": "2026-11-07T01:30Z",
+"home": {
+"id": "2294",
+"name": "Iowa",
+"short": "Iowa"
+},
+"away": {
+"id": "2197",
+"name": "Eastern Illinois",
+"short": "E Illinois"
+}
+},
+{
+"id": "401917914",
+"tip": "2026-11-07T01:30Z",
+"home": {
+"id": "145",
+"name": "Ole Miss",
+"short": "Ole Miss"
+},
+"away": {
+"id": "2110",
+"name": "Central Arkansas",
+"short": "C Arkansas"
+}
+},
+{
+"id": "401921719",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "2390",
+"name": "Miami",
+"short": "Miami"
+},
+"away": {
+"id": "2681",
+"name": "Wagner",
+"short": "Wagner"
+}
+},
+{
+"id": "401909785",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "2305",
+"name": "Kansas",
+"short": "Kansas"
+},
+"away": {
+"id": "2393",
+"name": "Middle Tennessee",
+"short": "MTSU"
+}
+},
+{
+"id": "401921739",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "252",
+"name": "BYU",
+"short": "BYU"
+},
+"away": {
+"id": "2437",
+"name": "Omaha",
+"short": "Omaha"
+}
+},
+{
+"id": "401922261",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "36",
+"name": "Colorado State",
+"short": "Colorado St"
+},
+"away": {
+"id": "70",
+"name": "Idaho",
+"short": "Idaho"
+}
+},
+{
+"id": "401921732",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "9",
+"name": "Arizona State",
+"short": "Arizona St"
+},
+"away": {
+"id": "2458",
+"name": "Northern Colorado",
+"short": "N Colorado"
+}
+},
+{
+"id": "401919040",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "197",
+"name": "Oklahoma State",
+"short": "Oklahoma St"
+},
+"away": {
+"id": "2511",
+"name": "Queens University",
+"short": "Queens"
+}
+},
+{
+"id": "401909797",
+"tip": "2026-11-07T02:00Z",
+"home": {
+"id": "2306",
+"name": "Kansas State",
+"short": "Kansas St"
+},
+"away": {
+"id": "2463",
+"name": "Cal State Northridge",
+"short": "CSU Northridge"
+}
+},
+{
+"id": "401929410",
+"tip": "2026-11-07T02:30Z",
+"home": {
+"id": "2571",
+"name": "South Dakota State",
+"short": "S Dakota St"
+},
+"away": {
+"id": "3065",
+"name": "Briar Cliff",
+"short": "Briar Cliff"
+}
+},
+{
+"id": "401929356",
+"tip": "2026-11-07T02:30Z",
+"home": {
+"id": "2501",
+"name": "Portland",
+"short": "Portland"
+},
+"away": {
+"id": "250",
+"name": "UT Arlington",
+"short": "UT Arlington"
+}
+},
+{
+"id": "401920344",
+"tip": "2026-11-07T02:30Z",
+"home": {
+"id": "204",
+"name": "Oregon State",
+"short": "Oregon St"
+},
+"away": {
+"id": "2856",
+"name": "California Baptist",
+"short": "CA Baptist"
+}
+},
+{
+"id": "401917515",
+"tip": "2026-11-07T02:30Z",
+"home": {
+"id": "301",
+"name": "San Diego",
+"short": "San Diego"
+},
+"away": {
+"id": "2627",
+"name": "Tarleton State",
+"short": "Tarleton St"
+}
+},
+{
+"id": "401921727",
+"tip": "2026-11-07T03:00Z",
+"home": {
+"id": "24",
+"name": "Stanford",
+"short": "Stanford"
+},
+"away": {
+"id": "2473",
+"name": "Oakland",
+"short": "Oakland"
+}
+},
+{
+"id": "401921061",
+"tip": "2026-11-07T03:00Z",
+"home": {
+"id": "2539",
+"name": "San Francisco",
+"short": "San Francisco"
+},
+"away": {
+"id": "2449",
+"name": "North Dakota State",
+"short": "N Dakota St"
+}
+},
+{
+"id": "401917516",
+"tip": "2026-11-07T03:00Z",
+"home": {
+"id": "2351",
+"name": "Loyola Marymount",
+"short": "LMU"
+},
+"away": {
+"id": "124946",
+"name": "Lincoln (CA)",
+"short": "Lincoln (CA)"
+}
+},
+{
+"id": "401922219",
+"tip": "2026-11-07T03:30Z",
+"home": {
+"id": "26",
+"name": "UCLA",
+"short": "UCLA"
+},
+"away": {
+"id": "2454",
+"name": "North Florida",
+"short": "North Florida"
+}
+},
+{
+"id": "401929001",
+"tip": "2026-11-07T04:59Z",
+"home": {
+"id": "62",
+"name": "Hawai'i",
+"short": "Hawai'i"
+},
+"away": {
+"id": "3246",
+"name": "Bethesda",
+"short": "Bethesda"
+}
+}
+],
+"20261107": [
+{
+"id": "401918948",
+"tip": "2026-11-07T17:00Z",
+"home": {
+"id": "97",
+"name": "Louisville",
+"short": "Louisville"
+},
+"away": {
+"id": "2413",
+"name": "Morehead State",
+"short": "Morehead St"
+}
+},
+{
+"id": "401925707",
+"tip": "2026-11-07T17:00Z",
+"home": {
+"id": "2737",
+"name": "Winthrop",
+"short": "Winthrop"
+},
+"away": {
+"id": "155",
+"name": "North Dakota",
+"short": "North Dakota"
+}
+},
+{
+"id": "401919758",
+"tip": "2026-11-07T17:00Z",
+"home": {
+"id": "161",
+"name": "Fairleigh Dickinson",
+"short": "FDU"
+},
+"away": {
+"id": "170",
+"name": "City College NY",
+"short": "City (NY)"
+}
+},
+{
+"id": "401929449",
+"tip": "2026-11-07T18:00Z",
+"home": {
+"id": "2247",
+"name": "Georgia State",
+"short": "Georgia St"
+},
+"away": {
+"id": "134851",
+"name": "Andrew",
+"short": "Andrew"
+}
+},
+{
+"id": "401921154",
+"tip": "2026-11-07T18:00Z",
+"home": {
+"id": "195",
+"name": "Ohio",
+"short": "Ohio"
+},
+"away": {
+"id": "2448",
+"name": "North Carolina A&T",
+"short": "NC A&T"
+}
+},
+{
+"id": "401926793",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "2335",
+"name": "Liberty",
+"short": "Liberty"
+},
+"away": {
+"id": "109700",
+"name": "Boyce",
+"short": "Boyce"
+}
+},
+{
+"id": "401925047",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "2443",
+"name": "LSU New Orleans",
+"short": "LSU N Orleans"
+},
+"away": {
+"id": "100",
+"name": "Loyola New Orleans",
+"short": "Loyola NO"
+}
+},
+{
+"id": "401920856",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "276",
+"name": "Marshall",
+"short": "Marshall"
+},
+"away": {
+"id": "2649",
+"name": "Toledo",
+"short": "Toledo"
+}
+},
+{
+"id": "401920770",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "2182",
+"name": "Drexel",
+"short": "Drexel"
+},
+"away": {
+"id": "2142",
+"name": "Colgate",
+"short": "Colgate"
+}
+},
+{
+"id": "401920156",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "233",
+"name": "South Dakota",
+"short": "South Dakota"
+},
+"away": {
+"id": "2239",
+"name": "Cal State Fullerton",
+"short": "Fullerton"
+}
+},
+{
+"id": "401918977",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "151",
+"name": "East Carolina",
+"short": "East Carolina"
+},
+"away": {
+"id": "350",
+"name": "UNC Wilmington",
+"short": "UNC Wilmington"
+}
+},
+{
+"id": "401917962",
+"tip": "2026-11-07T19:00Z",
+"home": {
+"id": "2000",
+"name": "Abilene Christian",
+"short": "Abilene Chrstn"
+},
+"away": {
+"id": "2320",
+"name": "Lamar",
+"short": "Lamar"
+}
+},
+{
+"id": "401924264",
+"tip": "2026-11-07T20:00Z",
+"home": {
+"id": "147",
+"name": "Montana State",
+"short": "Montana St"
+},
+"away": {
+"id": "299",
+"name": "Long Beach State",
+"short": "Long Beach St"
+}
+},
+{
+"id": "401922044",
+"tip": "2026-11-07T20:00Z",
+"home": {
+"id": "2344",
+"name": "Longwood",
+"short": "Longwood"
+},
+"away": {
+"id": "2428",
+"name": "North Carolina Central",
+"short": "NC Central"
+}
+},
+{
+"id": "401918986",
+"tip": "2026-11-07T20:00Z",
+"home": {
+"id": "235",
+"name": "Memphis",
+"short": "Memphis"
+},
+"away": {
+"id": "2670",
+"name": "VCU",
+"short": "VCU"
+}
+},
+{
+"id": "401928793",
+"tip": "2026-11-07T20:30Z",
+"home": {
+"id": "2534",
+"name": "Sam Houston",
+"short": "Sam Houston"
+},
+"away": {
+"id": "2758",
+"name": "Howard Payne",
+"short": "Howard Payne"
+}
+},
+{
+"id": "401919805",
+"tip": "2026-11-07T20:30Z",
+"home": {
+"id": "2325",
+"name": "La Salle",
+"short": "La Salle"
+},
+"away": {
+"id": "112358",
+"name": "Long Island University",
+"short": "Long Island"
+}
+},
+{
+"id": "401909760",
+"tip": "2026-11-07T20:30Z",
+"home": {
+"id": "38",
+"name": "Colorado",
+"short": "Colorado"
+},
+"away": {
+"id": "21",
+"name": "San Diego State",
+"short": "San Diego St"
+}
+},
+{
+"id": "401929293",
+"tip": "2026-11-07T21:00Z",
+"home": {
+"id": "328",
+"name": "Utah State",
+"short": "Utah State"
+},
+"away": {
+"id": "2437",
+"name": "Omaha",
+"short": "Omaha"
+}
+},
+{
+"id": "401928352",
+"tip": "2026-11-07T21:00Z",
+"home": {
+"id": "2540",
+"name": "UC Santa Barbara",
+"short": "Santa Barbara"
+},
+"away": {
+"id": "2473",
+"name": "Oakland",
+"short": "Oakland"
+}
+},
+{
+"id": "401924912",
+"tip": "2026-11-07T21:00Z",
+"home": {
+"id": "2439",
+"name": "UNLV",
+"short": "UNLV"
+},
+"away": {
+"id": "2535",
+"name": "Samford",
+"short": "Samford"
+}
+},
+{
+"id": "401920192",
+"tip": "2026-11-07T21:00Z",
+"home": {
+"id": "2603",
+"name": "Saint Joseph's",
+"short": "Saint Joseph's"
+},
+"away": {
+"id": "322",
+"name": "Lafayette",
+"short": "Lafayette"
+}
+},
+{
+"id": "401920062",
+"tip": "2026-11-07T21:00Z",
+"home": {
+"id": "227",
+"name": "Rhode Island",
+"short": "Rhode Island"
+},
+"away": {
+"id": "2405",
+"name": "Monmouth",
+"short": "Monmouth"
+}
+},
+{
+"id": "401919824",
+"tip": "2026-11-07T21:00Z",
+"home": {
+"id": "2385",
+"name": "Mercyhurst",
+"short": "Mercyhurst"
+},
+"away": {
+"id": "130195",
+"name": "Penn State Shenango",
+"short": "PSU Shenango"
+}
+},
+{
+"id": "401929039",
+"tip": "2026-11-07T21:30Z",
+"home": {
+"id": "2815",
+"name": "Lindenwood",
+"short": "Lindenwood"
+},
+"away": {
+"id": "3107",
+"name": "East West",
+"short": "East West"
+}
+},
+{
+"id": "401925839",
+"tip": "2026-11-07T21:30Z",
+"home": {
+"id": "2379",
+"name": "Maryland Eastern Shore",
+"short": "MD Eastern"
+},
+"away": {
+"id": "2129",
+"name": "Cheyney (PA)",
+"short": "Cheyney (PA)"
+}
+},
+{
+"id": "401928788",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "2250",
+"name": "Gonzaga",
+"short": "Gonzaga"
+},
+"away": {
+"id": "166",
+"name": "New Mexico State",
+"short": "New Mexico St"
+}
+},
+{
+"id": "401926201",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "2636",
+"name": "UTSA",
+"short": "UTSA"
+},
+"away": {
+"id": "2678",
+"name": "VMI",
+"short": "VMI"
+}
+},
+{
+"id": "401926112",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "231",
+"name": "Furman",
+"short": "Furman"
+},
+"away": {
+"id": "2460",
+"name": "Northern Iowa",
+"short": "Northern Iowa"
+}
+},
+{
+"id": "401924940",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "2083",
+"name": "Bucknell",
+"short": "Bucknell"
+},
+"away": {
+"id": "295",
+"name": "Old Dominion",
+"short": "Old Dominion"
+}
+},
+{
+"id": "401921174",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "85",
+"name": "IU Indianapolis",
+"short": "IU Indy"
+},
+"away": {
+"id": "2630",
+"name": "UT Martin",
+"short": "UT Martin"
+}
+},
+{
+"id": "401920703",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "288",
+"name": "Lipscomb",
+"short": "Lipscomb"
+},
+"away": {
+"id": "2565",
+"name": "SIU Edwardsville",
+"short": "SIUE"
+}
+},
+{
+"id": "401920411",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "2272",
+"name": "High Point",
+"short": "High Point"
+},
+"away": {
+"id": "265",
+"name": "Washington State",
+"short": "Washington St"
+}
+},
+{
+"id": "401911007",
+"tip": "2026-11-07T22:00Z",
+"home": {
+"id": "193",
+"name": "Miami (OH)",
+"short": "Miami OH"
+},
+"away": {
+"id": "91",
+"name": "Bellarmine",
+"short": "Bellarmine"
+}
+},
+{
+"id": "401925106",
+"tip": "2026-11-07T22:30Z",
+"home": {
+"id": "292",
+"name": "UT Rio Grande Valley",
+"short": "UT Rio Grande"
+},
+"away": {
+"id": "2504",
+"name": "Prairie View A&M",
+"short": "Prairie View"
+}
+},
+{
+"id": "401922291",
+"tip": "2026-11-07T22:30Z",
+"home": {
+"id": "2427",
+"name": "UNC Asheville",
+"short": "UNC Asheville"
+},
+"away": {
+"id": "2717",
+"name": "Western Carolina",
+"short": "W Carolina"
+}
+},
+{
+"id": "401926825",
+"tip": "2026-11-07T23:00Z",
+"home": {
+"id": "45",
+"name": "George Washington",
+"short": "G Washington"
+},
+"away": {
+"id": "2261",
+"name": "Hampton",
+"short": "Hampton"
+}
+},
+{
+"id": "401924895",
+"tip": "2026-11-07T23:00Z",
+"home": {
+"id": "167",
+"name": "New Mexico",
+"short": "New Mexico"
+},
+"away": {
+"id": "2464",
+"name": "Northern Arizona",
+"short": "N Arizona"
+}
+},
+{
+"id": "401924843",
+"tip": "2026-11-07T23:30Z",
+"home": {
+"id": "315",
+"name": "Niagara",
+"short": "Niagara"
+},
+"away": {
+"id": "2415",
+"name": "Morgan State",
+"short": "Morgan St"
+}
+},
+{
+"id": "401928817",
+"tip": "2026-11-08T00:00Z",
+"home": {
+"id": "2870",
+"name": "Purdue Fort Wayne",
+"short": "Purdue FW"
+},
+"away": {
+"id": "2790",
+"name": "Albion",
+"short": "Albion"
+}
+},
+{
+"id": "401925772",
+"tip": "2026-11-08T00:00Z",
+"home": {
+"id": "2166",
+"name": "Davidson",
+"short": "Davidson"
+},
+"away": {
+"id": "2382",
+"name": "Mercer",
+"short": "Mercer"
+}
+},
+{
+"id": "401924951",
+"tip": "2026-11-08T00:00Z",
+"home": {
+"id": "2710",
+"name": "Western Illinois",
+"short": "W Illinois"
+},
+"away": {
+"id": "2277",
+"name": "Houston Christian",
+"short": "Hou Christian"
+}
+},
+{
+"id": "401911262",
+"tip": "2026-11-08T00:00Z",
+"home": {
+"id": "2099",
+"name": "Canisius",
+"short": "Canisius"
+},
+"away": {
+"id": "179",
+"name": "St. Bonaventure",
+"short": "St Bonaventure"
+}
+},
+{
+"id": "401911186",
+"tip": "2026-11-08T00:00Z",
+"home": {
+"id": "2168",
+"name": "Dayton",
+"short": "Dayton"
+},
+"away": {
+"id": "2459",
+"name": "Northern Illinois",
+"short": "N Illinois"
+}
+},
+{
+"id": "401909532",
+"tip": "2026-11-08T00:00Z",
+"home": {
+"id": "158",
+"name": "Nebraska",
+"short": "Nebraska"
+},
+"away": {
+"id": "2507",
+"name": "Providence",
+"short": "Providence"
+}
+},
+{
+"id": "401926227",
+"tip": "2026-11-08T00:30Z",
+"home": {
+"id": "27",
+"name": "UC Riverside",
+"short": "UC Riverside"
+},
+"away": {
+"id": "2172",
+"name": "Denver",
+"short": "Denver"
+}
+},
+{
+"id": "401925780",
+"tip": "2026-11-08T00:30Z",
+"home": {
+"id": "2184",
+"name": "Duquesne",
+"short": "Duquesne"
+},
+"away": {
+"id": "2119",
+"name": "Central State",
+"short": "Central St"
+}
+},
+{
+"id": "401909513",
+"tip": "2026-11-08T00:30Z",
+"home": {
+"id": "46",
+"name": "Georgetown",
+"short": "Georgetown"
+},
+"away": {
+"id": "120",
+"name": "Maryland",
+"short": "Maryland"
+}
+},
+{
+"id": "401929399",
+"tip": "2026-11-08T01:00Z",
+"home": {
+"id": "198",
+"name": "Oral Roberts",
+"short": "Oral Roberts"
+},
+"away": {
+"id": "2823",
+"name": "Northwestern (OK)",
+"short": "N'Western (OK)"
+}
+},
+{
+"id": "401925077",
+"tip": "2026-11-08T01:00Z",
+"home": {
+"id": "93",
+"name": "Murray State",
+"short": "Murray St"
+},
+"away": {
+"id": "2466",
+"name": "Northwestern State",
+"short": "N'Western St"
+}
+},
+{
+"id": "401923392",
+"tip": "2026-11-08T01:00Z",
+"home": {
+"id": "339",
+"name": "Evansville",
+"short": "Evansville"
+},
+"away": {
+"id": "88",
+"name": "Southern Indiana",
+"short": "S Indiana"
+}
+},
+{
+"id": "401920816",
+"tip": "2026-11-08T01:00Z",
+"home": {
+"id": "2031",
+"name": "Little Rock",
+"short": "Little Rock"
+},
+"away": {
+"id": "2545",
+"name": "SE Louisiana",
+"short": "SE Louisiana"
+}
+},
+{
+"id": "401917518",
+"tip": "2026-11-08T01:00Z",
+"home": {
+"id": "71",
+"name": "Bradley",
+"short": "Bradley"
+},
+"away": {
+"id": "279",
+"name": "Pacific",
+"short": "Pacific"
+}
+},
+{
+"id": "401911345",
+"tip": "2026-11-08T01:00Z",
+"home": {
+"id": "2253",
+"name": "Grand Canyon",
+"short": "Grand Canyon"
+},
+"away": {
+"id": "2065",
+"name": "Bethune-Cookman",
+"short": "Bethune"
+}
+},
+{
+"id": "401931055",
+"tip": "2026-11-08T01:30Z",
+"home": {
+"id": "253",
+"name": "Southern Utah",
+"short": "Southern Utah"
+},
+"away": {
+"id": "3246",
+"name": "Bethesda",
+"short": "Bethesda"
+}
+},
+{
+"id": "401931195",
+"tip": "2026-11-08T02:00Z",
+"home": {
+"id": "2492",
+"name": "Pepperdine",
+"short": "Pepperdine"
+},
+"away": {
+"id": "3246",
+"name": "Bethesda",
+"short": "Bethesda"
+}
+},
+{
+"id": "401920435",
+"tip": "2026-11-08T02:00Z",
+"home": {
+"id": "2692",
+"name": "Weber State",
+"short": "Weber St"
+},
+"away": {
+"id": "3084",
+"name": "Utah Valley",
+"short": "Utah Valley"
+}
+},
+{
+"id": "401920371",
+"tip": "2026-11-08T03:00Z",
+"home": {
+"id": "28",
+"name": "UC San Diego",
+"short": "UC San Diego"
+},
+"away": {
+"id": "278",
+"name": "Fresno State",
+"short": "Fresno St"
+}
+},
+{
+"id": "401917519",
+"tip": "2026-11-08T03:00Z",
+"home": {
+"id": "2541",
+"name": "Santa Clara",
+"short": "Santa Clara"
+},
+"away": {
+"id": "16",
+"name": "Sacramento State",
+"short": "Sacramento St"
+}
+},
+{
+"id": "401917517",
+"tip": "2026-11-08T03:00Z",
+"home": {
+"id": "2547",
+"name": "Seattle U",
+"short": "Seattle U"
+},
+"away": {
+"id": "2502",
+"name": "Portland State",
+"short": "Portland St"
+}
+},
+{
+"id": "401911470",
+"tip": "2026-11-08T03:00Z",
+"home": {
+"id": "300",
+"name": "UC Irvine",
+"short": "UC Irvine"
+},
+"away": {
+"id": "23",
+"name": "San José State",
+"short": "San José St"
+}
+}
+],
+"20261104": [
+{
+"id": "401920232",
+"tip": "2026-11-04T23:30Z",
+"home": {
+"id": "159",
+"name": "Dartmouth",
+"short": "Dartmouth"
+},
+"away": {
+"id": "126956",
+"name": "Framingham State",
+"short": "Framingham St"
+}
+},
+{
+"id": "401929450",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "295",
+"name": "Old Dominion",
+"short": "Old Dominion"
+},
+"away": {
+"id": "131784",
+"name": "Regent",
+"short": "Regent"
+}
+},
+{
+"id": "401928853",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "2415",
+"name": "Morgan State",
+"short": "Morgan St"
+},
+"away": {
+"id": "3229",
+"name": "Virginia Lynchburg",
+"short": "VA Lynchburg"
+}
+},
+{
+"id": "401926142",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "2565",
+"name": "SIU Edwardsville",
+"short": "SIUE"
+},
+"away": {
+"id": "2151",
+"name": "Concordia Chicago",
+"short": "Concordia Chi"
+}
+},
+{
+"id": "401922290",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "2427",
+"name": "UNC Asheville",
+"short": "UNC Asheville"
+},
+"away": {
+"id": "2215",
+"name": "Erskine",
+"short": "Erskine"
+}
+},
+{
+"id": "401920410",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "2272",
+"name": "High Point",
+"short": "High Point"
+},
+"away": {
+"id": "2379",
+"name": "Maryland Eastern Shore",
+"short": "MD Eastern"
+}
+},
+{
+"id": "401920191",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "2603",
+"name": "Saint Joseph's",
+"short": "Saint Joseph's"
+},
+"away": {
+"id": "2344",
+"name": "Longwood",
+"short": "Longwood"
+}
+},
+{
+"id": "401902276",
+"tip": "2026-11-05T00:00Z",
+"home": {
+"id": "2086",
+"name": "Butler",
+"short": "Butler"
+},
+"away": {
+"id": "161",
+"name": "Fairleigh Dickinson",
+"short": "FDU"
+}
+},
+{
+"id": "401929438",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "2026",
+"name": "App State",
+"short": "App State"
+},
+"away": {
+"id": "111180",
+"name": "Christendom",
+"short": "Christendom"
+}
+},
+{
+"id": "401927361",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "2181",
+"name": "Drake",
+"short": "Drake"
+},
+"away": {
+"id": "2964",
+"name": "Central College",
+"short": "Central Col"
+}
+},
+{
+"id": "401926214",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "2635",
+"name": "Tennessee Tech",
+"short": "Tennessee Tech"
+},
+"away": {
+"id": "494",
+"name": "Blue Mountain Christian",
+"short": "Blue Mountain"
+}
+},
+{
+"id": "401926151",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "2546",
+"name": "Southeast Missouri State",
+"short": "SE Missouri"
+},
+"away": {
+"id": "2693",
+"name": "Webster",
+"short": "Webster"
+}
+},
+{
+"id": "401926111",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "231",
+"name": "Furman",
+"short": "Furman"
+},
+"away": {
+"id": "3243",
+"name": "Bob Jones",
+"short": "Bob Jones"
+}
+},
+{
+"id": "401919028",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "2724",
+"name": "Wichita State",
+"short": "Wichita St"
+},
+"away": {
+"id": "2463",
+"name": "Cal State Northridge",
+"short": "CSU Northridge"
+}
+},
+{
+"id": "401917977",
+"tip": "2026-11-05T00:30Z",
+"home": {
+"id": "2433",
+"name": "UL Monroe",
+"short": "UL Monroe"
+},
+"away": {
+"id": "3134",
+"name": "Champion Christian",
+"short": "Champ Chrstn"
+}
+},
+{
+"id": "401928811",
+"tip": "2026-11-05T01:00Z",
+"home": {
+"id": "233",
+"name": "South Dakota",
+"short": "South Dakota"
+},
+"away": {
+"id": "94",
+"name": "Northern Kentucky",
+"short": "N Kentucky"
+}
+},
+{
+"id": "401925893",
+"tip": "2026-11-05T01:00Z",
+"home": {
+"id": "2450",
+"name": "Norfolk State",
+"short": "Norfolk St"
+},
+"away": {
+"id": "3153",
+"name": "Randolph",
+"short": "Randolph"
+}
+},
+{
+"id": "401923391",
+"tip": "2026-11-05T01:00Z",
+"home": {
+"id": "88",
+"name": "Southern Indiana",
+"short": "S Indiana"
+},
+"away": {
+"id": "126824",
+"name": "Saint Mary of the Woods",
+"short": "St Mary's"
+}
+},
+{
+"id": "401920798",
+"tip": "2026-11-05T01:00Z",
+"home": {
+"id": "2",
+"name": "Auburn",
+"short": "Auburn"
+},
+"away": {
+"id": "2545",
+"name": "SE Louisiana",
+"short": "SE Louisiana"
+}
+},
+{
+"id": "401929171",
+"tip": "2026-11-05T02:00Z",
+"home": {
+"id": "68",
+"name": "Boise State",
+"short": "Boise St"
+},
+"away": {
+"id": "110418",
+"name": "West Coast Baptist",
+"short": "West Coast"
+}
+},
+{
+"id": "401925939",
+"tip": "2026-11-05T02:00Z",
+"home": {
+"id": "3101",
+"name": "Utah Tech",
+"short": "Utah Tech"
+},
+"away": {
+"id": "134743",
+"name": "Grace University",
+"short": "Grace U"
+}
+},
+{
+"id": "401922030",
+"tip": "2026-11-05T02:00Z",
+"home": {
+"id": "149",
+"name": "Montana",
+"short": "Montana"
+},
+"away": {
+"id": "131858",
+"name": "Salish Kootenai",
+"short": "SalishKootenai"
+}
+},
+{
+"id": "401918052",
+"tip": "2026-11-05T02:00Z",
+"home": {
+"id": "25",
+"name": "California",
+"short": "California"
+},
+"away": {
+"id": "2515",
+"name": "Radford",
+"short": "Radford"
+}
+},
+{
+"id": "401917514",
+"tip": "2026-11-05T03:00Z",
+"home": {
+"id": "2351",
+"name": "Loyola Marymount",
+"short": "LMU"
+},
+"away": {
+"id": "2511",
+"name": "Queens University",
+"short": "Queens"
+}
+},
+{
+"id": "401917513",
+"tip": "2026-11-05T03:00Z",
+"home": {
+"id": "2541",
+"name": "Santa Clara",
+"short": "Santa Clara"
+},
+"away": {
+"id": "270",
+"name": "Milwaukee",
+"short": "Milwaukee"
+}
+},
+{
+"id": "401917512",
+"tip": "2026-11-05T03:00Z",
+"home": {
+"id": "2608",
+"name": "Saint Mary's",
+"short": "Saint Mary's"
+},
+"away": {
+"id": "2449",
+"name": "North Dakota State",
+"short": "N Dakota St"
+}
+}
+],
+"20261105": [
+{
+"id": "401906770",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "57",
+"name": "Florida",
+"short": "Florida"
+},
+"away": {
+"id": "294",
+"name": "Jacksonville",
+"short": "Jacksonville"
+}
+},
+{
+"id": "401909563",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "150",
+"name": "Duke",
+"short": "Duke"
+},
+"away": {
+"id": "324",
+"name": "Coastal Carolina",
+"short": "Coastal"
+}
+},
+{
+"id": "401913526",
+"tip": "2026-11-06T01:30Z",
+"home": {
+"id": "356",
+"name": "Illinois",
+"short": "Illinois"
+},
+"away": {
+"id": "219",
+"name": "Pennsylvania",
+"short": "Penn"
+}
+},
+{
+"id": "401909739",
+"tip": "2026-11-06T03:30Z",
+"home": {
+"id": "12",
+"name": "Arizona",
+"short": "Arizona"
+},
+"away": {
+"id": "13",
+"name": "Cal Poly",
+"short": "Cal Poly"
+}
+},
+{
+"id": "401925754",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "127",
+"name": "Michigan State",
+"short": "Michigan St"
+},
+"away": {
+"id": "2649",
+"name": "Toledo",
+"short": "Toledo"
+}
+},
+{
+"id": "401906864",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "251",
+"name": "Texas",
+"short": "Texas"
+},
+"away": {
+"id": "2241",
+"name": "Gardner-Webb",
+"short": "Gardner-Webb"
+}
+},
+{
+"id": "401921133",
+"tip": "2026-11-06T02:00Z",
+"home": {
+"id": "2641",
+"name": "Texas Tech",
+"short": "Texas Tech"
+},
+"away": {
+"id": "2065",
+"name": "Bethune-Cookman",
+"short": "Bethune"
+}
+},
+{
+"id": "401909726",
+"tip": "2026-11-05T23:00Z",
+"home": {
+"id": "238",
+"name": "Vanderbilt",
+"short": "Vanderbilt"
+},
+"away": {
+"id": "154",
+"name": "Wake Forest",
+"short": "Wake Forest"
+}
+},
+{
+"id": "401925031",
+"tip": "2026-11-05T22:00Z",
+"home": {
+"id": "249",
+"name": "North Texas",
+"short": "North Texas"
+},
+"away": {
+"id": "2377",
+"name": "McNeese",
+"short": "McNeese"
+}
+},
+{
+"id": "401920960",
+"tip": "2026-11-05T22:15Z",
+"home": {
+"id": "2413",
+"name": "Morehead State",
+"short": "Morehead St"
+},
+"away": {
+"id": "3229",
+"name": "Virginia Lynchburg",
+"short": "VA Lynchburg"
+}
+},
+{
+"id": "401924948",
+"tip": "2026-11-05T23:00Z",
+"home": {
+"id": "322",
+"name": "Lafayette",
+"short": "Lafayette"
+},
+"away": {
+"id": "247",
+"name": "King's",
+"short": "King's"
+}
+},
+{
+"id": "401917177",
+"tip": "2026-11-05T23:00Z",
+"home": {
+"id": "213",
+"name": "Penn State",
+"short": "Penn State"
+},
+"away": {
+"id": "236",
+"name": "Chattanooga",
+"short": "Chattanooga"
+}
+},
+{
+"id": "401916287",
+"tip": "2026-11-05T23:00Z",
+"home": {
+"id": "84",
+"name": "Indiana",
+"short": "Indiana"
+},
+"away": {
+"id": "91",
+"name": "Bellarmine",
+"short": "Bellarmine"
+}
+},
+{
+"id": "401912227",
+"tip": "2026-11-05T23:00Z",
+"home": {
+"id": "349",
+"name": "Army",
+"short": "Army"
+},
+"away": {
+"id": "289",
+"name": "Mount St Mary",
+"short": "Mt St Mary"
+}
+},
+{
+"id": "401919804",
+"tip": "2026-11-05T23:30Z",
+"home": {
+"id": "2550",
+"name": "Seton Hall",
+"short": "Seton Hall"
+},
+"away": {
+"id": "112358",
+"name": "Long Island University",
+"short": "Long Island"
+}
+},
+{
+"id": "401929418",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "50",
+"name": "Florida A&M",
+"short": "Florida A&M"
+},
+"away": {
+"id": "2232",
+"name": "Fort Valley State",
+"short": "Fort Valley St"
+}
+},
+{
+"id": "401929198",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "326",
+"name": "Texas State",
+"short": "Texas St"
+},
+"away": {
+"id": "2758",
+"name": "Howard Payne",
+"short": "Howard Payne"
+}
+},
+{
+"id": "401929038",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2815",
+"name": "Lindenwood",
+"short": "Lindenwood"
+},
+"away": {
+"id": "131616",
+"name": "Central Bible",
+"short": "Central Bible"
+}
+},
+{
+"id": "401928849",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2711",
+"name": "Western Michigan",
+"short": "W Michigan"
+},
+"away": {
+"id": "126",
+"name": "Kalamazoo",
+"short": "Kalamazoo"
+}
+},
+{
+"id": "401927395",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "257",
+"name": "Richmond",
+"short": "Richmond"
+},
+"away": {
+"id": "2896",
+"name": "Southern Virginia",
+"short": "S Virginia"
+}
+},
+{
+"id": "401926078",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2504",
+"name": "Prairie View A&M",
+"short": "Prairie View"
+},
+"away": {
+"id": "128256",
+"name": "College of Biblical Studies",
+"short": "Biblical Stud"
+}
+},
+{
+"id": "401925819",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2429",
+"name": "Charlotte",
+"short": "Charlotte"
+},
+"away": {
+"id": "2247",
+"name": "Georgia State",
+"short": "Georgia St"
+}
+},
+{
+"id": "401925684",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2016",
+"name": "Alcorn State",
+"short": "Alcorn St"
+},
+"away": {
+"id": "47",
+"name": "Howard",
+"short": "Howard"
+}
+},
+{
+"id": "401924733",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "163",
+"name": "Princeton",
+"short": "Princeton"
+},
+"away": {
+"id": "2275",
+"name": "Hofstra",
+"short": "Hofstra"
+}
+},
+{
+"id": "401924718",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2329",
+"name": "Lehigh",
+"short": "Lehigh"
+},
+"away": {
+"id": "172",
+"name": "Cornell",
+"short": "Cornell"
+}
+},
+{
+"id": "401924703",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "171",
+"name": "Columbia",
+"short": "Columbia"
+},
+"away": {
+"id": "16231",
+"name": "SUNY Old Westbury",
+"short": "Old Westbury"
+}
+},
+{
+"id": "401921747",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2132",
+"name": "Cincinnati",
+"short": "Cincinnati"
+},
+"away": {
+"id": "2739",
+"name": "Green Bay",
+"short": "Green Bay"
+}
+},
+{
+"id": "401921682",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2529",
+"name": "Sacred Heart",
+"short": "Sacred Heart"
+},
+"away": {
+"id": "311",
+"name": "Maine",
+"short": "Maine"
+}
+},
+{
+"id": "401921681",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2520",
+"name": "Rider",
+"short": "Rider"
+},
+"away": {
+"id": "160",
+"name": "New Hampshire",
+"short": "New Hampshire"
+}
+},
+{
+"id": "401921680",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2514",
+"name": "Quinnipiac",
+"short": "Quinnipiac"
+},
+"away": {
+"id": "2803",
+"name": "Bryant",
+"short": "Bryant"
+}
+},
+{
+"id": "401921679",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2771",
+"name": "Merrimack",
+"short": "Merrimack"
+},
+"away": {
+"id": "2349",
+"name": "UMass Lowell",
+"short": "UMass Lowell"
+}
+},
+{
+"id": "401921678",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2363",
+"name": "Manhattan",
+"short": "Manhattan"
+},
+"away": {
+"id": "399",
+"name": "UAlbany",
+"short": "UAlbany"
+}
+},
+{
+"id": "401921219",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2426",
+"name": "Navy",
+"short": "Navy"
+},
+"away": {
+"id": "2169",
+"name": "Delaware State",
+"short": "Delaware St"
+}
+},
+{
+"id": "401921084",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2368",
+"name": "Marist",
+"short": "Marist"
+},
+"away": {
+"id": "2378",
+"name": "UMBC",
+"short": "UMBC"
+}
+},
+{
+"id": "401920864",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "314",
+"name": "Iona",
+"short": "Iona"
+},
+"away": {
+"id": "2885",
+"name": "NJIT",
+"short": "NJIT"
+}
+},
+{
+"id": "401920691",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2217",
+"name": "Fairfield",
+"short": "Fairfield"
+},
+"away": {
+"id": "261",
+"name": "Vermont",
+"short": "Vermont"
+}
+},
+{
+"id": "401920377",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "259",
+"name": "Virginia Tech",
+"short": "Virginia Tech"
+},
+"away": {
+"id": "2382",
+"name": "Mercer",
+"short": "Mercer"
+}
+},
+{
+"id": "401919823",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "87",
+"name": "Notre Dame",
+"short": "Notre Dame"
+},
+"away": {
+"id": "2385",
+"name": "Mercyhurst",
+"short": "Mercyhurst"
+}
+},
+{
+"id": "401919732",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2916",
+"name": "Incarnate Word",
+"short": "Incarnate Word"
+},
+"away": {
+"id": "2130",
+"name": "Chicago State",
+"short": "Chicago St"
+}
+},
+{
+"id": "401911375",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2127",
+"name": "Charleston Southern",
+"short": "Charleston So"
+},
+"away": {
+"id": "3242",
+"name": "Columbia International",
+"short": "Columbia Int'l"
+}
+},
+{
+"id": "401911273",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "2612",
+"name": "Saint Peter's",
+"short": "Saint Peter's"
+},
+"away": {
+"id": "2066",
+"name": "Binghamton",
+"short": "Binghamton"
+}
+},
+{
+"id": "401909717",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "183",
+"name": "Syracuse",
+"short": "Syracuse"
+},
+"away": {
+"id": "2115",
+"name": "Central Connecticut",
+"short": "C Connecticut"
+}
+},
+{
+"id": "401909706",
+"tip": "2026-11-06T00:00Z",
+"home": {
+"id": "221",
+"name": "Pittsburgh",
+"short": "Pitt"
+},
+"away": {
+"id": "2084",
+"name": "Buffalo",
+"short": "Buffalo"
+}
+},
+{
+"id": "401929370",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "2453",
+"name": "North Alabama",
+"short": "North Alabama"
+},
+"away": {
+"id": "237",
+"name": "Union (TN)",
+"short": "Union (TN)"
+}
+},
+{
+"id": "401928800",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "98",
+"name": "Western Kentucky",
+"short": "Western KY"
+},
+"away": {
+"id": "2316",
+"name": "Kentucky Wesleyan",
+"short": "KY Wesleyan"
+}
+},
+{
+"id": "401928467",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "2348",
+"name": "Louisiana Tech",
+"short": "Louisiana Tech"
+},
+"away": {
+"id": "2028",
+"name": "Arkansas Monticello",
+"short": "UA Monticello"
+}
+},
+{
+"id": "401920759",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "2057",
+"name": "Belmont",
+"short": "Belmont"
+},
+"away": {
+"id": "2121",
+"name": "Centre",
+"short": "Centre"
+}
+},
+{
+"id": "401919002",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "2655",
+"name": "Tulane",
+"short": "Tulane"
+},
+"away": {
+"id": "2296",
+"name": "Jackson State",
+"short": "Jackson St"
+}
+},
+{
+"id": "401911195",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "2230",
+"name": "Fordham",
+"short": "Fordham"
+},
+"away": {
+"id": "284",
+"name": "Stonehill",
+"short": "Stonehill"
+}
+},
+{
+"id": "401906792",
+"tip": "2026-11-06T00:30Z",
+"home": {
+"id": "344",
+"name": "Mississippi State",
+"short": "Mississippi St"
+},
+"away": {
+"id": "2466",
+"name": "Northwestern State",
+"short": "N'Western St"
+}
+},
+{
+"id": "401927373",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "2287",
+"name": "Illinois State",
+"short": "Illinois St"
+},
+"away": {
+"id": "2119",
+"name": "Central State",
+"short": "Central St"
+}
+},
+{
+"id": "401926780",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "6",
+"name": "South Alabama",
+"short": "South Alabama"
+},
+"away": {
+"id": "55",
+"name": "Jacksonville State",
+"short": "Jax State"
+}
+},
+{
+"id": "401921094",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "242",
+"name": "Rice",
+"short": "Rice"
+},
+"away": {
+"id": "2837",
+"name": "East Texas A&M",
+"short": "East Texas A&M"
+}
+},
+{
+"id": "401920913",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "202",
+"name": "Tulsa",
+"short": "Tulsa"
+},
+"away": {
+"id": "2459",
+"name": "Northern Illinois",
+"short": "N Illinois"
+}
+},
+{
+"id": "401920765",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "2634",
+"name": "Tennessee State",
+"short": "Tennessee St"
+},
+"away": {
+"id": "3107",
+"name": "East West",
+"short": "East West"
+}
+},
+{
+"id": "401918968",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "2567",
+"name": "SMU",
+"short": "SMU"
+},
+"away": {
+"id": "2678",
+"name": "VMI",
+"short": "VMI"
+}
+},
+{
+"id": "401911229",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "2350",
+"name": "Loyola Chicago",
+"short": "Loyola Chicago"
+},
+"away": {
+"id": "2698",
+"name": "West Georgia",
+"short": "West Georgia"
+}
+},
+{
+"id": "401909491",
+"tip": "2026-11-06T01:00Z",
+"home": {
+"id": "156",
+"name": "Creighton",
+"short": "Creighton"
+},
+"away": {
+"id": "2330",
+"name": "Le Moyne",
+"short": "Le Moyne"
+}
+},
+{
+"id": "401925922",
+"tip": "2026-11-06T01:30Z",
+"home": {
+"id": "253",
+"name": "Southern Utah",
+"short": "Southern Utah"
+},
+"away": {
+"id": "134743",
+"name": "Grace University",
+"short": "Grace U"
+}
+},
+{
+"id": "401911334",
+"tip": "2026-11-06T01:30Z",
+"home": {
+"id": "2005",
+"name": "Air Force",
+"short": "Air Force"
+},
+"away": {
+"id": "502",
+"name": "Calumet St. Joseph",
+"short": "Calumet"
+}
+},
+{
+"id": "401909501",
+"tip": "2026-11-06T01:30Z",
+"home": {
+"id": "305",
+"name": "DePaul",
+"short": "DePaul"
+},
+"away": {
+"id": "58",
+"name": "South Florida",
+"short": "South Florida"
+}
+},
+{
+"id": "401921698",
+"tip": "2026-11-06T02:00Z",
+"home": {
+"id": "254",
+"name": "Utah",
+"short": "Utah"
+},
+"away": {
+"id": "119",
+"name": "Towson",
+"short": "Towson"
+}
+},
+{
+"id": "401911518",
+"tip": "2026-11-06T02:00Z",
+"home": {
+"id": "302",
+"name": "UC Davis",
+"short": "UC Davis"
+},
+"away": {
+"id": "2381",
+"name": "Menlo",
+"short": "Menlo"
+}
+},
+{
+"id": "401920133",
+"tip": "2026-11-06T02:30Z",
+"home": {
+"id": "2934",
+"name": "Cal State Bakersfield",
+"short": "Bakersfield"
+},
+"away": {
+"id": "128501",
+"name": "Stanton",
+"short": "Stanton"
+}
+},
+{
+"id": "401929292",
+"tip": "2026-11-06T03:30Z",
+"home": {
+"id": "2492",
+"name": "Pepperdine",
+"short": "Pepperdine"
+},
+"away": {
+"id": "3167",
+"name": "La Sierra",
+"short": "La Sierra"
+}
+}
+]
+}
+}

@@ -17,6 +17,8 @@ import type { ReviewState } from "@/lib/picks/learning/review";
 import { pemWeeks } from "@/lib/picks/pem";
 import { harrisWeeks } from "@/lib/picks/harris";
 import { usableWeeks, type UsableWeeks } from "@/lib/picks/source-weeks";
+import { harrisCbbDays } from "@/lib/models/cbb/harris-store";
+import { usableDays } from "@/lib/models/cbb/harris";
 import { whenEt } from "../picks/ui";
 import { PageHead, Section, Row as StatusRow, Chip, Disclosure, Num } from "@/components/hh/ui";
 import s from "../picks/picks.module.css";
@@ -42,8 +44,8 @@ interface Row {
   last: string | null;
   href: string;
   waiting?: boolean;
-  /** Outside sources: weeks the picks review can use (verified sheets) of weeks on file. */
-  usable?: UsableWeeks;
+  /** Outside sources: weeks (or days, for CBB) the review can use (verified sheets) of those on file. */
+  usable?: { usable: number; total: number; missing: (number | string)[]; unit?: "week" | "day" };
 }
 
 function picksMarket(state: ReviewState | null, policy: PicksPolicy, league: "nfl" | "cfb", market: "ats" | "ou" | "su"): Pick<Row, "live" | "collecting" | "last"> {
@@ -91,7 +93,7 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
   const nbaSeason = nbaSeasonOfDate(new Date());
-  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel, pemOnFile, harrisOnFile] = await Promise.all([
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel, pemOnFile, harrisOnFile, harrisCbbOnFile] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
@@ -107,8 +109,11 @@ export default async function LearningPage() {
     loadSection(CBB_SECTION, cbbSeason(new Date())),
     pemWeeks(season),
     harrisWeeks(season),
+    harrisCbbDays(cbbSeason(new Date())),
   ]);
-  const usable = { pem: usableWeeks(pemOnFile), harris: usableWeeks(harrisOnFile) };
+  const usable: { pem: UsableWeeks; harris: UsableWeeks } = { pem: usableWeeks(pemOnFile), harris: usableWeeks(harrisOnFile) };
+  // John Harris's CBB slices live in the CBB section; his row reports them apart.
+  const harrisCbb = Object.values(cbbModel.entries).filter((e) => e.id.startsWith("cbb:harris"));
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
   const PICKS = "Picks review: 7am ET after each slate (Fri, Sun, Mon, Tue), one change per part per week, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
@@ -157,6 +162,20 @@ export default async function LearningPage() {
           loop: "Shared engine, college hoops gate: paper bets at the saved price on its own slices and the learner's combinations; 150+ games and 150+ bets over 3+ weeks at t 2.33, must beat its parent, rollback. Nothing staked; every slice started 0-0 on opening night (Nov 3)",
           href: "/picks/cbb?v=log",
           ...engineRow(cbbModel),
+        },
+      ],
+    },
+    {
+      title: "Outside sources (college hoops)",
+      rows: [
+        {
+          name: "John Harris (CBB, his website)",
+          loop: "Shared engine, same college hoops gate as our slices: his side against our saved line, our side when he agrees or disagrees, his 3+ and 5+ point edges and his Trigger flag, each a paper bet at the saved price on games after it registered, using only his last read before tip. Nothing staked until a slice clears the gate.",
+          href: "/picks/cbb?v=research",
+          usable: { ...usableDays(harrisCbbOnFile), unit: "day" as const },
+          live: harrisCbb.some((e) => e.status === "active") ? harrisCbb.filter((e) => e.status === "active").map((e) => e.label).join("; ") : "Not used on any bet",
+          collecting: harrisCbb.length ? `${harrisCbb.filter((e) => e.status === "collecting").length} of ${harrisCbb.length} slices collecting` : "Registers at the next CBB review",
+          last: cbbModel.lastReviewAt ?? null,
         },
       ],
     },
@@ -239,9 +258,9 @@ export default async function LearningPage() {
                   <p className="mt-1 text-sm text-hh-ink-2"><span className="text-hh-muted">Live: </span>{r.live}</p>
                   {r.usable && (
                     <p className="mt-1 text-sm text-hh-ink-2">
-                      <span className="text-hh-muted">Usable weeks: </span>
+                      <span className="text-hh-muted">{`Usable ${r.usable.unit ?? "week"}s: `}</span>
                       <Num tone={r.usable.total && r.usable.usable < r.usable.total ? "gold" : undefined}>{`${r.usable.usable} of ${r.usable.total}`}</Num>
-                      {r.usable.missing.length > 0 && <span className="text-hh-muted">{` · no checked sheet for week${r.usable.missing.length === 1 ? "" : "s"} ${r.usable.missing.join(", ")}`}</span>}
+                      {r.usable.missing.length > 0 && <span className="text-hh-muted">{` · no checked sheet for ${r.usable.unit ?? "week"}${r.usable.missing.length === 1 ? "" : "s"} ${r.usable.missing.join(", ")}`}</span>}
                     </p>
                   )}
                   <Disclosure summary="Rules, testing and latest review">
