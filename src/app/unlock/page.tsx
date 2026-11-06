@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE, SESSION_DAYS, makeToken, sameString, validToken } from "@/lib/auth/session";
 import { PageHead } from "@/components/hh/ui";
 
 // Unlock this device (security audit, 2026-11-04): the passphrase sets a signed
-// cookie for SESSION_DAYS, and the survivor saves, screenshot reader and cache
-// refresh accept it. Reading the site never needs it.
+// cookie for SESSION_DAYS, and the survivor saves, screenshot reader, cache
+// refresh and the private /portfolio page accept it. Other reads never need it.
 
 export const metadata: Metadata = { title: "Unlock · Hobby Hub", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -38,9 +39,14 @@ export default async function UnlockPage({ searchParams }: { searchParams: Promi
   const msg = q.e === "wrong" ? "That passphrase didn't match. Try again." : q.e === "setup" ? "Unlocking isn't set up yet: the passphrase hasn't been added in Vercel." : null;
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-16 pt-10">
-      <PageHead title="Unlock" sub="Saving survivor picks, reading a pool screenshot and refreshing the cache need this device unlocked. Reading the site never does." />
+      <PageHead title="Unlock" sub="Your Portfolio page, saving survivor picks, reading a pool screenshot and refreshing the cache need this device unlocked. The rest of the site is open to read." />
       {on || q.ok ? (
-        <p className="hh-spot p-4 text-[15px]">This device is unlocked for {SESSION_DAYS} days.</p>
+        <p className="hh-spot p-4 text-[15px]">
+          This device is unlocked for {SESSION_DAYS} days.{" "}
+          <Link href="/portfolio" className="font-semibold text-hh-accent-ink underline-offset-2 hover:underline">
+            Open your portfolio
+          </Link>
+        </p>
       ) : (
         <form action={unlock} className="flex flex-col gap-3">
           <label htmlFor="passphrase" className="text-sm font-semibold text-hh-ink">

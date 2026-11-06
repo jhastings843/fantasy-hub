@@ -59,8 +59,12 @@ export const HUBS: Hub[] = [
     key: "money",
     label: "Money",
     href: "/money",
-    owns: (p) => under(p, "/money"),
-    tabs: [],
+    // Portfolio sits next to Money (Jack, 2026-11-05): the real accounts, locked to his devices.
+    owns: (p) => under(p, "/money") || under(p, "/portfolio"),
+    tabs: [
+      { href: "/money", label: "Money", owns: (p) => under(p, "/money") },
+      { href: "/portfolio", label: "Portfolio", owns: (p) => under(p, "/portfolio") },
+    ],
   },
   {
     key: "results",
