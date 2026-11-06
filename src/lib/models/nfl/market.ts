@@ -35,6 +35,9 @@ export interface NflMarketExtra {
   fd?: { line: number; over: number; under: number };
 }
 
+/** Does DK's over price clear the over floor? True when no floor is set. Pure. overPriced(-125, { overMaxPrice: -120 }) true; overPriced(-110, ...) false. */
+export const overPriced = (over: number, p: Pick<NflParams, "overMaxPrice">) => p.overMaxPrice === undefined || over <= p.overMaxPrice;
+
 const r1 = (x: number) => Math.round(x * 10) / 10;
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 
@@ -65,7 +68,9 @@ export function ourNflMarkets(
     const fair = noVig(over, under);
     const ev = (s: Side) => ch[s] - implied(s === "over" ? over : under);
     // No edge without a real price: an assumed -110 says nothing about what DK would pay.
-    const side: Side | null = source === "assumed" ? null : ev("over") > 0 && ev("over") >= ev("under") ? "over" : ev("under") > 0 ? "under" : null;
+    // An over is an edge only at p.overMaxPrice or shorter (see NflParams.overMaxPrice); a longer one is no edge, not an under.
+    const best: Side | null = source === "assumed" ? null : ev("over") > 0 && ev("over") >= ev("under") ? "over" : ev("under") > 0 ? "under" : null;
+    const side: Side | null = best === "over" && !overPriced(over, p) ? null : best;
     const id = `${stat}|${who.name}`;
     const median = stat === "rec" ? mean : nflMedian(stat, Math.max(mean, 0.1), p);
     markets.push({

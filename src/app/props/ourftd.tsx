@@ -120,8 +120,9 @@ export async function OurFtdWeek({ season }: { season: number }) {
 export async function OurFtdResults({ season }: { season: number }) {
   const v = await load(season);
   if (!v) return null;
-  // Our favorite first (Jack: "if we bet our model's favorite, how many units?"), then the value bets.
-  const order = ["ftdb:pick", "ftdb:value", "ftdb:value3"];
+  // Our favorite first (Jack: "if we bet our model's favorite, how many units?"), then the edge rule in force
+  // (ftdEdge, from Nov 2), then the wider value rows. All paper: 1u each, no real bets until a slice clears the gate.
+  const order = ["ftdb:pick", "ftdb:gate", "ftdb:value", "ftdb:value3"];
   const tiles = order.map((want) => OUR_FTD_SLICES.find(([id]) => id === want)!).map(([id, label, keep]) => {
     const bets = bestBets(v.graded, keep);
     return { id, label, w: bets.filter((b) => b.win).length, n: bets.length, units: bets.reduce((a, b) => a + b.net, 0) };
@@ -133,7 +134,7 @@ export async function OurFtdResults({ season }: { season: number }) {
         <h2 className={s.h2} id="our-ftd-results">
           Our model: results
         </h2>
-        <p className={s.p}>Every graded board, one unit per bet at the best price: Kalshi&apos;s ask with its fee, or DraftKings or FanDuel when cheaper (books from Oct 21 on).</p>
+        <p className={s.p}>Paper tracking, no real bets: every graded board, one unit per bet at the best price: Kalshi&apos;s ask with its fee, or DraftKings or FanDuel when cheaper (books from Oct 21 on). The value rows count every player we rate above his price, often several a game.</p>
       </div>
       {v.graded.length ? (
         <div className={s.tiles}>

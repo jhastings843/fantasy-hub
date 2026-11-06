@@ -464,5 +464,7 @@ function report(name: string, cs: Case[], base: typeof base2025) {
 report("TEST 2025 weeks 10-18", test, base2025);
 report("TEST 2026 weeks 1-6 (2025 as the prior)", s2026, base2026);
 
-writeFileSync("src/lib/models/nfl/params.json", JSON.stringify(P, null, 2) + "\n");
+// overMaxPrice is not fit here (it was picked on graded DK prices, 2026-11-06): keep it.
+const keepOver = (PROPS_DEFAULTS as NflParams).overMaxPrice;
+writeFileSync("src/lib/models/nfl/params.json", JSON.stringify({ ...P, ...(keepOver !== undefined ? { overMaxPrice: keepOver } : {}) }, null, 2) + "\n");
 writeFileSync(".cache/fit-nfl-props.txt", log.join("\n") + "\n");

@@ -11,7 +11,10 @@ import NFL from "@/lib/models/nfl/params.json";
 import NBA from "@/lib/models/nba/params.json";
 import type { AttdRow } from "@/lib/models/nfl/anytime";
 
-const P = NFL as NflParams;
+// The fresh-check mechanics below are about one over edge at -110, so they run without the over price floor
+// (NflParams.overMaxPrice, 2026-11-06); the floor itself is tested at the end of this block.
+const LIVE = NFL as NflParams;
+const P: NflParams = { ...LIVE, overMaxPrice: undefined };
 const PB = NBA as NbaParams;
 const kick = "2026-11-03T01:15:00.000Z"; // 8:15pm ET, Nov 2
 const now = new Date("2026-11-03T00:10:00.000Z"); // 65 minutes before
@@ -20,13 +23,13 @@ const edge: LiveEntry[] = [{ id: "edge:all", label: "Every edge", status: "activ
 const empty = { line: null, over: null, under: null };
 
 /** Our NFL board for one prop: Chase receiving yards, mean 95, at DK's line and prices. */
-function nflBoard(line: number, over: number, under: number) {
+function nflBoard(line: number, over: number, under: number, params: NflParams = P) {
   const { markets, extra } = ourNflMarkets(
     new Map([["1", { type: "Total Receiving Yards (incl. overtime)", athlete: "1", current: { line, over: null, under: null }, dkOpen: empty } as LiveLine]]),
     new Map([["1", { mean: { rec_yds: 95 } } as NflProjection]]),
     new Map([["1", { name: "Ja'Marr Chase", team: "CIN" }]]),
     () => ({ over, under, source: "odds-api" as const }),
-    P,
+    params,
   );
   return { game: { season: 2026, week: 9, slug: "401", away: "CIN", home: "PIT", breakEven: null, favorites: [], markets }, capturedAt: "", firstSeenAt: "", first: {}, kickoff: kick, espnId: "401", extra, away: "CIN", home: "PIT" };
 }
@@ -110,6 +113,12 @@ describe("re-judging our NFL props at the fresh read", () => {
     const b = judge(null, { ok: false, at: now.toISOString(), why: "quota stop: 449 credits used this month (stop 450)" });
     expect(b.check).toEqual({ state: "failed", at: now.toISOString(), note: "no fresh price (quota stop: 449 credits used this month (stop 450))" });
     expect(pushable(b, now)).toBe(false);
+  });
+  it("with the live over floor (-120), a -110 over is no edge and not staked; a -125 over is", () => {
+    expect(LIVE.overMaxPrice).toBe(-120);
+    expect(stake([nflBoard(70.5, -110, -110, LIVE)]).length).toBe(0);
+    const b = stake([nflBoard(70.5, -125, 105, LIVE)]);
+    expect(b.map((x) => x.pick)).toEqual(["Ja'Marr Chase Over 70.5 rec yds"]);
   });
   it("prop missing from the fresh read: no push", () => {
     const b = judge({ at: now.toISOString(), props: {}, firstTd: {} });

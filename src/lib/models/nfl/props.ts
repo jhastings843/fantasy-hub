@@ -79,6 +79,17 @@ export interface NflParams {
   pow: { rec_yds: number; rush_yds: number; pass_yds: number };
   calib: number;
   /**
+   * An over is an edge only when DK prices it at this American price or
+   * shorter (-120 means -120, -150, ...; never plus money). Absent: no floor.
+   * Jack (2026-11-06): over edges went 83-96, -20.1u while under edges went
+   * 282-233, +13.3u. The leak was overs DK priced near even or plus money
+   * (-115 or longer: 53-86, -30.2u), the ones the market leaned against;
+   * overs at -130 or shorter went 23-4. Our P(over) runs overconfident there.
+   * Picked on games before Oct 29 (overs 39-44, -6.6u, became 9-1, +4.5u),
+   * checked on Oct 29 to Nov 2 (44-52, -13.5u became 14-3, +5.7u). Thin.
+   */
+  overMaxPrice?: number;
+  /**
    * Opponent defense, per stat: pseudo-games of league average added to what
    * the opponent allowed to the player's position. A stat left out: no adjustment.
    */

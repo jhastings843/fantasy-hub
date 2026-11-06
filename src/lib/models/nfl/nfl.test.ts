@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { parseCsv, readGames, readStats } from "./data";
 import { NflRunning, summarizeNfl, teamGames } from "./history";
 import { gammaP, nflCdf, nflMedian, nflOverUnder, projectNflGame, type NflParams } from "./props";
-import { ourNflMarkets } from "./market";
+import { ourNflMarkets, overPriced } from "./market";
 import { readPropBets, type PropBetRow } from "../lines";
 import PARAMS from "./params.json";
 
@@ -126,6 +126,29 @@ describe("ourNflMarkets (DK lines, NE at CHI 2026-10-22, no prices posted)", () 
     expect(m.line).toBe(at);
     expect(m.books[0]).toMatchObject({ line: at, over: -112, under: -112 });
     expect(extra[m.id]).toMatchObject({ price: "odds-api", espnLine: rec.current.line });
+  });
+  it("an over is an edge only at overMaxPrice or shorter; the under is untouched", () => {
+    const big = proj(rec.current.line! * 2); // our number far over the line
+    const at = (o: number, u: number) => () => ({ over: o, under: u, line: rec.current.line!, source: "odds-api" as const });
+    const side = (o: number, u: number, q: NflParams) => ourNflMarkets(lines, big, names, at(o, u), q).markets.find((x) => x.stat === "rec_yds")!;
+    expect(side(-110, -110, { ...P, overMaxPrice: -120 }).side).toBeNull();
+    expect(side(-110, -110, { ...P, overMaxPrice: -120 }).lean).toBe("over");
+    expect(side(105, -125, { ...P, overMaxPrice: -120 }).side).toBeNull();
+    expect(side(-120, 100, { ...P, overMaxPrice: -120 }).side).toBe("over");
+    expect(side(-150, 120, { ...P, overMaxPrice: -120 }).side).toBe("over");
+    const { overMaxPrice: _drop, ...none } = P;
+    void _drop;
+    expect(side(-110, -110, none as NflParams).side).toBe("over");
+    const low = ourNflMarkets(lines, proj(rec.current.line! / 3), names, at(-110, -110), { ...P, overMaxPrice: -120 }).markets.find((x) => x.stat === "rec_yds")!;
+    expect(low.side).toBe("under");
+  });
+  it("overPriced: -120 floor keeps -120 and shorter, drops -115 and plus money; no floor keeps all", () => {
+    expect(overPriced(-120, { overMaxPrice: -120 })).toBe(true);
+    expect(overPriced(-200, { overMaxPrice: -120 })).toBe(true);
+    expect(overPriced(-115, { overMaxPrice: -120 })).toBe(false);
+    expect(overPriced(110, { overMaxPrice: -120 })).toBe(false);
+    expect(overPriced(110, {})).toBe(true);
+    expect(P.overMaxPrice).toBe(-120);
   });
   it("takes both prices from the read at a moved line, never ESPN's lone side from its own line", () => {
     const at = rec.current.line! + 1;
