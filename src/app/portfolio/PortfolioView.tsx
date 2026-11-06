@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Chip, Num, PageHead, Row, Section, Spotlight, type Tone } from "@/components/hh/ui";
-import type { Action, CashStep, Idea, Outlook, PortfolioSnapshot, SourceLink, TrackRecord, WatchItem } from "@/lib/portfolio/types";
+import type { Action, CashStep, Idea, Outlook, PortfolioSnapshot, SourceLink, TrackCall, TrackRecord, WatchItem } from "@/lib/portfolio/types";
 import {
   capState,
   etTime,
@@ -613,6 +613,7 @@ function Track({ r }: { r: TrackRecord }) {
           ))}
         </div>
       )}
+      {(r.log?.length ?? 0) > 0 && <CallLog log={r.log ?? []} />}
       {lessons.length > 0 && (
         <div className="flex flex-col gap-1.5 border-t border-hh-line pt-3 mt-3">
           <span className="text-xs font-semibold text-hh-muted">What it has learned</span>
@@ -624,5 +625,68 @@ function Track({ r }: { r: TrackRecord }) {
         </div>
       )}
     </Section>
+  );
+}
+
+// Every call the advisor has made, newest first, with how and when it gets
+// graded. Grades come from learn.py against real closes, never from the model.
+const CALL_STATUS: Record<string, { tone: Tone; label: string }> = {
+  pending: { tone: "muted", label: "Waiting" },
+  hit: { tone: "pos", label: "Right" },
+  miss: { tone: "neg", label: "Wrong" },
+  void: { tone: "muted", label: "Void" },
+};
+const CALL_VERB: Record<string, string> = { up: "Up", down: "Down", flat: "Flat", sell: "Sell", buy: "Buy", wait: "Wait", hold: "Hold" };
+
+function CallLog({ log }: { log: TrackCall[] }) {
+  const open = log.filter((c) => (c.status ?? "pending") === "pending").length;
+  const order = ["outlook", "sell", "buy", "wait", "hold", "idea"];
+  const rank = (g?: string) => {
+    const i = order.findIndex((k) => (g ?? "").startsWith(k));
+    return i < 0 ? order.length : i;
+  };
+  const rows = [...log].sort((a, b) => b.logged.localeCompare(a.logged) || rank(a.group) - rank(b.group));
+  return (
+    <details className="group mt-3 border-t border-hh-line pt-3">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-[4px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-hh-accent [&::-webkit-details-marker]:hidden">
+        <span className="flex flex-col">
+          <span className="text-[15px] font-semibold text-hh-ink">Learner log</span>
+          <span className="text-xs text-hh-muted">
+            {log.length} calls · {open} waiting on a grade
+          </span>
+        </span>
+        <span aria-hidden className="text-hh-muted transition-transform group-open:rotate-90">
+          ›
+        </span>
+      </summary>
+      <ul className="flex flex-col pt-1">
+        {rows.map((c, i) => {
+          const st = CALL_STATUS[c.status ?? "pending"] ?? CALL_STATUS.pending;
+          const graded = c.status === "hit" || c.status === "miss";
+          const sym = c.symbol === "^GSPC" ? "S&P 500" : c.symbol;
+          const verb = CALL_VERB[c.call ?? ""] ?? c.call;
+          return (
+            <li key={`${c.logged}-${c.group}-${c.symbol}-${i}`} className="flex flex-col gap-1 border-b border-hh-line py-2.5 last:border-b-0">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Chip tone={st.tone}>{st.label}</Chip>
+                  <span className="truncate text-[15px] text-hh-ink">
+                    <b className="font-semibold">{verb}</b> {sym}
+                  </span>
+                </span>
+                <Num className="shrink-0 text-xs text-hh-muted">{shortDate(c.logged)}</Num>
+              </div>
+              <span className="text-xs text-hh-muted">
+                {c.label}
+                {c.confidence && ` · ${c.confidence} confidence`}
+                {c.due && (graded ? ` · graded ${shortDate(c.due)}` : c.status === "pending" ? ` · grade about ${shortDate(c.due)}` : "")}
+              </span>
+              {c.text && <p className="text-sm leading-snug text-hh-ink-2">{c.text}</p>}
+              {c.detail && <p className={`text-sm leading-snug ${graded ? (c.status === "hit" ? "text-hh-pos" : "text-hh-neg") : "text-hh-muted"}`}>{c.detail}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }

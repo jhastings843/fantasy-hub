@@ -176,6 +176,20 @@ export interface TrackResult {
   detail?: string;
 }
 
+/** One logged advisor call (learn.py). "due" is when it gets graded (an estimate until graded). */
+export interface TrackCall {
+  logged: string;
+  group?: string;
+  label?: string;
+  symbol?: string;
+  call?: string;
+  confidence?: string | null;
+  text?: string;
+  status?: "pending" | "hit" | "miss" | "void" | string;
+  due?: string | null;
+  detail?: string | null;
+}
+
 /** From learn.py on Jack's Mac (code): the advisor's past calls graded against real closes. */
 export interface TrackRecord {
   asOf?: string;
@@ -186,6 +200,7 @@ export interface TrackRecord {
   groups?: TrackGroup[];
   recent?: TrackResult[];
   lessons?: string[];
+  log?: TrackCall[];
 }
 
 export interface PortfolioSnapshot {
@@ -234,7 +249,8 @@ export function isPortfolioSnapshot(x: unknown): x is PortfolioSnapshot {
   if (Array.isArray(x.history) && !x.history.every((p) => isObj(p) && typeof p.date === "string" && isNum(p.total))) return false;
   if (isObj(x.trackRecord)) {
     const r = x.trackRecord;
-    for (const k of ["groups", "recent", "lessons"]) if (!optArray(r[k])) return false;
+    for (const k of ["groups", "recent", "lessons", "log"]) if (!optArray(r[k])) return false;
+    if (Array.isArray(r.log) && !r.log.every((c) => isObj(c) && typeof c.logged === "string")) return false;
     if (Array.isArray(r.groups) && !r.groups.every((g) => isObj(g) && typeof g.key === "string")) return false;
   }
   if (isObj(x.advisor)) {

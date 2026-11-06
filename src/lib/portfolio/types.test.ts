@@ -19,6 +19,10 @@ describe("isPortfolioSnapshot", () => {
     expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { groups: "sell" } })).toBe(false);
     expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { groups: [{ label: "no key" }] } })).toBe(false);
     expect(isPortfolioSnapshot({ ...fixture(), trackRecord: [] })).toBe(false);
+    const log = [{ logged: "2026-11-05", group: "sell", symbol: "PYPL", call: "sell", status: "pending", due: "2026-12-03" }];
+    expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { groups: [], log } })).toBe(true);
+    expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { log: "x" } })).toBe(false);
+    expect(isPortfolioSnapshot({ ...fixture(), trackRecord: { log: [{ symbol: "no date" }] } })).toBe(false);
   });
 
   it("accepts a snapshot whose advisor is missing", () => {
