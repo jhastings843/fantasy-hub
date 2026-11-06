@@ -22,6 +22,7 @@ import {
   usdSigned,
 } from "@/lib/portfolio/view";
 import { HistoryChart } from "./HistoryChart";
+import { PortfolioRefresh } from "./PortfolioRefresh";
 
 // The unlocked Portfolio page. Server only: every number is already in the
 // snapshot (from code on Jack's Mac); the advisor's outlook is a model estimate
@@ -74,9 +75,12 @@ export function PortfolioView({ s }: { s: PortfolioSnapshot }) {
       <PageHead
         title="Portfolio"
         aside={
-          <span className="flex flex-col gap-0.5 sm:items-end">
-            <span>As of {etTime(s.asOf)}</span>
-            {s.priceDate && <span>Closing prices from {shortDate(s.priceDate)}</span>}
+          <span className="flex flex-col gap-2 sm:items-end">
+            <PortfolioRefresh asOf={s.asOf} />
+            <span className="flex flex-col gap-0.5 sm:items-end">
+              <span>As of {etTime(s.asOf)}</span>
+              {s.priceDate && <span>Closing prices from {shortDate(s.priceDate)}</span>}
+            </span>
           </span>
         }
       />
