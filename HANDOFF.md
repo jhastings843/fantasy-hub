@@ -1,8 +1,11 @@
-# START HERE: UX pass, items 1 and 6 DONE (committed 2026-11-06 evening, see push state below)
-Jack's 2026-11-06 walkthrough list. Done this session: 1 (freshness + /status) and 6 (small fixes). Next: 3 (fold tab stacks), then 4 (speed), then 5 (plain words). Item 2 (props edge display) waits on Jack's answer.
+# START HERE: UX pass, items 1, 2 and 6 DONE and PUSHED (2026-11-06 evening)
+Jack's 2026-11-06 walkthrough list. Done: 1 (freshness + /status), 2 (calibrated props %, Jack chose it), 6 (small fixes). Next: 3 (fold tab stacks), then 4 (speed), then 5 (plain words).
+
+Item 2 as built: lib/props/calibrate.ts (slope 0.35, intercept NFL -0.10 / NBA -0.02 on logit P(over), display only). props/week.tsx propEdges adds Edge.cal; EdgeCard shows "Ours, adj." and the calibrated edge (red when negative), sorted by it; "Model says X%" is the first row of Every number. Which markets clear, slices, grading: unchanged. Example: Makai Lemon under 4.5 rec, model 77.9% vs DK 45.6% (+32.3) now shows 63.2% (+17.6). Not applied: NBA tables in ournba.tsx, First TD/basket, KOTC, lottos (no fit for those). Refit by hand if the props model changes.
+
+Harris CBB: Jack chose to drop the Edge check (checkCbbRow now checks only the pick side). Live re-check: Nov 5 43/44 (1 unpriced), Nov 6 57/57, Nov 7 44/44. Nov 6 re-verifies on the next yesterday read (every 6 h), which clears the failing streak on /status.
 
 Remaining items, unchanged from the walkthrough:
-2. (Jack decides) Props board shows raw model edges like "Ours 77.9% vs DK 45.6%, Edge +32.3" but the props model is overconfident (calibration slope about 0.35). Options: shrink displayed probabilities to calibrated ones, or a plain confidence label instead of the raw edge.
 3. Fold the tab stacks: picks pages have top nav + Picks/Props + sport + market + Board/Results/Research/Learner log + How it works (5 rows before content). Props has 8 sub-tabs + 4 views. Proposal: sport+market as one compact row/dropdown; Research + Learner log + How it works into one "Lab" tab. League pages: drop the duplicate button row (Season plan, Players, Draft) that repeats the tab row; keep Refresh + Trade analyzer.
 4. Speed: Today 3.6s and /models 3.9s server time; /props is 2.8 MB HTML / ~18k DOM nodes (every hidden "Every number" panel renders server-side: render on open). /picks/cfb is ~1 MB.
 5. Plain-words pass: "what this means" lines under jargon headers, who's-who for Sam/David/PEM/Harris, every Pass row says why, explain "1u" and "Locks 9:00 AM", Today's best bet vs per-sport best bet, learner machinery behind the Lab tab.
@@ -15,9 +18,6 @@ Remaining items, unchanged from the walkthrough:
 - 6b: NOT a bug. 2026 season opened Thu Sep 10, so Mon Nov 2 ended week 8; Sleeper says last_scored_leg 8, leg 9. Label now reads "Through week 8 (week 9 in progress)".
 - 6c: Money summed rounded weekly ledgers (-4.14u); SportsView now carries picksTotals from the season ledger (NFL +1.14, CFB -5.29 = -4.15u, same as Today and /records). desks.tsx and MoneyView PicksPanel use it.
 - 6d: Fantasy list rows show "You: 6-10, 8th of 12" (lib/league/my-standing.ts, same order as Standings) or "Alive, 8 of 16 left" for guillotine.
-
-## Open: Harris CBB Nov 6 unverified (his sheet, not our code)
-After Nov 6's games his feed's Edge column equals his Model for every row (Youngstown St at Ohio St: Model -24.7, Spread -25.5, Edge -24.7). matchRows' |Edge| = |Model - Spread| check sets all 57 aside, so the day reads unverified and "Harris CBB feed" has a 5-run failing streak (already pushed). Pregame rows (57) were saved earlier, so the slices are fine. Nothing reads Edge; options: drop the Edge check when Model and Spread are present, or wait and see if he fixes it. Jack decides.
 
 Other state (not this repo): trade-bot has 4 local commits not pushed; trade-bot/phil f5d697c local only; weather-desk 0e5d5b1 local, 1 ahead. Push only if Jack asks. Stocks notes: ~/Projects/stocks/HANDOFF.md.
 

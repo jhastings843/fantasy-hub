@@ -30,6 +30,7 @@ import { LearningBlock, betRecordTile } from "./learning";
 import { Matchup, type MatchupProps } from "./matchup";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
+import { calibratedSide } from "@/lib/props/calibrate";
 
 export type PropTab = "pp" | "ftd" | "nba" | "fb";
 
@@ -65,6 +66,12 @@ export interface Edge {
   result?: { won: boolean | null; text: string };
   /** A live learner slice bets this one: the card shows a stake, not "tracked". */
   staked?: boolean;
+  /**
+   * Player props only: our chance after calibration (lib/props/calibrate.ts) and
+   * its gap to the market. The card leads with these; the raw model number
+   * moves to "Every number" (Jack, 2026-11-06).
+   */
+  cal?: { ours: number; gap: number };
 }
 
 export interface GameRowData {
@@ -146,8 +153,8 @@ export function EdgeCard({ e }: { e: Edge }) {
       </div>
       <dl className={s.edgeTrio}>
         <div>
-          <dt>Ours</dt>
-          <dd>{pct(e.ours)}</dd>
+          <dt>{e.cal ? "Ours, adj." : "Ours"}</dt>
+          <dd title={e.cal ? `Model says ${pct(e.ours)}; adjusted to what chances like this have actually hit` : undefined}>{pct(e.cal ? e.cal.ours : e.ours)}</dd>
         </div>
         <div>
           <dt>{e.mktLabel}</dt>
@@ -155,7 +162,10 @@ export function EdgeCard({ e }: { e: Edge }) {
         </div>
         <div>
           <dt>Edge</dt>
-          <dd className={s.pos}>{`+${(e.gap * 100).toFixed(1)}`}</dd>
+          {(() => {
+            const g = (e.cal ? e.cal.gap : e.gap) * 100;
+            return <dd className={g > 0 ? s.pos : g < 0 ? s.neg : undefined}>{`${g > 0 ? "+" : g < 0 ? "−" : ""}${Math.abs(g).toFixed(1)}`}</dd>;
+          })()}
         </div>
       </dl>
       {(e.line || e.more.length > 0) && (
@@ -284,6 +294,7 @@ function propEdges(league: "nfl" | "nba", board: (OurStoredProps | OurNflStored)
           const x = g.extra[m.id] as { over: number; under: number; median?: number };
           const r = g.result?.markets.find((y) => y.id === m.id);
           const out = r?.play?.outcome;
+          const calOurs = x ? calibratedSide(league, x.over, side) : null;
           return {
             key: `${g.game.slug}|${m.id}`,
             player: m.player,
@@ -298,12 +309,13 @@ function propEdges(league: "nfl" | "nba", board: (OurStoredProps | OurNflStored)
             price: dk[side] !== null ? `${am(dk[side]!)} DK` : "·",
             gap: m.gap!,
             line: { at: m.line, ours: x?.median ?? m.model, david: david?.(m, g.game.slug), fmt: (v) => `${Math.round(v * 10) / 10}` },
-            more: extraMore(g, m),
+            more: [...(x ? ([["Model says", pct(x[side])]] as [string, string][]) : []), ...extraMore(g, m)],
+            ...(calOurs !== null ? { cal: { ours: calOurs, gap: calOurs - fair } } : {}),
             ...(out && r?.actual !== null ? { result: { won: out === "W" ? true : out === "L" ? false : null, text: `${out === "W" ? "Won" : out === "L" ? "Lost" : "Push"} · ${r!.actual}` } } : {}),
           };
         }),
     )
-    .sort((a, b) => b.gap - a.gap);
+    .sort((a, b) => (b.cal?.gap ?? b.gap) - (a.cal?.gap ?? a.gap));
 }
 
 /** When the board used DK's alternate line nearer -110 instead of the main line, say which. */
