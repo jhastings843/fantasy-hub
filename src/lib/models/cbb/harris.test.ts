@@ -55,9 +55,10 @@ describe("signs (Spread and Model are home lines; he picks home when Model < Spr
     expect(checkCbbRow(fdu)).toBeNull();
   });
 
-  it("a row whose Edge size is off, or whose pick is on the wrong side, is named", () => {
-    const [r] = feedRows({ headers: nov6.headers, rows: [["2026-11-06", "A", "B", "N", "-3.5", "-5", "0.6", "+2.5", "B -3.5", "N"]] });
-    expect(checkCbbRow(r)).toMatch(/not 2.5 apart/);
+  it("ignores his Edge column, but names a pick on the wrong side", () => {
+    // Edge printed as the Model (his Nov 6 post-game sheet): still a good row.
+    const [r] = feedRows({ headers: nov6.headers, rows: [["2026-11-06", "A", "B", "N", "-3.5", "-5", "0.6", "-5", "B -3.5", "N"]] });
+    expect(checkCbbRow(r)).toBeNull();
     const [w] = feedRows({ headers: nov6.headers, rows: [["2026-11-06", "A", "B", "N", "-3.5", "-5", "0.6", "-1.5", "A +3.5", "N"]] });
     expect(checkCbbRow(w)).toMatch(/favors home, ATS Pick says away/);
   });
@@ -155,18 +156,18 @@ describe("usable days", () => {
 });
 
 describe("matchRows with a typo row", () => {
-  it("sets the bad row aside and keeps the day clean (Nov 6 Youngstown State at Ohio State)", () => {
+  it("keeps an Edge = Model row and sets a wrong-side pick aside, the day stays clean", () => {
     const games: BoardTeams[] = [
       { id: "g1", tip: "2026-11-07T00:00:00Z", home: { id: "1", name: "Ohio State Buckeyes", short: "Ohio State" }, away: { id: "2", name: "Youngstown State Penguins", short: "Youngstown State" } },
       { id: "g2", tip: "2026-11-07T00:00:00Z", home: { id: "3", name: "Minnesota Golden Gophers", short: "Minnesota" }, away: { id: "4", name: "St. Thomas Tommies", short: "St. Thomas" } },
     ];
     const bad = { date: "2026-11-06", away: "Youngstown State", home: "Ohio State", neutral: false, spread: -25.5, model: -24.7, confidence: 0.477, edge: -24.7, pick: "away", trigger: false };
-    const good = { date: "2026-11-06", away: "St. Thomas", home: "Minnesota", neutral: false, spread: -14.5, model: -14, confidence: 0.489, edge: 0.5, pick: "away", trigger: false };
-    const m = matchRows([bad, good] as never, games);
+    const wrongSide = { date: "2026-11-06", away: "St. Thomas", home: "Minnesota", neutral: false, spread: -14.5, model: -14, confidence: 0.489, edge: 0.5, pick: "home", trigger: false };
+    const m = matchRows([bad, wrongSide] as never, games);
     expect(m.problems).toEqual([]);
     expect(m.setAside).toHaveLength(1);
-    expect(m.setAside[0]).toMatch(/Youngstown State at Ohio State/);
-    expect(m.rows.map((r) => r.home)).toEqual(["Minnesota"]);
+    expect(m.setAside[0]).toMatch(/St. Thomas at Minnesota/);
+    expect(m.rows.map((r) => r.home)).toEqual(["Ohio State"]);
   });
 });
 

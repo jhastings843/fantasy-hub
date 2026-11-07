@@ -166,10 +166,14 @@ export function feedRows(table: CbbFeedTable): HarrisCbbRow[] {
 export const modelSide = (r: Pick<HarrisCbbRow, "model" | "spread">): "home" | "away" | null =>
   r.model === null || r.spread === null || r.model === r.spread ? null : r.model < r.spread ? "home" : "away";
 
-/** A row's own arithmetic: |Edge| = |Model - Spread| (each rounded to 0.1), and the ATS Pick on the side his numbers favor. Null when fine. */
+/**
+ * A row's own logic: the ATS Pick on the side his Model and Spread favor. Null when fine.
+ * His Edge column is NOT checked (Jack, 2026-11-06): nothing here reads it, and
+ * after Nov 6's games his sheet printed Edge = Model on every row, which threw
+ * out a whole day of good Model and Spread numbers.
+ */
 export function checkCbbRow(r: HarrisCbbRow): string | null {
-  if (r.spread === null || r.model === null || r.edge === null) return null;
-  if (Math.abs(Math.abs(r.model - r.spread) - Math.abs(r.edge)) > 0.1 + 1e-9) return `${r.away} at ${r.home}: Model ${r.model} and Spread ${r.spread} are not ${Math.abs(r.edge)} apart (Edge ${r.edge})`;
+  if (r.spread === null || r.model === null) return null;
   const side = modelSide(r);
   if (side && r.pick && side !== r.pick) return `${r.away} at ${r.home}: Model ${r.model} vs Spread ${r.spread} favors ${side}, ATS Pick says ${r.pick}`;
   return null;
