@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { isOut } from "@/lib/injuries/status";
 import { redis } from "@/lib/redis/client";
 import { etDate, shiftDay, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
@@ -202,10 +203,20 @@ export async function loadWeek(season: number, week: number): Promise<{ [id: str
   return (await redis.hgetall<{ [id: string]: OurStoredProps }>(K.week(season, week))) ?? {};
 }
 
+// Page reads (UX pass item 4, 2026-11-06): one /models render read every saved
+// week up to five times (board, graded list, first basket, lottos, King of the
+// Court). These memoize per request in a server render; outside one (routes,
+// scripts) React's cache is a pass-through, so writers always read fresh.
+const weekNums = cache(async (season: number): Promise<number[]> => ((await redis.smembers(K.weeks(season))) ?? []).map(Number));
+const readWeek = cache((season: number, week: number) => loadWeek(season, week));
+const readAllWeeks = cache(async (season: number) => {
+  const nums = await weekNums(season);
+  return Promise.all(nums.map(async (n) => [n, await readWeek(season, n)] as const));
+});
+
 /** Every saved board this season, for the lotto shadow (lotto.ts reads only boards that carry long rungs). */
 export async function allBoards(season: number): Promise<OurStoredProps[]> {
-  const weeks = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
-  return (await Promise.all(weeks.map((w) => loadWeek(season, w)))).flatMap((h) => Object.values(h));
+  return (await readAllWeeks(season)).flatMap(([, h]) => Object.values(h));
 }
 
 export interface RunOptions {
@@ -499,8 +510,7 @@ export function carded(g: Pick<OurStoredProps, "game" | "extra">, result: Graded
 }
 
 export async function gradedList(season: number): Promise<GradedPropsGame[]> {
-  const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
-  const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
+  const weeks = await readAllWeeks(season);
   return weeks
     .flatMap(([week, games]) => Object.entries(games).flatMap(([slug, g]) => (g.result ? [{ week, slug, ...carded(g, g.result), first: g.first, kickoff: g.kickoff, capturedAt: g.capturedAt, ...(g.david ? { david: g.david } : {}), ...chanceOf(g.extra) }] : [])))
     .sort((a, b) => (b.kickoff ?? "").localeCompare(a.kickoff ?? "") || a.slug.localeCompare(b.slug));
@@ -508,8 +518,7 @@ export async function gradedList(season: number): Promise<GradedPropsGame[]> {
 
 /** Every graded First Basket board, newest first. */
 export async function fbGraded(season: number): Promise<(FbGradedBoard & { board: FbBoard })[]> {
-  const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number);
-  const weeks = await Promise.all(nums.map(async (n) => [n, await loadWeek(season, n)] as const));
+  const weeks = await readAllWeeks(season);
   return weeks
     .flatMap(([week, games]) =>
       Object.entries(games).flatMap(([event, g]) => {
@@ -534,22 +543,24 @@ export interface OurNbaView {
 }
 
 export async function getOurNbaView(season: number, now = new Date()): Promise<OurNbaView> {
-  await primeParams();
-  const nums = ((await redis.smembers(K.weeks(season))) ?? []).map(Number).sort((a, b) => b - a);
-  const recent = await Promise.all(nums.slice(0, 2).map((n) => loadWeek(season, n)));
-  const yesterday = etDate(new Date(now.getTime() - 86_400_000));
-  const board = recent
-    .flatMap((h) => Object.values(h))
-    .filter((g) => !g.kickoff || etDate(new Date(g.kickoff)) >= yesterday)
-    .sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
-  const graded = await gradedList(season);
-  const [state, journal, fbState, fbJournal, fbList] = await Promise.all([
+  // Everything at once: params, every week (read once, shared), the learners.
+  const [, all, state, journal, fbState, fbJournal] = await Promise.all([
+    primeParams(),
+    readAllWeeks(season),
     loadSection(OUR_SECTION.nbaProps, season),
     loadJournal(OUR_SECTION.nbaProps, season),
     loadSection(OUR_SECTION.nbaFirstBasket, season),
     loadJournal(OUR_SECTION.nbaFirstBasket, season),
-    fbGraded(season),
   ]);
+  // After the params are primed (as before); both read the weeks loaded above.
+  const [graded, fbList] = await Promise.all([gradedList(season), fbGraded(season)]);
+  const yesterday = etDate(new Date(now.getTime() - 86_400_000));
+  const board = [...all]
+    .sort((a, b) => b[0] - a[0])
+    .slice(0, 2)
+    .flatMap(([, h]) => Object.values(h))
+    .filter((g) => !g.kickoff || etDate(new Date(g.kickoff)) >= yesterday)
+    .sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
   return {
     season,
     board,

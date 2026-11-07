@@ -1,4 +1,6 @@
 // Spreads (ATS): this week's bets, results, research.
+import { LazyDetails } from "@/components/hh/LazyDetails";
+import { loadAtsGame } from "./actions";
 import type { BoardGame, CutResult, CutTest } from "@/lib/picks/engine";
 import { bettable, cutResult, matches } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
@@ -228,9 +230,8 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
   const num = (x?: number) => (x === undefined ? "·" : line(Math.round(x * 10) / 10));
   const rd = readOf(g, r, live);
   const side = g.side && g.homeLine !== undefined ? pickText(g, name) : g.tier === "split" && g.read ? "Models split" : "None";
-  return (
-    <details className={`${s.gRow} ${s.ledger}`} open={st === "started" && !!g.issued}>
-      <summary>
+  const summary = (
+      <summary key="summary">
         <GameCell
           league={r.league}
           away={g.away}
@@ -290,11 +291,20 @@ function LedgerRow({ g, r, live }: { g: BoardGame; r: PicksReport; live?: LiveGa
           ›
         </span>
       </summary>
-      <div className={s.gBody}>
-        <GameExpand g={g} r={r} />
-      </div>
-    </details>
   );
+  // A started game with a bet opens with its panel on the page; every other game
+  // loads its panel when opened (UX pass item 4: /picks/cfb was ~1 MB).
+  if (st === "started" && g.issued) {
+    return (
+      <details className={`${s.gRow} ${s.ledger}`} open>
+        {summary}
+        <div className={s.gBody}>
+          <GameExpand g={g} r={r} />
+        </div>
+      </details>
+    );
+  }
+  return <LazyDetails className={`${s.gRow} ${s.ledger}`} summary={summary} load={loadAtsGame.bind(null, r.league, g.away, g.home)} loadingClass={s.gBody} wrapClass={s.gBody} />;
 }
 
 type Res = "W" | "L" | "P";
@@ -1065,7 +1075,7 @@ function EdgeCards({ g, r }: { g: BoardGame; r: PicksReport }) {
 }
 
 /** What opens under a board row: the chart, the three cards and every number, across the full width. */
-function GameExpand({ g, r }: { g: BoardGame; r: PicksReport }) {
+export function GameExpand({ g, r }: { g: BoardGame; r: PicksReport }) {
   const st = statusOf(g);
   return (
     <div className={s.expand}>

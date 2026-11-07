@@ -10,6 +10,8 @@ import { CBB_SLICES } from "@/lib/models/cbb/learn";
 import { scoresAt } from "@/lib/live/scores-at";
 import { ScopeRow, ViewTabs } from "../tabs";
 import { scopeGroups, viewTabs } from "../tab-sets";
+import { LazyDetails } from "@/components/hh/LazyDetails";
+import { loadCbbGame } from "./actions";
 import s from "../picks.module.css";
 import c from "./cbb.module.css";
 
@@ -232,9 +234,9 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
     ) : (
       pieces(`${day ? `${day} · ` : ""}${tipTime(g.tip)}${g.tv ? ` · ${g.tv}` : ""}${g.neutral ? " · neutral" : ""}`)
     );
-  return (
-    <details className={`${s.gRow} ${s.ledger} ${l && l.tier !== "lean" && g.state === "pre" && (m !== "su" ? !!r.line : false) ? c.hot : ""}`}>
-      <summary>
+  const cls = `${s.gRow} ${s.ledger} ${l && l.tier !== "lean" && g.state === "pre" && (m !== "su" ? !!r.line : false) ? c.hot : ""}`;
+  const summary = (
+      <summary key="summary">
         <GameCell league="cfb" away={g.away.abbr} home={g.home.abbr} awayName={teamLabel(g.away)} homeName={teamLabel(g.home)} href={cbbGameHref(g.id)} quote={{ homeId: g.home.id, awayId: g.away.id }} status={status} />
         <span className={s.gNum} data-k={m === "su" ? "Moneyline" : "DraftKings"}>
           {mk.v}
@@ -255,6 +257,15 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
           ›
         </span>
       </summary>
+  );
+  // The numbers under each game load when it opens (UX pass item 4: ~94 games a day).
+  return <LazyDetails className={cls} summary={summary} load={loadCbbGame.bind(null, g.id)} loadingClass={s.gBody} />;
+}
+
+/** One game's numbers: projections, lines, ratings, where, what was saved. */
+export function CbbRowBody({ x }: { x: CbbBoardRow }) {
+  const { g, read: r } = x;
+  return (
       <div className={s.gBody}>
         <div className={c.stats}>
           <div>
@@ -301,7 +312,6 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
           )}
         </dl>
       </div>
-    </details>
   );
 }
 

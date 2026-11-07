@@ -2,7 +2,6 @@ import { Freshness } from "@/components/hh/Freshness";
 import { LOG_VIEW, NBA_VIEWS, VIEWS, type View } from "../picks/ui";
 import { PropsLineup, PropsLog } from "./top";
 import { PropTabWeek } from "./week";
-import { DavidResearch, DavidResults, DavidWeek } from "./davidprops";
 import { OurNflResults } from "./ournfl";
 import { OurFtdResults } from "./ourftd";
 import { OurFirstBasketResults, OurNbaResults } from "./ournba";
@@ -11,7 +10,8 @@ import { NbaNewsResults, NbaNewsToday } from "./news";
 import { LottoLog, LottoResults, LottoToday } from "./lotto";
 import { AttdLog, AttdResults, AttdWeek } from "./attd";
 import { KotezResults, KotezWeek } from "./kotez";
-import { Background, PageHead, SecHead } from "../picks/board";
+import { LazyBackground, PageHead, SecHead } from "../picks/board";
+import { loadDavid } from "./actions";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
 import { ScopeRow, ViewTabs } from "../picks/tabs";
@@ -117,21 +117,15 @@ export default async function PropsView({
         {shown === "week" && <PropsLineup tab={market} season={season} />}
         {/* David's board is research only (Jack, 2026-10-22), folded into the view it belongs to (2026-10-27): his board on Board, his record on Results, his trends on Research. */}
         {market === "pp" && shown === "week" && (
-          <Background title="David Sasser's board this week · research only">
-            <DavidWeek season={season} />
-          </Background>
+          <LazyBackground title="David Sasser's board this week · research only" load={loadDavid.bind(null, "week")} />
         )}
         {market === "pp" && shown === "results" && (
-          <Background title="David Sasser's results · research only">
-            <DavidResults season={season} />
-          </Background>
+          <LazyBackground title="David Sasser's results · research only" load={loadDavid.bind(null, "results")} />
         )}
         {market === "pp" && shown === "research" && (
           <>
             <SecHead title="David Sasser's props board" aside="Research only · tracked in the background" />
-            <Background title="Research: what beats the price">
-              <DavidResearch season={season} />
-            </Background>
+            <LazyBackground title="Research: what beats the price" load={loadDavid.bind(null, "research")} />
           </>
         )}
         {market === "ftd" && shown === "results" && <OurFtdResults season={season} />}

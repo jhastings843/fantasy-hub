@@ -2,6 +2,7 @@
 // answer, the stat strip, the market-vs-models line, a learner log, the
 // season curve, and the "tracked in the background" drawer. Picks and Props
 // both build on these so the two tabs read the same.
+import { LazyDetails } from "@/components/hh/LazyDetails";
 import type { ReactNode } from "react";
 import type { JournalLine } from "@/lib/learning/engine";
 import { whenEt } from "./ui";
@@ -177,6 +178,11 @@ export function Background({ title = "Tracked in the background", children }: { 
       <div className={s.bgBody}>{children}</div>
     </details>
   );
+}
+
+/** Background, but the body loads when opened (UX pass item 4): for heavy research-only panels like David's board. */
+export function LazyBackground({ title, load }: { title: string; load: () => Promise<ReactNode> }) {
+  return <LazyDetails className={s.bg} summary={<summary key="summary">{title}</summary>} load={load} loadingClass={s.bgBody} wrapClass={s.bgBody} />;
 }
 
 /** The running unit total after each graded week, as a line. */

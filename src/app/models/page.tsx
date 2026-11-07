@@ -96,8 +96,10 @@ export default async function OurModelsPage() {
     settle(getNbaSectionLearning(SECTIONS.nbaLotto, nbaSeason)),
     settle(getNbaSectionLearning(SECTIONS.nbaKotc, nbaSeason)),
   ]);
-  const nflOurs = nfl?.value ? await settle(ourFootballRecords("nfl", season, nfl.value)) : null;
-  const cfbOurs = cfb?.value ? await settle(ourFootballRecords("cfb", season, cfb.value)) : null;
+  const [nflOurs, cfbOurs] = await Promise.all([
+    nfl?.value ? settle(ourFootballRecords("nfl", season, nfl.value)) : null,
+    cfb?.value ? settle(ourFootballRecords("cfb", season, cfb.value)) : null,
+  ]);
 
   const signal = (rs: { id: string; w: number; l: number; p: number; units: number; clv: number | null }[] | undefined, id: string) => rs?.find((x) => x.id === id) ?? null;
   const fb = nbaProps?.fb.graded.flatMap((g) => g.bets) ?? [];
