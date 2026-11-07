@@ -178,6 +178,29 @@ export function desks(v: View): Desk[] {
       href: "/money?v=intraday",
     });
   }
+  const op = snap?.options;
+  if (op && !op.retired) {
+    const start = 100_000;
+    const ret = op.equity / start - 1;
+    const c = op.curve;
+    const spy0 = c.find((x) => x.spy !== null)?.spy;
+    const spyNow = c.at(-1)?.spy;
+    const spy = spy0 && spyNow ? spyNow / start - 1 : null;
+    out.push({
+      id: "options",
+      money: "usd",
+      name: "Options",
+      what: "QQQ calls or puts on the /stocks research lean",
+      result: pct(ret),
+      rec: c.length ? `${c.length} ${c.length === 1 ? "session" : "sessions"}, ${op.fills.filter((f) => f.side === "buy").length} trades` : "Waiting for the first run",
+      tone: toneOf(ret),
+      ours: `Book ${pct(ret)}`,
+      yard: spy !== null ? `SPY ${pct(spy)} same days` : "SPY, same days",
+      read: c.length < 20 ? "Too early" : spy !== null && ret > spy ? "Ahead of SPY" : "Behind SPY",
+      readTone: c.length < 20 ? "neutral" : spy !== null && ret > spy ? "good" : "bad",
+      href: "/money?v=options",
+    });
+  }
   if (snap?.gus && !snap.gus.error) out.push(philDesk(snap.gus, "kalshi", "Gus", "Claude agent, Kalshi", "/money?v=kalshi"));
   // Props join only once something is staked (Jack, 2026-11-02: "tracked records shouldn't show up until we are putting stakes down").
   // Staked = bets from learner slices that went live (models/money.ts "system"); tracked edges stay on the Props pages.
@@ -333,6 +356,13 @@ export function moneyLog(v: View): LogEntry[] {
     if (!e.decisions.length) out.push({ at, kind: "test", title: "Stock books: reviewed, no changes", detail: e.lessons ?? undefined });
     for (const d of e.decisions) out.push({ at, kind: /retire|close|drop/i.test(d.action) ? "back" : /open|add|promot/i.test(d.action) ? "new" : "test", title: `Stock books: ${d.action} ${d.book}`, detail: d.why });
   }
+  // Research lean (trade-bot research_switch): log only the mornings it changed what the bots hold.
+  const lean = snap?.researchSwitch?.log ?? [];
+  lean.forEach((r, i) => {
+    const prev = lean[i + 1];
+    if (i < 6 && prev && prev.hold !== r.hold)
+      out.push({ at: r.logged || `${r.as_of}T21:00:00Z`, kind: "new", title: `Research bots: ${prev.hold} to ${r.hold}`, detail: r.why });
+  });
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 14);
 }
 

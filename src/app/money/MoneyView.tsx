@@ -11,6 +11,7 @@ import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 import { Term } from "./Term";
 import { IntradayHero, IntradayTab } from "./IntradayTab";
+import { OptionsHero, OptionsTab } from "./OptionsTab";
 import { PopLink } from "@/components/hh/PopLink";
 import { teamHref } from "../picks/hrefs";
 
@@ -21,7 +22,7 @@ import { teamHref } from "../picks/hrefs";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "weather";
+export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "options" | "weather";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -35,6 +36,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "books", label: "Stock books" },
   { id: "trends", label: "Trends" },
   { id: "intraday", label: "Day Trader" },
+  { id: "options", label: "Options" },
   { id: "weather", label: "Weather" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
@@ -1781,6 +1783,8 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "intraday" && snap && (snap.intraday
           ? (snap.intraday.error ? <p className={s.error}>{`The Day Trader desk failed: ${snap.intraday.error}`}</p> : <IntradayTab d={snap.intraday} />)
           : <p className={s.calm}>The Day Trader hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
+        {v && tab === "options" && snap && <OptionsHero o={snap.options} rs={snap.researchSwitch} />}
+        {v && tab === "options" && snap && <OptionsTab o={snap.options} rs={snap.researchSwitch} books={snap.books} />}
 
         <footer className={s.footer}>
           <span>

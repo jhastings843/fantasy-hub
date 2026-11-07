@@ -219,6 +219,29 @@ export interface MoneySnapshot {
   /** The intraday desk (trade-bot tradebot/intraday.py export()): opening-range breakouts on 5-minute bars,
    *  filtered by the Time Machine. Its own $100,000 paper book. Missing before 2026-10-28; `{ error }` if the desk failed. */
   intraday?: Intraday | null;
+  /** The paper options book (trade-bot tradebot/options_book.py desk()). Missing before 2026-11-07. */
+  options?: OptionsDesk | null;
+  /** What research-switch read each morning (trade-bot tradebot/research_switch.py). Missing before 2026-11-07. */
+  researchSwitch?: ResearchSwitch | null;
+}
+
+export interface OptionsDesk {
+  id: string;
+  label: string;
+  about: string;
+  started: string;
+  cash: number;
+  equity: number;
+  curve: { day: string; equity: number; spy: number | null }[];
+  positions: { contract: string; kind: "call" | "put"; strike: number; expiry: string; qty: number; entry_day: string; entry_price: number; last_mid: number | null }[];
+  fills: { at: string; contract: string; side: "buy" | "sell"; qty: number; price: number; fee: number; reason: string }[];
+  retired: string | null;
+}
+
+export interface ResearchSwitch {
+  rule: string;
+  /** Newest first, one row per session: what the book held and why. */
+  log: { as_of: string; hold: string; why: string; logged: string }[];
 }
 
 /** n graded picks, average return vs SPY, share that beat SPY, t-stat. */
@@ -559,5 +582,7 @@ export function isSnapshot(x: unknown): x is MoneySnapshot {
   return !!s && s.version === 1 && typeof s.generatedAt === "string" && Array.isArray(s.books)
     && s.books.every((b) => typeof b.id === "string" && Array.isArray(b.curve) && Array.isArray(b.positions))
     && (s.phil === null || typeof s.phil === "object")
-    && (s.intraday === undefined || s.intraday === null || typeof s.intraday === "object");
+    && (s.intraday === undefined || s.intraday === null || typeof s.intraday === "object")
+    && (s.options === undefined || s.options === null || (typeof s.options === "object" && Array.isArray(s.options.curve)))
+    && (s.researchSwitch === undefined || s.researchSwitch === null || Array.isArray(s.researchSwitch.log));
 }
