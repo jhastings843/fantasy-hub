@@ -5,16 +5,16 @@
   "status": "UX pass complete and live 2026-11-06: /status + freshness, calibrated props %, folded tabs, lazy-loaded game details (props ~3 MB -> ~0.2 MB), plain-words pass, audit LOW fixes.",
   "status_detail": "Multi-league fantasy football tools. Every tool lives under /l/[leagueId] with leagues auto-discovered from Sleeper and format detected from settings.type (including type 3, which is Sleeper's undocumented guillotine code). Four live leagues: Dah Dynasty League (dynasty, in season), 2026 Half PPR (redraft, drafts Sep 7), Sunday Scaries #2 (redraft, full PPR, in season), and Dah Chopped League (guillotine, 16 teams, $1000 FAAB, still pre-draft). Guillotine leagues get a weekly FAAB advisor at /l/[id]/faab, /api/faab and a Tuesday email. Written playbooks with sources at /strategy. His rankings moved off Substack to the FantasyPros platform on 2026-09-17 and are read from there by week rather than by post, per scoring, so each league finally reads a list in its own scoring. SURVIVOR is a live recommendation engine at /survivor and /api/survivor: no-vig moneylines from ESPN, real public pick percentages from Yahoo, first-place equity scoring and a season-long Hungarian assignment for future value. TWO POOLS now, 500 entries and 30, tracked apart: separate burned teams, separate logged distributions, separate chalk factors, one shared data pull. Switcher on the page, ?pool=<id>|all on the API, one labelled card per pool in the Thursday email. Each pool carries a POSTURE, computed from expected entries alive at week 18, which breaks ties toward safety in a pool that will thin to one entry and toward leverage in one that will split. Week 1 live: 500 pool takes JAX, 30 pool takes LAC. A PULSE now keeps it current: /api/pulse called every fifteen minutes by GitHub Actions, tiered by the Eastern clock (live gameday, hourly, overnight), plus five scheduled emails through one shell and a Sunday 11:45 exception alarm that stays silent when nothing is wrong.",
   "next_steps": [
-    "Check /status after the next pulse: Harris CBB day check should be green.",
-    "Compare live /props, /picks/cfb, /picks/cbb sizes and /models, / server times to the 'before' numbers in HANDOFF item 4.",
-    "Rerun the lotto cap sweep around Nov 20 and judge lotto:checked-cap / lotto:ours-cap on new nights only.",
-    "Refit props calibration (lib/props/calibrate.ts) if the props model changes."
+    "Lotto cap sweep around Nov 20",
+    "Confirm League sync (early/late) rows on /status record a time after their next run",
+    "/models speed: cache slow loaders (lotto/KOTC learning, NBA view) instead of the whole page"
   ],
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-11-06",
+  "last_worked": "2026-11-07",
   "notes": [
+    "2026-11-07: post-UX check. /status 30/32 ok (2 league sync rows await first timed run), Harris CBB day check green. Live sizes: /props 149 KB, /picks/cfb 389 KB, /picks/cbb 299 KB, /models ttfb 3.5 s.",
     "2026-11-06 (late): UX pass items 3-5 live: two-row Picks/Props headers with a Lab tab, game details load on open (props ~3 MB page), NBA weeks read once per request, Pass rows say why, who's-who guide; audit LOW error text fixed; CFB week 0 closed as not needed.",
     "2026-11-06 (eve, later): Props edge cards show calibrated chance and edge (model 77.9% -> 63.2%, edge +32.3 -> +17.6), raw kept under Every number. Harris CBB Edge column no longer checked (his Nov 6 sheet printed Edge = Model).",
     "2026-11-06 (eve): /status page (every job's last run, failing first, errors only when unlocked), freshness line on Today/Fantasy/leagues/Props, locked Refresh explains itself, Money units match Today (-4.15u), Fantasy rows show my record and rank. 'Through week 8' was correct (week 9 in progress).",

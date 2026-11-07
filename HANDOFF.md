@@ -1,3 +1,8 @@
+# Nov 7 check (morning)
+- /status: every job clean; Harris CBB day check green. Only "League sync (early/late)" show "No time yet" (they record a time from their next run). Check again next session.
+- Live sizes vs Nov 6: /props 149 KB (same), /picks/cfb 389 KB (423), /picks/cbb 299 KB (502), / 93 KB ttfb 1.9 s, /models ttfb 3.5 s (2.7-3.3, still the slow one).
+- Open items all closed: error text live (e0a4153), CFB week 0 no change, Preview unlock env set, lotto cap sweep around Nov 20.
+
 # START HERE: UX pass DONE, all items live (2026-11-06 late evening)
 Jack's 2026-11-06 walkthrough list is finished: 1 freshness + /status, 2 calibrated props %, 3 folded tabs, 4 speed, 5 plain words, 6 small fixes. Also done: Harris CBB Edge check dropped, audit LOW error text, CFB week 0 closed (no change: Harris slices count only games after their November registration, so August's week 0 has no use; the route already refuses it with "No college games on file for week 0"). HH_SESSION_SECRET and HH_PASSPHRASE are on Preview (set 2026-11-04 by Jack).
 
