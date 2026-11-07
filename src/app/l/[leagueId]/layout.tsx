@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Freshness } from "@/components/hh/Freshness";
 import { notFound } from "next/navigation";
 import { LeagueSwitcher } from "@/components/LeagueSwitcher";
 import { LeagueTypeProvider } from "@/components/LeagueTypeProvider";
@@ -93,6 +94,9 @@ export default async function LeagueLayout({
           </span>
         </div>
       </div>
+      {league.source !== "manual" && (
+        <Freshness what={["leagues", "pulse"]} className="mx-auto w-full max-w-6xl px-4 pt-3 sm:px-6 lg:px-8" />
+      )}
       {league.source === "manual" ? (
         <ManualLeagueNotice name={league.name} />
       ) : (

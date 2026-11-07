@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { Freshness } from "@/components/hh/Freshness";
 import { BookOpen, Compass, ShieldCheck, Target } from "lucide-react";
 import { RefreshButton } from "@/components/RefreshButton";
 import { Chip, Empty, Num, PageHead, Section, type Tone } from "@/components/hh/ui";
 import { getMyLeagues } from "@/lib/league/discover";
+import { myStanding, standingText } from "@/lib/league/my-standing";
+import { getLeagueRosters, getUser } from "@/lib/sleeper/client";
 import { leaguePath } from "@/lib/league/tools";
 import {
   LEAGUE_TYPE_BLURB,
@@ -68,6 +71,25 @@ export default async function FantasyHome() {
       e instanceof Error ? e.message : "Could not load leagues from Sleeper.";
   }
 
+  // My record and place per league, for leagues past the draft. A league whose
+  // rosters can't be read just shows no line; the list never fails over it.
+  const standing = new Map<string, string>();
+  const username = process.env.SLEEPER_USERNAME;
+  if (username && leagues.length) {
+    const me = await getUser(username).catch(() => null);
+    if (me) {
+      await Promise.all(
+        leagues
+          .filter((l) => l.status === "in_season" || l.status === "complete")
+          .map(async (l) => {
+            const rosters = await getLeagueRosters(l.id).catch(() => null);
+            const s = rosters ? myStanding(rosters, me.user_id, l.type === "guillotine") : null;
+            if (s) standing.set(l.id, standingText(s));
+          }),
+      );
+    }
+  }
+
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-10 px-4 py-8 text-hh-ink sm:px-6 lg:px-8 lg:py-12">
       <PageHead
@@ -75,6 +97,7 @@ export default async function FantasyHome() {
         sub={error ? "Your leagues could not be loaded. Refresh to try Sleeper again." : <><Num>{leagues.length}</Num> leagues. Open a league for tools that adapt to its format.</>}
         aside={<RefreshButton all label="Refresh all leagues" />}
       />
+      <Freshness what={["leagues", "pulse"]} className="-mt-7" />
 
       <Section
         label="Your leagues"
@@ -107,6 +130,12 @@ export default async function FantasyHome() {
                   <span>{l.ppr === 1 ? "PPR" : l.ppr === 0.5 ? "Half PPR" : "Standard"}</span>
                   <span aria-hidden>·</span>
                   <span className="font-semibold text-hh-ink-2">{STATUS_LABEL[l.status]}</span>
+                  {standing.has(l.id) && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span className="font-semibold text-hh-accent-ink">You: {standing.get(l.id)}</span>
+                    </>
+                  )}
                 </Num>
                 <p className="text-sm leading-relaxed text-hh-ink-2">
                   {LEAGUE_TYPE_BLURB[l.type]}

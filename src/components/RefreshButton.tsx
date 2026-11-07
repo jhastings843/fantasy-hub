@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { Lock, RefreshCw } from "lucide-react";
 
 // Manually busts the league cache (rosters, users, draft, players)
 // then re-renders the page. Use after a draft completes, a trade
@@ -23,7 +24,7 @@ export function RefreshButton({
   all?: boolean;
 }) {
   const router = useRouter();
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error" | "locked">(
     "idle",
   );
 
@@ -37,9 +38,10 @@ export function RefreshButton({
           all ? { all: true } : leagueId ? { leagueId } : {},
         ),
       });
-      // Locked device (security audit, 2026-11-04): send it to the unlock page.
+      // Locked device (security audit, 2026-11-04). Say so in place instead of
+      // jumping to /unlock with no explanation (UX pass, 2026-11-06).
       if (res.status === 401) {
-        router.push("/unlock");
+        setState("locked");
         return;
       }
       if (!res.ok) throw new Error(await res.text());
@@ -50,6 +52,23 @@ export function RefreshButton({
       setState("error");
       setTimeout(() => setState("idle"), 2500);
     }
+  }
+
+  if (state === "locked") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <span className="inline-flex items-center gap-1.5 text-hh-muted">
+          <Lock size={14} aria-hidden />
+          Refreshing needs this device unlocked.
+        </span>
+        <Link
+          href="/unlock"
+          className="font-semibold text-hh-accent-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hh-accent"
+        >
+          Unlock
+        </Link>
+      </span>
+    );
   }
 
   const text =

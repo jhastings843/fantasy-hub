@@ -100,7 +100,8 @@ export function desks(v: View): Desk[] {
   const snap = v.snapshot;
   const sp = v.sports;
   if (sp) {
-    const p = sp.picks.reduce((a, x) => ({ u: a.u + x.units, w: a.w + x.w, l: a.l + x.l, pu: a.pu + x.p }), { u: 0, w: 0, l: 0, pu: 0 });
+    // Season ledger totals (not rounded weeks summed), so the desk matches Today and /records.
+    const p = sp.picksTotals.reduce((a, x) => ({ u: Math.round((a.u + x.units) * 100) / 100, w: a.w + x.w, l: a.l + x.l, pu: a.pu + x.p }), { u: 0, w: 0, l: 0, pu: 0 });
     out.push({
       id: "picks",
       money: "units",

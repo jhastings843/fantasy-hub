@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Freshness } from "@/components/hh/Freshness";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -417,6 +418,7 @@ export default async function TodayPage() {
         sub={`${sub}.${propsLive.length ? "" : " Nothing in Props carries a stake."}`}
         aside={live.length ? <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" /> : undefined}
       />
+      <Freshness what={["lines", "props", "pulse"]} className="-mt-5" />
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-8">

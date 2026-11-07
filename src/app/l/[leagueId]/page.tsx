@@ -199,6 +199,9 @@ export default async function LeaguePage({
   // two results, so the page says which weeks the record covers.
   const scoredWeeks = Number(league.settings?.last_scored_leg ?? 0) || 0;
   const medianGame = league.settings?.league_average_match === 1;
+  // The week being played now. Sleeper scores a week after its Monday game, so
+  // "through week 8" while week 9 is live reads as stale unless it says so.
+  const liveWeek = Number(league.settings?.leg ?? 0) || 0;
 
   // A guillotine league has no head-to-head games, so Sleeper leaves every
   // record at 0-0. Its table is rebuilt from the weekly scores instead.
@@ -602,6 +605,7 @@ export default async function LeaguePage({
             scoredWeeks >= 1 ? (
               <>
                 Through week <Num>{scoredWeeks}</Num>
+                {liveWeek > scoredWeeks ? <> (week <Num>{liveWeek}</Num> in progress)</> : null}
                 {isGuillotine
                   ? ". Record is all-play: a win for every live team you outscored each week"
                   : ""}

@@ -1485,8 +1485,9 @@ function cumulative(rows: { at: string | null; v: number }[]) {
 
 function PicksPanel({ sp }: { sp: Sports }) {
   const leagues = (["nfl", "cfb"] as const).map((l) => {
-    const rows = sp.picks.filter((p) => p.league === l);
-    return { l, units: rows.reduce((a, r) => a + r.units, 0), w: rows.reduce((a, r) => a + r.w, 0), l_: rows.reduce((a, r) => a + r.l, 0), p: rows.reduce((a, r) => a + r.p, 0), n: rows.length };
+    // Season ledger totals, not the sum of rounded weeks, so this matches Today and /records.
+    const t = sp.picksTotals.find((x) => x.league === l);
+    return { l, units: t?.units ?? 0, w: t?.w ?? 0, l_: t?.l ?? 0, p: t?.p ?? 0, n: sp.picks.filter((p) => p.league === l).length };
   });
   const name = { nfl: "NFL", cfb: "CFB" };
   return (

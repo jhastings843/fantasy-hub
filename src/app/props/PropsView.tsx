@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Freshness } from "@/components/hh/Freshness";
 import { LOG_VIEW, NBA_VIEWS, VIEWS, type View } from "../picks/ui";
 import { PropsLineup, PropsLog } from "./top";
 import { PropTabWeek } from "./week";
@@ -72,6 +73,7 @@ export default async function PropsView({
             sub="Our own models only. Sam plays no part in Props."
             asof={sport === "nba" ? `NBA ${season}-${String(season + 1).slice(2)}` : `NFL ${season}`}
           />
+          <Freshness what={["props", "pulse"]} />
           <div className={s.controlBar}>
             <nav className={s.chips} aria-label="Market">
               {ALL_MARKETS.map((m) => (
