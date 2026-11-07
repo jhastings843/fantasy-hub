@@ -12,6 +12,7 @@ import type { PlayerRow, TeamSummary } from "./power-rankings";
 import { tradeRooms } from "./trade-fits";
 import { tradeable, untouchableNote } from "./untouchables";
 import type { RAPick } from "@/lib/rosteraudit/types";
+import type { TradePlan } from "./trade-plan";
 
 const TRADE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 
@@ -55,6 +56,8 @@ export interface BestTradeIdea extends BilateralScore {
   positionalGain: { position: string; from: number; to: number };
   score: number;
   kind: BestTradeKind;
+  /** Lines saying how the season plan shaped this idea, if it did. */
+  planReasons?: string[];
 }
 
 // Position-specific cutoffs for "aging" status. Dynasty values
@@ -117,6 +120,54 @@ export interface BestTradeOptions {
    * redraft league was being told Justin Jefferson had a short runway.
    */
   youth?: boolean;
+  /**
+   * The season plan (lib/dynasty/trade-plan): stance tilts dynasty ideas
+   * toward proven or young players, focus positions count as needs even when
+   * the room ranks well, shed positions score as good things to send. Keepers
+   * arrive already marked untouchable.
+   */
+  plan?: TradePlan | null;
+}
+
+function avgAge(players: PlayerRow[]): number | null {
+  const ages = players.map((p) => p.age).filter((a): a is number => a != null);
+  return ages.length ? ages.reduce((s, a) => s + a, 0) / ages.length : null;
+}
+
+/** Score change and reason line for a position-fit idea under the plan. */
+function planTilt(
+  plan: TradePlan | null | undefined,
+  youth: boolean,
+  send: PlayerRow[],
+  receive: PlayerRow[],
+  recvPos: string,
+): { delta: number; reasons: string[] } {
+  if (!plan) return { delta: 0, reasons: [] };
+  let delta = 0;
+  const reasons: string[] = [];
+  const focus = plan.focus.find((f) => f.position === recvPos);
+  if (focus) {
+    delta += 3;
+    reasons.push(`Your goal: "${focus.goal}"`);
+  }
+  const shed = plan.shed.find((s) => send.some((p) => p.position === s.position));
+  if (shed) {
+    delta += 2;
+    reasons.push(`Sells from ${shed.position}, per your goal "${shed.goal}"`);
+  }
+  // Age tilt is a dynasty idea: a redraft value is already this season's.
+  if (youth && plan.stance !== "balanced") {
+    const sa = avgAge(send);
+    const ra = avgAge(receive);
+    if (sa != null && ra != null) {
+      const older = Math.max(-4, Math.min(4, ra - sa)); // + means I get older
+      const t = plan.stance === "win_now" ? older : -older;
+      delta += t * 0.75;
+      if (t >= 2) reasons.push(plan.stance === "win_now" ? "Fits win now: proven players back" : "Fits the build: younger players back");
+      if (plan.stance === "build") delta -= 3 * receive.filter(isAging).length;
+    }
+  }
+  return { delta, reasons };
 }
 
 export function findBestTrades(
@@ -127,6 +178,9 @@ export function findBestTrades(
   options: BestTradeOptions = {},
 ): BestTradeIdea[] {
   const youth = options.youth ?? true;
+  const plan = options.plan ?? null;
+  // A contender is not told to sell its vets for youth.
+  const youthIdeas = youth && plan?.stance !== "win_now";
   const ideas: BestTradeIdea[] = [];
 
   const myRanksByPos = TRADE_POSITIONS.map((p) => ({
@@ -148,7 +202,9 @@ export function findBestTrades(
     .filter((x) => x.rank >= nearTop)
     .slice(0, 2)
     .map((x) => x.pos);
-  const myWeakPositions = [...new Set([...belowMedian, ...weakest])];
+  // Positions a plan goal asks for count as needs even when the room ranks well.
+  const focus = (plan?.focus ?? []).map((f) => f.position).filter((p) => TRADE_POSITIONS.includes(p as (typeof TRADE_POSITIONS)[number]));
+  const myWeakPositions = [...new Set([...focus, ...belowMedian, ...weakest])];
 
   if (myWeakPositions.length === 0) {
     // Every room is near the top of the league. Nothing to fix by trade.
@@ -183,6 +239,7 @@ export function findBestTrades(
         const from = myTeam.positionRanks[recvPos] ?? 99;
         const to = projectedRank(myTeam, allTeams, recvPos, send, receive);
         const fillsDeficit = send.some((p) => deficits.has(p.position));
+        const tilt = planTilt(plan, youth, send, receive, recvPos);
         ideas.push({
           ...bilateral,
           partnerRosterId: partner.rosterId,
@@ -191,10 +248,11 @@ export function findBestTrades(
           receive,
           myValue,
           theirValue,
-          reasoning: [`Improves ${recvPos} room (#${from} → projected #${to})`],
+          reasoning: [`Improves ${recvPos} room (#${from} → projected #${to})`, ...tilt.reasons],
           positionalGain: { position: recvPos, from, to },
-          score: bilateral.mutualScore + (fillsDeficit ? 3 : 0),
+          score: bilateral.mutualScore + (fillsDeficit ? 3 : 0) + tilt.delta,
           kind: "position_fit",
+          planReasons: tilt.reasons,
         });
       }
     }
@@ -205,7 +263,7 @@ export function findBestTrades(
   // positional fit. For each of my aging stars, find a younger player
   // on a partner's roster within 70-110% of my player's value.
   const myAgingStars = myTeam.players
-    .filter((p) => youth && tradeable(p) && isAging(p) && p.value >= 1500)
+    .filter((p) => youthIdeas && tradeable(p) && isAging(p) && p.value >= 1500)
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
@@ -235,7 +293,8 @@ export function findBestTrades(
 
         // Score the dynasty arc: age delta is the headline, value
         // parity matters less but losing too much still hurts.
-        const score = ageDelta * 3 + pct * 30 + 6; // base bump so these compete with position-fit ideas
+        const score = ageDelta * 3 + pct * 30 + 6 + // base bump so these compete with position-fit ideas
+          (plan?.stance === "build" ? 6 : 0); // a rebuild wants these first
 
         // Capture positional ranks for the receive position so the
         // existing UI ("X #from → #to") still has data even though
@@ -282,6 +341,7 @@ export function findBestTrades(
           },
           score,
           kind: "youth_arbitrage",
+          planReasons: plan?.stance === "build" ? ["Fits the build: younger player back"] : [],
         });
       }
     }

@@ -8,6 +8,7 @@
 // Sleeper. Pure, so the client builder can run it.
 
 import type { PlayerRow, TeamSummary } from "./power-rankings";
+import type { TradePlan } from "./trade-plan";
 import { findBestTrades, jinglesLean, type BestTradeIdea, type PositionalImpact } from "./trade-recommender";
 
 export interface TradeChance {
@@ -65,9 +66,9 @@ export function tradeOffers(
   myTeam: TeamSummary,
   allTeams: TeamSummary[],
   totalTeams: number,
-  options: { youth?: boolean; limit?: number } = {},
+  options: { youth?: boolean; limit?: number; plan?: TradePlan | null } = {},
 ): TradeOffer[] {
-  const ideas = findBestTrades(myTeam, allTeams, totalTeams, 500, { youth: options.youth ?? false });
+  const ideas = findBestTrades(myTeam, allTeams, totalTeams, 500, { youth: options.youth ?? false, plan: options.plan ?? null });
   const best = new Map<number, BestTradeIdea>();
   for (const idea of ideas) {
     const had = best.get(idea.partnerRosterId);
@@ -79,7 +80,7 @@ export function tradeOffers(
     .map((idea) => {
       const ours = roomLines(idea.positionalImpact, "Your");
       const theirs = roomLines(idea.partner.positionalImpact, "Their");
-      const why = [...ours, ...costLines(idea.positionalImpact, "Your"), ...theirs];
+      const why = [...(idea.planReasons ?? []), ...ours, ...costLines(idea.positionalImpact, "Your"), ...theirs];
       if (theirs.length === 0) why.push("Their rooms barely move, so the pitch to them is value");
 
       const gap = idea.theirValue - idea.myValue;

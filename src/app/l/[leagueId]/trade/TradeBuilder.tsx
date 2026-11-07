@@ -26,8 +26,42 @@ import { PlayerLink } from "@/components/PlayerLink";
 import { tradeOffers } from "@/lib/dynasty/trade-offers";
 import { Chip, Disclosure, Empty, Num, PosBadge, Section, type Tone } from "@/components/hh/ui";
 import { PopLink } from "@/components/hh/PopLink";
+import Link from "next/link";
 import { teamHref } from "@/app/picks/hrefs";
 import Offers from "./Offers";
+import { STANCE_LABEL, type TradePlan } from "@/lib/dynasty/trade-plan";
+import { trajectoryLabel } from "@/lib/dynasty/season-plan";
+
+/** One line saying which plan the ideas below follow, with a way to edit it. */
+function PlanStrip({ plan, loaded, leagueId }: { plan: TradePlan | null; loaded: boolean; leagueId: string }) {
+  if (!plan) return null;
+  const from =
+    plan.stanceFrom === "goal" && plan.stanceGoal
+      ? <>from your goal &ldquo;{plan.stanceGoal}&rdquo;</>
+      : plan.stanceFrom === "trajectory" && plan.trajectory
+        ? <>from your trajectory ({trajectoryLabel(plan.trajectory)})</>
+        : plan.stanceFrom === "format"
+          ? <>one-season league</>
+          : <>no trajectory grade yet</>;
+  const parts: string[] = [];
+  if (plan.focus.length) parts.push(`Wants ${plan.focus.map((f) => f.position).join(", ")}`);
+  if (plan.shed.length) parts.push(`Selling ${plan.shed.map((f) => f.position).join(", ")}`);
+  if (plan.keep.length) parts.push(`Keeping ${plan.keep.map((k) => k.name).join(", ")}`);
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-hh-line py-3 text-sm text-hh-muted">
+      <Chip tone={plan.stance === "win_now" ? "gold" : plan.stance === "build" ? "pos" : "muted"}>
+        {STANCE_LABEL[plan.stance]}
+      </Chip>
+      <span>
+        Ideas follow your plan, {from}.
+        {parts.length > 0 ? ` ${parts.join(" · ")}.` : loaded ? " No open goals for this league yet." : " Couldn't read your goals just now, so only trajectory and weakest rooms count."}
+      </span>
+      <Link href={`/l/${leagueId}/plan`} className="font-semibold text-hh-accent-ink underline-offset-2 hover:underline">
+        Edit plan
+      </Link>
+    </p>
+  );
+}
 
 // Shared control looks (C3): hairline outline, panel fill, accent on focus,
 // 44px tall on phones and compact from sm up.
@@ -349,6 +383,9 @@ export default function TradeBuilder({
   faabBudget,
   faabByRosterId,
   jingles = null,
+  plan = null,
+  planLoaded = true,
+  leagueId,
 }: {
   teams: TeamSummary[];
   myRosterId: number;
@@ -362,6 +399,11 @@ export default function TradeBuilder({
   faabByRosterId: Record<number, number>;
   /** Null in dynasty, where his redraft list has no say. */
   jingles?: JinglesBlendInfo | null;
+  /** This league's season plan: stance, goal positions, keepers. */
+  plan?: TradePlan | null;
+  /** False when the goals could not be read, so the strip can say so. */
+  planLoaded?: boolean;
+  leagueId: string;
 }) {
   // Only a dynasty league has future rookie picks. Offering them anywhere else
   // was the bug: a redraft trade screen let you build an offer around assets
@@ -461,22 +503,24 @@ export default function TradeBuilder({
 
   const myWeakPositions = useMemo(() => {
     if (!myTeam) return [];
-    return ["QB", "RB", "WR", "TE"]
+    const weakest = ["QB", "RB", "WR", "TE"]
       .map((p) => ({ p, rank: myTeam.positionRanks[p] ?? 99 }))
       .sort((a, b) => b.rank - a.rank)
       .slice(0, 2)
       .map((x) => x.p);
-  }, [myTeam]);
+    // Positions a plan goal asks for count as needs too.
+    return [...new Set([...(plan?.focus ?? []).map((f) => f.position), ...weakest])];
+  }, [myTeam, plan]);
 
   const bestTrades = useMemo(() => {
     if (!myTeam) return [];
-    return findBestTrades(myTeam, teams, teams.length, 6, { youth: tradesPicks });
-  }, [myTeam, teams, tradesPicks]);
+    return findBestTrades(myTeam, teams, teams.length, 6, { youth: tradesPicks, plan });
+  }, [myTeam, teams, tradesPicks, plan]);
 
   const offers = useMemo(() => {
     if (!myTeam) return [];
-    return tradeOffers(myTeam, teams, teams.length, { youth: tradesPicks });
-  }, [myTeam, teams, tradesPicks]);
+    return tradeOffers(myTeam, teams, teams.length, { youth: tradesPicks, plan });
+  }, [myTeam, teams, tradesPicks, plan]);
 
   const assessment = useMemo(() => {
     if (!myTeam) return null;
@@ -785,6 +829,7 @@ export default function TradeBuilder({
           </span>
         </p>
       )}
+      <PlanStrip plan={plan} loaded={planLoaded} leagueId={leagueId} />
       <Offers offers={offers} onApply={applyBestTrade} />
       {bestTrades.length === 0 && myTeam && (
         <p className="border-b border-hh-line py-3 text-xs text-hh-muted">
@@ -797,9 +842,10 @@ export default function TradeBuilder({
       {bestTrades.length > 0 && (
         <Disclosure summary={`More trade ideas (${bestTrades.length})`}>
           <p className="text-xs text-hh-muted">
-            Player-for-player swaps that fill your weakest positions from
-            each opponent&apos;s surplus, scored by positional gain and
-            value parity. Tap Apply to load into the builder.
+            Player-for-player swaps that fill your weakest positions and the
+            ones your goals name, from each opponent&apos;s surplus, scored by
+            positional gain, value parity and your plan. Tap Apply to load
+            into the builder.
           </p>
           <ul className="mt-2 grid gap-x-8 md:grid-cols-2">
             {bestTrades.map((idea) => (

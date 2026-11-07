@@ -23,6 +23,7 @@ import {
   type Trajectory,
 } from "@/lib/dynasty/season-plan";
 import { CustomGoals } from "./CustomGoals";
+import { readGoals } from "@/lib/plan/goals-store";
 import { RefreshButton } from "@/components/RefreshButton";
 import { getValuesForProfile } from "@/lib/values";
 import { profileFromSleeper } from "@/lib/league/detect";
@@ -127,6 +128,7 @@ export default async function SeasonPlanPage({
         (): RAGradesByRosterId => ({}),
       ),
     ]);
+  const goalsRead = await readGoals(leagueId);
 
   const myRoster = rosters.find((r) => r.owner_id === me.user_id);
   if (!myRoster) {
@@ -416,8 +418,8 @@ export default async function SeasonPlanPage({
           </p>
         </Section>
 
-        <Section label="Custom goals">
-          <CustomGoals />
+        <Section label="Your goals">
+          <CustomGoals leagueId={leagueId} initialGoals={goalsRead.ok ? goalsRead.goals : null} />
         </Section>
 
         <Disclosure summary={<>Key dates (<Num>{sortedDates.length}</Num>)</>}>

@@ -3,7 +3,7 @@ import { SESSION_COOKIE, validToken } from "@/lib/auth/session";
 
 // Routes that write or spend money refuse callers without Jack's signed cookie
 // (security audit, 2026-11-04): survivor saves, the survivor screenshot reader
-// (a paid Anthropic call) and the cache refresh. Reads stay open. Fails closed:
+// (a paid Anthropic call), the cache refresh and season-plan goals (2026-11-07). Reads stay open. Fails closed:
 // with no HH_SESSION_SECRET set, nothing gets through (local dev excepted).
 export async function proxy(req: NextRequest) {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return NextResponse.next();
@@ -18,5 +18,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/survivor/:path*", "/api/refresh"],
+  matcher: ["/api/survivor/:path*", "/api/refresh", "/api/plan/:path*"],
 };

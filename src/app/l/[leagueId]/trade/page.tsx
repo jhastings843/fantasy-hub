@@ -3,7 +3,12 @@ import Link from "next/link";
 import {
   formatKeyFromLeague,
   getPicks,
+  getRosterGrades,
 } from "@/lib/rosteraudit/client";
+import type { RAGradesByRosterId } from "@/lib/rosteraudit/types";
+import { inferTrajectory } from "@/lib/dynasty/season-plan";
+import { buildTradePlan, markPlanKeeps } from "@/lib/dynasty/trade-plan";
+import { readGoals } from "@/lib/plan/goals-store";
 import { computeTeamSummaries } from "@/lib/dynasty/power-rankings";
 import { markUntouchables } from "@/lib/dynasty/untouchables";
 import {
@@ -136,6 +141,24 @@ export default async function TradePage({
   // and the analyzer declines any proposal that includes one.
   markUntouchables(teams, leagueId, myRoster.roster_id);
 
+  // The season plan for this league (lib/dynasty/trade-plan): trajectory from
+  // the same RosterAudit grade the plan page reads (dynasty only), plus Jack's
+  // open goals. Keepers join the do-not-trade list.
+  const [grades, goalsRead] = await Promise.all([
+    profile.type === "dynasty"
+      ? getRosterGrades(leagueId, me.user_id).catch((): RAGradesByRosterId => ({}))
+      : Promise.resolve({} as RAGradesByRosterId),
+    readGoals(leagueId),
+  ]);
+  const myTeam = teams.find((t) => t.rosterId === myRoster.roster_id);
+  const plan = buildTradePlan({
+    leagueType: profile.type,
+    trajectory: profile.type === "dynasty" ? inferTrajectory(grades[myRoster.roster_id] ?? null) : null,
+    goals: goalsRead.ok ? goalsRead.goals : [],
+    myPlayers: myTeam?.players ?? [],
+  });
+  if (myTeam) markPlanKeeps(myTeam.players, plan);
+
   return (
     <main className="mx-auto w-full min-w-0 max-w-7xl break-words px-4 py-8 text-hh-ink sm:px-6 lg:px-8">
       <div className="flex flex-col gap-6">
@@ -163,6 +186,9 @@ export default async function TradePage({
           faabBudget={profile.faab}
           faabByRosterId={faabByRosterId}
           jingles={jingles}
+          plan={plan}
+          planLoaded={goalsRead.ok}
+          leagueId={leagueId}
         />
 
       </div>
