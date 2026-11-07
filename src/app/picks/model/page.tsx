@@ -12,6 +12,8 @@ import { CfbModelCard } from "../cfb-model";
 import { PageHead, Section, Stat, Disclosure, Num } from "@/components/hh/ui";
 import { LEAGUE_NAME, href, rec, units, whenEt } from "../ui";
 import s from "../picks.module.css";
+import { ScopeRow, ViewTabs } from "../tabs";
+import { footballViewTabs } from "../tab-sets";
 
 export const dynamic = "force-dynamic";
 
@@ -40,17 +42,16 @@ export default async function ModelPage({ searchParams }: { searchParams: Promis
   });
   const changed = ours.filter((j) => ["activate", "rollback", "retire"].includes(j.kind));
   const mine = [...changed, ...ours.filter((j) => j.kind === "register")].slice(0, Math.max(5, Math.min(changed.length, 8)));
+  // Same folded header as the boards, with How it works lit inside Lab (UX pass item 3).
+  const tabs = footballViewTabs(league, "ats", "week");
   const back = (
-    <nav className={s.chips} aria-label="Sport">
-      {(["nfl", "cfb"] as const).map((l) => (
-        <Link key={l} className={s.chip} href={`/picks/model?l=${l}`} aria-current={l === league ? "page" : undefined}>
-          {LEAGUE_NAME[l]}
-        </Link>
-      ))}
-      <Link className={s.chip} href={href(league, "ats", "week")}>
-        {`Back to ${L} picks`}
-      </Link>
-    </nav>
+    <div className={s.controlBar}>
+      <ScopeRow
+        label="Sport"
+        groups={[(["nfl", "cfb"] as const).map((l) => ({ key: l, label: LEAGUE_NAME[l], href: `/picks/model?l=${l}`, current: l === league }))]}
+      />
+      <ViewTabs board={{ ...tabs.board, current: false }} results={tabs.results} lab={tabs.lab.map((t) => ({ ...t, current: t.key === "how" }))} />
+    </div>
   );
   if (!r) {
     return (

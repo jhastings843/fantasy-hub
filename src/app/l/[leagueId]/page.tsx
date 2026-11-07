@@ -335,9 +335,6 @@ export default async function LeaguePage({
     if (typeof p.age === "number") room.ages.push(p.age);
   }
 
-  const linkBtn =
-    "inline-flex min-h-11 items-center justify-center rounded-[4px] border border-hh-line px-3 text-sm font-medium text-hh-ink transition-colors hover:border-hh-muted hover:bg-hh-sunk";
-
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-8">
@@ -351,15 +348,7 @@ export default async function LeaguePage({
           aside={
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <RefreshButton leagueId={leagueId} />
-              <Link href={`/l/${leagueId}/plan`} className={linkBtn}>
-                Season plan
-              </Link>
-              <Link href={`/l/${leagueId}/players`} className={linkBtn}>
-                Players
-              </Link>
-              <Link href={`/l/${leagueId}/draft`} className={linkBtn}>
-                Draft
-              </Link>
+              {/* Season plan, Players and Draft live in the tab row above; not repeated here (UX pass item 3). */}
               <Link
                 href={`/l/${leagueId}/trade`}
                 className="inline-flex min-h-11 items-center justify-center rounded-[4px] bg-hh-accent px-3 text-sm font-semibold text-[var(--hh-on-accent)] transition-opacity hover:opacity-90"

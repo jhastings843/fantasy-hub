@@ -11,7 +11,7 @@ import { PoolCard } from "./pool";
 import { HarrisCard } from "./harris";
 import { OurSpreadCard } from "./ours";
 import { CfbModelCard } from "./cfb-model";
-import { FOOTBALL_VIEWS, LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
+import { LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
 import { Background, ModelLineup, PageHead, Stats, type ModelRow } from "./board";
 import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
 import { scoreboard } from "@/lib/live/espn";
@@ -21,6 +21,8 @@ import { BoardSpot } from "./BoardSpot";
 import { marketOf } from "./learning";
 import { redisStore } from "@/lib/picks/learning/store";
 import s from "./picks.module.css";
+import { ScopeRow, ViewTabs } from "./tabs";
+import { footballViewTabs, scopeGroups } from "./tab-sets";
 
 // The Picks tab. Sport, then market, then view, all in the URL (?m=, ?v=),
 // so a view can be shared, survives a refresh and works with Back. The
@@ -87,24 +89,8 @@ export default async function PicksView({ league, market: asked, view }: { leagu
             updated={live.length ? readAt : (fresh?.at ?? r.generatedAt)}
           />
           <div className={s.controlBar}>
-            {sportNav}
-            <nav className={s.chips} aria-label="Market">
-              {MARKETS.map((m) => (
-                <Link key={m.id} href={href(league, m.id, view)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
-                  {m.label}
-                </Link>
-              ))}
-            </nav>
-            <nav className={s.chips} aria-label="View">
-              {FOOTBALL_VIEWS.map((v) => (
-                <Link key={v.id} href={href(league, market, v.id)} aria-current={v.id === view ? "page" : undefined} className={s.chip}>
-                  {v.id === "week" ? "Board" : v.label}
-                </Link>
-              ))}
-            </nav>
-            <Link className={s.chip} href={`/picks/model?l=${league}`}>
-              How it works
-            </Link>
+            <ScopeRow groups={scopeGroups(league, market, view)} />
+            <ViewTabs {...footballViewTabs(league, market, view)} />
             {anyLive && view === "week" && (
               <span className={s.liveRefresh}>
                 <AutoRefresh intervalMs={600_000} label="Live games: refreshing every" />

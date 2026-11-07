@@ -841,3 +841,18 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 /* Prop cards keep a light box each, so every prop reads as its own unit (Jack, 2026-11-04). */
 .edgeCard { border: 1px solid var(--rule); border-radius: var(--hh-radius); padding: 14px 16px; background: color-mix(in srgb, var(--surface) 55%, transparent); }
 .edgeGrid { gap: 12px; }
+
+/* Folded headers (UX pass item 3, 2026-11-06): sport and market on one sideways-scrolling line, Lab sub-row. */
+.chips.scopeRow { display: flex; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; width: auto; max-width: 100%; }
+.chips.scopeRow::-webkit-scrollbar { display: none; }
+.chips.scopeRow .chip { flex: none; white-space: nowrap; }
+.scopeSep { flex: none; width: 1px; align-self: stretch; margin: 10px 6px; background: var(--rule); }
+.viewStack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.labRow { display: flex; flex-wrap: wrap; gap: 4px 18px; padding-left: 4px; font-size: 14px; }
+.labRow a { color: var(--mute); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+.labRow a:hover { color: var(--ink); }
+.labRow a[aria-current="page"] { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px var(--hh-accent); }
+.labRow a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .chips.scopeRow { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+}

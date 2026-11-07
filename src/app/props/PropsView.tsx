@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Freshness } from "@/components/hh/Freshness";
 import { LOG_VIEW, NBA_VIEWS, VIEWS, type View } from "../picks/ui";
 import { PropsLineup, PropsLog } from "./top";
@@ -15,6 +14,7 @@ import { KotezResults, KotezWeek } from "./kotez";
 import { Background, PageHead, SecHead } from "../picks/board";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
+import { ScopeRow, ViewTabs } from "../picks/tabs";
 
 // The Props tab: our own models (NFL props and first TD, NBA props, first
 // basket and King of the Court) and David Sasser's NFL props board. Sam's props, first TD and NBA
@@ -35,6 +35,8 @@ const ALL_MARKETS: { id: PropsMarket; label: string }[] = [
   { id: "kotc", label: "King of the Court" },
   { id: "lotto", label: "Lottos" },
 ];
+const NFL_MARKETS: PropsMarket[] = ["pp", "ftd", "attd", "kotez"];
+const NBA_MARKETS: PropsMarket[] = ["nba", "fb", "kotc", "lotto"];
 const TITLE: { [k in PropsMarket]: string } = { pp: "NFL player props", ftd: "NFL First TD", nba: "NBA player props", fb: "NBA First Basket", kotc: "NBA King of the Court", lotto: "NBA lottos (paper)", attd: "NFL Anytime TD", kotez: "NFL King of the End Zone" };
 export const parsePropsMarket = (x: unknown): PropsMarket => (x === "ftd" || x === "nba" || x === "fb" || x === "kotc" || x === "lotto" || x === "attd" || x === "kotez" ? x : "pp");
 
@@ -75,20 +77,24 @@ export default async function PropsView({
           />
           <Freshness what={["props", "pulse"]} />
           <div className={s.controlBar}>
-            <nav className={s.chips} aria-label="Market">
-              {ALL_MARKETS.map((m) => (
-                <Link key={m.id} href={href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown)} aria-current={m.id === market ? "page" : undefined} className={s.chip}>
-                  {m.label}
-                </Link>
-              ))}
-            </nav>
-            <nav className={s.chips} aria-label="View">
-              {views.map((v) => (
-                <Link key={v.id} href={href(market, v.id)} aria-current={v.id === shown ? "page" : undefined} className={s.chip}>
-                  {v.id === "week" ? "Board" : v.label}
-                </Link>
-              ))}
-            </nav>
+            <ScopeRow
+              label="Market"
+              groups={[NFL_MARKETS, NBA_MARKETS].map((g) =>
+                ALL_MARKETS.filter((m) => g.includes(m.id)).map((m) => ({
+                  key: m.id,
+                  label: m.label,
+                  href: href(m.id, shown === "research" && m.id !== "pp" ? "week" : shown),
+                  current: m.id === market,
+                })),
+              )}
+            />
+            <ViewTabs
+              board={{ key: "week", label: sport === "nba" ? "Today" : "Board", href: href(market, "week"), current: shown === "week" }}
+              results={{ key: "results", label: "Results", href: href(market, "results"), current: shown === "results" }}
+              lab={views
+                .filter((v) => v.id === "research" || v.id === "log")
+                .map((v) => ({ key: v.id, label: v.label, href: href(market, v.id), current: v.id === shown }))}
+            />
           </div>
         </header>
 

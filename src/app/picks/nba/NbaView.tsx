@@ -9,11 +9,13 @@ import { decimal, shrunk } from "@/lib/picks/staking";
 import pv from "../game/preview.module.css";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { BREAK_EVEN, MIN_SAMPLE } from "@/lib/picks/engine";
-import { drawdown, GameCell, href, line, pieces, LOG_VIEW, MARKETS, NBA_VIEWS, price, rec, units, whenEt, type Market, type View } from "../ui";
+import { drawdown, GameCell, line, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow } from "../board";
 import { NbaGameModelCard } from "./game-model";
 import { NbaModelRecords } from "../model-records";
 import { scoresAt } from "@/lib/live/scores-at";
+import { ScopeRow, ViewTabs } from "../tabs";
+import { scopeGroups, viewTabs } from "../tab-sets";
 import s from "../picks.module.css";
 import n from "./nba.module.css";
 
@@ -734,22 +736,6 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
   // The board reads ESPN on every load; Results and the log show finals as of the last tracking run.
   const updated = b ? new Date().toISOString() : await scoresAt("nba");
   const today = etDay(new Date());
-  const sportNav = (
-    <nav className={s.chips} aria-label="Sport">
-      <Link className={s.chip} href={href("nfl", m, view)}>
-        NFL
-      </Link>
-      <Link className={s.chip} href={href("cfb", m, view)}>
-        CFB
-      </Link>
-      <Link className={s.chip} href={nbaHref(m, view)} aria-current="page">
-        NBA
-      </Link>
-      <Link className={s.chip} href="/picks/cbb">
-        CBB
-      </Link>
-    </nav>
-  );
   const all = v?.cuts.find((c) => c.id === `${m}:all`);
   const rule = v ? ruleOf(v, m) : null;
   const t1 = rule?.tier1;
@@ -786,21 +772,8 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
         <header className={s.pageFrame}>
           <PageHead title="NBA picks" sub="Tonight. Which model moves money here, and what each game reads." asof={`NBA ${v ? `${v.season}-${String(v.season + 1).slice(2)}` : "2026-27"}`} updated={updated} />
           <div className={s.controlBar}>
-            {sportNav}
-            <nav className={s.chips} aria-label="Market">
-              {MARKETS.map((x) => (
-                <Link key={x.id} href={nbaHref(x.id, view)} aria-current={x.id === m ? "page" : undefined} className={s.chip}>
-                  {x.label}
-                </Link>
-              ))}
-            </nav>
-            <nav className={s.chips} aria-label="View">
-              {[...NBA_VIEWS, LOG_VIEW].map((x) => (
-                <Link key={x.id} href={nbaHref(m, x.id)} aria-current={x.id === view ? "page" : undefined} className={s.chip}>
-                  {x.id === "week" ? "Board" : x.label}
-                </Link>
-              ))}
-            </nav>
+            <ScopeRow groups={scopeGroups("nba", m, view)} />
+            <ViewTabs {...viewTabs("nba", m, view)} />
           </div>
           {view !== "week" && stats}
         </header>

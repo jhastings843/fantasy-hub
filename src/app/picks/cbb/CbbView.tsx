@@ -3,12 +3,13 @@ import { cbbGameHref } from "../hrefs";
 import { getCbbBoard, getCbbRecord, CBB_PARAMS, type CbbBoard, type CbbBoardRow, type CbbRecord } from "@/lib/models/cbb/store";
 import { SIGNALS, signalsOf, graded, type SignalRecord } from "@/lib/models/cbb/track";
 import BACKTEST from "@/lib/models/cbb/backtest.json";
-import { GameCell, href, line, MARKETS, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
+import { GameCell, line, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { betRecordTile } from "../../props/learning";
 import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress } from "../board";
 import { CBB_SLICES } from "@/lib/models/cbb/learn";
-import { nbaHref } from "../nba/NbaView";
 import { scoresAt } from "@/lib/live/scores-at";
+import { ScopeRow, ViewTabs } from "../tabs";
+import { scopeGroups, viewTabs } from "../tab-sets";
 import s from "../picks.module.css";
 import c from "./cbb.module.css";
 
@@ -25,12 +26,6 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { t
 const pctOf = (x: number) => `${(x * 100).toFixed(0)}%`;
 const signed = (x: number, d = 1) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(d)}`;
 const cls = (u: number) => (u > 0 ? s.pos : u < 0 ? s.neg : "");
-const CBB_VIEWS: { id: View; label: string }[] = [
-  { id: "week", label: "Board" },
-  { id: "results", label: "Results" },
-  { id: "research", label: "Research" },
-  { id: "log", label: "Learner log" },
-];
 const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this week", "rolled-back": "Rolled back", retired: "Retired" } as const;
 /** Which slices belong to a market tab. */
 const sliceMarket = (id: string): Market => (CBB_SLICES.find((x) => x[0] === id)?.[3] === "total" ? "ou" : "ats");
@@ -630,46 +625,14 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
   const season = b?.season ?? v?.season ?? 2026;
   // The board reads ESPN on every load; Results and the log show finals as of the last tracking run.
   const updated = b ? new Date().toISOString() : await scoresAt("cbb");
-  const sportNav = (
-    <nav className={s.chips} aria-label="Sport">
-      <Link className={s.chip} href={href("nfl", m, view === "week" || view === "results" || view === "research" ? view : "week")}>
-        NFL
-      </Link>
-      <Link className={s.chip} href={href("cfb", m, view)}>
-        CFB
-      </Link>
-      <Link className={s.chip} href={nbaHref(m, view)}>
-        NBA
-      </Link>
-      <Link className={s.chip} href={cbbHref(m, view)} aria-current="page">
-        CBB
-      </Link>
-    </nav>
-  );
   return (
     <main className={s.page}>
       <div className={s.wrap}>
         <header className={s.pageFrame}>
           <PageHead title="CBB" sub="Every Division I game: our number against DraftKings', tracked from tip one." asof={`NCAAB ${season}-${String(season + 1).slice(2)}`} updated={view === "research" ? null : updated} />
           <div className={s.controlBar}>
-            {sportNav}
-            <nav className={s.chips} aria-label="Market">
-              {MARKETS.map((x) => (
-                <Link key={x.id} href={cbbHref(x.id, view)} aria-current={x.id === m ? "page" : undefined} className={s.chip}>
-                  {x.label}
-                </Link>
-              ))}
-            </nav>
-            <nav className={s.chips} aria-label="View">
-              {CBB_VIEWS.map((x) => (
-                <Link key={x.id} href={cbbHref(m, x.id)} aria-current={x.id === view ? "page" : undefined} className={s.chip}>
-                  {x.label}
-                </Link>
-              ))}
-              <Link href="/picks/cbb/bracket" className={`${s.chip} ${c.bracketChip}`}>
-                Bracket lab
-              </Link>
-            </nav>
+            <ScopeRow groups={scopeGroups("cbb", m, view)} />
+            <ViewTabs {...viewTabs("cbb", m, view, [{ key: "bracket", label: "Bracket lab", href: "/picks/cbb/bracket" }])} />
           </div>
         </header>
         {view === "results" ? (
