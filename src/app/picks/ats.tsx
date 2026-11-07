@@ -206,8 +206,30 @@ function readOf(g: BoardGame, r: PicksReport, live?: LiveGame): { chip: [string,
   if (st === "budget") return { chip: ["Close call", s.readTrack], note: "Over this week's budget" };
   if (st === "wait") return { chip: ["Needs PEM", s.readTrack], note: g.waitFor ? `${g.waitFor === "t1" ? "Tier 1" : "Tier 2"} if PEM agrees` : undefined };
   if (st === "noquote") return { chip: ["No line", s.readPass] };
-  // The Side column carries the edge; the read doesn't repeat it.
-  return { chip: [g.tier === "split" ? "Split" : "Pass", s.readPass] };
+  // The Side column carries the edge; the read says why it passes (UX pass item 5).
+  return { chip: [g.tier === "split" ? "Split" : "Pass", s.readPass], note: passReason(g, r) };
+}
+
+/**
+ * Why a game with a read is not a bet, in a few words:
+ *   vetoed            "PEM disagrees"
+ *   tier on hold      "Tier 2 on hold: losing since Week 6"
+ *   outside the rule  "Rule bets: agree on road dog"
+ *   split / one model "Sam and David split" / "Only Sam posted"
+ */
+export function passReason(g: BoardGame, r: PicksReport): string | undefined {
+  if (g.vetoedBy) return `${g.vetoedBy} disagrees`;
+  if (g.tier === "one") return g.sam ? "Only Sam posted" : "Only David posted";
+  if (g.tier === "split") return "They pick different sides";
+  if (g.forwardHold) {
+    const c = g.forwardHold === "t1" ? r.strategies.rule : r.strategies.second;
+    return `${g.forwardHold === "t1" ? "Tier 1" : "Tier 2"} on hold${c?.forward ? `: ${c.forward.w}-${c.forward.l} since Week ${c.forward.since}` : ""}`;
+  }
+  if (g.tier === "pass" || g.tier === "fav") {
+    const rule = r.strategies.rule;
+    return rule ? `Rule bets: ${rule.label.toLowerCase()}` : "No rule in force";
+  }
+  return undefined;
 }
 
 /** "Kennesaw State +2.5" may wrap, but never between "State" and "+2.5": the last word stays with the line. */
@@ -534,16 +556,16 @@ export function ReadLegend() {
   return (
     <div className={s.legendRow}>
       <span>
-        <span className={`${s.readChip} ${s.readBet}`}>Tier 1 · 1u</span> sent, saved price and stake
+        <span className={`${s.readChip} ${s.readBet}`}>Tier 1 · 1u</span> bet sent by email (1u = one standard bet)
       </span>
       <span>
-        <span className={`${s.readChip} ${s.readPend}`}>Tier 2 · not sent</span> qualifies, not sent yet
+        <span className={`${s.readChip} ${s.readPend}`}>Tier 2 · not sent</span> a bet, email not sent yet
       </span>
       <span>
-        <span className={`${s.readChip} ${s.readTrack}`}>Close call</span> tracked, no stake
+        <span className={`${s.readChip} ${s.readTrack}`}>Close call</span> almost a bet, graded with no money
       </span>
       <span>
-        <span className={`${s.readChip} ${s.readPass}`}>Pass</span> no position
+        <span className={`${s.readChip} ${s.readPass}`}>Pass</span> no bet, the reason is under it
       </span>
     </div>
   );

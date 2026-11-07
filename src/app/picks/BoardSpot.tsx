@@ -33,7 +33,7 @@ export function BoardSpot({ r }: { r: PicksReport }) {
   const fmt = (v: number) => line(Math.round(v * 10) / 10);
   const href = `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`;
   return (
-    <Spotlight label={g.issued ? "Best bet this week" : "Best bet · sized, not sent"} aside={`${LEAGUE_NAME[r.league]} · ${kickoffEt(ref?.kickoff)}`}>
+    <Spotlight label={g.issued ? `Best ${LEAGUE_NAME[r.league]} bet this week` : `Best ${LEAGUE_NAME[r.league]} bet · not sent yet`} aside={`${LEAGUE_NAME[r.league]} · ${kickoffEt(ref?.kickoff)}`}>
       <Link href={href} scroll={false} className="group flex items-center gap-3" data-first-pick>
         <TeamLogo league={r.league} team={team} espnId={side === "home" ? ref?.homeId : ref?.awayId} size={40} />
         <div className="min-w-0">

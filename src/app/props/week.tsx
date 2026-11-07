@@ -25,8 +25,8 @@ import { kalshiCost, kalshiFor } from "@/lib/firsttd/trends";
 import { bestBets, bestCost, bookPrice, ftdEdge } from "@/lib/models/nfl/ftd-price";
 import { pricedPlayers } from "@/lib/firsttd/parse";
 import { whenEt } from "../picks/ui";
-import { Background, Hero, SecHead, Stats, type Stat } from "../picks/board";
-import { LearningBlock, betRecordTile } from "./learning";
+import { Hero, SecHead, Stats, type Stat } from "../picks/board";
+import { betRecordTile } from "./learning";
 import { Matchup, type MatchupProps } from "./matchup";
 import s from "../picks/picks.module.css";
 import pp from "./props.module.css";
@@ -268,17 +268,28 @@ export function PropStats({ edges, graded, learning, logHref, unit, extra }: { e
           sub: extra ? <>{live ? "bets for real" : "games a slice needs"} · <Link href={logHref}>{testing} testing</Link></> : live ? "bets for real" : "games a slice needs",
           small: true,
         },
-        ...(extra ? [] : [{ k: "Learner", v: `${testing} slices testing`, sub: <Link href={logHref}>Open the log</Link>, small: true }]),
+        ...(extra ? [] : [{ k: "Being tested", v: `${testing} slice${testing === 1 ? "" : "s"}`, sub: <Link href={logHref}>See them in Lab</Link>, small: true }]),
       ]}
     />
   );
 }
 
+/**
+ * On a board: one plain sentence on whether anything here bets real money,
+ * and where the machinery lives (UX pass item 5). The full slice table is on
+ * Results and the learner's working on /learning.
+ */
 export function Gate({ learning, label }: { learning: SectionView; label: string }) {
+  const live = learning.entries.filter((e) => e.status === "active");
+  const best = Math.max(0, ...learning.entries.map((e) => e.ev?.games ?? 0));
+  const need = learning.gate.minGames;
   return (
-    <Background title={`How ${label} edges become bets: every slice and the exact bar`}>
-      <LearningBlock v={learning} />
-    </Background>
+    <p className={s.thin}>
+      {live.length
+        ? `${live.length} ${label} slice${live.length === 1 ? " bets" : "s bet"} real money: ${live.map((e) => e.label).join(", ")}. Everything else here is tracked with no stake.`
+        : `Nothing here bets real money yet. A slice (one kind of ${label} edge) goes live after ${need}+ games with a clear profit; the closest has ${Math.min(best, need)} of ${need}.`}{" "}
+      <Link href="/learning">How a slice goes live</Link>
+    </p>
   );
 }
 

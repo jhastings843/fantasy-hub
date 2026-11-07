@@ -10,7 +10,7 @@ import pv from "../game/preview.module.css";
 import { CRITERIA } from "@/lib/picks/learning/model";
 import { BREAK_EVEN, MIN_SAMPLE } from "@/lib/picks/engine";
 import { drawdown, GameCell, line, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
-import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow } from "../board";
+import { Background, CutRanges, Curve, Hero, LearnerLog, ModelLineup, PageHead, SecHead, Stats, TrackingProgress, type LogEntry, type ModelRow, WordsGuide } from "../board";
 import { NbaGameModelCard } from "./game-model";
 import { NbaModelRecords } from "../model-records";
 import { scoresAt } from "@/lib/live/scores-at";
@@ -824,6 +824,8 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
           </section>
         )}
         {v && view === "week" && <ModelLineup title={`Who decides NBA ${MARKET_NAME[m].toLowerCase()}`} aside={m === "su" ? "No stakes in straight up." : v.gate.live && m === "ats" ? "The tier rule sets stakes under NBA's own limits." : "Nothing here sets a stake yet."} models={lineup(v, m)} />}
+
+        {view === "week" && <WordsGuide />}
 
         <footer className={s.footer}>
           <span>

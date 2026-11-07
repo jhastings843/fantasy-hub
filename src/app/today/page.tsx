@@ -96,7 +96,7 @@ interface Slip {
 }
 
 /** Said once under Next up rather than on every row that is waiting to send. */
-const READY_NOTE = "Sized, not sent yet: it goes out as a late-add email within 30 minutes (none inside an hour of kickoff).";
+const READY_NOTE = "Not sent yet: it goes out as a late-add email within 30 minutes (none inside an hour of kickoff).";
 
 /** "Missouri +2.5" -> name in the text face, the number in mono. */
 function PickText({ pick, className = "" }: { pick: string; className?: string }) {
@@ -245,7 +245,7 @@ function BetSpot({ x }: { x: Slip }) {
   const edge = l && avg !== undefined ? l.market - avg : undefined;
   const fmt = (v: number) => line(Math.round(v * 10) / 10);
   return (
-    <Spotlight label={x.kind === "ready" ? "Best bet · sized, not sent" : "Best bet"} aside={x.state === "live" ? "Live now" : `${x.league} · ${x.when}`}>
+    <Spotlight label={x.kind === "ready" ? "Today's best bet, any sport · not sent yet" : "Today's best bet, any sport"} aside={x.state === "live" ? "Live now" : `${x.league} · ${x.when}`}>
       <Link href={x.href ?? "/picks"} scroll={false} className="group flex items-center gap-3">
         <Logos x={x} size={40} />
         <div className="min-w-0">
@@ -406,7 +406,7 @@ export default async function TodayPage() {
   const sub = [
     live.length ? `${plural(liveStakes.length, "stake", "stakes")} in play` : "Nothing in play",
     issuedNext.length ? `${issuedNext.length} more issued and not started` : "none issued yet",
-    readyNext.length ? `${plural(readyNext.length, "bet", "bets")} sized and ready to send` : null,
+    readyNext.length ? `${plural(readyNext.length, "bet", "bets")} set and waiting to be emailed` : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -445,7 +445,7 @@ export default async function TodayPage() {
 
           <Section id="t-next" label="Next up" aside={<Num>{`${next.reduce((a, x) => a + (x.kind === "issued" ? (x.stake ?? 0) : 0), 0)}u issued, not started`}</Num>}>
             {nextRest.length ? nextRest.map((x) => <BetRow key={x.key} x={x} />) : <Empty>{spot ? "That's the only bet waiting." : "No issued bets are waiting to start."}</Empty>}
-            {next.some((x) => x.note === READY_NOTE) && <p className="mt-3 text-xs leading-relaxed text-hh-muted">{`"Not sent" bets: ${READY_NOTE.replace("Sized, not sent yet: it", "each")}`}</p>}
+            {next.some((x) => x.note === READY_NOTE) && <p className="mt-3 text-xs leading-relaxed text-hh-muted">{`"Not sent" bets: ${READY_NOTE.replace("Not sent yet: it", "each")}`}</p>}
             {next.some((x) => x.note?.startsWith("Early look")) && <p className="mt-2 text-xs leading-relaxed text-hh-muted">An early look is sized now and locks at that morning&apos;s price, the time shown in gold.</p>}
           </Section>
         </div>
@@ -484,11 +484,11 @@ export default async function TodayPage() {
               ))}
             </div>
             <p className="mt-2 text-xs text-hh-muted">
-              {`${readyNext.length} ready to send, sized and not issued yet. `}
+              {`${readyNext.length} set and waiting to be emailed, not counted until sent. Sides we only track carry no money and stay out of these totals; `}
               <Link href="/records" className="font-medium text-hh-accent-ink hover:underline">
-                Shadow records
+                their records
               </Link>
-              {" are tracked and never staked, and kept apart."}
+              {" are kept apart."}
             </p>
           </Section>
         </div>

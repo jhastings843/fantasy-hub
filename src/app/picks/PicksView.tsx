@@ -12,7 +12,7 @@ import { HarrisCard } from "./harris";
 import { OurSpreadCard } from "./ours";
 import { CfbModelCard } from "./cfb-model";
 import { LEAGUE_NAME, MARKETS, href, kickoffEt, rec, units, type Market, type View } from "./ui";
-import { Background, ModelLineup, PageHead, Stats, type ModelRow } from "./board";
+import { Background, ModelLineup, PageHead, Stats, type ModelRow, WordsGuide } from "./board";
 import { sourceState, type PicksPolicy } from "@/lib/picks/policy";
 import { scoreboard } from "@/lib/live/espn";
 import { AutoRefresh } from "@/components/AutoRefresh";
@@ -121,6 +121,8 @@ export default async function PicksView({ league, market: asked, view }: { leagu
           {r.board.length > 0 && <p className={`${s.progress} ${s.num}`}>{`${r.board.filter((g) => g.final).length}/${r.board.length} games have completed`}</p>}
         </Background>
 
+        {view === "week" && <WordsGuide />}
+
         <footer className={s.footer}>
           <span>
             Sources: <a href={SOURCES[league].davidBoard}>David Sasser</a> and <a href={SOURCES[league].samRecord}>Sam&apos;s Models</a>
@@ -202,7 +204,7 @@ function TopStats({ r, market, testing, logHref }: { r: PicksReport; market: Mar
   const L = LEAGUE_NAME[r.league];
   const label = MARKETS.find((m) => m.id === market)!.label;
   const finals = `${r.board.filter((g) => g.final).length} of ${r.board.length} games final`;
-  const learner = { k: "Learner", v: `${testing} idea${testing === 1 ? "" : "s"} testing`, sub: <Link href={logHref}>Open the log</Link>, small: true };
+  const learner = { k: "Being tested", v: `${testing} idea${testing === 1 ? "" : "s"}`, sub: <Link href={logHref}>See them in Lab</Link>, small: true };
   if (market === "su") {
     const season = r.live.reduce((t, w) => ({ w: t.w + w.su.w, l: t.l + w.su.l }), { w: 0, l: 0 });
     const wk = r.live.find((w) => w.week === r.week)?.su;

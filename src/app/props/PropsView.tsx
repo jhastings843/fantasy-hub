@@ -10,7 +10,7 @@ import { NbaNewsResults, NbaNewsToday } from "./news";
 import { LottoLog, LottoResults, LottoToday } from "./lotto";
 import { AttdLog, AttdResults, AttdWeek } from "./attd";
 import { KotezResults, KotezWeek } from "./kotez";
-import { LazyBackground, PageHead, SecHead } from "../picks/board";
+import { LazyBackground, PageHead, SecHead, WordsGuide } from "../picks/board";
 import { loadDavid } from "./actions";
 import { DAVID_URL } from "@/lib/props/david";
 import s from "../picks/picks.module.css";
@@ -138,6 +138,8 @@ export default async function PropsView({
           </>
         )}
         {market === "fb" && shown === "results" && <OurFirstBasketResults season={season} />}
+
+        {shown === "week" && <WordsGuide props />}
 
         <footer className={s.footer}>
           <span>

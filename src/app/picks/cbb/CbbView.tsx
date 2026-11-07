@@ -5,7 +5,7 @@ import { SIGNALS, signalsOf, graded, type SignalRecord } from "@/lib/models/cbb/
 import BACKTEST from "@/lib/models/cbb/backtest.json";
 import { GameCell, line, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { betRecordTile } from "../../props/learning";
-import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress } from "../board";
+import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress, WordsGuide } from "../board";
 import { CBB_SLICES } from "@/lib/models/cbb/learn";
 import { scoresAt } from "@/lib/live/scores-at";
 import { ScopeRow, ViewTabs } from "../tabs";
@@ -670,6 +670,8 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
             Couldn&apos;t load the college hoops slate right now. Try again in a few minutes.
           </div>
         )}
+        {view === "week" && <WordsGuide />}
+
         <footer className={s.footer}>
           <span>
             Sources: <a href="https://barttorvik.com/">Bart Torvik&apos;s T-Rank</a>, ESPN finals. Lines: DraftKings via ESPN. Model output, not betting advice.

@@ -180,6 +180,57 @@ export function Background({ title = "Tracked in the background", children }: { 
   );
 }
 
+/**
+ * Plain words for the boards (UX pass item 5, 2026-11-06): who the outside
+ * models are and what the chips mean. Closed by default, one per board.
+ */
+const WHO: [string, string][] = [
+  ["Sam", "Sam's Models, a betting model site. His line for every NFL, college and NBA game is read before kickoff."],
+  ["David", "David Sasser (davidsasser.com). His spreads, totals and player prop projections, read the same way."],
+  ["PEM", "Jay's weekly college card (@FansOfCFB on X, posted Tuesdays). A third vote on college games."],
+  ["Harris", "John Harris's college football and college hoops sheets. Tracked beside ours; on college games he can veto a bet."],
+  ["Ours", "Hobby Hub's own models. Tracked like everyone else until a slice earns real stakes."],
+];
+const WORDS: [string, string][] = [
+  ["1u", "One unit, your standard bet. +2.5u means you are up two and a half standard bets."],
+  ["Tier 1, Tier 2", "Tier 1 is the main rule that sets stakes. Tier 2 is a second rule that bets only while its recent record holds up."],
+  ["Not sent", "The bet and stake are set, but the email hasn't gone out yet."],
+  ["Locks", "When an early look becomes final and is emailed. Until then a line move can still change it."],
+  ["Close call", "Almost a bet: the price is too short now, or the week's budget is used up. Graded, no money."],
+  ["Tracked, shadow", "Graded as if bet, with no money on it. That record decides whether it ever gets real stakes."],
+  ["Lab", "Research and the learner log: how each rule and slice is being tested."],
+];
+
+export function WordsGuide({ props = false }: { props?: boolean }) {
+  return (
+    <details className={s.bg}>
+      <summary>Who&apos;s who and what the words mean</summary>
+      <div className={s.bgBody}>
+        <dl className={s.kv}>
+          {(props ? WHO.filter(([k]) => k === "David" || k === "Ours") : WHO).map(([k, v]) => (
+            <div key={k} style={{ display: "contents" }}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+          {(props ? WORDS.filter(([k]) => k === "1u" || k === "Tracked, shadow" || k === "Lab") : WORDS).map(([k, v]) => (
+            <div key={k} style={{ display: "contents" }}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+          {props && (
+            <div style={{ display: "contents" }}>
+              <dt>Ours, adj.</dt>
+              <dd>Our chance after adjusting for how often chances like it have actually hit. The raw model number is under Every number.</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+    </details>
+  );
+}
+
 /** Background, but the body loads when opened (UX pass item 4): for heavy research-only panels like David's board. */
 export function LazyBackground({ title, load }: { title: string; load: () => Promise<ReactNode> }) {
   return <LazyDetails className={s.bg} summary={<summary key="summary">{title}</summary>} load={load} loadingClass={s.bgBody} wrapClass={s.bgBody} />;
