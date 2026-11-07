@@ -1720,7 +1720,9 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
   try {
     v = await getMoneyView();
   } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
+    // Cause to the server log; the page says it plainly (audit LOW, 2026-11-04).
+    console.error("[money] view:", e);
+    error = "load";
   }
   const snap = v?.snapshot;
   // Server component on a force-dynamic page: reading the clock per request is the point.
@@ -1738,7 +1740,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
           <MoneyChips tab={tab} />
         </header>
 
-        {error && <p className={s.error}>{`The Money page could not load: ${error}`}</p>}
+        {error && <p className={s.error}>The Money page could not load just now. Try again in a minute.</p>}
         {SHOW_BETS && v && v.problems.length > 0 && <p className={s.error}>{`Some bets could not be checked against ESPN: ${v.problems.join("; ")}`}</p>}
         {v && !snap && tab !== "bets" && (
           <p className={s.calm}>Phil and the stock books have not reported yet. They post here from the Mac after their next run.</p>

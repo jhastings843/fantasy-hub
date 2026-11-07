@@ -15,7 +15,9 @@ export default async function SurvivorPage() {
   try {
     reports = await buildReports();
   } catch (e) {
-    error = e instanceof Error ? e.message : "Could not build this week's report.";
+    // Cause to the server log; the page says it plainly (audit LOW, 2026-11-04).
+    console.error("[survivor] report:", e);
+    error = "Could not build this week's report just now. Try again in a minute.";
   }
 
   return (

@@ -65,7 +65,8 @@ async function engineGroup(title: string, href: string, sport: Sport, load: () =
     const view = keep ? { ...v, entries: v.entries.filter((e) => keep(e.id)) } : v;
     return { title, href, sport, rows: engineInputs(view, sport, now).map((x) => forecast(x, now)).sort(byOutlook) };
   } catch (e) {
-    return { title, href, sport, rows: [], error: e instanceof Error ? e.message : String(e) };
+    console.error(`[forecast] ${title}:`, e);
+    return { title, href, sport, rows: [], error: "load" };
   }
 }
 
@@ -102,7 +103,8 @@ async function picksGroups(now: Date): Promise<Group[]> {
         .sort(byOutlook),
     }));
   } catch (e) {
-    return [{ title: "Football picks", href: "/picks?v=research", sport: "nfl", rows: [], error: e instanceof Error ? e.message : String(e) }];
+    console.error("[forecast] football picks:", e);
+    return [{ title: "Football picks", href: "/picks?v=research", sport: "nfl", rows: [], error: "load" }];
   }
 }
 
@@ -135,7 +137,8 @@ async function inForce(): Promise<{ rows: InForce[]; error?: string }> {
       add("Spread Tier 2", c.strategies.second);
       add("Totals rule", c.totalsBacktest.rule);
     } catch (e) {
-      errs.push(`${L}: ${e instanceof Error ? e.message : String(e)}`);
+      console.error(`[forecast] in force ${L}:`, e);
+      errs.push(L);
     }
   }
   return { rows, ...(errs.length ? { error: errs.join("; ") } : {}) };
@@ -245,7 +248,7 @@ export default async function ForecastPage() {
             they are picked weekly from the best cuts, not learned slices, so they aren&apos;t in the forecast below. NBA picks aren&apos;t staked yet.
           </p>
           </Disclosure>
-          {live.error && <p className={s.p}>Couldn&apos;t load: {live.error}</p>}
+          {live.error && <p className={s.p}>Couldn&apos;t load what is in force just now. Try again in a minute.</p>}
           <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3">
             {live.rows.map((r) => (
               <li key={`${r.league}:${r.market}`} className="flex min-w-0 flex-col gap-1.5 border-b border-hh-line py-3">
@@ -296,7 +299,7 @@ export default async function ForecastPage() {
               <span className={s.dim} style={{ fontSize: 12 }}>
                 Season ends {md(SEASON_END[g.sport])} (estimate) · {g.rows.length} slices
               </span>
-              {g.error && <p className={s.p}>Couldn&apos;t load this section: {g.error}</p>}
+              {g.error && <p className={s.p}>Couldn&apos;t load this section just now. Try again in a minute.</p>}
               <Disclosure summary={`Slice detail · ${g.rows.length} slices`}>
               {loud.length > 0 && (
                 <ul className="grid min-w-0 grid-cols-1 gap-x-7 sm:grid-cols-2 lg:grid-cols-3" style={{ marginTop: 8 }}>
