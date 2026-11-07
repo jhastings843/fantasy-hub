@@ -1,4 +1,4 @@
-import type { Book, OptionsDesk, ResearchSwitch } from "@/lib/money/types";
+import type { Book, OptionLane, OptionsDesk, ResearchSwitch } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { DeskHero, Stats } from "./desks";
 import s from "../picks/picks.module.css";
@@ -8,7 +8,8 @@ import { Term } from "./Term";
 // Two paper books that trade on the /stocks research (trade-bot, added 2026-11-07):
 //   research-switch  TQQQ when the outlook leans up, SQQQ when it leans down, T-bills otherwise
 //                    (a stock book: it also shows on the Stock books tab and the learner grades it)
-//   options-qqq      a QQQ call or put 30 to 45 days out on the same lean (this tab's own desk)
+//   options-market   calls and puts on any US stock or ETF the research names (this tab's own desk):
+//                    index lane = the lean on SPY, trend lane = the trend book's picks, idea lane = /stocks ideas once ready
 // Both read the outlook the 6pm /stocks run writes; neither calls a model.
 
 const usd = (n: number, signed = false) =>
@@ -24,10 +25,17 @@ const LEAN: Record<string, { label: string; cls: string }> = {
   BIL: { label: "No lean", cls: s.readTrack },
 };
 
+const LANE_NAME: Record<OptionLane, string> = { index: "Market lean", trend: "Trend picks", idea: "Stock ideas" };
+const LANE_HOW: Record<OptionLane, string> = {
+  index: "SPY call or put when the /stocks outlook leans, 30 to 45 days out. Out at +50% or -50%.",
+  trend: "A call on each trend-book pick, expiring about three weeks past the pick's horizon. Out at +100%, -50%, or the horizon.",
+  idea: "A call 60 to 90 days out when a /stocks idea hits its entry trigger. Out at +100%, -50%, or after 60 days.",
+};
+
 const TERM = {
   lean: "Read from the /stocks daily outlook. Weeks call up or down at medium or high confidence (with the days call not pointing the other way), or days and weeks agreeing, counts as a lean. Anything else is no lean.",
   dte: "Days to expiry. The book buys 30 to 45 days out and sells with 7 days left, before time decay speeds up.",
-  risk: "The most an option can lose is what it cost. Each trade spends 5% of the book (2.5% when VIX is 30 or higher).",
+  risk: "The most an option can lose is what it cost. Market-lean trades spend 4% of the book, trend and idea trades 2% (halved when VIX is 30 or higher). At most 8 open and 25% of the book at risk.",
 };
 
 /** The research-switch book from the snapshot's stock books, if it has started. */
@@ -54,7 +62,7 @@ export function OptionsHero({ o, rs }: { o?: OptionsDesk | null; rs?: ResearchSw
   const lean = today ? LEAN[today.hold] ?? LEAN.BIL : null;
   return (
     <DeskHero
-      eyebrow="Research bots · TQQQ/SQQQ switch and QQQ options · paper"
+      eyebrow="Research bots · TQQQ/SQQQ switch and market-wide options · paper"
       title={
         o?.curve?.length ? (
           <>
@@ -69,7 +77,7 @@ export function OptionsHero({ o, rs }: { o?: OptionsDesk | null; rs?: ResearchSw
         `${lean ? `Research today: ${lean.label.toLowerCase()} (${shortDay(today!.as_of)} close). ` : ""}`
         + (o?.curve?.length
           ? `Book ${usd(h.equity)} (${pct(h.ret, 2)}), SPY over the same days ${h.spyRet !== null ? pct(h.spyRet, 2) : "n/a"}. Far too early to judge.`
-          : "It checks the market at 10:05am and 3:55pm Eastern on weekdays and only buys when the research leans.")
+          : "It checks at 10:05am and 3:55pm Eastern on weekdays and buys calls or puts on whatever the research names: the market lean, trend picks, and ready stock ideas.")
       }
     />
   );
@@ -92,7 +100,7 @@ export function OptionsTab({ o, rs, books }: { o?: OptionsDesk | null; rs?: Rese
           { k: "Options book", v: pct(h.ret, 2), sub: `${usd(h.equity)} of ${usd(h.start)}`, tone: h.ret > 0 ? "up" : h.ret < 0 ? "down" : undefined },
           { k: "SPY, same days", v: h.spyRet !== null ? pct(h.spyRet, 2) : "·", sub: "from the first mark" },
           { k: "TQQQ/SQQQ switch", v: swRet !== null ? pct(swRet, 2) : "·", sub: sw ? `holds ${swHold}, SPY ${swSpy !== null ? pct(swSpy, 2) : "n/a"}` : "starts with the next 6:30am run", tone: swRet && swRet > 0 ? "up" : swRet && swRet < 0 ? "down" : undefined },
-          { k: "Open options", v: `${o?.positions.length ?? 0}`, sub: o?.positions[0] ? o.positions[0].kind : "none" },
+          { k: "Open options", v: `${o?.positions.length ?? 0}`, sub: o?.positions.length ? [...new Set(o.positions.map((p) => p.underlying))].join(", ") : "none" },
         ]}
       />
 
@@ -156,20 +164,42 @@ export function OptionsTab({ o, rs, books }: { o?: OptionsDesk | null; rs?: Rese
               const dte = Math.round((Date.parse(`${p.expiry}T12:00:00Z`) - Date.parse(`${h.asOf ?? p.entry_day}T12:00:00Z`)) / 86_400_000);
               return (
                 <li key={p.contract} className={m.grade}>
-                  <span className={s.play}>{`QQQ ${p.strike} ${p.kind} · ${p.qty}x`}</span>
+                  <span className={s.play}>{`${p.underlying} ${p.strike} ${p.kind} · ${p.qty}x`}</span>
+                  <span className={m.tag}>{LANE_NAME[p.lane] ?? p.lane}</span>
                   <span className={`${s.num} ${tone(chg)}`}>{pct(chg)}</span>
                   <span className={m.why}>
                     {`Bought ${shortDay(p.entry_day)} at $${p.entry_price.toFixed(2)}, now about $${now.toFixed(2)}. Expires ${shortDay(p.expiry)} (`}
                     <Term label={`${dte} DTE`} def={TERM.dte} />
-                    {`). Out at +50%, -50%, 7 days left, or a flip.`}
+                    {`). ${LANE_HOW[p.lane] ?? ""}`}
                   </span>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className={m.sub}>Nothing open. The book only buys when the research leans up or down.</p>
+          <p className={m.sub}>Nothing open. The book only buys when the research names something.</p>
         )}
+      </div>
+
+      <div className={m.panel}>
+        <div className={m.panelHead}>
+          <h2 className={m.panelTitle}>Which research earns its keep</h2>
+          <span className={m.foldMeta}>closed trades, return on premium</span>
+        </div>
+        <div className={m.scroll}><table className={m.trades}>
+          <tbody>
+            {(o?.lanes ?? (["index", "trend", "idea"] as OptionLane[]).map((lane) => ({ lane, n: 0, mean: null, hit: null, t: null, benched: false, risk: 0 }))).map((l) => (
+              <tr key={l.lane}>
+                <td><b>{LANE_NAME[l.lane] ?? l.lane}</b><br /><span className={s.muted}>{LANE_HOW[l.lane]}</span></td>
+                <td className={m.tnum}>{`${l.n} closed`}</td>
+                <td className={`${m.tnum} ${tone(l.mean)}`}>{l.mean != null ? `${pct(l.mean)} avg` : "·"}</td>
+                <td className={m.tnum}>{l.hit != null ? `${Math.round(l.hit * 100)}% won` : "·"}</td>
+                <td>{l.benched ? <span className={`${s.readChip} ${s.readL}`}>Benched</span> : <span className={`${s.readChip} ${s.readTrack}`}>{l.n < 20 ? "Collecting" : "Active"}</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        {o?.bench && <p className={s.thin}>{o.bench}</p>}
       </div>
 
       {(o?.fills.length ?? 0) > 0 && (
@@ -180,7 +210,7 @@ export function OptionsTab({ o, rs, books }: { o?: OptionsDesk | null; rs?: Rese
               {o!.fills.map((f) => (
                 <tr key={`${f.at}${f.contract}${f.side}`}>
                   <td>{shortDay(f.at)}</td>
-                  <td>{`${f.side} ${f.qty}x ${f.contract}`}</td>
+                  <td>{`${f.side} ${f.qty}x ${f.contract}`}<br /><span className={s.muted}>{LANE_NAME[f.lane] ?? f.lane}</span></td>
                   <td className={m.tnum}>{`$${f.price.toFixed(2)}`}</td>
                   <td>{f.reason}</td>
                 </tr>
@@ -191,7 +221,7 @@ export function OptionsTab({ o, rs, books }: { o?: OptionsDesk | null; rs?: Rese
       )}
 
       <p className={s.thin}>
-        {o?.about ?? "Buys a QQQ call or put when the research leans."}
+        {o?.about ?? "Buys calls and puts on what the research names."}
         {" Fills use Yahoo's delayed quotes: buys at the ask, sells at the bid, $0.65 a contract. The learner grades both books against SPY with the same rules as every stock book."}
       </p>
     </section>

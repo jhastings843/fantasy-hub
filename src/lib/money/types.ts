@@ -233,10 +233,18 @@ export interface OptionsDesk {
   cash: number;
   equity: number;
   curve: { day: string; equity: number; spy: number | null }[];
-  positions: { contract: string; kind: "call" | "put"; strike: number; expiry: string; qty: number; entry_day: string; entry_price: number; last_mid: number | null }[];
-  fills: { at: string; contract: string; side: "buy" | "sell"; qty: number; price: number; fee: number; reason: string }[];
+  positions: { contract: string; underlying: string; lane: OptionLane; kind: "call" | "put"; strike: number; expiry: string; qty: number; entry_day: string; entry_price: number; exit_by: string | null; last_mid: number | null }[];
+  fills: { at: string; contract: string; underlying: string; lane: OptionLane; side: "buy" | "sell"; qty: number; price: number; fee: number; reason: string }[];
+  /** Closed trades, newest first. ret is the return on premium after fees. */
+  trades: { contract: string; underlying: string; lane: OptionLane; kind: "call" | "put"; opened: string; closed: string; ret: number; pnl: number; why: string }[];
+  /** One row per lane: closed-trade record and whether the bench rule stopped it. */
+  lanes: { lane: OptionLane; risk: number; n: number; mean: number | null; hit: number | null; t: number | null; benched: boolean }[];
+  bench: string;
   retired: string | null;
 }
+
+/** index: the /stocks lean on SPY. trend: the trend book's picks. idea: /stocks ideas once ready. */
+export type OptionLane = "index" | "trend" | "idea";
 
 export interface ResearchSwitch {
   rule: string;

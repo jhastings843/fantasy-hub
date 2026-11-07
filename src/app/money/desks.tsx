@@ -190,7 +190,7 @@ export function desks(v: View): Desk[] {
       id: "options",
       money: "usd",
       name: "Options",
-      what: "QQQ calls or puts on the /stocks research lean",
+      what: "Calls and puts on what the research names",
       result: pct(ret),
       rec: c.length ? `${c.length} ${c.length === 1 ? "session" : "sessions"}, ${op.fills.filter((f) => f.side === "buy").length} trades` : "Waiting for the first run",
       tone: toneOf(ret),
