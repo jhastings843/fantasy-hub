@@ -1,3 +1,11 @@
+# Nov 7: trade ideas follow the season plan (67628e7)
+- Jack asked whether trade suggestions follow each league's plan. They only used the two weakest rooms. Now:
+- `lib/dynasty/trade-plan.ts` (pure, keyword rules, no model): stance from dynasty trajectory (contender/compete = win now, rebuild = build, else balanced; redraft/guillotine = win now, never moved by goals). Open goals (not done, not draft) add: positions wanted (focus), positions to sell (shed), players to keep (name or last name 4+ letters with keep/hold/don't trade), and "win now"/"rebuild" wording overriding trajectory.
+- `findBestTrades`/`tradeOffers` take `plan`: win now drops sell-the-vet ideas; build adds +6 to them and penalizes receiving aging players; focus positions count as needs (+3, reason line quotes the goal); shed sends +2; age tilt only in dynasty. Keepers marked untouchable. Trade page shows a PlanStrip with stance, source, wants/selling/keeping and an Edit plan link.
+- Goals: Redis `plan:goals:v1:<leagueId>` via `lib/plan/goals-store.ts`, `/api/plan/goals` (GET open, PUT behind proxy unlock). A failed read disables editing so a save can't wipe the list. Old localStorage list (was one list for every league) is offered once per league: "Add to this league" / "Not for this league".
+- Custom goals now render server-side, so anyone with a league plan URL can read them (same as every other page). Dah Dynasty currently reads as Rebuild -> "Build for later".
+- Insecure-defaults audit skipped: the new write route reuses the existing unlock guard (matcher entry added); verified on prod that a PUT without the cookie returns 401. Test key `plan:goals:v1:999999001` (empty list) left in Redis from the local round trip, harmless.
+
 # Nov 7 check (morning)
 - /status: every job clean; Harris CBB day check green. Only "League sync (early/late)" show "No time yet" (they record a time from their next run). Check again next session.
 - Live sizes vs Nov 6: /props 149 KB (same), /picks/cfb 389 KB (423), /picks/cbb 299 KB (502), / 93 KB ttfb 1.9 s, /models ttfb 3.5 s (2.7-3.3, still the slow one).
