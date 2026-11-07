@@ -1,25 +1,28 @@
-# START HERE: UX pass, items 1, 2 and 6 DONE and PUSHED (2026-11-06 evening)
-Jack's 2026-11-06 walkthrough list. Done: 1 (freshness + /status), 2 (calibrated props %, Jack chose it), 6 (small fixes). Next: 3 (fold tab stacks), then 4 (speed), then 5 (plain words).
+# START HERE: UX pass DONE, all items live (2026-11-06 late evening)
+Jack's 2026-11-06 walkthrough list is finished: 1 freshness + /status, 2 calibrated props %, 3 folded tabs, 4 speed, 5 plain words, 6 small fixes. Also done: Harris CBB Edge check dropped, audit LOW error text, CFB week 0 closed (no change: Harris slices count only games after their November registration, so August's week 0 has no use; the route already refuses it with "No college games on file for week 0"). HH_SESSION_SECRET and HH_PASSPHRASE are on Preview (set 2026-11-04 by Jack).
 
-Item 2 as built: lib/props/calibrate.ts (slope 0.35, intercept NFL -0.10 / NBA -0.02 on logit P(over), display only). props/week.tsx propEdges adds Edge.cal; EdgeCard shows "Ours, adj." and the calibrated edge (red when negative), sorted by it; "Model says X%" is the first row of Every number. Which markets clear, slices, grading: unchanged. Example: Makai Lemon under 4.5 rec, model 77.9% vs DK 45.6% (+32.3) now shows 63.2% (+17.6). Not applied: NBA tables in ournba.tsx, First TD/basket, KOTC, lottos (no fit for those). Refit by hand if the props model changes.
+Next session: check /status after a pulse (Harris CBB day check should be green), compare live page sizes and times to the numbers below, then the lotto cap sweep around Nov 20.
 
-Harris CBB: Jack chose to drop the Edge check (checkCbbRow now checks only the pick side). Live re-check: Nov 5 43/44 (1 unpriced), Nov 6 57/57, Nov 7 44/44. Nov 6 re-verifies on the next yesterday read (every 6 h), which clears the failing streak on /status.
+## Item 3: folded headers (app/picks/tabs.tsx, tab-sets.ts, ScopeScroll.tsx)
+- Picks (NFL/CFB/NBA/CBB) and Props: row 1 = sport + market in one sideways-scrolling line (current tab scrolled into view on load, right-edge fade under 640px); row 2 = Board/Today, Results, Lab. Lab shows a sub-row: Research, Learner log, How it works (football), Bracket lab (CBB). Old ?v=research / ?v=log URLs open inside Lab. /picks/model uses the same header with How it works lit.
+- League home page: Season plan / Players / Draft buttons removed (tab row has them); Refresh + Trade analyzer stay.
 
-Remaining items, unchanged from the walkthrough:
-3. Fold the tab stacks: picks pages have top nav + Picks/Props + sport + market + Board/Results/Research/Learner log + How it works (5 rows before content). Props has 8 sub-tabs + 4 views. Proposal: sport+market as one compact row/dropdown; Research + Learner log + How it works into one "Lab" tab. League pages: drop the duplicate button row (Season plan, Players, Draft) that repeats the tab row; keep Refresh + Trade analyzer.
-4. Speed: Today 3.6s and /models 3.9s server time; /props is 2.8 MB HTML / ~18k DOM nodes (every hidden "Every number" panel renders server-side: render on open). /picks/cfb is ~1 MB.
-5. Plain-words pass: "what this means" lines under jargon headers, who's-who for Sam/David/PEM/Harris, every Pass row says why, explain "1u" and "Locks 9:00 AM", Today's best bet vs per-sport best bet, learner machinery behind the Lab tab.
+## Item 4: speed
+- Before (live, Nov 6): /props 2.98 MB, /props?m=nba 2.23 MB, /picks/cfb 1.02 MB, /picks/cbb 720 KB; /models 3.9 s, / 2.0 s server.
+- components/hh/LazyDetails.tsx: a <details> whose body comes from a server function on first open (links and pop-ups keep working). Used by: props/week.tsx PropGames (PropGameBody via props/actions.ts loadPropGame), picks/ats.tsx LedgerRow (GameExpand via picks/actions.ts loadAtsGame), picks/cbb/CbbView.tsx Row (CbbRowBody via picks/cbb/actions.ts loadCbbGame), David's three research panels (board.tsx LazyBackground + loadDavid). Games in progress (props) and started games with a bet (spreads) still render inline, open.
+- Dev measure: /props 1.35 MB -> 203 KB ("Every game" 700 KB -> 22 KB of HTML). Confirm on production.
+- lib/models/nba/store.ts: weekNums/readWeek/readAllWeeks wrapped in React cache(); getOurNbaView, gradedList, fbGraded, allBoards share one read of every saved week per request (was up to five, three in sequence). primeParams still runs before gradedList (params may feed chanceOf). Measured from the Mac outside a render: 3.1 s -> 1.8 s; inside a render the cache also dedupes.
+- /models reads both football records in parallel.
 
-## What shipped for 1 and 6
-- /status (src/app/status/page.tsx, src/lib/status/{core,load}.ts): every job that calls watchProblems (all pulse jobs as "Pulse <id>", the capture routes, Harris feeds), the last pulse's email sends, and the Mac desk export. Failing jobs lead in "Failing now"; then groups Every hour / Captures and models / Outside sources / Emails / From the Mac. Error text only on an unlocked device (canSeePortfolio check). Pulse jobs get their time from pulse:last until their own record has one.
-- ProblemState (notify/problems-core.ts) now stores at / okAt / failAt / since. Old records have none, so non-pulse jobs say "Run time not recorded yet" until their next run after deploy.
-- Freshness line (components/hh/Freshness.tsx, streamed in Suspense): Today (lines, props, pulse), Fantasy list and every league page via the league layout (leagues, pulse), Props (props, pulse). Picks already had "Scores updated". "Leagues synced" = okAt of Pulse refresh-all-early/late, so it appears after the first run post-deploy. Over 6 h reads red.
-- 6a: RefreshButton on 401 shows "Refreshing needs this device unlocked. Unlock" in place, no redirect.
-- 6b: NOT a bug. 2026 season opened Thu Sep 10, so Mon Nov 2 ended week 8; Sleeper says last_scored_leg 8, leg 9. Label now reads "Through week 8 (week 9 in progress)".
-- 6c: Money summed rounded weekly ledgers (-4.14u); SportsView now carries picksTotals from the season ledger (NFL +1.14, CFB -5.29 = -4.15u, same as Today and /records). desks.tsx and MoneyView PicksPanel use it.
-- 6d: Fantasy list rows show "You: 6-10, 8th of 12" (lib/league/my-standing.ts, same order as Standings) or "Alive, 8 of 16 left" for guillotine.
+## Item 5: plain words
+- ats.tsx passReason: Pass/Split rows say why ("PEM disagrees", "Tier 2 on hold: 8-12 since Week 6", "Rule bets: agree on road dog", "They pick different sides", "Only Sam posted").
+- board.tsx WordsGuide ("Who's who and what the words mean"): Sam, David, PEM, Harris, Ours, 1u, Tier 1/2, Not sent, Locks, Close call, Tracked/shadow, Lab; props variant adds "Ours, adj.". On every Board view above the footer.
+- Legend chips reworded; BoardSpot says "Best NFL bet"; Today says "Today's best bet, any sport"; "sized, not sent" is gone everywhere.
+- Props boards: Gate is now one sentence ("Nothing here bets real money yet... closest has 29 of 30") + link to /learning; the full slice table stays on Results. "Learner" tiles read "Being tested · See them in Lab".
 
-Other state (not this repo): trade-bot has 4 local commits not pushed; trade-bot/phil f5d697c local only; weather-desk 0e5d5b1 local, 1 ahead. Push only if Jack asks. Stocks notes: ~/Projects/stocks/HANDOFF.md.
+## Audit LOWs
+- money/MoneyView.tsx, survivor/page.tsx, learning/forecast/page.tsx: plain error text on the page, cause to console.error.
+
 
 # 2026-11-06 (night): props over leak and First TD "did it bet everything" (pushed, live 7b5fb97)
 - Data (read-only from Redis, scratchpad scripts): NFL edges 365-329 -6.8u = overs 83-96 (46.4%) -20.1u, unders 282-233 (54.8%) +13.3u. NBA edges 434-430 -33.0u = overs 183-189 -16.1u, unders 251-241 -16.9u (NBA loses on both sides; overs are not its leak).
