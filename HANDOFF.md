@@ -1,6 +1,8 @@
 # START HERE: UX pass DONE, all items live (2026-11-06 late evening)
 Jack's 2026-11-06 walkthrough list is finished: 1 freshness + /status, 2 calibrated props %, 3 folded tabs, 4 speed, 5 plain words, 6 small fixes. Also done: Harris CBB Edge check dropped, audit LOW error text, CFB week 0 closed (no change: Harris slices count only games after their November registration, so August's week 0 has no use; the route already refuses it with "No college games on file for week 0"). HH_SESSION_SECRET and HH_PASSPHRASE are on Preview (set 2026-11-04 by Jack).
 
+Live after deploy (Nov 6, late): /props 149 KB (was 2.98 MB), ttfb 0.9 s; /picks/cfb 423 KB (1.02 MB); /picks/cbb 502 KB (720 KB); /props?m=nba 1.66 MB while tonight's games were live (live games render open on purpose); / 1.1-1.9 s (2.0); /models 2.7-3.3 s (3.9). Tried revalidate = 300 on /models: the build prerender took over 60 s and failed, so it stays force-dynamic. Next idea for /models: cache the slow loaders (lotto/KOTC learning, NBA view) in Redis or "use cache" instead of the whole page.
+
 Next session: check /status after a pulse (Harris CBB day check should be green), compare live page sizes and times to the numbers below, then the lotto cap sweep around Nov 20.
 
 ## Item 3: folded headers (app/picks/tabs.tsx, tab-sets.ts, ScopeScroll.tsx)
