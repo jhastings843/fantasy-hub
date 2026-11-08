@@ -283,6 +283,8 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
   };
   const bets = games.filter((g) => g.stake);
   const ou = (x?: string) => (x === "over" ? "Over" : "Under");
+  const venomByGame = new Map(r.board.map((g) => [`${g.away}@${g.home}`, g.venom]));
+  const venomOf = (g: TotalsBoardGame) => venomByGame.get(`${g.away}@${g.home}`);
   const why = (g: TotalsBoardGame) => (
     <dl className={s.kv}>
       <dt>Total now</dt>
@@ -291,6 +293,12 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
       <dd className={s.num}>{g.sam !== undefined ? g.sam.toFixed(1) : "not posted"}</dd>
       <dt>David total</dt>
       <dd className={s.num}>{g.david !== undefined ? g.david.toFixed(1) : "not posted"}</dd>
+      {r.league === "nfl" && venomOf(g) && (
+        <>
+          <dt>Venom total (tracked)</dt>
+          <dd className={s.num}>{`${venomOf(g)!.modelTotal} vs ${venomOf(g)!.total} on his board${venomOf(g)!.edgeTotal ? `, his edge flag on the ${venomOf(g)!.edgeTotal}` : ""}`}</dd>
+        </>
+      )}
       <dt>Our total</dt>
       <dd className={s.num}>{g.ours !== undefined ? `${g.ours.toFixed(1)}${g.ref ? ` (${g.ours > g.ref.total ? "over" : g.ours < g.ref.total ? "under" : "on the number"}; tracked, no stake)` : ""}` : "not yet"}</dd>
       {g.p !== undefined && (

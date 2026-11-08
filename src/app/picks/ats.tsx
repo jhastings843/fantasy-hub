@@ -94,8 +94,6 @@ function WhyList({ g, r }: { g: BoardGame; r: PicksReport }) {
         <>
           <dt>Venom (tracked)</dt>
           <dd className={s.num}>{`${home} ${line(g.venom.model)}${g.venom.edgeSide ? `, his edge flag on ${r.names[g.venom.edgeSide === "home" ? g.home : g.away] ?? (g.venom.edgeSide === "home" ? g.home : g.away)}` : ""}`}</dd>
-          <dt>Venom total</dt>
-          <dd className={s.num}>{`${g.venom.modelTotal} vs ${g.venom.total} on his board${g.venom.edgeTotal ? `, his edge flag on the ${g.venom.edgeTotal}` : ""}`}</dd>
         </>
       )}
       <dt>Our model</dt>
