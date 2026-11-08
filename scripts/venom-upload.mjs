@@ -13,16 +13,22 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN,
 });
 const arg = process.argv[2];
-if (!arg) throw new Error("usage: venom-upload.mjs WEEK|all");
+if (!arg) throw new Error("usage: venom-upload.mjs WEEK|all [games]");
+// "games" as a second argument uploads only the Game Cheat Code board (the reader's --games-only backfill).
+const onlyGames = process.argv[3] === "games";
 const wanted = (f) => arg === "all" || Number(f.match(/w(\d+)/)[1]) === Number(arg);
-const files = readdirSync("data/venom")
+const files = onlyGames ? [] : readdirSync("data/venom")
   .filter((f) => /^nfl-attd-\d{4}-w\d+\.json$/.test(f))
   .filter(wanted);
 // Prop boards: one hash per week, field = stat, value = that board's rows.
-const propFiles = readdirSync("data/venom")
+const propFiles = onlyGames ? [] : readdirSync("data/venom")
   .filter((f) => /^nfl-(pass_yds|rush_yds|rec)-\d{4}-w\d+\.json$/.test(f))
   .filter(wanted);
-if (!files.length && !propFiles.length) throw new Error(`no saved Venom week ${arg} in data/venom`);
+// Game Cheat Code: per game, home-side market and Venom spread, both totals, his EDGE flags.
+const gameFiles = readdirSync("data/venom")
+  .filter((f) => /^nfl-games-\d{4}-w\d+\.json$/.test(f))
+  .filter(wanted);
+if (!files.length && !propFiles.length && !gameFiles.length) throw new Error(`no saved Venom week ${arg} in data/venom`);
 for (const f of files) {
   const d = JSON.parse(readFileSync(`data/venom/${f}`, "utf8"));
   const rows = d.rows.map((r) => ({ name: r.name, team: r.team, p: r.p }));
@@ -36,4 +42,10 @@ for (const f of propFiles) {
   await redis.hset(`venom:v1:nfl:props:${d.season}:w${d.week}`, { [d.stat]: rows });
   await redis.sadd(`venom:v1:nfl:props:${d.season}:weeks`, String(d.week));
   console.log(`week ${d.week} ${d.stat}: ${rows.length} players uploaded`);
+}
+for (const f of gameFiles) {
+  const d = JSON.parse(readFileSync(`data/venom/${f}`, "utf8"));
+  await redis.set(`venom:v1:nfl:games:${d.season}:w${d.week}`, { read: d.source.match(/read (\d{4}-\d{2}-\d{2})/)?.[1] ?? null, rows: d.rows });
+  await redis.sadd(`venom:v1:nfl:games:${d.season}:weeks`, String(d.week));
+  console.log(`week ${d.week} games: ${d.rows.length} uploaded`);
 }

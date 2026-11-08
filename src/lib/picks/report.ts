@@ -19,7 +19,8 @@ import { closingLines, currentLines } from "./closing-store";
 import { type IssuedRecord, confirmed, issuedGames } from "./issued";
 import { loadIssued, loadIssuedStrict } from "./issued-store";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "./limits";
-import { pemCompare, researchRows } from "./research";
+import { pemCompare, researchRows, venomCompare } from "./research";
+import { venomGameWeeks, venomLines } from "./venom-games";
 import { TOTALS_EDGE, type TotalsBacktest, type TotalsSeen, totalsBacktest, totalsCutGames } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
 import type { PemWeek } from "./pem-card";
@@ -265,11 +266,14 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   for (const w of pem.filter((x) => x.verified)) {
     for (const r of w.rows) pemLines.set(key({ week: w.week, home: r.home, away: r.away }), { model: r.model, market: r.market });
   }
+  // Venom's Game Cheat Code, NFL only (tracked outside source, venom-games.ts).
+  const venom = league === "nfl" ? venomLines(await venomGameWeeks(season)) : new Map();
   const j = {
     ...joined,
     graded: joined.graded.map((g) => {
       const p = pemLines.get(key(g));
-      return p ? gradeGame({ ...g, pem: p }) : g;
+      const v = venom.get(key(g));
+      return p || v ? gradeGame({ ...g, ...(p ? { pem: p } : {}), ...(v ? { venom: v } : {}) }) : g;
     }),
   };
   // Review state before the policy: a review that has finished has already
@@ -431,6 +435,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     clvModels: clvTable(j.graded, closes, rule ? { label: rule.label, matches: (g) => matches(g.read, rule.test) } : null),
     research: researchRows(j.graded, s.cuts, closes),
     pemCompare: league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null,
+    venomCompare: league === "nfl" && j.graded.some((g) => g.venom) ? venomCompare(j.graded, closes) : null,
     totalsBacktest: await totalsForwardChecked(league, season, week, totalsBacktest(league, seen, points, sam, totalsMarket, key, totalsAllowed(policy, league)), seen, points, issued),
     totalsEdge: TOTALS_EDGE[league],
     totalsArchived: seen.length,

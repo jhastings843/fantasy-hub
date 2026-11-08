@@ -33,7 +33,19 @@ export interface Game {
   pem?: PemLine;
   /** Our own model's home spread, its latest pregame read (forecasts.ts `ours`). Third vote for the consensus cuts. */
   ours?: number;
+  /** Venom Analytics' Game Cheat Code (NFL, from Week 3 of 2026): his spread and total beside the market he showed. Tracked only. */
+  venom?: VenomLine;
   final?: { home: number; away: number };
+}
+
+/** Venom's game read, home side (venom-games.ts). edgeSide / edgeTotal: his own "VENOM EDGE" flags. */
+export interface VenomLine {
+  model: number;
+  market: number;
+  modelTotal: number;
+  total: number;
+  edgeSide: "home" | "away" | null;
+  edgeTotal: "over" | "under" | null;
 }
 
 export interface PemLine {
@@ -70,9 +82,11 @@ export interface Read {
   pemSide?: "home" | "away";
   /** Our own model's side against the average market line, when we have a pregame read. */
   oursSide?: "home" | "away";
+  /** Venom's side against the average market line, when his Game Cheat Code covers the game. */
+  venomSide?: "home" | "away";
 }
 
-export function read(sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: number): Read {
+export function read(sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: number, venom?: VenomLine): Read {
   const samSide: "home" | "away" = sam.model < sam.market ? "home" : "away";
   const davidSide: "home" | "away" = david.model < david.market ? "home" : "away";
   // A model sitting exactly on the number has no side; treat it as a split.
@@ -92,6 +106,7 @@ export function read(sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: num
     avgMarket,
     pemSide: pem && pem.model !== avgMarket ? (pem.model < avgMarket ? ("home" as const) : ("away" as const)) : undefined,
     oursSide: ours !== undefined && ours !== avgMarket ? (ours < avgMarket ? ("home" as const) : ("away" as const)) : undefined,
+    venomSide: venom && venom.model !== avgMarket ? (venom.model < avgMarket ? ("home" as const) : ("away" as const)) : undefined,
   };
   if (!agree) return { ...base };
   const home = samSide === "home";
@@ -151,6 +166,8 @@ export interface CutTest {
   splitHome?: boolean;
   /** Our own model on the same side as Sam and David, or against them (consensus research, Jack 2026-11-04). */
   ours?: "agree" | "disagree";
+  /** Venom on the same side as Sam and David, or against them (NFL, tracked, Jack 2026-11-08). */
+  venom?: "agree" | "disagree";
 }
 
 export interface Cut {
@@ -177,6 +194,8 @@ export function matches(r: Read, t: CutTest): boolean {
   if (t.pem === "disagree" && (!r.pemSide || r.pemSide === r.side)) return false;
   if (t.ours === "agree" && (!r.oursSide || r.oursSide !== r.side)) return false;
   if (t.ours === "disagree" && (!r.oursSide || r.oursSide === r.side)) return false;
+  if (t.venom === "agree" && (!r.venomSide || r.venomSide !== r.side)) return false;
+  if (t.venom === "disagree" && (!r.venomSide || r.venomSide === r.side)) return false;
   if (t.side === "dog" && !r.dog) return false;
   if (t.side === "fav" && r.dog) return false;
   if (t.venue === "home" && r.side !== "home") return false;
@@ -235,6 +254,19 @@ export const OURS_CUTS: Cut[] = [
   consensus("ours-agree", "All three agree (with our model)", "agree", { ours: "agree" }),
   consensus("ours-agree-dog", "All three agree on the dog (with our model)", "dog", { ours: "agree", side: "dog" }),
   consensus("ours-disagree", "Sam + David agree, our model disagrees", "agree", { ours: "disagree" }),
+];
+
+/**
+ * Venom Analytics' Game Cheat Code as a third NFL vote (Jack, 2026-11-08: "add it, tracked only").
+ * Same question as our model's: does Sam and David agreeing get better when Venom agrees too?
+ * Thresholds none (any side), set before any graded game; never a candidate.
+ */
+const venomVote = (id: string, label: string, parent: string, test: CutTest): Cut => ({ id, label, group: "Venom, third vote", test, candidate: false, parent });
+export const VENOM_CUTS: Cut[] = [
+  venomVote("venom-agree", "All three agree (with Venom)", "agree", { venom: "agree" }),
+  venomVote("venom-agree-dog", "All three agree on the dog (with Venom)", "dog", { venom: "agree", side: "dog" }),
+  venomVote("venom-agree-fav", "All three agree on the favorite (with Venom)", "agree", { venom: "agree", side: "fav" }),
+  venomVote("venom-disagree", "Sam + David agree, Venom disagrees", "agree", { venom: "disagree" }),
 ];
 
 export function researchCuts(league: "nfl" | "cfb"): Cut[] {
@@ -307,6 +339,7 @@ export function cutsFor(league: "nfl" | "cfb", withPem = false): Cut[] {
     c("split-home", "Sam and David split: home team", "Splits", { splitHome: true }, false),
     ...researchCuts(league),
     ...OURS_CUTS,
+    ...(league === "nfl" ? VENOM_CUTS : []),
   ];
 }
 
@@ -361,7 +394,7 @@ export interface GradedGame extends Game {
 }
 
 export function gradeGame(g: Game & { final: { home: number; away: number }; sam: ModelLine; david: ModelLine }): GradedGame {
-  const r = read(g.sam, g.david, g.pem, g.ours);
+  const r = read(g.sam, g.david, g.pem, g.ours, g.venom);
   const samSide = g.sam.model < g.sam.market ? "home" : "away";
   const davidSide = g.david.model < g.david.market ? "home" : "away";
   return {

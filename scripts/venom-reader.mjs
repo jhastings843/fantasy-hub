@@ -6,6 +6,9 @@
 //   node --env-file=.env.local scripts/venom-reader.mjs          read the newest week, save, upload
 //   node --env-file=.env.local scripts/venom-reader.mjs --dry    read and print counts only
 //   node --env-file=.env.local scripts/venom-reader.mjs --week 8 read a past week (saves, uploads)
+//   add --games-only to read just the Game Cheat Code board (backfill without re-reading past prop boards)
+// Since 2026-11-08 it also reads the GAME CHEAT CODE tab: each game's market and Venom
+// spread and total (nfl-games-SEASON-wNN.json), a tracked outside source for the NFL picks.
 //
 // Same rules as the /venom skill: it reads the app as shown on screen in Jack's own
 // logged-in Chrome (OpenCLI, a background tab it closes), never the app's data
@@ -32,6 +35,7 @@ const TABS = [
 // the next week yet, and that week's games may have started.
 const STALE_DAYS = 4;
 const dry = process.argv.includes("--dry");
+const gamesOnly = process.argv.includes("--games-only");
 const weekArg = process.argv.includes("--week") ? Number(process.argv[process.argv.indexOf("--week") + 1]) : null;
 
 const log = (msg) => console.log(`${new Date().toISOString()} ${msg}`);
@@ -79,6 +83,59 @@ export function parseBoard(text, stat) {
   return rows;
 }
 
+/**
+ * The Game Cheat Code board: per game, "AWAY @ HOME", the kickoff, then SPREAD / TOTAL
+ * under MARKET and VENOM ("JAX -10" or "PK", then the total), then any "VENOM EDGE X"
+ * flags (a team, OVER or UNDER) before "LINE MOVEMENT". Lines come back home-side,
+ * betting style (-3 = the home team gives 3), as the picks engine uses.
+ *   parseGames("JAX\n@\nBAL\nTHU, NOV 5 · 20:15 ET\nSPREAD\nTOTAL\nMARKET\nJAX -10\n39.5\nVENOM\nJAX -5\n44\nVENOM EDGE BAL\nLINE MOVEMENT")
+ *     -> [{ away: "JAX", home: "BAL", kickoff: "THU, NOV 5 · 20:15 ET", market: 10, total: 39.5, model: 5, modelTotal: 44, edgeSide: "home", edgeTotal: null }]
+ */
+export function parseGames(text) {
+  const L = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const out = [];
+  const home = (s, away, h) => {
+    if (/^PK$/i.test(s)) return 0;
+    const m = s.match(/^([A-Z]{2,3})\s*([+-]?\d+(?:\.\d+)?)$/);
+    if (!m) return null;
+    const v = Number(m[2]);
+    return m[1] === h ? v : m[1] === away ? -v : null;
+  };
+  for (let i = 1; i + 1 < L.length; i++) {
+    if (L[i] !== "@" || !/^[A-Z]{2,3}$/.test(L[i - 1]) || !/^[A-Z]{2,3}$/.test(L[i + 1])) continue;
+    const away = L[i - 1], h = L[i + 1];
+    const mk = L.indexOf("MARKET", i), vn = L.indexOf("VENOM", i);
+    if (mk < 0 || vn < 0 || mk > i + 8 || vn > mk + 4) continue;
+    const market = home(L[mk + 1], away, h), total = Number(L[mk + 2]);
+    const model = home(L[vn + 1], away, h), modelTotal = Number(L[vn + 2]);
+    if (market === null || model === null || !Number.isFinite(total) || !Number.isFinite(modelTotal)) continue;
+    let edgeSide = null, edgeTotal = null;
+    for (let j = vn + 3; j < L.length && !/^LINE MOVEMENT/.test(L[j]) && L[j] !== "@"; j++) {
+      const e = L[j].match(/^VENOM EDGE (.+)$/);
+      if (!e) continue;
+      if (/^OVER$/i.test(e[1])) edgeTotal = "over";
+      else if (/^UNDER$/i.test(e[1])) edgeTotal = "under";
+      else if (e[1] === h) edgeSide = "home";
+      else if (e[1] === away) edgeSide = "away";
+    }
+    out.push({ away, home: h, kickoff: L[i + 2], market, total, model, modelTotal, edgeSide, edgeTotal });
+  }
+  return out;
+}
+
+/** Reads the Game Cheat Code tab of the week already chosen. */
+async function readGames() {
+  if (!click("GAME CHEAT CODE")) throw new Error("no GAME CHEAT CODE tab");
+  await sleep(4000);
+  const text = inApp("document.body.innerText");
+  const cap = text.match(/(\d{4}) · WEEK (\d+) · SORTED/);
+  if (!cap) throw new Error(`GAME CHEAT CODE: no "WEEK N" caption`);
+  const rows = parseGames(text);
+  const shown = (text.match(/^@$/gm) ?? []).length;
+  if (shown < 8 || rows.length < shown - 1) throw new Error(`GAME CHEAT CODE: read ${rows.length} of ${shown} games`);
+  return { season: Number(cap[1]), week: Number(cap[2]), rows };
+}
+
 const file = (stat, season, week) => path.join(ROOT, "data/venom", `nfl-${stat}-${season}-w${String(week).padStart(2, "0")}.json`);
 
 async function main() {
@@ -111,6 +168,17 @@ async function main() {
     const boards = {};
     let season = null;
     let week = null;
+    const saveGames = (g) => {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+      writeFileSync(file("games", g.season, g.week), JSON.stringify({ season: g.season, week: g.week, stat: "games", source: `Venom Analytics app, Game Vault NFL Game Cheat Code (market and Venom spread and total), read ${today}`, rows: g.rows }, null, 1));
+    };
+    if (gamesOnly) {
+      const g = await readGames();
+      if (dry) return log(`week ${g.week} (dry): games ${g.rows.length}`);
+      saveGames(g);
+      const up = execFileSync(process.execPath, ["--env-file=.env.local", "scripts/venom-upload.mjs", String(g.week), "games"], { cwd: ROOT, encoding: "utf8", env });
+      return log(`week ${g.week}: games ${g.rows.length}\n${up.trim()}`);
+    }
     for (const [label, stat] of TABS) {
       if (!click(label)) throw new Error(`no ${label} tab`);
       await sleep(3500);
@@ -132,7 +200,16 @@ async function main() {
       boards[stat] = { rows, games };
     }
 
-    const summary = TABS.map(([, s]) => `${s} ${boards[s].rows.length}`).join(", ");
+    // The Game Cheat Code board last: a failure there never costs the four boards above.
+    let games = null;
+    try {
+      games = await readGames();
+      if (games.week !== week) throw new Error(`GAME CHEAT CODE shows week ${games.week}, boards week ${week}`);
+    } catch (e) {
+      log(`games board skipped: ${e.message}`);
+      games = null;
+    }
+    const summary = TABS.map(([, s]) => `${s} ${boards[s].rows.length}`).join(", ") + `, games ${games ? games.rows.length : "not read"}`;
     if (dry) return log(`week ${week} (dry): ${summary}`);
 
     const existing = file("attd", season, week);
@@ -146,12 +223,14 @@ async function main() {
       const source = stat === "attd" ? `Venom Analytics app, Game Vault NFL Anytime TD, top 5 per game, read ${today}` : `Venom Analytics app, Game Vault NFL ${stat} board, every player (rank, 0-100 score), read ${today}`;
       writeFileSync(file(stat, season, week), JSON.stringify({ season, week, stat, source, rows: boards[stat].rows }, null, 1));
     }
+    if (games) saveGames(games);
     const up = execFileSync(process.execPath, ["--env-file=.env.local", "scripts/venom-upload.mjs", String(week)], { cwd: ROOT, encoding: "utf8", env });
     log(`week ${week}: ${summary}\n${up.trim()}`);
     if (!weekArg) await push(`Venom Week ${week} read`, `${boards.attd.games} games. Anytime TD ${boards.attd.rows.length}, pass yards ${boards.pass_yds.rows.length}, rush yards ${boards.rush_yds.rows.length}, receptions ${boards.rec.rows.length}. Uploaded for the learners.`);
   } catch (e) {
     log(`failed: ${e.message}`);
-    await push("Venom reader couldn't read the boards", `${e.message}. If Whop logged you out, log in in Chrome; or run /venom.`);
+    // A hand-run backfill reports in the terminal; only the scheduled read alerts the phone.
+    if (!gamesOnly && !weekArg) await push("Venom reader couldn't read the boards", `${e.message}. If Whop logged you out, log in in Chrome; or run /venom.`);
   } finally {
     try {
       opencli(["close"]);

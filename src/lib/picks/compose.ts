@@ -78,6 +78,8 @@ export interface PicksCore {
   clvModels: ClvRow[];
   research: ResearchRow[];
   pemCompare: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
+  /** Venom's Game Cheat Code on the NFL games he covers (research.ts venomCompare). Missing on boards cached before 2026-11-08. */
+  venomCompare?: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
   totalsBacktest: TotalsBacktest;
   totalsEdge: number;
   totalsArchived: number;

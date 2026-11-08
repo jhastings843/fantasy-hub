@@ -971,6 +971,34 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
           </div>
         </details>
       )}
+      {r.venomCompare && r.venomCompare.games > 0 && (
+        <details className={s.details}>
+          <summary>{`Venom on the same games (${r.venomCompare.games})`}</summary>
+          <div className={s.detailsBody}>
+            <p className={s.p}>Venom&apos;s Game Cheat Code, tracked only. Spread rows are judged and graded at one line, the average of Sam&apos;s and David&apos;s posted numbers. Total rows use the market total on his board.</p>
+          </div>
+          <div className={s.tw}>
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>On these games</th>
+                  <th>W-L-P</th>
+                  <th>vs close (n)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.venomCompare.rows.map((x) => (
+                  <tr key={x.id}>
+                    <td>{x.label}</td>
+                    <td className={s.num}>{n(x.record) + x.record.p ? rec(x.record) : "·"}</td>
+                    <td className={s.num}>{x.clv.n ? `${x.clv.avg > 0 ? "+" : ""}${x.clv.avg.toFixed(2)} (${x.clv.n})` : "·"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
       {panel}
       {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} r={r} />}
       <details className={s.details}>
