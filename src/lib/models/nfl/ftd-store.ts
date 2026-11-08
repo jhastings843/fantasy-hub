@@ -182,6 +182,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
         const line = await marketLine(e.id);
         if (!line) continue; // no market yet
         const lists: { [team: string]: TdLine[] } = {};
+        const attdLists: { [team: string]: TdLine[] } = {};
         const espnName = new Map<string, string>();
         for (const [t, T] of [[away, A], [home, H]] as const) {
           const r = await json<{ athletes?: { items?: { id?: string; fullName?: string; injuries?: { status?: string }[] }[] }[] }>(`${SITE}/teams/${t.id}/roster`);
@@ -197,6 +198,8 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
           // Last 3 games plus players back from injury (team-list.ts).
           const tl = teamList({ team: T, rows, prior, cur, active, out, nameKey });
           lists[T] = tl.lines;
+          // ATTD may weigh last season differently (AttdParams.wPrev, set by the weekly refit): same players, its own totals.
+          attdLists[T] = (AP.wPrev ?? 1) === 1 ? tl.lines : teamList({ team: T, rows, prior, cur, active, out, nameKey, wPrev: AP.wPrev }).lines;
           if (tl.returners.length) report.saved.push(`${T} back: ${tl.returners.join(", ")}`);
         }
         const pts = impliedPoints(line.total, line.margin);
@@ -215,7 +218,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
           const dk = new Map([...readTdScorers(rows)].flatMap(([id, x]) => (espnName.has(id) ? [[espnName.get(id)!, x] as const] : [])));
           for (const [k, price] of Object.entries(reads.get(e.id)?.anytime ?? {})) if (dk.get(k)?.anytime === undefined) dk.set(k, { ...dk.get(k), anytime: price });
           const players = [A, H].flatMap((T) =>
-            attdTeam(lists[T] ?? [], T === H ? pts.home : pts.away, AP).map((x): AttdRow => {
+            attdTeam(attdLists[T] ?? [], T === H ? pts.home : pts.away, AP).map((x): AttdRow => {
               const key = nameKey(x.name);
               const q = dk.get(key);
               return { ...x, key, ...(q?.anytime !== undefined ? { dk: q.anytime } : {}), ...(q?.two !== undefined ? { dk2: q.two } : {}) };

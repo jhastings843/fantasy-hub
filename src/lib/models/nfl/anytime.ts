@@ -30,6 +30,8 @@ export interface AttdParams extends FtdParams {
   wRz?: number;
   /** Extra weight on goal-line carries inside the red-zone carry share. */
   gGl?: number;
+  /** Weight on last season's totals beside this season's (1 = equal; from 2026-11-08, chosen by the weekly refit). */
+  wPrev?: number;
 }
 
 /** Red-zone (20 and in) and goal-line (5 and in) opportunities over the same games as a TdLine, his and his team's. */

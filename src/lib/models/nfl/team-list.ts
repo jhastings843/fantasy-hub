@@ -36,6 +36,8 @@ export interface TeamListInput {
   /** nameKeys ESPN lists Out or IR. */
   out: Set<string>;
   nameKey: (name: string) => string;
+  /** Weight on last season's totals (the ATTD model's wPrev); 1 when omitted, as the First TD model uses. */
+  wPrev?: number;
 }
 
 export function teamList(x: TeamListInput): { lines: TdLine[]; returners: string[] } {
@@ -55,7 +57,7 @@ export function teamList(x: TeamListInput): { lines: TdLine[]; returners: string
     returners.push(name);
   }
   const lines = ids.flatMap((id) => {
-    const tot = addTotals(x.prior[id], x.cur.get(id));
+    const tot = addTotals(x.prior[id], x.cur.get(id), x.wPrev ?? 1);
     return tot && !x.out.has(x.nameKey(tot.name)) ? [{ ...tot, team: T }] : [];
   });
   return { lines, returners: returners.filter((n) => lines.some((l) => l.name === n)) };

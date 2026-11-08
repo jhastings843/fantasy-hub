@@ -57,6 +57,8 @@ interface Case {
   team: string;
   pts: number;
   list: AttdLine[];
+  /** Each listed player's last-season (a) and this-season (b) totals, so a refit can weigh last season (wPrev). */
+  parts: { a?: Omit<TdLine, "team">; b?: Omit<TdLine, "team"> }[];
   /** TDs per listed player in this game. */
   tds: number[];
   /** The team's rushing + receiving TDs in this game (all players). */
@@ -101,12 +103,20 @@ for (const season of [2024, 2025, 2026]) {
         team: t,
         pts: t === g.home ? pts.home : pts.away,
         list,
+        parts: ids.map((id) => ({ a: prevTot.get(id), b: curTot.get(id) })),
         tds: list.map((l) => here.get(l.id)!.rushTd + here.get(l.id)!.recTd),
         teamTds: inGame.filter((r) => r.team === t).reduce((s, r) => s + r.rushTd + r.recTd, 0),
       });
     }
   }
 }
+const TK = ["rushTd", "recTd", "car", "tgt", "teamRushTd", "teamRecTd", "teamCar", "teamTgt"] as const;
+/** The case's list with last season at weight p.wPrev (as team-list.ts does live). wPrev 1 is the list as built. */
+const L = (c: Case, p: AttdParams): AttdLine[] => {
+  const w = p.wPrev ?? 1;
+  if (w === 1) return c.list;
+  return c.list.map((l, i) => ({ ...l, ...(Object.fromEntries(TK.map((k) => [k, w * (c.parts[i].a?.[k] ?? 0) + (c.parts[i].b?.[k] ?? 0)])) as { [k in (typeof TK)[number]]: number }) }));
+};
 const wk = (c: Case) => c.season * 100 + c.week;
 const lastWeeks = [...new Set(cases.map(wk))].sort((a, b) => a - b).slice(-4);
 const train = REFIT ? cases.filter((c) => wk(c) < lastWeeks[0]) : cases.filter((c) => c.season === 2024 || (c.season === 2025 && c.week <= 9));
@@ -129,7 +139,7 @@ say(`teams: a ${a} rushing + receiving TDs per implied point (a 24-point team ex
 const loss = (cs: Case[], p: AttdParams) => {
   let l = 0, n = 0;
   for (const c of cs) {
-    attdTeam(c.list, c.pts, p).forEach((x, i) => {
+    attdTeam(L(c, p), c.pts, p).forEach((x, i) => {
       const y = c.tds[i] > 0;
       l -= Math.log(Math.max(1e-6, y ? x.anytime : 1 - x.anytime));
       n++;
@@ -163,6 +173,19 @@ const loss = (cs: Case[], p: AttdParams) => {
   P = withZ;
 }
 {
+  // Last season's weight (Jack, 2026-11-08: a back who lost the job stays overrated by old roles).
+  // Searched with kTd, since lighter totals change how hard the shrink should pull. scripts/test-attd-recency.mts
+  // found recency within this season hurt, so only last season's weight is a setting.
+  let b = { e: loss(train, P), wPrev: P.wPrev ?? 1, kTd: P.kTd };
+  for (const wPrev of [1, 0.75, 0.5, 0.25, 0.1])
+    for (const kTd of [10, 20, 40, 80]) {
+      const e = loss(train, { ...P, wPrev, kTd });
+      if (e < b.e) b = { e, wPrev, kTd };
+    }
+  P = { ...P, wPrev: b.wPrev, kTd: b.kTd };
+  say(`last season: wPrev ${P.wPrev}, kTd ${P.kTd} (train log loss ${b.e.toFixed(4)})`);
+}
+{
   let b = { e: Infinity, calib: 1 };
   for (let c = 0.6; c <= 1.2001; c += 0.02) {
     const e = loss(train, { ...P, calib: c });
@@ -173,7 +196,7 @@ const loss = (cs: Case[], p: AttdParams) => {
 }
 
 function report(name: string, cs: Case[]) {
-  const all = cs.flatMap((c) => attdTeam(c.list, c.pts, P).map((x, i) => ({ p: x.anytime, two: x.two, y: c.tds[i] > 0, y2: c.tds[i] > 1 })));
+  const all = cs.flatMap((c) => attdTeam(L(c, P), c.pts, P).map((x, i) => ({ p: x.anytime, two: x.two, y: c.tds[i] > 0, y2: c.tds[i] > 1 })));
   const rate = all.filter((x) => x.y).length / all.length;
   const base = -all.reduce((s, x) => s + Math.log(x.y ? rate : 1 - rate), 0) / all.length;
   say(`\n${name}: ${all.length} player-games, ${(rate * 100).toFixed(1)}% scored. Log loss ${loss(cs, P).toFixed(4)} vs flat rate ${base.toFixed(4)}`);
@@ -196,7 +219,7 @@ report("test 2025 wks 10-18", testA);
 report("test 2026", testB);
 
 // Our walk-forward chance for every 2026 player-game, to grade other sources (data/venom) on the same players.
-writeFileSync(".cache/attd-ours-2026.json", JSON.stringify(Object.fromEntries(testB.flatMap((c) => attdTeam(c.list, c.pts, P).map((x, i) => [`${c.week}|${c.list[i].name}`, { p: x.anytime, td: c.tds[i] }])))));
+writeFileSync(".cache/attd-ours-2026.json", JSON.stringify(Object.fromEntries(testB.flatMap((c) => attdTeam(L(c, P), c.pts, P).map((x, i) => [`${c.week}|${c.list[i].name}`, { p: x.anytime, td: c.tds[i] }])))));
 writeFileSync("src/lib/models/nfl/attd-params.json", JSON.stringify(P, null, 2) + "\n");
 writeFileSync(".cache/fit-anytime-td.txt", log.join("\n") + "\n");
 console.log("\nwrote src/lib/models/nfl/attd-params.json");
