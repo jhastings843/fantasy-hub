@@ -15,6 +15,7 @@
   ],
   "last_worked": "2026-11-07",
   "notes": [
+    "2026-11-07: Money > Options tab (research lean log, options book, switch book), Overview card, lean changes in the learner log (e3a2479, deployed).",
     "2026-11-07: trade ideas follow the season plan (trajectory stance + per-league goals in Redis, lib/dynasty/trade-plan.ts). Goals moved off localStorage; /api/plan behind unlock.",
     "2026-11-07: post-UX check. /status 30/32 ok (2 league sync rows await first timed run), Harris CBB day check green. Live sizes: /props 149 KB, /picks/cfb 389 KB, /picks/cbb 299 KB, /models ttfb 3.5 s.",
     "2026-11-06 (late): UX pass items 3-5 live: two-row Picks/Props headers with a Lab tab, game details load on open (props ~3 MB page), NBA weeks read once per request, Pass rows say why, who's-who guide; audit LOW error text fixed; CFB week 0 closed as not needed.",
@@ -337,7 +338,8 @@
     "nextjs",
     "typescript",
     "fantasy-football",
-    "vercel"
+    "vercel",
+    "hobby-hub"
   ],
   "phase": "in-progress",
   "live_url": "https://fantasy-hub-tan.vercel.app"
