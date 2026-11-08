@@ -102,9 +102,20 @@ describe("PEM and Harris: added or dropped on forward evidence", () => {
   const cmp = (t: number, meanDiff: number) => ({ n: 34, weeks: [8, 9, 10], meanDiff, t, challenger: { bets: 20, units: 2, risked: 20, roi: 0.1, clv: null, clvN: 0, drawdown: 2 }, incumbent: { bets: 34, units: -1, risked: 34, roi: 0, clv: null, clvN: 0, drawdown: 4 } });
   const cal = { n: 0, meanP: 0, winRate: 0, brier: 0, calibrated: false };
 
-  it("registers a standing question for each, college only", () => {
-    expect(hs.filter((h) => h.kind === "source").map((h) => h.id).sort()).toEqual(["cfb:source:harris", "cfb:source:pem"]);
-    expect(SOURCE_DEFAULT).toEqual({ pem: "cuts", harris: "out" });
+  it("registers a standing question for each: PEM and Harris on college, Venom on NFL (2026-11-08)", () => {
+    expect(hs.filter((h) => h.kind === "source").map((h) => h.id).sort()).toEqual(["cfb:source:harris", "cfb:source:pem", "nfl:source:venom"]);
+    expect(SOURCE_DEFAULT).toEqual({ pem: "cuts", harris: "out", venom: "out" });
+  });
+
+  it("Venom: his line decides his side in the review, and the NFL board can veto on it once promoted", () => {
+    const s = snap({ sam: { model: -9, market: -6 }, david: { model: -8, market: -6 } });
+    const o = { ...opp({ home: 20, away: 17 }, s), league: "nfl" as const };
+    expect(sourcePairs("venom", {}, [o], undefined, new Map([[o.key, -3]]))[0].ch.bet).toBe(false); // Venom on the road side: skipped
+    expect(sourcePairs("venom", {}, [o], undefined, new Map([[o.key, -10]]))[0].ch.bet).toBe(true);
+    const row = { home: "KC", away: "LV", sam: { model: -9, market: -6 }, david: { model: -8, market: -6 }, venom: { model: -3, market: -6, modelTotal: 44, total: 45, edgeSide: null, edgeTotal: null } };
+    const st = { rule: { id: "agree", label: "Both agree", test: {}, record: { w: 10, l: 2, p: 0, pct: 0.8, lo: 0.6, hi: 0.9, units: 7 } }, second: null } as unknown as Parameters<typeof tierBoard>[2];
+    expect(tierBoard("nfl", [row], st)[0].tier).toBe("t1"); // shown, never vetoes while tracked
+    expect(tierBoard("nfl", [row], st, "avg", { venom: true })[0]).toMatchObject({ vetoedBy: "Venom" });
   });
 
   it("a clear gain from skipping its disagreements adds it as a veto; a clear loss drops it", () => {

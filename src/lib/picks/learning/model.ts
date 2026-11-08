@@ -177,7 +177,20 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
               origin: "Jack, 2026-10-20: keep checking whether PEM and Harris add value, and add or drop them at any time",
             }),
           )
-        : [];
+        : [
+            // Venom's Game Cheat Code (Jack, 2026-11-08: "it should be an input at some point"): same paired test on games
+            // after registration; a clear gain from skipping the rule bets he disagrees with makes him a veto.
+            {
+              id: `nfl:source:venom`,
+              kind: "source",
+              league,
+              definition: { kind: "source", source: "venom", label: "Venom: does skipping the rule bets he disagrees with gain?" },
+              actionable: true,
+              registeredAt,
+              status: "collecting",
+              origin: "Jack, 2026-11-08: show Venom on the board, and make him an input once the evidence says so",
+            } satisfies Hypothesis,
+          ];
     const market = MARKET_FILTERS.map(
       (f): Hypothesis => ({
         id: `${league}:mkt:${f.id}`,
@@ -534,6 +547,8 @@ export interface EvalInputs {
   sizing?: SizingInputs;
   /** John Harris's sheet line per college game key (home side), from his verified sheets. */
   harris?: Map<string, number>;
+  /** Venom's Game Cheat Code line per NFL game key (home side). */
+  venom?: Map<string, number>;
 }
 
 export interface SizingInputs {
@@ -598,11 +613,11 @@ export function scoreSu(method: string, o: Opportunity): Scored {
 }
 
 /** A source's side on a game at the last pregame snapshot's line; null when it has no number or sits on the line. */
-export function sourceSide(src: Source, o: Opportunity, harris?: Map<string, number>): "home" | "away" | null {
+export function sourceSide(src: Source, o: Opportunity, harris?: Map<string, number>, venom?: Map<string, number>): "home" | "away" | null {
   const s = o.last;
   if (!s.ref || !s.sam || !s.david) return null;
   if (src === "pem") return readAt(s.ref.line, s.sam, s.david, s.pem).pemSide ?? null;
-  const h = harris?.get(o.key);
+  const h = (src === "venom" ? venom : harris)?.get(o.key);
   return h === undefined || h === s.ref.line ? null : h < s.ref.line ? "home" : "away";
 }
 
@@ -612,13 +627,13 @@ export function sourceSide(src: Source, o: Opportunity, harris?: Map<string, num
  * when the source disagrees. Challenger = with the veto. Games where the
  * source has no number score the same on both sides.
  */
-export function sourcePairs(src: Source, rule: CutTest, opps: Opportunity[], harris?: Map<string, number>): { o: Opportunity; ch: Scored; inc: Scored }[] {
+export function sourcePairs(src: Source, rule: CutTest, opps: Opportunity[], harris?: Map<string, number>, venom?: Map<string, number>): { o: Opportunity; ch: Scored; inc: Scored }[] {
   return opps.map((o) => {
     const inc = scoreCut(rule, o.last, o);
     if (!inc.bet) return { o, ch: inc, inc };
     const r = readAt(o.last.ref!.line, o.last.sam!, o.last.david!, o.last.pem);
     const side = rule.pemSplit ? r.pemSide : r.side;
-    const theirs = sourceSide(src, o, harris);
+    const theirs = sourceSide(src, o, harris, venom);
     return { o, ch: theirs && side && theirs !== side ? none : inc, inc };
   });
 }
@@ -677,7 +692,7 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       if (!t) return { id: h.id, note: "no rule in force" };
       const since = [h.registeredAt, x.active.sourcesChangedAt?.[d.source] ?? ""].sort().at(-1)!;
       const own = after(h, x.opps, since).filter((o) => o.league === "cfb");
-      return { id: h.id, comparison: compare(sourcePairs(d.source, t, own, x.harris)), note: `${d.source} is ${sourceState(x.active, d.source)}; challenger = skip its disagreements` };
+      return { id: h.id, comparison: compare(sourcePairs(d.source, t, own, x.harris, x.venom)), note: `${d.source} is ${sourceState(x.active, d.source)}; challenger = skip its disagreements` };
     }
     case "market": {
       const t = x.ruleTest[h.league as League];

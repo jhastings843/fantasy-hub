@@ -96,6 +96,7 @@ export function MarketLine({
   sam,
   david,
   pem,
+  venom,
   fmt,
   pk,
 }: {
@@ -103,18 +104,20 @@ export function MarketLine({
   sam?: number;
   david?: number;
   pem?: number;
+  /** Venom's Game Cheat Code line (NFL, tracked): a hollow marker so it reads as a reference, not a vote. */
+  venom?: number;
   fmt: (x: number) => string;
   /** Spreads: mark pick'em (0) and name who is favored on each side of it. */
   pk?: { below: string; above: string };
 }) {
-  const xs = [market, sam, david, pem, ...(pk ? [0] : [])].filter((x): x is number => x !== undefined);
+  const xs = [market, sam, david, pem, venom, ...(pk ? [0] : [])].filter((x): x is number => x !== undefined);
   const lo = Math.min(...xs);
   const hi = Math.max(...xs);
   const pad = Math.max(1.5, (hi - lo) * 0.2);
   const at = (x: number) => `${(((x - (lo - pad)) / (hi - lo + 2 * pad)) * 100).toFixed(1)}%`;
   return (
     <div className={s.mline}>
-      <div className={s.mtrack} role="img" aria-label={[`Market ${fmt(market)}`, sam !== undefined ? `Sam ${fmt(sam)}` : "", david !== undefined ? `David ${fmt(david)}` : "", pem !== undefined ? `PEM ${fmt(pem)}` : ""].filter(Boolean).join(", ")}>
+      <div className={s.mtrack} role="img" aria-label={[`Market ${fmt(market)}`, sam !== undefined ? `Sam ${fmt(sam)}` : "", david !== undefined ? `David ${fmt(david)}` : "", pem !== undefined ? `PEM ${fmt(pem)}` : "", venom !== undefined ? `Venom ${fmt(venom)}` : ""].filter(Boolean).join(", ")}>
         {pk && <span className={s.mPk} style={{ left: at(0) }} aria-hidden />}
         {pk && (
           <span className={s.mPkLabel} style={{ left: at(0) }} aria-hidden>
@@ -123,6 +126,7 @@ export function MarketLine({
         )}
         <span className={s.mMarket} style={{ left: at(market) }} />
         {pem !== undefined && <span className={`${s.mDot} ${s.mPem}`} style={{ left: at(pem) }} />}
+        {venom !== undefined && <span className={`${s.mDot} ${s.mVenom}`} style={{ left: at(venom) }} />}
         {david !== undefined && <span className={`${s.mDot} ${s.mDavid}`} style={{ left: at(david) }} />}
         {sam !== undefined && <span className={`${s.mDot} ${s.mSam}`} style={{ left: at(sam) }} />}
       </div>
@@ -139,13 +143,14 @@ export function MarketLine({
           {sam !== undefined && david !== undefined ? " · " : ""}
           {david !== undefined && <span className={s.cDavid}>{`David ${fmt(david)}`}</span>}
           {pem !== undefined ? ` · PEM ${fmt(pem)}` : ""}
+          {venom !== undefined ? ` · Venom ${fmt(venom)}` : ""}
         </span>
       </div>
     </div>
   );
 }
 
-export function MarketKey({ pem = false }: { pem?: boolean }) {
+export function MarketKey({ pem = false, venom = false }: { pem?: boolean; venom?: boolean }) {
   return (
     <div className={s.mKey}>
       <span>
@@ -164,6 +169,12 @@ export function MarketKey({ pem = false }: { pem?: boolean }) {
         <span>
           <i style={{ background: "var(--ink2)" }} />
           PEM
+        </span>
+      )}
+      {venom && (
+        <span>
+          <i className={s.mVenomKey} />
+          Venom (tracked)
         </span>
       )}
     </div>

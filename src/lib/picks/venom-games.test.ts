@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VENOM_CUTS, cutsFor, gradeGame, matches, read, type VenomLine } from "./engine";
 import { venomCompare } from "./research";
-// @ts-expect-error plain .mjs script, no types
 import { parseGames } from "../../../scripts/venom-reader.mjs";
 
 const cut = (id: string) => VENOM_CUTS.find((c) => c.id === id)!.test;

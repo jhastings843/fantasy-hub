@@ -294,14 +294,15 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   const harrisLines = new Map<string, number>();
   if (league === "cfb" && week) for (const w of await harrisWeeks(season).catch(() => [])) if (w.week === week && w.verified) for (const r of w.rows) harrisLines.set(`${r.away}@${r.home}`, r.model);
   const harrisNow = (home: string, away: string) => harrisLines.get(`${away}@${home}`);
+  const venomNow = (home: string, away: string) => (week ? venom.get(key({ week, home, away })) : undefined);
   const posted = week ? await notePosted(league, season, week, sb.week === week, db.week === week, pem.some((w) => w.week === week && w.verified)) : {};
   const rows: PicksCore["rows"] = samLive.map((r) => {
     const d = dmap.get(`${r.away}@${r.home}`);
     dmap.delete(`${r.away}@${r.home}`);
-    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), harris: harrisNow(r.home, r.away), samTotal: r.modelTotal, davidTotal: d?.modelTotal };
+    return { home: r.home, away: r.away, sam: r.line, david: d?.line, pem: pemNow(r.home, r.away), harris: harrisNow(r.home, r.away), venom: venomNow(r.home, r.away), samTotal: r.modelTotal, davidTotal: d?.modelTotal };
   });
   for (const d of dmap.values()) {
-    rows.push({ home: d.home, away: d.away, david: d.line, pem: pemNow(d.home, d.away), harris: harrisNow(d.home, d.away), davidTotal: d.modelTotal });
+    rows.push({ home: d.home, away: d.away, david: d.line, pem: pemNow(d.home, d.away), harris: harrisNow(d.home, d.away), venom: venomNow(d.home, d.away), davidTotal: d.modelTotal });
   }
 
   const seen = await loadTotalsSeen(league, season);

@@ -10,6 +10,7 @@
 
 import { type ChosenMap, totalsStakes } from "./forward";
 import { finishedResults } from "./finished";
+import type { VenomLine } from "./engine";
 import type { League, ModelLine } from "./parse";
 import type { ClosingLine } from "./closing";
 import { priceSummary, summarize, type ClvRow } from "./closing";
@@ -48,6 +49,8 @@ export interface CoreRow {
   pem?: PemLine;
   /** John Harris's sheet line, home side (college, verified sheets only). */
   harris?: number;
+  /** Venom's Game Cheat Code line and total (NFL, tracked; a veto only if the review promotes it). */
+  venom?: VenomLine;
   samTotal?: number;
   davidTotal?: number;
   /** Our own model's latest saved read on this game (tracked only; straight up and totals use it once promoted). */
@@ -184,7 +187,7 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
   };
   const withRefs = core.rows.map((r) => ({ ...r, ...refOf(r.home, r.away) }));
   const s = core.strategies;
-  const veto = core.league === "cfb" ? { pem: sourceState(policy, "pem") === "veto", harris: sourceState(policy, "harris") === "veto" } : {};
+  const veto = core.league === "cfb" ? { pem: sourceState(policy, "pem") === "veto", harris: sourceState(policy, "harris") === "veto" } : { venom: sourceState(policy, "venom") === "veto" };
   const tiered = tierBoard(core.league, withRefs, s, core.su.best?.id ?? "avg", veto);
   const tierRec = (c: { record: { w: number; l: number }; activated?: boolean } | null) =>
     c ? { w: c.record.w, l: c.record.l, activated: c.activated } : undefined;

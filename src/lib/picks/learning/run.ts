@@ -1,5 +1,6 @@
 import "server-only";
 import { harrisReview, harrisWeeks } from "../harris";
+import { venomGameWeeks, venomLines } from "../venom-games";
 import { dropPicksCore, getPicksCore, getQuotes } from "../report";
 import { activatedFor } from "../report-scope";
 import { strategies } from "../engine";
@@ -68,7 +69,10 @@ async function gather(now: Date): Promise<ReviewInputs> {
   // Harris's sheet lines, verified sheets only, keyed like every other college game.
   const harris = new Map<string, number>();
   for (const w of await harrisWeeks(season).catch(() => [])) if (w.verified) for (const r of w.rows) harris.set(`${w.week}:${r.away}@${r.home}`, r.model);
-  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days, harris };
+  // Venom's Game Cheat Code lines (NFL), for the nfl:source:venom question.
+  const venom = new Map<string, number>();
+  for (const [k, v] of venomLines(await venomGameWeeks(season).catch(() => []))) venom.set(k, v.model);
+  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days, harris, venom };
 }
 
 export async function runStrategyReview(opts: { dryRun?: boolean; reason?: string; now?: Date } = {}): Promise<ReviewResult> {

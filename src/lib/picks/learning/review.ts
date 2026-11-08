@@ -177,6 +177,8 @@ export interface ReviewInputs {
   decisionDays?: string[];
   /** John Harris's sheet line per college game key (source hypotheses). */
   harris?: Map<string, number>;
+  /** Venom's Game Cheat Code line per NFL game key (home side). */
+  venom?: Map<string, number>;
 }
 
 export interface ReviewResult {
@@ -358,7 +360,7 @@ export async function runReview(store: LearningStore, x: ReviewInputs, opts: { d
 
   // Evaluate and decide.
   const collecting = hs.filter((h) => h.status === "collecting");
-  const evaluations = collecting.map((h) => evaluate(h, { opps, issued: bets, active, ruleTest: x.ruleTest, sizing, harris: x.harris }));
+  const evaluations = collecting.map((h) => evaluate(h, { opps, issued: bets, active, ruleTest: x.ruleTest, sizing, harris: x.harris, venom: x.venom }));
   const decisions = collecting.map((h, i) => decide(h, evaluations[i], { calibration: cal, active }));
   for (const d of decisions.filter((y) => y.verdict === "reject")) {
     const h = hs.find((y) => y.id === d.id)!;

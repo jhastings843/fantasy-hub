@@ -651,7 +651,7 @@ export interface BoardGame {
   read?: Read;
   tier: Tier;
   /** A rule bet skipped because a veto source (PEM, Harris) disagreed. */
-  vetoedBy?: "PEM" | "Harris";
+  vetoedBy?: "PEM" | "Harris" | "Venom";
   /** Fits this tier, but the tier failed its forward check (forward.ts): tracked, no stake. */
   forwardHold?: "t1" | "t2";
   /** "TB +8.5", or each model's side on a split. */
@@ -673,6 +673,8 @@ export interface BoardGame {
   su?: StraightUp;
   /** Our own model's latest read on the game (tracked only). */
   ours?: OursRead;
+  /** Venom's Game Cheat Code (NFL, tracked; a veto only if the review promotes him). */
+  venom?: VenomLine;
   pem?: PemLine;
   /** The play is PEM's side of a Sam/David split. */
   pemPick?: boolean;
@@ -716,12 +718,13 @@ const fmt = (x: number) => (x === 0 ? "PK" : `${x > 0 ? "+" : ""}${x}`);
  * actually available: Sam home -2 against his -3, David home -6 against his
  * -7, and at home -5 Sam is on the road team and David on the home team.
  */
-export function readAt(ref: number, sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: number): Read {
+export function readAt(ref: number, sam: ModelLine, david: ModelLine, pem?: PemLine, ours?: number, venom?: VenomLine): Read {
   return read(
     { market: ref, model: sam.model },
     { market: ref, model: david.model },
     pem ? { model: pem.model, market: ref } : undefined,
     ours,
+    venom,
   );
 }
 
@@ -756,11 +759,11 @@ function holdForward(g: BoardGame, s: StrategyBoard): BoardGame {
 
 export function tierBoard(
   league: "nfl" | "cfb",
-  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; ref?: RefLine; lastRef?: RefLine; started?: boolean; ours?: OursRead }[],
+  rows: { home: string; away: string; sam?: ModelLine; david?: ModelLine; pem?: PemLine; harris?: number; venom?: VenomLine; ref?: RefLine; lastRef?: RefLine; started?: boolean; ours?: OursRead }[],
   s: StrategyBoard,
   suMethod = "avg",
   /** Sources the strategy review made vetoes (policy source "veto"): a rule bet one disagrees with is skipped. */
-  veto: { pem?: boolean; harris?: boolean } = {},
+  veto: { pem?: boolean; harris?: boolean; venom?: boolean } = {},
 ): BoardGame[] {
   return rows.map((row): BoardGame => {
     // A game that has kicked off is never actionable, whatever the cache says.
@@ -775,7 +778,7 @@ export function tierBoard(
       const at = atRef?.line ?? m.market;
       return { ...row, basis, tier: "one", play: `${only} only: ${team(m.model < at ? "home" : "away")}`, su };
     }
-    const r = atRef ? readAt(atRef.line, row.sam, row.david, row.pem, row.ours?.spread) : read(row.sam, row.david, row.pem, row.ours?.spread);
+    const r = atRef ? readAt(atRef.line, row.sam, row.david, row.pem, row.ours?.spread, row.venom) : read(row.sam, row.david, row.pem, row.ours?.spread, row.venom);
     const pemMissing = league === "cfb" && !row.pem;
     // A rule that needs PEM, on a game PEM has not covered, is undecided, not a "no".
     const waiting = (cut: CutResult | null): boolean =>
@@ -814,7 +817,7 @@ export function tierBoard(
     const homeLine = r.side === "home" ? r.line : -r.line;
     const base = { ...row, basis, read: r, play, su, side: r.side, homeLine };
     // A veto source that disagrees turns a rule bet into a pass, saying who.
-    const vetoedBy = veto.pem && r.pemSide && r.pemSide !== r.side ? "PEM" : veto.harris && harrisSide && harrisSide !== r.side ? "Harris" : undefined;
+    const vetoedBy = veto.pem && r.pemSide && r.pemSide !== r.side ? "PEM" : veto.harris && harrisSide && harrisSide !== r.side ? "Harris" : veto.venom && r.venomSide && r.venomSide !== r.side ? "Venom" : undefined;
     const isBet = (s.rule && matches(r, s.rule.test)) || (s.second && matches(r, s.second.test));
     if (vetoedBy && isBet) return { ...base, tier: r.dog ? "pass" : "fav", vetoedBy };
     if (s.rule && matches(r, s.rule.test)) return { ...base, tier: "t1" };
