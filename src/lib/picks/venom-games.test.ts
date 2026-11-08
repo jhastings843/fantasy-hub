@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VENOM_CUTS, cutsFor, gradeGame, matches, read, type VenomLine } from "./engine";
-import { venomCompare } from "./research";
+import { venomCompare, venomTotalsCompare } from "./research";
 import { parseGames } from "../../../scripts/venom-reader.mjs";
 
 const cut = (id: string) => VENOM_CUTS.find((c) => c.id === id)!.test;
@@ -26,7 +26,7 @@ describe("Venom's Game Cheat Code", () => {
     expect(VENOM_CUTS.every((c) => !c.candidate)).toBe(true);
   });
 
-  it("grades his spread at Sam and David's average line and his total at his board's number", () => {
+  it("grades his spread at Sam and David's average line; totals live in the totals research", () => {
     // Market home -3 everywhere; home wins 27-20 (covers -3); 47 points.
     const base = { week: 4, home: "BAL", away: "JAX", final: { home: 27, away: 20 }, sam: { model: -6, market: -3 }, david: { model: -5, market: -3 } };
     const games = [
@@ -40,6 +40,26 @@ describe("Venom's Game Cheat Code", () => {
     expect(row("agree-v")).toMatchObject({ w: 1, l: 0 });
     expect(row("agree-not-v")).toMatchObject({ w: 1, l: 0 }); // graded on Sam and David's side, which covered
     expect(row("flag")).toMatchObject({ w: 1, l: 0 });
+    expect(r.rows.some((x) => x.id.startsWith("total"))).toBe(false);
+  });
+
+  it("grades his totals at his board's number, and against Sam and David at the archived total", () => {
+    const key = (g: { week: number; home: string; away: string }) => `${g.week}:${g.away}@${g.home}`;
+    const venom = new Map([
+      ["4:JAX@BAL", { modelTotal: 49, total: 44, edgeTotal: "over" as const }], // over 44 W
+      ["4:CIN@ATL", { modelTotal: 40, total: 44, edgeTotal: null }], // under 44 L
+    ]);
+    const points = new Map([["4:JAX@BAL", 47], ["4:CIN@ATL", 47]]);
+    const seen = [
+      { week: 4, home: "BAL", away: "JAX", sam: 48, david: 47, line: 45 }, // both over 45, Venom over: W
+      { week: 4, home: "ATL", away: "CIN", sam: 48, david: 46, line: 45 }, // both over 45, Venom under: W for the models
+    ];
+    const r = venomTotalsCompare(venom, seen, points, key);
+    const row = (id: string) => r.rows.find((x) => x.id === id)!.record;
+    expect(r.games).toBe(2);
+    expect(row("agree")).toMatchObject({ w: 2, l: 0 });
+    expect(row("agree-v")).toMatchObject({ w: 1, l: 0 });
+    expect(row("agree-not-v")).toMatchObject({ w: 1, l: 0 });
     expect(row("total")).toMatchObject({ w: 1, l: 1 });
     expect(row("total-3")).toMatchObject({ w: 1, l: 1 });
     expect(row("total-flag")).toMatchObject({ w: 1, l: 0 });

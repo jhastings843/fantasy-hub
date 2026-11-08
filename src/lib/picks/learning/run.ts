@@ -71,8 +71,12 @@ async function gather(now: Date): Promise<ReviewInputs> {
   for (const w of await harrisWeeks(season).catch(() => [])) if (w.verified) for (const r of w.rows) harris.set(`${w.week}:${r.away}@${r.home}`, r.model);
   // Venom's Game Cheat Code lines (NFL), for the nfl:source:venom question.
   const venom = new Map<string, number>();
-  for (const [k, v] of venomLines(await venomGameWeeks(season).catch(() => []))) venom.set(k, v.model);
-  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days, harris, venom };
+  const venomTotal = new Map<string, number>();
+  for (const [k, v] of venomLines(await venomGameWeeks(season).catch(() => []))) {
+    venom.set(k, v.model);
+    venomTotal.set(k, v.modelTotal);
+  }
+  return { now, forecasts, finals, closes, issued, ruleTest, replay, history, decisions: decided.decisions, decisionDays: decided.days, harris, venom, venomTotal };
 }
 
 export async function runStrategyReview(opts: { dryRun?: boolean; reason?: string; now?: Date } = {}): Promise<ReviewResult> {

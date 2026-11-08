@@ -83,6 +83,8 @@ export interface PicksCore {
   pemCompare: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
   /** Venom's Game Cheat Code on the NFL games he covers (research.ts venomCompare). Missing on boards cached before 2026-11-08. */
   venomCompare?: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
+  /** Venom's totals on the games he covers (research.ts venomTotalsCompare), for the totals research. */
+  venomTotals?: { rows: PemCompareRow[]; games: number; weeks: number[] } | null;
   totalsBacktest: TotalsBacktest;
   totalsEdge: number;
   totalsArchived: number;
@@ -206,8 +208,10 @@ export function compose({ core, quotes, issued, exposure, policy = BASELINE_POLI
         r.ref?.total !== undefined
           ? { total: r.ref.total, source: r.ref.source, fetchedAt: r.ref.fetchedAt, overPrice: r.ref.overPrice, underPrice: r.ref.underPrice, kickoff: r.ref.kickoff, ...(r.ref.shop ? { shop: { over: r.ref.shop.over, under: r.ref.shop.under } } : {}) }
           : undefined,
+      ...(r.venom ? { venom: { total: r.venom.modelTotal, edge: r.venom.edgeTotal } } : {}),
     })),
     tb.rule,
+    { venom: core.league === "nfl" && sourceState(policy, "venomTotal") === "veto" },
   ).map((g) => {
     // The totals rule's forward check (forward.ts): until it passes, its games
     // are tracked, never sized, so nothing downstream can stake or send them.

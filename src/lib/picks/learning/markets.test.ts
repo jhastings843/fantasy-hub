@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyPromotion, decide, evaluate, laterHypotheses, scoreSu, scoreTotal, sourcePairs, type Hypothesis, type Opportunity } from "./model";
+import { applyPromotion, decide, evaluate, laterHypotheses, scoreSu, scoreTotal, sourcePairs, venomTotalPairs, type Hypothesis, type Opportunity } from "./model";
 import { tierBoard } from "../engine";
 import { BASELINE_POLICY, SOURCE_DEFAULT, SU_DEFAULT, sourceState, suInForce, totalsAllowed } from "../policy";
-import { totalsBacktest } from "../totals";
+import { totalsBacktest, totalsBoard } from "../totals";
 import type { ForecastSnapshot } from "../forecasts";
 
 // Totals and straight up on the same loop as the spread side (2026-10-20).
@@ -103,8 +103,37 @@ describe("PEM and Harris: added or dropped on forward evidence", () => {
   const cal = { n: 0, meanP: 0, winRate: 0, brier: 0, calibrated: false };
 
   it("registers a standing question for each: PEM and Harris on college, Venom on NFL (2026-11-08)", () => {
-    expect(hs.filter((h) => h.kind === "source").map((h) => h.id).sort()).toEqual(["cfb:source:harris", "cfb:source:pem", "nfl:source:venom"]);
-    expect(SOURCE_DEFAULT).toEqual({ pem: "cuts", harris: "out", venom: "out" });
+    expect(hs.filter((h) => h.kind === "source").map((h) => h.id).sort()).toEqual(["cfb:source:harris", "cfb:source:pem", "nfl:ou:source:venom", "nfl:source:venom"]);
+    expect(SOURCE_DEFAULT).toEqual({ pem: "cuts", harris: "out", venom: "out", venomTotal: "out" });
+  });
+
+  it("Venom's spread question is judged on NFL games at the NFL rule, not college (fixed 2026-11-08)", () => {
+    const h = hs.find((x) => x.id === "nfl:source:venom")!;
+    const s = snap({ sam: { model: -9, market: -6 }, david: { model: -8, market: -6 } });
+    const o = { ...opp({ home: 20, away: 17 }, s), league: "nfl" as const, first: { ...s, at: "2026-10-25T12:00:00Z" } };
+    const later = { ...h, registeredAt: "2026-10-01T00:00:00Z" };
+    const e = evaluate(later, { opps: [o], issued: [], active: BASELINE_POLICY, ruleTest: { nfl: {} }, venom: new Map([[o.key, -3]]) });
+    expect(e.comparison?.n).toBe(1);
+    expect(evaluate(later, { opps: [o], issued: [], active: BASELINE_POLICY, ruleTest: { cfb: {} } }).note).toBe("no rule in force");
+  });
+
+  it("Venom's total: a learner question on the totals loop, and a totals veto once promoted", () => {
+    const h = hs.find((x) => x.id === "nfl:ou:source:venom")!;
+    expect(h.definition).toMatchObject({ kind: "source", source: "venomTotal" });
+    // Both models over 45; final 50 (over wins).
+    const o = opp({ home: 30, away: 20 });
+    expect(venomTotalPairs([o], new Map([[o.key, 42]]))[0]).toMatchObject({ ch: { bet: false }, inc: { bet: true, result: "W" } }); // Venom under: skipped
+    expect(venomTotalPairs([o], new Map([[o.key, 48]]))[0].ch.bet).toBe(true);
+    expect(venomTotalPairs([o])[0].ch.bet).toBe(true); // no Venom number: same as the parent
+    const p = applyPromotion(BASELINE_POLICY, h, "p9", "2026-11-10T00:00:00Z", "veto");
+    expect(sourceState(p, "venomTotal")).toBe("veto");
+    expect(p.summary).toContain("Venom's total added as a veto");
+    const ref = { total: 45, source: "test", fetchedAt: "" };
+    const row = { home: "KC", away: "LV", sam: 50, david: 49, ref, venom: { total: 42, edge: "under" as const } };
+    const rule = { id: "t-agree", label: "Both agree", test: {} };
+    expect(totalsBoard([row], rule)[0]).toMatchObject({ tier: "t1", venom: { total: 42, edge: "under" } }); // shown, no veto while tracked
+    expect(totalsBoard([row], rule, { venom: true })[0]).toMatchObject({ tier: "lean", vetoedBy: "Venom" });
+    expect(totalsBoard([{ ...row, venom: { total: 48, edge: null } }], rule, { venom: true })[0].tier).toBe("t1");
   });
 
   it("Venom: his line decides his side in the review, and the NFL board can veto on it once promoted", () => {

@@ -190,6 +190,17 @@ export function laterHypotheses(registeredAt: string): Hypothesis[] {
               status: "collecting",
               origin: "Jack, 2026-11-08: show Venom on the board, and make him an input once the evidence says so",
             } satisfies Hypothesis,
+            // His total, on the totals loop (Jack, 2026-11-08: Venom's total belongs with the totals).
+            {
+              id: `nfl:ou:source:venom`,
+              kind: "source",
+              league,
+              definition: { kind: "source", source: "venomTotal", label: "Venom's total: does skipping the totals bets he disagrees with gain?" },
+              actionable: true,
+              registeredAt,
+              status: "collecting",
+              origin: "Jack, 2026-11-08: Venom's total tracked in the totals sections, same test as his spread",
+            } satisfies Hypothesis,
           ];
     const market = MARKET_FILTERS.map(
       (f): Hypothesis => ({
@@ -549,6 +560,8 @@ export interface EvalInputs {
   harris?: Map<string, number>;
   /** Venom's Game Cheat Code line per NFL game key (home side). */
   venom?: Map<string, number>;
+  /** Venom's projected total per NFL game key. */
+  venomTotal?: Map<string, number>;
 }
 
 export interface SizingInputs {
@@ -622,6 +635,23 @@ export function sourceSide(src: Source, o: Opportunity, harris?: Map<string, num
 }
 
 /**
+ * Venom's total, per game: totals bets where both models agree (the "t-agree"
+ * parent every totals refinement is judged against) at the last pregame
+ * snapshot, and the same bet skipped when his total sits on the other side of
+ * that snapshot's total. Games with no Venom total score the same on both sides.
+ */
+export function venomTotalPairs(opps: Opportunity[], venomTotal?: Map<string, number>): { o: Opportunity; ch: Scored; inc: Scored }[] {
+  return opps.map((o) => {
+    const inc = scoreTotal({}, o.last, o);
+    const line = o.last.ref?.total;
+    const v = venomTotal?.get(o.key);
+    if (!inc.bet || line === undefined || v === undefined || v === line) return { o, ch: inc, inc };
+    const r = readTotal(line, o.last.samTotal, o.last.davidTotal);
+    return { o, ch: (v > line ? "over" : "under") !== r.side ? none : inc, inc };
+  });
+}
+
+/**
  * A source's value, per game: the rule's bet at the last pregame snapshot
  * (PEM posts midweek, after most first snapshots), and the same bet skipped
  * when the source disagrees. Challenger = with the veto. Games where the
@@ -688,10 +718,12 @@ export function evaluate(h: Hypothesis, x: EvalInputs): Evaluation {
       // parentId "none": the challenger is judged against not betting at all.
       return { id: h.id, comparison: compare(opps.map((o) => ({ o, ch: scoreCut(d.test, o.first, o), inc: d.parentId === "none" ? none : scoreCut(d.parentTest, o.first, o) }))) };
     case "source": {
-      const t = x.ruleTest.cfb;
-      if (!t) return { id: h.id, note: "no rule in force" };
       const since = [h.registeredAt, x.active.sourcesChangedAt?.[d.source] ?? ""].sort().at(-1)!;
-      const own = after(h, x.opps, since).filter((o) => o.league === "cfb");
+      const own = after(h, x.opps, since).filter((o) => o.league === h.league);
+      if (d.source === "venomTotal")
+        return { id: h.id, comparison: compare(venomTotalPairs(own, x.venomTotal)), note: `Venom's total is ${sourceState(x.active, d.source)}; challenger = skip the both-agree totals bets he disagrees with` };
+      const t = x.ruleTest[h.league as League];
+      if (!t) return { id: h.id, note: "no rule in force" };
       return { id: h.id, comparison: compare(sourcePairs(d.source, t, own, x.harris, x.venom)), note: `${d.source} is ${sourceState(x.active, d.source)}; challenger = skip its disagreements` };
     }
     case "market": {
@@ -864,6 +896,8 @@ function decideSource(src: Source, e: Evaluation, active: PicksPolicy, id: strin
   return { id, verdict: "retain", why: `${src} stays ${state}: ${read}` };
 }
 
+const SOURCE_NAME: { [s in Source]: string } = { pem: "PEM", harris: "Harris", venom: "Venom", venomTotal: "Venom's total" };
+
 /** The policy a promotion would produce: a new frozen version, never an edit. */
 export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, at: string, to?: string): PicksPolicy {
   const d = h.definition;
@@ -875,7 +909,7 @@ export function applyPromotion(active: PicksPolicy, h: Hypothesis, id: string, a
       createdAt: at,
       sources: { ...active.sources, [d.source]: next },
       sourcesChangedAt: { ...active.sourcesChangedAt, [d.source]: at },
-      summary: `${active.summary}; ${d.source === "pem" ? "PEM" : "Harris"} ${next === "veto" ? "added as a veto" : next === "out" ? "dropped" : "cuts only"}`,
+      summary: `${active.summary}; ${SOURCE_NAME[d.source]} ${next === "veto" ? "added as a veto" : next === "out" ? "dropped" : "cuts only"}`,
     };
   }
   if (d.kind === "ats-cut") {

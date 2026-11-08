@@ -34,9 +34,9 @@ export interface PicksPolicy {
   /** The straight-up method the review switched to, per league; absent = SU_DEFAULT. */
   suMethod?: { nfl?: string; cfb?: string };
   /** Outside sources (college): how each is used, as the review last set it; absent = SOURCE_DEFAULT. */
-  sources?: { pem?: SourceState; harris?: SourceState; venom?: SourceState };
+  sources?: { pem?: SourceState; harris?: SourceState; venom?: SourceState; venomTotal?: SourceState };
   /** When the review last switched each source: its value test restarts then. */
-  sourcesChangedAt?: { pem?: string; harris?: string; venom?: string };
+  sourcesChangedAt?: { pem?: string; harris?: string; venom?: string; venomTotal?: string };
   /**
    * Splits signals the review made live, per league (learning/model.ts
    * MarketFilter ids). A sent bet one of them flags gets a "skip" alert about
@@ -55,9 +55,10 @@ export interface PicksPolicy {
  * adds the veto; a clear loss drops it to out.
  */
 export type SourceState = "out" | "cuts" | "veto";
-export type Source = "pem" | "harris" | "venom";
+/** "venomTotal": Venom's total as a veto on totals bets (NFL); the rest act on the spread rule. */
+export type Source = "pem" | "harris" | "venom" | "venomTotal";
 /** As of 2026-10-20: PEM's cuts compete (no veto), Harris is tracked only. Venom (NFL, from 2026-11-08) starts tracked only. */
-export const SOURCE_DEFAULT: { [s in Source]: SourceState } = { pem: "cuts", harris: "out", venom: "out" };
+export const SOURCE_DEFAULT: { [s in Source]: SourceState } = { pem: "cuts", harris: "out", venom: "out", venomTotal: "out" };
 export const sourceState = (p: PicksPolicy, s: Source): SourceState => p.sources?.[s] ?? SOURCE_DEFAULT[s];
 
 /**

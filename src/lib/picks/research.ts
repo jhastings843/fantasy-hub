@@ -156,10 +156,8 @@ export function pemCompare(
 /**
  * Venom's Game Cheat Code (NFL) on the games he covers, like pemCompare: every
  * spread row judged and graded at one line, the average of Sam's and David's
- * posted market numbers. Two more spread rows for his own "VENOM EDGE" flag, and
- * his totals: his side of the total he showed, graded on the final score. The
- * totals use the market number printed on his board (backfilled weeks were read
- * after the games, so that number may be a late one); no CLV for them.
+ * posted market numbers, plus his own "VENOM EDGE" side flag. His totals are
+ * in venomTotalsCompare (the totals research).
  */
 export function venomCompare(
   games: GradedGame[],
@@ -167,7 +165,6 @@ export function venomCompare(
 ): { rows: PemCompareRow[]; games: number; weeks: number[] } {
   const covered = games.filter((g) => g.venom);
   const b: { [id: string]: { side: "home" | "away"; line: number; g: GradedGame }[] } = { agree: [], "agree-v": [], "agree-not-v": [], split: [], venom: [], flag: [] };
-  const tot: { [id: string]: Result[] } = { total: [], "total-flag": [], "total-3": [] };
   for (const g of covered) {
     const v = g.venom!;
     const line = (g.sam.market + g.david.market) / 2;
@@ -180,14 +177,6 @@ export function venomCompare(
       if (ven === sam) b["agree-v"].push({ side: sam, line, g });
       else if (ven) b["agree-not-v"].push({ side: sam, line, g });
     } else if (sam && david && ven) b.split.push({ side: ven, line, g });
-    const pts = g.final.home + g.final.away;
-    if (v.modelTotal !== v.total) {
-      const over = v.modelTotal > v.total;
-      const r: Result = pts === v.total ? "P" : (pts > v.total) === over ? "W" : "L";
-      tot.total.push(r);
-      if (Math.abs(v.modelTotal - v.total) >= 3) tot["total-3"].push(r);
-    }
-    if (v.edgeTotal) tot["total-flag"].push(pts === v.total ? "P" : (pts > v.total) === (v.edgeTotal === "over") ? "W" : "L");
   }
   const row = (id: string, label: string): PemCompareRow => {
     const vs = b[id].flatMap((p) => {
@@ -196,7 +185,6 @@ export function venomCompare(
     });
     return { id, label, record: tally(b[id].map((p) => grade(p.g.final, p.line, p.side))), clv: { avg: vs.length ? Math.round((vs.reduce((a, x) => a + x, 0) / vs.length) * 100) / 100 : 0, n: vs.length } };
   };
-  const trow = (id: string, label: string): PemCompareRow => ({ id, label, record: tally(tot[id]), clv: { avg: 0, n: 0 } });
   return {
     rows: [
       row("agree", "Sam and David agree"),
@@ -205,11 +193,68 @@ export function venomCompare(
       row("split", "Sam and David split: Venom's side"),
       row("venom", "Venom alone, his spread"),
       row("flag", "Venom alone, his EDGE flag on the side"),
-      trow("total", "Venom's total, any gap (his board's number)"),
-      trow("total-3", "Venom's total, 3+ pts off"),
-      trow("total-flag", "Venom's total, his EDGE flag"),
     ],
     games: covered.length,
     weeks: [...new Set(covered.map((g) => g.week))].sort((a, b) => a - b),
+  };
+}
+
+/**
+ * Venom's totals, for the totals research. Agreement rows use the totals
+ * archive (both models and the quote as first seen together, the same games
+ * every totals cut is graded on), with Venom's side judged at that archived
+ * total. His own rows use the market total printed on his board (backfilled
+ * weeks were read after the games, so that number may be a late one). No CLV.
+ */
+export function venomTotalsCompare(
+  venom: Map<string, { modelTotal: number; total: number; edgeTotal: "over" | "under" | null }>,
+  seen: { week: number; home: string; away: string; sam: number; david: number; line: number }[],
+  points: Map<string, number>,
+  keyOf: (g: { week: number; home: string; away: string }) => string,
+): { rows: PemCompareRow[]; games: number; weeks: number[] } {
+  const res = (pts: number, line: number, side: "over" | "under"): Result => (pts === line ? "P" : (pts > line) === (side === "over") ? "W" : "L");
+  const sideOf = (x: number, line: number) => (x === line ? null : x > line ? ("over" as const) : ("under" as const));
+  const b: { [id: string]: Result[] } = { agree: [], "agree-v": [], "agree-not-v": [], split: [], total: [], "total-3": [], "total-flag": [] };
+  const games = new Set<string>();
+  const weeks = new Set<number>();
+  for (const g of seen) {
+    const k = keyOf(g);
+    const v = venom.get(k);
+    const pts = points.get(k);
+    if (!v || pts === undefined) continue;
+    games.add(k);
+    weeks.add(g.week);
+    const sam = sideOf(g.sam, g.line), david = sideOf(g.david, g.line), ven = sideOf(v.modelTotal, g.line);
+    if (sam && sam === david) {
+      b.agree.push(res(pts, g.line, sam));
+      if (ven === sam) b["agree-v"].push(res(pts, g.line, sam));
+      else if (ven) b["agree-not-v"].push(res(pts, g.line, sam));
+    } else if (sam && david && ven) b.split.push(res(pts, g.line, ven));
+  }
+  for (const [k, v] of venom) {
+    const pts = points.get(k);
+    if (pts === undefined) continue;
+    games.add(k);
+    weeks.add(Number(k.split(":")[0]));
+    const ven = sideOf(v.modelTotal, v.total);
+    if (ven) {
+      b.total.push(res(pts, v.total, ven));
+      if (Math.abs(v.modelTotal - v.total) >= 3) b["total-3"].push(res(pts, v.total, ven));
+    }
+    if (v.edgeTotal) b["total-flag"].push(res(pts, v.total, v.edgeTotal));
+  }
+  const row = (id: string, label: string): PemCompareRow => ({ id, label, record: tally(b[id]), clv: { avg: 0, n: 0 } });
+  return {
+    rows: [
+      row("agree", "Sam and David agree (archived total)"),
+      row("agree-v", "...and Venom agrees"),
+      row("agree-not-v", "...and Venom disagrees"),
+      row("split", "Sam and David split: Venom's side"),
+      row("total", "Venom alone, his total (his board's number)"),
+      row("total-3", "Venom alone, 3+ pts off"),
+      row("total-flag", "Venom alone, his EDGE flag on the total"),
+    ],
+    games: games.size,
+    weeks: [...weeks].sort((a, b) => a - b),
   };
 }

@@ -6,6 +6,7 @@ import { bettable, cutResult, matches } from "@/lib/picks/engine";
 import type { PicksReport } from "@/lib/picks/report";
 import { forwardNote, holdText } from "@/lib/picks/forward";
 import type { BetRow } from "@/lib/picks/units";
+import type { PemCompareRow } from "@/lib/picks/research";
 import { decimal, worstPrice } from "@/lib/picks/staking";
 import { Fragment } from "react";
 import Link from "next/link";
@@ -70,6 +71,38 @@ function pricedWhy(g: BoardGame): string {
   const worst = g.p !== undefined ? worstPrice(g.p) : null;
   const need = worst === null ? "a plus-money price" : `${price(worst)} or better`;
   return `At ${priceWithBook(price(g.price), g.ref, g.side)}, the best of DraftKings and FanDuel on this line, the tier's estimated edge is too thin for a 1u bet. It would need ${need}.`;
+}
+
+/** Venom on the games he covers (research.ts venomCompare / venomTotalsCompare): one record per row, CLV where there is one. */
+export function VenomTable({ x, note }: { x: { rows: PemCompareRow[]; games: number }; note: string }) {
+  return (
+    <details className={s.details}>
+      <summary>{`Venom on the same games (${x.games})`}</summary>
+      <div className={s.detailsBody}>
+        <p className={s.p}>{note}</p>
+      </div>
+      <div className={s.tw}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th>On these games</th>
+              <th>W-L-P</th>
+              <th>vs close (n)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {x.rows.map((row) => (
+              <tr key={row.id}>
+                <td>{row.label}</td>
+                <td className={s.num}>{n(row.record) + row.record.p ? rec(row.record) : "·"}</td>
+                <td className={s.num}>{row.clv.n ? `${row.clv.avg > 0 ? "+" : ""}${row.clv.avg.toFixed(2)} (${row.clv.n})` : "·"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
 }
 
 /** Every reason behind a game's call: the line, each model, tier, chance, price, stake or why no bet. */
@@ -978,32 +1011,10 @@ export function AtsResearch({ r, panel }: { r: PicksReport; panel?: React.ReactN
         </details>
       )}
       {r.venomCompare && r.venomCompare.games > 0 && (
-        <details className={s.details}>
-          <summary>{`Venom on the same games (${r.venomCompare.games})`}</summary>
-          <div className={s.detailsBody}>
-            <p className={s.p}>Venom&apos;s Game Cheat Code, tracked only. Spread rows are judged and graded at one line, the average of Sam&apos;s and David&apos;s posted numbers. Total rows use the market total on his board.</p>
-          </div>
-          <div className={s.tw}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>On these games</th>
-                  <th>W-L-P</th>
-                  <th>vs close (n)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {r.venomCompare.rows.map((x) => (
-                  <tr key={x.id}>
-                    <td>{x.label}</td>
-                    <td className={s.num}>{n(x.record) + x.record.p ? rec(x.record) : "·"}</td>
-                    <td className={s.num}>{x.clv.n ? `${x.clv.avg > 0 ? "+" : ""}${x.clv.avg.toFixed(2)} (${x.clv.n})` : "·"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
+        <VenomTable
+          x={r.venomCompare}
+          note="Venom's Game Cheat Code, tracked only. Every row is judged and graded at one line, the average of Sam's and David's posted numbers. His totals are in the Totals research."
+        />
       )}
       {panel}
       {r.priceShadow && <PriceShadowPanel x={r.priceShadow} name={name} r={r} />}

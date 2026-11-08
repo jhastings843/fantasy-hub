@@ -19,7 +19,7 @@ import { closingLines, currentLines } from "./closing-store";
 import { type IssuedRecord, confirmed, issuedGames } from "./issued";
 import { loadIssued, loadIssuedStrict } from "./issued-store";
 import { OUTSTANDING_CAP, WEEKLY_CAP } from "./limits";
-import { pemCompare, researchRows, venomCompare } from "./research";
+import { pemCompare, researchRows, venomCompare, venomTotalsCompare } from "./research";
 import { venomGameWeeks, venomLines } from "./venom-games";
 import { TOTALS_EDGE, type TotalsBacktest, type TotalsSeen, totalsBacktest, totalsCutGames } from "./totals";
 import { archiveTotals, loadTotalsSeen } from "./totals-store";
@@ -437,6 +437,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     research: researchRows(j.graded, s.cuts, closes),
     pemCompare: league === "cfb" && j.graded.some((g) => g.pem) ? pemCompare(j.graded, closes) : null,
     venomCompare: league === "nfl" && j.graded.some((g) => g.venom) ? venomCompare(j.graded, closes) : null,
+    venomTotals: league === "nfl" && venom.size ? venomTotalsCompare(venom, seen, points, key) : null,
     totalsBacktest: await totalsForwardChecked(league, season, week, totalsBacktest(league, seen, points, sam, totalsMarket, key, totalsAllowed(policy, league)), seen, points, issued),
     totalsEdge: TOTALS_EDGE[league],
     totalsArchived: seen.length,

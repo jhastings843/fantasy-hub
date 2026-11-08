@@ -275,6 +275,10 @@ export interface TotalsBoardGame {
   held?: string;
   /** Fits the totals rule, but the rule's forward check hasn't passed (forward.ts): tracked, no stake. */
   forwardHold?: boolean;
+  /** Venom's Game Cheat Code total and his EDGE flag (NFL, tracked; a veto only if the review promotes it). */
+  venom?: { total: number; edge: OU | null };
+  /** A rule bet skipped because a vetoing source sits on the other side. */
+  vetoedBy?: "Venom";
 }
 
 export interface TotalsRef {
@@ -288,22 +292,43 @@ export interface TotalsRef {
   shop?: { over?: string; under?: string };
 }
 
+/** One game going onto the totals board: both models, ours, the current quote, and Venom when he covers it. */
+export type TotalsRow = { home: string; away: string; sam?: number; david?: number; ours?: number; ref?: TotalsRef; venom?: { total: number; edge: OU | null } };
+
 export function totalsBoard(
-  rows: { home: string; away: string; sam?: number; david?: number; ours?: number; ref?: TotalsRef }[],
+  rows: TotalsRow[],
   rule: TotalsCut | null,
+  veto: { venom?: boolean } = {},
 ): TotalsBoardGame[] {
-  return rows.map((row) => {
-    if (!row.ref) return { ...row, tier: "noline" };
-    // Our model as the rule (only once the strategy review promoted "t-ours"): its side is the play, whatever Sam and David say.
-    if (rule?.test.ours) {
-      const r = readTotal(row.ref.total, row.sam, row.david, row.ours);
-      if (totalsMatches(r, rule.test) && r.oursSide) return { ...row, read: r, play: `${r.oursSide === "over" ? "Over" : "Under"} ${row.ref.total}`, side: r.oursSide, line: row.ref.total, tier: "t1" };
-    }
-    if (row.sam === undefined || row.david === undefined) return { ...row, tier: "one" };
+  return rows.map((row) => tierTotal(row, rule, veto));
+}
+
+function tierTotal(
+  row: TotalsRow,
+  rule: TotalsCut | null,
+  veto: { venom?: boolean },
+): TotalsBoardGame {
+  const g = tierTotalRaw(row, rule);
+  // Venom as a totals veto (learning "nfl:ou:source:venom" promoted): a rule bet his total disagrees with drops to a lean.
+  if (g.tier === "t1" && veto.venom && g.side && row.ref && row.venom && row.venom.total !== row.ref.total && (row.venom.total > row.ref.total ? "over" : "under") !== g.side)
+    return { ...g, tier: "lean", vetoedBy: "Venom" };
+  return g;
+}
+
+function tierTotalRaw(
+  row: TotalsRow,
+  rule: TotalsCut | null,
+): TotalsBoardGame {
+  if (!row.ref) return { ...row, tier: "noline" };
+  // Our model as the rule (only once the strategy review promoted "t-ours"): its side is the play, whatever Sam and David say.
+  if (rule?.test.ours) {
     const r = readTotal(row.ref.total, row.sam, row.david, row.ours);
-    if (!r.agree || !r.side) return { ...row, read: r, tier: "split" };
-    const play = `${r.side === "over" ? "Over" : "Under"} ${row.ref.total}`;
-    const base = { ...row, read: r, play, side: r.side, line: row.ref.total };
-    return rule && totalsMatches(r, rule.test) ? { ...base, tier: "t1" } : { ...base, tier: "lean" };
-  });
+    if (totalsMatches(r, rule.test) && r.oursSide) return { ...row, read: r, play: `${r.oursSide === "over" ? "Over" : "Under"} ${row.ref.total}`, side: r.oursSide, line: row.ref.total, tier: "t1" };
+  }
+  if (row.sam === undefined || row.david === undefined) return { ...row, tier: "one" };
+  const r = readTotal(row.ref.total, row.sam, row.david, row.ours);
+  if (!r.agree || !r.side) return { ...row, read: r, tier: "split" };
+  const play = `${r.side === "over" ? "Over" : "Under"} ${row.ref.total}`;
+  const base = { ...row, read: r, play, side: r.side, line: row.ref.total };
+  return rule && totalsMatches(r, rule.test) ? { ...base, tier: "t1" } : { ...base, tier: "lean" };
 }

@@ -11,7 +11,7 @@ import Link from "next/link";
 import { GameCell, href, kickoffEt, price, rec, units } from "./ui";
 import { priceWithBook } from "@/lib/picks/shop";
 import { Background, CutRanges, Hero, SecHead } from "./board";
-import { ReadLegend, WeekBets } from "./ats";
+import { ReadLegend, VenomTable, WeekBets } from "./ats";
 import { findGame, type LiveGame } from "@/lib/live/espn";
 import s from "./picks.module.css";
 
@@ -283,8 +283,6 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
   };
   const bets = games.filter((g) => g.stake);
   const ou = (x?: string) => (x === "over" ? "Over" : "Under");
-  const venomByGame = new Map(r.board.map((g) => [`${g.away}@${g.home}`, g.venom]));
-  const venomOf = (g: TotalsBoardGame) => venomByGame.get(`${g.away}@${g.home}`);
   const why = (g: TotalsBoardGame) => (
     <dl className={s.kv}>
       <dt>Total now</dt>
@@ -293,10 +291,10 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
       <dd className={s.num}>{g.sam !== undefined ? g.sam.toFixed(1) : "not posted"}</dd>
       <dt>David total</dt>
       <dd className={s.num}>{g.david !== undefined ? g.david.toFixed(1) : "not posted"}</dd>
-      {r.league === "nfl" && venomOf(g) && (
+      {g.venom && (
         <>
-          <dt>Venom total (tracked)</dt>
-          <dd className={s.num}>{`${venomOf(g)!.modelTotal}${venomOf(g)!.edgeTotal ? `, his edge flag on the ${venomOf(g)!.edgeTotal}` : ""}`}</dd>
+          <dt>Venom total</dt>
+          <dd className={s.num}>{`${g.venom.total}${g.venom.edge ? `, his edge flag on the ${g.venom.edge}` : ""}${g.vetoedBy ? " · skipped: Venom disagrees (veto)" : ""}`}</dd>
         </>
       )}
       <dt>Our total</dt>
@@ -516,6 +514,12 @@ export function TotalsResearch({ r }: { r: PicksReport }) {
         ]}
         open
       />
+      {r.venomTotals && r.venomTotals.games > 0 && (
+        <VenomTable
+          x={r.venomTotals}
+          note="Venom's Game Cheat Code totals, tracked only. The agreement rows use the totals archive (both models and the total as first seen together) with Venom's side judged at that total; his own rows use the market total on his board. No closing-line check on totals yet."
+        />
+      )}
       <p className={s.thin}>
         {bt.samAlone.clv.n
           ? `Sam alone vs the closing total: ${bt.samAlone.clv.avg > 0 ? "+" : ""}${bt.samAlone.clv.avg.toFixed(2)} on ${bt.samAlone.clv.n}; flattered if he posted after the line moved.`
