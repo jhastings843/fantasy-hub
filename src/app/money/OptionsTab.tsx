@@ -1,16 +1,16 @@
-import type { Book, OptionLane, OptionsDesk, ResearchSwitch } from "@/lib/money/types";
+import type { OptionLane, OptionsDesk, ResearchSwitch } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { DeskHero, Stats } from "./desks";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
 import { Term } from "./Term";
+import { LEAN } from "./SwitchLean";
 
-// Two paper books that trade on the /stocks research (trade-bot, added 2026-11-07):
-//   research-switch  TQQQ when the outlook leans up, SQQQ when it leans down, T-bills otherwise
-//                    (a stock book: it also shows on the Stock books tab and the learner grades it)
-//   options-market   calls and puts on any US stock or ETF the research names (this tab's own desk):
-//                    index lane = the lean on SPY, trend lane = the trend book's picks, idea lane = /stocks ideas once ready
-// Both read the outlook the 6pm /stocks run writes; neither calls a model.
+// The options book (trade-bot options-market, added 2026-11-07): calls and puts on any US
+// stock or ETF the research names. Index lane = the /stocks lean on SPY, trend lane = the
+// trend book's picks, idea lane = /stocks ideas once ready. No model calls.
+// The TQQQ/SQQQ switch is a stock book and lives on Stock books (SwitchLean.tsx), not here
+// (Jack, 2026-11-08: keep the two apart).
 
 const usd = (n: number, signed = false) =>
   `${signed && n > 0 ? "+" : n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -19,11 +19,6 @@ const shortDay = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLo
 const t = (iso: string) => Date.parse(`${iso}T16:00:00Z`);
 const tone = (n: number | null | undefined) => (n == null ? s.muted : n > 0 ? s.pos : n < 0 ? s.neg : "");
 
-const LEAN: Record<string, { label: string; cls: string }> = {
-  TQQQ: { label: "Leans up", cls: s.readW },
-  SQQQ: { label: "Leans down", cls: s.readL },
-  BIL: { label: "No lean", cls: s.readTrack },
-};
 
 const LANE_NAME: Record<OptionLane, string> = { index: "Market lean", trend: "Trend picks", idea: "Stock ideas" };
 const LANE_HOW: Record<OptionLane, string> = {
@@ -33,15 +28,9 @@ const LANE_HOW: Record<OptionLane, string> = {
 };
 
 const TERM = {
-  lean: "Read from the /stocks daily outlook. Weeks call up or down at medium or high confidence (with the days call not pointing the other way), or days and weeks agreeing, counts as a lean. Anything else is no lean.",
   dte: "Days to expiry. The book buys 30 to 45 days out and sells with 7 days left, before time decay speeds up.",
   risk: "The most an option can lose is what it cost. Market-lean trades spend 4% of the book, trend and idea trades 2% (halved when VIX is 30 or higher). At most 8 open and 25% of the book at risk.",
 };
-
-/** The research-switch book from the snapshot's stock books, if it has started. */
-export function switchBook(books: Book[]): Book | null {
-  return books.find((b) => b.id === "research-switch") ?? null;
-}
 
 function head(o: OptionsDesk | null | undefined) {
   const start = 100_000;
@@ -62,7 +51,7 @@ export function OptionsHero({ o, rs }: { o?: OptionsDesk | null; rs?: ResearchSw
   const lean = today ? LEAN[today.hold] ?? LEAN.BIL : null;
   return (
     <DeskHero
-      eyebrow="Research bots · TQQQ/SQQQ switch and market-wide options · paper"
+      eyebrow="Options book · calls and puts on what the research names · paper"
       title={
         o?.curve?.length ? (
           <>
@@ -74,7 +63,7 @@ export function OptionsHero({ o, rs }: { o?: OptionsDesk | null; rs?: ResearchSw
         )
       }
       sub={
-        `${lean ? `Research today: ${lean.label.toLowerCase()} (${shortDay(today!.as_of)} close). ` : ""}`
+        `${lean ? `Market lean today: ${lean.label.toLowerCase()} (${shortDay(today!.as_of)} close), which its SPY lane follows. ` : ""}`
         + (o?.curve?.length
           ? `Book ${usd(h.equity)} (${pct(h.ret, 2)}), SPY over the same days ${h.spyRet !== null ? pct(h.spyRet, 2) : "n/a"}. Far too early to judge.`
           : "It checks at 10:05am and 3:55pm Eastern on weekdays and buys calls or puts on whatever the research names: the market lean, trend picks, and ready stock ideas.")
@@ -83,50 +72,21 @@ export function OptionsHero({ o, rs }: { o?: OptionsDesk | null; rs?: ResearchSw
   );
 }
 
-export function OptionsTab({ o, rs, books }: { o?: OptionsDesk | null; rs?: ResearchSwitch | null; books: Book[] }) {
+export function OptionsTab({ o }: { o?: OptionsDesk | null }) {
   const h = head(o);
   const curve = o?.curve ?? [];
-  const sw = switchBook(books);
-  const swRet = sw ? sw.equity / sw.start - 1 : null;
-  const swSpy = sw?.spyEquity != null ? sw.spyEquity / sw.start - 1 : null;
-  const swHold = sw?.positions.find((p) => p.symbol !== "BIL")?.symbol ?? (sw ? "BIL" : null);
-  const log = rs?.log ?? [];
 
   return (
     <section className={s.section}>
       <Stats
-        label="Research bots at a glance"
+        label="Options book at a glance"
         items={[
           { k: "Options book", v: pct(h.ret, 2), sub: `${usd(h.equity)} of ${usd(h.start)}`, tone: h.ret > 0 ? "up" : h.ret < 0 ? "down" : undefined },
           { k: "SPY, same days", v: h.spyRet !== null ? pct(h.spyRet, 2) : "·", sub: "from the first mark" },
-          { k: "TQQQ/SQQQ switch", v: swRet !== null ? pct(swRet, 2) : "·", sub: sw ? `holds ${swHold}, SPY ${swSpy !== null ? pct(swSpy, 2) : "n/a"}` : "starts with the next 6:30am run", tone: swRet && swRet > 0 ? "up" : swRet && swRet < 0 ? "down" : undefined },
+          { k: "Closed trades", v: `${(o?.lanes ?? []).reduce((a, l) => a + l.n, 0)}`, sub: "graded by lane below" },
           { k: "Open options", v: `${o?.positions.length ?? 0}`, sub: o?.positions.length ? [...new Set(o.positions.map((p) => p.underlying))].join(", ") : "none" },
         ]}
       />
-
-      <div className={m.panel}>
-        <div className={m.panelHead}>
-          <h2 className={m.panelTitle}><Term label="Research lean" def={TERM.lean} /></h2>
-          <span className={m.foldMeta}>from the 6pm /stocks outlook</span>
-        </div>
-        {log.length ? (
-          <ul className={m.grades}>
-            {log.slice(0, 10).map((r) => {
-              const l = LEAN[r.hold] ?? LEAN.BIL;
-              return (
-                <li key={r.as_of} className={m.grade}>
-                  <span className={s.play}>{shortDay(r.as_of)}</span>
-                  <span className={`${s.readChip} ${l.cls}`}>{`${l.label} · ${r.hold}`}</span>
-                  <span className={m.why}>{r.why}</span>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className={m.sub}>No reads yet. The switch book logs one each morning at 6:30am, Tuesday to Saturday.</p>
-        )}
-        {rs?.rule && <p className={s.thin}>{`Rule: ${rs.rule}`}</p>}
-      </div>
 
       {curve.length >= 2 ? (
         <div className={m.panel}>

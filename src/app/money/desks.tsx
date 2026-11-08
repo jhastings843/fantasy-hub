@@ -361,7 +361,7 @@ export function moneyLog(v: View): LogEntry[] {
   lean.forEach((r, i) => {
     const prev = lean[i + 1];
     if (i < 6 && prev && prev.hold !== r.hold)
-      out.push({ at: r.logged || `${r.as_of}T21:00:00Z`, kind: "new", title: `Research bots: ${prev.hold} to ${r.hold}`, detail: r.why });
+      out.push({ at: r.logged || `${r.as_of}T21:00:00Z`, kind: "new", title: `TQQQ/SQQQ switch: ${prev.hold} to ${r.hold}`, detail: r.why });
   });
   return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 14);
 }

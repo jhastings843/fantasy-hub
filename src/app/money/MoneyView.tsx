@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { getMoneyView } from "@/lib/money/store";
 import type { MoneyBet } from "@/lib/money/bets";
-import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, PhilBet, PhilLearn, TrendGraded, TrendPick, Trends, TrendSlice, TrendStats, Weather, WeatherBet, WeatherCity, WeatherDay, WeatherSlice, WeatherSliceGate } from "@/lib/money/types";
+import type { Book, Grades, Kalshi, KalshiRow, LearnEntry, Phil, ResearchSwitch, PhilBet, PhilLearn, TrendGraded, TrendPick, Trends, TrendSlice, TrendStats, Weather, WeatherBet, WeatherCity, WeatherDay, WeatherSlice, WeatherSliceGate } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { BrierGauge, DeskHero, DeskTable, LearnerLog, MoneyLogSection, Stats, WeatherBrake, booksLog, booksTotals, desks, moneyLog, retroLog } from "./desks";
 import { Background, PageHead, SecHead } from "../picks/board";
@@ -12,6 +12,7 @@ import m from "./money.module.css";
 import { Term } from "./Term";
 import { IntradayHero, IntradayTab } from "./IntradayTab";
 import { OptionsHero, OptionsTab } from "./OptionsTab";
+import { SWITCH_ID, SwitchLean } from "./SwitchLean";
 import { PopLink } from "@/components/hh/PopLink";
 import { teamHref } from "../picks/hrefs";
 
@@ -520,7 +521,7 @@ function LearnLog({ log, grades, books }: { log: LearnEntry[]; grades: Grades | 
   );
 }
 
-function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; grades: Grades | null }) {
+function BooksTab({ books, log, grades, rs }: { books: Book[]; log: LearnEntry[]; grades: Grades | null; rs?: ResearchSwitch | null }) {
   const active = books.filter((b) => !b.retired);
   const ahead = active.filter((b) => b.spyEquity !== null && b.equity > b.spyEquity).length;
   const live = books.find((b) => b.liveAt)?.liveAt;
@@ -543,6 +544,7 @@ function BooksTab({ books, log, grades }: { books: Book[]; log: LearnEntry[]; gr
           </Link>
         ))}
       </div>
+      <SwitchLean rs={rs} book={books.find((b) => b.id === SWITCH_ID) ?? null} rows={5} link />
       <div className={m.panel}>
         <div className={m.panelHead}>
           <h2 className={m.panelTitle}>Holdings</h2>
@@ -1774,7 +1776,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         {v && tab === "weather" && snap?.weather && <WeatherHero w={snap.weather} />}
         {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The weather desk hasn&apos;t posted yet.</p>)}
         {v && tab === "books" && snap && snap.books.length > 0 && <BooksHero books={snap.books} />}
-        {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} />}
+        {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} rs={snap.researchSwitch} />}
         {v && tab === "trends" && snap?.trends && !snap.trends.error && <TrendsHero tr={snap.trends} />}
         {v && tab === "trends" && snap && (snap.trends
           ? (snap.trends.error ? <p className={s.error}>{snap.trends.error}</p> : <TrendsTab tr={snap.trends} />)
@@ -1784,7 +1786,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
           ? (snap.intraday.error ? <p className={s.error}>{`The Day Trader desk failed: ${snap.intraday.error}`}</p> : <IntradayTab d={snap.intraday} />)
           : <p className={s.calm}>The Day Trader hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
         {v && tab === "options" && snap && <OptionsHero o={snap.options} rs={snap.researchSwitch} />}
-        {v && tab === "options" && snap && <OptionsTab o={snap.options} rs={snap.researchSwitch} books={snap.books} />}
+        {v && tab === "options" && snap && <OptionsTab o={snap.options} />}
 
         <footer className={s.footer}>
           <span>

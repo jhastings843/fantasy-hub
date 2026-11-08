@@ -6,6 +6,7 @@ import type { Book } from "@/lib/money/types";
 import BookChart from "../../BookChart";
 import { Hero, LearnerLog, Stats } from "../../../picks/board";
 import { booksLog } from "../../desks";
+import { SWITCH_ID, SwitchLean } from "../../SwitchLean";
 import s from "../../../picks/picks.module.css";
 import m from "../../money.module.css";
 
@@ -133,6 +134,8 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
               <p className={s.calm}>All cash right now.</p>
             )}
           </div>
+
+          {b.id === SWITCH_ID && <SwitchLean rs={snap.researchSwitch} />}
 
           {grade && (
             <Disclosure summary="This week's grade"><div className={m.panel}>
