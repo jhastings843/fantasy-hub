@@ -36,6 +36,9 @@ const TABS = [
 const STALE_DAYS = 4;
 const dry = process.argv.includes("--dry");
 const gamesOnly = process.argv.includes("--games-only");
+// Every player on the Anytime TD board (not just his top 5), saved as nfl-attd_full-*.json for a research
+// grade only (Jack, 2026-11-08): never uploaded, so the learner's "Venom picks" slice keeps its top-5 meaning.
+const attdFull = process.argv.includes("--attd-full");
 const weekArg = process.argv.includes("--week") ? Number(process.argv[process.argv.indexOf("--week") + 1]) : null;
 
 const log = (msg) => console.log(`${new Date().toISOString()} ${msg}`);
@@ -78,6 +81,8 @@ export function parseBoard(text, stat) {
     const base = { team: m[1].toUpperCase(), name: lines[i - 2], pos: lines[i - 1] };
     if (stat === "attd") {
       if (pct !== null) rows.push({ ...base, score, p: pct });
+    } else if (stat === "attd_full") {
+      if (pct !== null) rows.push({ ...base, rank: Number(lines[i - 3]), score, p: pct });
     } else rows.push({ ...base, rank: Number(lines[i - 3]), score });
   }
   return rows;
@@ -172,6 +177,22 @@ async function main() {
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
       writeFileSync(file("games", g.season, g.week), JSON.stringify({ season: g.season, week: g.week, stat: "games", source: `Venom Analytics app, Game Vault NFL Game Cheat Code (market and Venom spread and total), read ${today}`, rows: g.rows }, null, 1));
     };
+    if (attdFull) {
+      if (!click("ANY TD")) throw new Error("no ANY TD tab");
+      await sleep(3500);
+      inApp(`[...document.querySelectorAll("*")].filter((e) => e.children.length === 0 && /^show all \\d+ players$/i.test(e.textContent.trim())).forEach((e) => e.click())`);
+      await sleep(3000);
+      const text = inApp("document.body.innerText");
+      const cap = text.match(/(\d{4}) · WEEK (\d+) · SORTED/);
+      if (!cap) throw new Error(`ANY TD: no "WEEK N" caption`);
+      const games = (text.match(/FULL MATCHUP/g) ?? []).length;
+      const rows = parseBoard(text, "attd_full");
+      if (dry) return log(`week ${cap[2]} (dry): attd_full ${rows.length} from ${games} games`);
+      if (rows.length < games * 8) throw new Error(`ANY TD full: read ${rows.length} rows from ${games} games`);
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+      writeFileSync(file("attd_full", Number(cap[1]), Number(cap[2])), JSON.stringify({ season: Number(cap[1]), week: Number(cap[2]), stat: "attd_full", source: `Venom Analytics app, Game Vault NFL Anytime TD, every player, read ${today}`, rows }, null, 1));
+      return log(`week ${cap[2]}: attd_full ${rows.length} from ${games} games (saved, not uploaded)`);
+    }
     if (gamesOnly) {
       const g = await readGames();
       if (dry) return log(`week ${g.week} (dry): games ${g.rows.length}`);
@@ -230,7 +251,7 @@ async function main() {
   } catch (e) {
     log(`failed: ${e.message}`);
     // A hand-run backfill reports in the terminal; only the scheduled read alerts the phone.
-    if (!gamesOnly && !weekArg) await push("Venom reader couldn't read the boards", `${e.message}. If Whop logged you out, log in in Chrome; or run /venom.`);
+    if (!gamesOnly && !attdFull && !weekArg) await push("Venom reader couldn't read the boards", `${e.message}. If Whop logged you out, log in in Chrome; or run /venom.`);
   } finally {
     try {
       opencli(["close"]);
