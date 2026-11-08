@@ -296,7 +296,7 @@ export function TotalsWeek({ r, live = [], finishedOnly = false }: { r: PicksRep
       {r.league === "nfl" && venomOf(g) && (
         <>
           <dt>Venom total (tracked)</dt>
-          <dd className={s.num}>{`${venomOf(g)!.modelTotal} vs ${venomOf(g)!.total} on his board${venomOf(g)!.edgeTotal ? `, his edge flag on the ${venomOf(g)!.edgeTotal}` : ""}`}</dd>
+          <dd className={s.num}>{`${venomOf(g)!.modelTotal}${venomOf(g)!.edgeTotal ? `, his edge flag on the ${venomOf(g)!.edgeTotal}` : ""}`}</dd>
         </>
       )}
       <dt>Our total</dt>
