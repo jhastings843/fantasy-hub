@@ -15,6 +15,9 @@ import { OptionsHero, OptionsTab } from "./OptionsTab";
 import { SWITCH_ID, SwitchLean } from "./SwitchLean";
 import { PopLink } from "@/components/hh/PopLink";
 import { teamHref } from "../picks/hrefs";
+import { loadChecks, recentLines } from "@/lib/money/activity";
+import { DeskChecked, type Feed } from "@/components/hh/activity-client";
+import type { DeskId } from "@/lib/money/schedule";
 
 // The Money tab: Jack's own bets, Phil (the Polymarket paper agent) and the
 // paper stock books, all paper or unit-based. Bets live in this app;
@@ -1729,6 +1732,18 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
     error = "load";
   }
   const snap = v?.snapshot;
+  // Which desk this tab is, for its "Checked 6 min ago" line (Jack, 2026-11-09).
+  const deskOf: Partial<Record<MoneyTab, DeskId>> = { phil: "phil", kalshi: "gus", books: "books", trends: "trends", intraday: "intraday", options: "options", weather: "weather" };
+  const desk = deskOf[tab];
+  let feed: Feed | null = null;
+  if (desk) {
+    try {
+      const [lines, checks] = await Promise.all([recentLines(60), loadChecks(snap ?? null)]);
+      feed = { now: new Date().toISOString(), lines, checks };
+    } catch (e) {
+      console.error("[money] activity:", e);
+    }
+  }
   // Server component on a force-dynamic page: reading the clock per request is the point.
   // eslint-disable-next-line react-hooks/purity
   const age = snap ? (Date.now() - Date.parse(snap.generatedAt)) / 3600_000 : null;
@@ -1742,6 +1757,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
             asof={snap ? <span className={age !== null && age > 3 ? m.stale : ""}>{`Desks updated ${when(snap.generatedAt)}`}</span> : undefined}
           />
           <MoneyChips tab={tab} />
+          {desk && <DeskChecked desk={desk} initial={feed} />}
         </header>
 
         {error && <p className={s.error}>The Money page could not load just now. Try again in a minute.</p>}

@@ -1,5 +1,8 @@
 import { Suspense } from "react";
 import { Freshness } from "@/components/hh/Freshness";
+import { LiveResearch, type Feed } from "@/components/hh/activity-client";
+import { loadChecks, recentLines } from "@/lib/money/activity";
+import { getSnapshot } from "@/lib/money/store";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -494,6 +497,20 @@ export default async function TodayPage() {
         </div>
       </div>
 
+      <Section
+        id="t-research"
+        label="Research desks"
+        aside={
+          <Link href="/money" className="inline-flex min-h-11 items-center gap-0.5 font-semibold text-hh-accent-ink hover:underline">
+            Money<ChevronRight size={14} aria-hidden />
+          </Link>
+        }
+      >
+        <Suspense fallback={<div className="h-24 animate-pulse rounded bg-hh-line" aria-hidden />}>
+          <ResearchFeed />
+        </Suspense>
+      </Section>
+
       <Section id="t-drivers" label="Details">
         <Disclosure summary="What drives each section">
           <ul className="mt-1 flex flex-col">
@@ -528,4 +545,16 @@ export default async function TodayPage() {
       </Section>
     </main>
   );
+}
+
+/** What the Mac's money desks are doing right now, live (Jack, 2026-11-09). Streams in after the page. */
+async function ResearchFeed() {
+  let initial: Feed | null = null;
+  try {
+    const [lines, snap] = await Promise.all([recentLines(60), getSnapshot().catch(() => null)]);
+    initial = { now: new Date().toISOString(), lines, checks: await loadChecks(snap) };
+  } catch (e) {
+    console.error("[today] research feed:", e);
+  }
+  return <LiveResearch initial={initial} />;
 }

@@ -223,6 +223,8 @@ export interface MoneySnapshot {
   options?: OptionsDesk | null;
   /** What research-switch read each morning (trade-bot tradebot/research_switch.py). Missing before 2026-11-07. */
   researchSwitch?: ResearchSwitch | null;
+  /** Each desk's last finished check, from trade-bot data/checks.json (tradebot/activity.py). Missing before 2026-11-09. */
+  checks?: Record<string, { at: string; text: string }> | null;
 }
 
 export interface OptionsDesk {
