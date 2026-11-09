@@ -84,7 +84,7 @@ export function DeskChecked({ desk, initial }: { desk: DeskId; initial: Feed | n
   const late = !live && due && now.getTime() - due.getTime() > 15 * 60_000;
   return (
     <div className="flex flex-col gap-0.5 text-xs text-hh-muted">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {live ? (
           <span className="inline-flex items-center gap-2 font-semibold text-hh-ink">
             <span className="hh-live-dot" aria-hidden />
