@@ -84,14 +84,14 @@ export function DeskChecked({ desk, initial }: { desk: DeskId; initial: Feed | n
   const late = !live && due && now.getTime() - due.getTime() > 15 * 60_000;
   return (
     <div className="flex flex-col gap-0.5 text-xs text-hh-muted">
-      <p className="hh-num flex flex-wrap items-center gap-x-2 gap-y-1">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
         {live ? (
           <span className="inline-flex items-center gap-2 font-semibold text-hh-ink">
             <span className="hh-live-dot" aria-hidden />
             {`Checking now: ${live.text}`}
           </span>
         ) : c ? (
-          <span className={late ? "font-semibold text-hh-neg" : "text-hh-ink-2"}>
+          <span className={late ? "font-semibold text-hh-neg" : "font-semibold text-hh-ink-2"}>
             Checked <time dateTime={c.at}>{ago(c.at, now)}</time>
             <span className="text-hh-muted">{` (${clock(c.at, now)})`}</span>
           </span>
@@ -162,7 +162,7 @@ export function LiveResearch({ initial }: { initial: Feed | null }) {
         <ol className="flex flex-col">
           {shown.map((l, i) => (
             <li key={`${l.at}-${l.desk}-${i}`} className={`grid grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-t border-hh-line py-2 first:border-t-0 ${i === 0 ? "hh-tick" : ""}`}>
-              <time dateTime={l.at} className="hh-num pt-px text-xs text-hh-muted">
+              <time dateTime={l.at} className="pt-px text-xs tabular-nums text-hh-muted">
                 {clock(l.at, now)}
               </time>
               <p className={`min-w-0 text-sm leading-snug ${l.done ? "text-hh-ink" : "text-hh-ink-2"}`}>
