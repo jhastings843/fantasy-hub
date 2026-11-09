@@ -13,7 +13,7 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-11-08",
+  "last_worked": "2026-11-09",
   "notes": [
     "2026-11-08: Venom total moved to the totals side (board row, totals research table, learner question nfl:ou:source:venom with a totals veto); fixed nfl:source:venom judging college games. TQQQ/SQQQ switch moved off the Options tab to Stock books + its book page (options bot kept, BIL kept on no-lean days).",
     "2026-11-08: ATTD wPrev (last season weight) now a weekly-refit setting, ships only at 2+ SE; Venom Game Cheat Code added as a tracked NFL third vote with Weeks 3-9 backfilled.",
@@ -333,7 +333,8 @@
     "2026-11-06: Portfolio learner log (every advisor call, status, grade date) under the track record card; insecure-defaults audit on src/lib/portfolio clean.",
     "2026-11-06: Harris CBB as an outside source: daily sheet from his Apps Script feed matched to ESPN (127 of 127 games Nov 3-6 plus 44 of 44 for Nov 7, one alias), 6 Harris slices on the CBB engine (his side vs our saved line, agree/split, 3+/5+, Trigger), pregame reads only. Harris route accepts CFB week 0.",
     "2026-11-06: Portfolio Refresh button (Mac polls every minute, re-prices newest Fidelity export); 8:30pm price refresh; lean scheduled runs.",
-    "2026-11-06: Portfolio plan tracking + trade status, Harris website feeds (CFB+CBB), props NFL over rule (-120), UX walkthrough; next: freshness/status page, tab fold, speed, plain words (HANDOFF top)"
+    "2026-11-06: Portfolio plan tracking + trade status, Harris website feeds (CFB+CBB), props NFL over rule (-120), UX walkthrough; next: freshness/status page, tab fold, speed, plain words (HANDOFF top)",
+    "2026-11-09: Money tabs show 'Checked X ago, found Y, next check Z' per desk; Today has a live Research desks feed. trade-bot tradebot/activity.py posts lines to /api/money/activity (Day Trader, Trends, Stock books, Options, Phil); Gus and Weather use their snapshot times."
   ],
   "tags": [
     "personal",
