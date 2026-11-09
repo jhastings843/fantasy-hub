@@ -69,6 +69,40 @@ export function activeDesks(lines: Line[], now: Date): Map<DeskId, Line> {
   return out;
 }
 
+export interface Row extends Line {
+  /** How many identical finished checks this row stands for. */
+  times: number;
+  /** The oldest of them. */
+  since: string;
+}
+
+/**
+ * The feed as shown (Jack, 2026-11-09: "dang it's a lot of day trader"). A
+ * finished run keeps only its one-line result; the step lines show only for a
+ * run still going. Repeats of the same result from the same desk fold into one
+ * row: "Scanned 541 stocks, no new breakouts, 12 times since 10:15am".
+ */
+export function feedRows(lines: Line[], now: Date): Row[] {
+  const active = activeDesks(lines, now);
+  const finished = new Set<DeskId>(); // desks whose newest run we have passed
+  const last = new Map<DeskId, Row>();
+  const out: Row[] = [];
+  for (const l of lines) {
+    if (l.done) finished.add(l.desk);
+    else if (finished.has(l.desk) || !active.has(l.desk)) continue; // a step of a finished run
+    const prev = last.get(l.desk);
+    if (l.done && prev?.done && prev.text === l.text) {
+      prev.times += 1;
+      prev.since = l.at;
+      continue;
+    }
+    const row = { ...l, times: 1, since: l.at };
+    last.set(l.desk, row);
+    out.push(row);
+  }
+  return out;
+}
+
 /**
  * One Money tab's freshness: when the desk last looked, what it found, when it
  * looks next. Reads "Checking now" while a run is in progress.
@@ -130,12 +164,13 @@ export function DeskChecked({ desk, initial }: { desk: DeskId; initial: Feed | n
 export function LiveResearch({ initial }: { initial: Feed | null }) {
   const { feed, now } = useFeed(initial, 4_000);
   const lines = (feed?.lines ?? []).filter((l) => now.getTime() - Date.parse(l.at) < 3 * 3_600_000);
+  const rows = feedRows(lines, now);
   const active = feed ? activeDesks(feed.lines, now) : new Map<DeskId, Line>();
   const upcoming = (Object.keys(DESK_NAMES) as DeskId[])
     .map((d) => ({ d, at: nextRun(d, now, feed?.checks[d]?.at) }))
     .filter((x): x is { d: DeskId; at: Date } => !!x.at)
     .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
-  const shown = lines.slice(0, 14);
+  const shown = rows.slice(0, 10);
 
   return (
     <div className="flex flex-col gap-3">
@@ -168,6 +203,7 @@ export function LiveResearch({ initial }: { initial: Feed | null }) {
               <p className={`min-w-0 text-sm leading-snug ${l.done ? "text-hh-ink" : "text-hh-ink-2"}`}>
                 <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wide text-hh-muted">{DESK_NAMES[l.desk]}</span>
                 {l.text}
+                {l.times > 1 && <span className="text-hh-muted">{`, ${l.times} times since ${clock(l.since, now)}`}</span>}
               </p>
             </li>
           ))}

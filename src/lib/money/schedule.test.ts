@@ -1,6 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { clock, nextRun } from "./schedule";
-import { activeDesks } from "@/components/hh/activity-client";
+import { activeDesks, feedRows } from "@/components/hh/activity-client";
+
+describe("feedRows", () => {
+  const now = new Date("2026-11-09T19:12:00Z");
+  const i = "intraday" as const;
+  it("drops finished runs' steps, folds repeats, keeps the live run's steps", () => {
+    const rows = feedRows(
+      [
+        { at: "2026-11-09T19:10:30Z", desk: i, text: "Checking 541 stocks" },
+        { at: "2026-11-09T19:10:00Z", desk: i, text: "Checking open trades" },
+        { at: "2026-11-09T19:05:40Z", desk: i, text: "Scanned 541 stocks, no new breakouts", done: true },
+        { at: "2026-11-09T19:05:10Z", desk: i, text: "Checking 541 stocks" },
+        { at: "2026-11-09T19:00:40Z", desk: i, text: "Scanned 541 stocks, no new breakouts", done: true },
+        { at: "2026-11-09T18:55:40Z", desk: i, text: "Scanned 541 stocks, no new breakouts", done: true },
+        { at: "2026-11-09T18:50:40Z", desk: i, text: "Scanned 541 stocks; bought NVDA", done: true },
+      ],
+      now,
+    );
+    expect(rows.map((r) => [r.text, r.times])).toEqual([
+      ["Checking 541 stocks", 1],
+      ["Checking open trades", 1],
+      ["Scanned 541 stocks, no new breakouts", 3],
+      ["Scanned 541 stocks; bought NVDA", 1],
+    ]);
+    expect(rows[2].since).toBe("2026-11-09T18:55:40Z");
+  });
+});
 
 // Mon Nov 9 2026, 1:52pm New York (EST, UTC-5).
 const MON = new Date("2026-11-09T18:52:00Z");
