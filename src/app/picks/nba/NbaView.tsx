@@ -199,56 +199,77 @@ function readChip(x: Read, m: Market): [string, string] {
   return ["Sam's side · no stake", s.readTrack];
 }
 
-/** Our own game model's latest number for this game (tracked only, game-store.ts). */
-async function NbaOurLine({ g }: { g: NbaBoardGame }) {
+/** Our own game model's latest number for this game (tracked only, game-store.ts). Only the asked market's number when `m` is set. */
+async function NbaOurLine({ g, m }: { g: NbaBoardGame; m?: Market }) {
   const v = await ourNbaGameModel(nbaSeasonOfDate(new Date()));
   const t = v?.games.find((x) => x.event === g.id);
+  const spread = t ? `${g.home.short} ${line(Math.round(t.last.ours.spread * 10) / 10)}` : "";
+  const total = t ? (Math.round(t.last.ours.total * 10) / 10).toFixed(1) : "";
   return (
     <>
-      <dt>Our model</dt>
-      <dd className={s.num}>{t ? `${g.home.short} ${line(Math.round(t.last.ours.spread * 10) / 10)}, total ${(Math.round(t.last.ours.total * 10) / 10).toFixed(1)}` : "no read yet"}</dd>
+      <dt>{m === "ou" ? "Our total" : "Our model"}</dt>
+      <dd className={s.num}>{!t ? "no read yet" : m === "ou" ? total : m ? spread : `${spread}, total ${total}`}</dd>
     </>
   );
 }
 
-/** Everything behind one game: spread, total, moneyline, Sam's numbers. */
-export function NbaWhy({ g }: { g: NbaBoardGame }) {
+/**
+ * The lines behind one game. With `m` (the board's drop-down) only that market shows: spreads never
+ * carry a total and totals never carry a spread (same rule as Venom on the football boards). The game
+ * page leaves `m` off and shows every market.
+ */
+export function NbaWhy({ g, m }: { g: NbaBoardGame; m?: Market }) {
   const r = g.read;
+  const d = g.david;
+  const sides = m !== "ou";
+  const totals = m === undefined || m === "ou";
   return (
     <dl className={s.kv}>
-      <dt>Spread</dt>
-      <dd className={s.num}>{g.line ? `${g.home.short} ${line(g.line.home)} (${price(g.line.homePrice)} / ${price(g.line.awayPrice)})` : "not posted"}</dd>
-      <dt>Total</dt>
-      <dd className={s.num}>{g.total ? `${g.total.points} (o ${price(g.total.overPrice)} / u ${price(g.total.underPrice)})` : "not posted"}</dd>
-      <dt>Moneyline</dt>
-      <dd className={s.num}>{g.ml ? `${g.away.abbr} ${price(g.ml.away)} · ${g.home.abbr} ${price(g.ml.home)}` : "not posted"}</dd>
-      {r && (
+      {(m === undefined || m === "ats") && (
+        <>
+          <dt>Spread</dt>
+          <dd className={s.num}>{g.line ? `${g.home.short} ${line(g.line.home)} (${price(g.line.homePrice)} / ${price(g.line.awayPrice)})` : "not posted"}</dd>
+        </>
+      )}
+      {totals && (
+        <>
+          <dt>Total</dt>
+          <dd className={s.num}>{g.total ? `${g.total.points} (o ${price(g.total.overPrice)} / u ${price(g.total.underPrice)})` : "not posted"}</dd>
+        </>
+      )}
+      {(m === undefined || m === "su") && (
+        <>
+          <dt>Moneyline</dt>
+          <dd className={s.num}>{g.ml ? `${g.away.abbr} ${price(g.ml.away)} · ${g.home.abbr} ${price(g.ml.home)}` : "not posted"}</dd>
+        </>
+      )}
+      {r && sides && (
         <>
           <dt>Sam line</dt>
           <dd className={s.num}>{`${g.home.short} ${line(r.model)}${r.samLine !== undefined ? ` vs his posted ${line(r.samLine)}` : ""}`}</dd>
-          {r.modelTotal !== undefined && (
-            <>
-              <dt>Sam total</dt>
-              <dd className={s.num}>{`${r.modelTotal} (${r.totalSide} by ${r.totalEdge?.toFixed(1)})`}</dd>
-            </>
-          )}
         </>
       )}
-      {g.david && (
+      {r && totals && r.modelTotal !== undefined && (
+        <>
+          <dt>Sam total</dt>
+          <dd className={s.num}>{`${r.modelTotal} (${r.totalSide} by ${r.totalEdge?.toFixed(1)})`}</dd>
+        </>
+      )}
+      {d && sides && (
         <>
           <dt>David line</dt>
           <dd className={s.num}>
-            {`${g.home.short} ${line(g.david.model)}${g.david.davidLine !== undefined ? ` vs his posted ${line(g.david.davidLine)}` : ""} (${g.david.side === "home" ? g.home.short : g.away.short} by ${g.david.edge.toFixed(1)}${g.david.crossed ? ", DK crossed" : ""})`}
+            {`${g.home.short} ${line(d.davidLine ?? d.model)}`}
           </dd>
-          {g.david.modelTotal !== undefined && (
-            <>
-              <dt>David total</dt>
-              <dd className={s.num}>{`${g.david.modelTotal} (${g.david.totalSide} by ${g.david.totalEdge?.toFixed(1)})`}</dd>
-            </>
-          )}
         </>
       )}
-      <NbaOurLine g={g} />
+      {d && totals && d.modelTotal !== undefined && (
+        <>
+          <dt>David total</dt>
+          <dd className={s.num}>{`${d.modelTotal} (${d.totalSide} by ${d.totalEdge?.toFixed(1)})`}</dd>
+        </>
+      )}
+      <NbaOurLine g={g} m={m} />
       {g.tv && (
         <>
           <dt>Watch</dt>
@@ -344,7 +365,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
       </summary>
       <div className={s.gBody}>
         <NbaStats x={x} m={m} />
-        <NbaWhy g={g} />
+        <NbaWhy g={g} m={m} />
         <Link href={nbaGameHref(g.id)} scroll={false} className={s.linkA} style={{ fontWeight: 600, fontSize: 14, display: "inline-block", marginTop: 10 }}>
           Open the game: every market ›
         </Link>
