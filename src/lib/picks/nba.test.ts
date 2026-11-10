@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { nbaNameIndex, nbaTv, parseNbaScoreboard, parseSamNba, readNba } from "./nba";
+import { nbaNameIndex, nbaTv, parseDavidNbaGames, parseNbaScoreboard, parseSamNba, readDavid, readNba } from "./nba";
 
 const fixture = (f: string) => readFileSync(path.resolve(__dirname, "../../../test/fixtures/picks", f), "utf8");
 const slate = parseNbaScoreboard(JSON.parse(fixture("espn-scoreboard-nba-20261020.json")), "20261020");
@@ -108,5 +108,28 @@ describe("nbaTv", () => {
     expect(nbaTv({ geoBroadcasts: [{ media: { shortName: "NBCS-BOS" }, market: { type: "Home" } }, { media: { shortName: "ESPN" }, market: { type: "National" } }] })).toBe("ESPN");
     expect(nbaTv({ broadcasts: [{ market: "home", names: ["FDSN Ohio"] }] })).toBe("FDSN Ohio");
     expect(nbaTv({})).toBeUndefined();
+  });
+});
+
+describe("David's NBA game board", () => {
+  it("reads the Nov 9 slate from the RSC payload, home side, keyed by ESPN id", () => {
+    const d = parseDavidNbaGames(fixture("ds-nba-board.html"));
+    expect(d.state).toBe("live");
+    if (d.state !== "live") return;
+    expect(d.rows).toHaveLength(8);
+    // LAL at ATL: projection.homeSpread 0.8666 (ATL +0.9), total 233.57, posted ATL -1.5 and 237.5.
+    expect(d.rows[0]).toEqual({ id: "401909952", home: "ATL", away: "LAL", model: 0.9, total: 233.6, line: -1.5, postedTotal: 237.5 });
+  });
+
+  it("says unread, not empty, when the slate isn't in the page", () => {
+    expect(parseDavidNbaGames("<html><body>NBA</body></html>").state).toBe("unread");
+  });
+
+  it("takes his side against his posted line and measures the edge at DraftKings", () => {
+    // ATL +0.9 model, he posted ATL -1.5, DK still ATL -1.5: Lakers +1.5 by 2.4, under by 3.9.
+    const r = readDavid({ line: { home: -1.5 }, total: { points: 237.5 } }, { model: 0.9, total: 233.6, line: -1.5 });
+    expect(r).toMatchObject({ side: "away", edge: 2.4, crossed: false, davidLine: -1.5, totalSide: "under", totalEdge: 3.9 });
+    // DK moves to ATL +2: through his number, so his Lakers side is crossed.
+    expect(readDavid({ line: { home: 2 } }, { model: 0.9, line: -1.5 })).toMatchObject({ side: "away", edge: -1.1, crossed: true });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocateNbaDay, compareCut, cutRecord, nbaRoom, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, samGaps, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
+import { allocateNbaDay, compareCut, cutRecord, davidBets, nbaRoom, NBA_CUT, NBA_CUTS, nbaBets, nbaGate, nbaRule, nbaStake, registerNew, reviewDue, reviewNba, samGaps, settledRows, tierOf, type NbaSnap, type NbaTracked } from "./nba-track";
 
 const snap = (x: Partial<NbaSnap> = {}): NbaSnap => ({ at: "2026-10-20T12:00:00Z", line: -4.5, homePrice: -110, awayPrice: -110, total: 230.5, overPrice: -110, underPrice: -110, mlHome: -190, mlAway: 160, model: -7, modelTotal: 226, ...x });
 const game = (i: number, x: Partial<NbaTracked> = {}, s: Partial<NbaSnap> = {}): NbaTracked => ({
@@ -206,5 +206,46 @@ describe("rechecking Sam when today's game has no saved line", () => {
 
   it("nothing to do once every game is saved or has tipped", () => {
     expect(samGaps([g("1", "2026-10-23T23:00:00Z"), g("3", "2026-10-23T21:00:00Z")], new Set(["1"]), NOW)).toEqual([]);
+  });
+});
+
+describe("David's NBA bets (2026-11-09)", () => {
+  const withDavid = (i: number, d: NbaSnap["david"], x: Partial<NbaTracked> = {}) => game(i, x, { david: d });
+
+  it("builds his own side at the saved DK line, tagged as his", () => {
+    // DK NY -4.5, David NY -2 posted at -4.5: PHI +4.5 by 2.5; total 233 vs 230.5: over by 2.5.
+    const b = davidBets(withDavid(1, { model: -2, line: -4.5, total: 233 }));
+    expect(b.find((x) => x.market === "ats")).toMatchObject({ by: "david", side: "away", line: 4.5, edge: 2.5, dog: true });
+    expect(b.find((x) => x.market === "ou")).toMatchObject({ by: "david", side: "over", line: 230.5, edge: 2.5 });
+    expect(b.find((x) => x.market === "su")).toMatchObject({ by: "david", side: "home" });
+  });
+
+  it("marks Sam's bets agree or disagree with David", () => {
+    // Sam NY -7 (home), David NY -2 (away): disagree. Sam under 226, David over 233: disagree.
+    const sam = nbaBets(withDavid(1, { model: -2, line: -4.5, total: 233 }));
+    expect(sam.find((x) => x.market === "ats")?.david).toBe("disagree");
+    expect(sam.find((x) => x.market === "ou")?.david).toBe("disagree");
+    expect(nbaBets(withDavid(2, { model: -9, line: -4.5, total: 220 })).find((x) => x.market === "ats")?.david).toBe("agree");
+    expect(nbaBets(game(3)).find((x) => x.market === "ats")?.david).toBeUndefined();
+  });
+
+  it("keeps the two records apart: Sam's cuts never count David's bets", () => {
+    // 10 games, NY wins by 6: Sam (NY -4.5) wins, David (PHI +4.5) loses.
+    const games = Array.from({ length: 10 }, (_, i) => withDavid(i, { model: -2, line: -4.5 }, { final: { home: 110, away: 104 } }));
+    const rows = settledRows(games);
+    expect(cutRecord(NBA_CUT.get("ats:all")!, rows)).toMatchObject({ w: 10, l: 0, david: false });
+    expect(cutRecord(NBA_CUT.get("ats:d-all")!, rows)).toMatchObject({ w: 0, l: 10, david: true });
+    expect(cutRecord(NBA_CUT.get("ats:david-disagree")!, rows).w).toBe(10);
+  });
+
+  it("a copy saved on David's read alone has no Sam bets", () => {
+    const g = game(4, {}, { model: undefined, modelTotal: undefined, david: { model: -2, line: -4.5 } });
+    expect(nbaBets(g)).toEqual([]);
+    expect(davidBets(g).length).toBeGreaterThan(0);
+  });
+
+  it("registers the David research cuts at the next run", () => {
+    const ids = registerNew([], "2026-11-10T00:00:00Z").map((h) => h.id);
+    expect(ids).toEqual(expect.arrayContaining(["ats:david-agree", "ats:david-disagree", "ou:david-agree", "ou:david-disagree"]));
   });
 });

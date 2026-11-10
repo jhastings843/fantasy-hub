@@ -10,7 +10,7 @@ import { markScoresAt } from "@/lib/live/scores-at";
 import { notifyNbaGate } from "@/lib/notify/golive";
 import {
   allocateNbaDay,
-  nbaBets,
+  nbaAllBets,
   nbaRoom,
   nbaStake,
   tierOf,
@@ -89,7 +89,8 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
 
   // 1. Pregame reads: the first copy is kept, the latest pregame copy replaces the last.
   for (const g of board?.days.flatMap((d) => d.games) ?? []) {
-    if (g.state !== "pre" || new Date(g.tip) <= now || !g.read) continue;
+    // A copy is saved once either model has posted; the other fills in on a later copy.
+    if (g.state !== "pre" || new Date(g.tip) <= now || (!g.read && !g.david)) continue;
     const snap: NbaSnap = {
       at: now.toISOString(),
       line: g.line?.home,
@@ -100,9 +101,8 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
       underPrice: g.total?.underPrice,
       mlHome: g.ml?.home,
       mlAway: g.ml?.away,
-      model: g.read.model,
-      samLine: g.read.samLine,
-      modelTotal: g.read.modelTotal,
+      ...(g.read ? { model: g.read.model, samLine: g.read.samLine, modelTotal: g.read.modelTotal } : {}),
+      ...(g.david ? { david: { model: g.david.model, ...(g.david.davidLine !== undefined ? { line: g.david.davidLine } : {}), ...(g.david.modelTotal !== undefined ? { total: g.david.modelTotal } : {}) } } : {}),
     };
     const m = matchSplits({ home: g.home.name, away: g.away.name, kickoff: g.tip, line: g.line?.home }, feed);
     if (m) snap.splits = toSplits(m);
@@ -131,7 +131,12 @@ export async function runNbaPicks(now = new Date()): Promise<NbaPicksRunReport> 
     for (const day of [...new Set(open.map((g) => g.day))].sort()) {
       const todays = open.filter((g) => g.day === day);
       const cands = todays.flatMap((g) => {
-        const b = nbaBets(g).find((x) => x.market === "ats");
+        // Either model's spread bet can be in the rule (David's cuts are candidates too); the better tier wins, Sam's first on a tie.
+        const b = nbaAllBets(g)
+          .filter((x) => x.market === "ats")
+          .map((x) => ({ x, t: tierOf(x, rule) }))
+          .filter((y) => y.t !== null)
+          .sort((p, q) => p.t! - q.t!)[0]?.x;
         const tier = b ? tierOf(b, rule) : null;
         const rec = tier === 1 ? rule.tier1 : tier === 2 ? rule.tier2 : null;
         const stake = live && b && rec && (tier === 1 || t2live) ? nbaStake(rec, b.price) : null;
@@ -255,7 +260,8 @@ export async function recheckSam(now = new Date()): Promise<string> {
   const res = await fetch(`${NBA_SOURCES.espn}?dates=${day}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`ESPN ${day} answered ${res.status}`);
   const today = parseNbaScoreboard(await res.json(), day);
-  const saved = new Set((await loadGames(nbaSeasonOfDate(now))).map((g) => g.id));
+  // Saved with Sam's number: a copy saved on David's read alone still needs Sam's.
+  const saved = new Set((await loadGames(nbaSeasonOfDate(now))).filter((g) => g.last.model !== undefined).map((g) => g.id));
   const gaps = samGaps(today, saved, now);
   if (!gaps.length) return today.length ? "every game today has Sam's read" : "no games today";
   const r = await runNbaPicks(now);

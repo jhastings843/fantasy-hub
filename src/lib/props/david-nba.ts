@@ -10,7 +10,8 @@ import { objectAt, rscText } from "@/lib/rsc";
 import { nameKey } from "./grade";
 import type { NbaStat } from "./parse";
 
-export const DAVID_NBA_URL = "https://davidsasser.com/nba";
+// Moved from /nba to /nba/props on 2026-11-09, when /nba became his spreads and totals board.
+export const DAVID_NBA_URL = "https://davidsasser.com/nba/props";
 
 const STAT: { [k: string]: NbaStat } = { points: "pts", rebounds: "reb", assists: "ast", threes: "threes" };
 

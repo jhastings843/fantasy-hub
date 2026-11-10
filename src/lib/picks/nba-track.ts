@@ -1,7 +1,9 @@
 // NBA picks, tracked the way NFL and College are (pure half; Redis and
 // fetching live in nba-track-store.ts).
 //
-// One model (Sam) against DraftKings. Each game's read is saved before tip
+// Two models (Sam, and David Sasser from 2026-11-09) against DraftKings, each
+// graded on his own side at the same saved DK line and price, on equal footing
+// (David's core cuts are rule candidates like Sam's). Each game's read is saved before tip
 // (first and latest pregame copy), graded from ESPN's final, and sliced into
 // cuts. "The rule" is chosen exactly as the football rule is (engine.ts):
 // a cut with MIN_SAMPLE+ decided games and a rate past BREAK_EVEN, ranked by
@@ -25,7 +27,7 @@ import { samSpreadSide } from "./nba";
 
 export type NbaMarket = "ats" | "su" | "ou";
 
-/** One pregame read: DraftKings' numbers and Sam's at that moment. */
+/** One pregame read: DraftKings' numbers and Sam's and David's at that moment. */
 export interface NbaSnap {
   at: string;
   line?: number;
@@ -36,11 +38,13 @@ export interface NbaSnap {
   underPrice?: number;
   mlHome?: number;
   mlAway?: number;
-  /** Sam's home line. */
-  model: number;
+  /** Sam's home line. Missing on a copy saved when only David had posted (from 2026-11-09). */
+  model?: number;
   /** The home line Sam's page posted beside his model; his side is taken against it. Missing on copies saved before 2026-10-21. */
   samLine?: number;
   modelTotal?: number;
+  /** David's home line, the DK home line his page posted beside it, and his total (from 2026-11-09). */
+  david?: { model: number; line?: number; total?: number };
   /** Public betting splits and the opening line at this read (splits.ts), when the feed had the game. */
   splits?: Splits;
 }
@@ -65,6 +69,8 @@ export interface NbaTracked {
 }
 
 export interface NbaBet {
+  /** Whose bet: David's, or Sam's when missing (every copy saved before 2026-11-09 is Sam's). */
+  by?: "david";
   market: NbaMarket;
   side: "home" | "away" | "over" | "under";
   /** The number bet: the side's spread, the total, or 0 straight up. */
@@ -83,6 +89,8 @@ export interface NbaBet {
   mkt?: { rlmAgainst: boolean; publicOurs: boolean; sharpAgainst: boolean };
   /** Spread and total: our own game model on Sam's side or against it, when we saved a read (consensus research, 2026-11-04). */
   ours?: "agree" | "disagree";
+  /** Sam's bets only: David on the same side or the other, when the copy saved David's read (2026-11-09). */
+  david?: "agree" | "disagree";
 }
 
 const payout = (p?: number) => (p === undefined ? 100 / 110 : p > 0 ? p / 100 : 100 / -p);
@@ -92,13 +100,17 @@ const r1 = (x: number) => Math.round(x * 10) / 10;
 export function nbaBets(g: NbaTracked): NbaBet[] {
   const s = g.last;
   const out: NbaBet[] = [];
+  if (s.model === undefined) return out;
+  const d = s.david;
+  const dAts = d && s.line !== undefined && (s.line !== d.model || (d.line !== undefined && d.line !== d.model)) ? samSpreadSide(s.line, d.model, d.line).side : undefined;
+  const dOver = d?.total !== undefined && s.total !== undefined && d.total !== s.total ? d.total > s.total : undefined;
   if (s.line !== undefined && (s.line !== s.model || (s.samLine !== undefined && s.samLine !== s.model))) {
     const { side, edge, crossed } = samSpreadSide(s.line, s.model, s.samLine);
     const home = side === "home";
     const m = s.splits && readMarket("nba", s.splits, s.line);
     const mkt = m ? { rlmAgainst: !!m.rlm && m.rlm !== side, publicOurs: m.publicSide === side, sharpAgainst: !!m.sharpSide && m.sharpSide !== side } : undefined;
     const ourSide = g.ours && g.ours.spread !== s.line ? (g.ours.spread < s.line ? "home" : "away") : undefined;
-    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0, ...(mkt ? { mkt } : {}), ...(ourSide ? { ours: ourSide === side ? ("agree" as const) : ("disagree" as const) } : {}) });
+    out.push({ market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0, ...(mkt ? { mkt } : {}), ...(ourSide ? { ours: ourSide === side ? ("agree" as const) : ("disagree" as const) } : {}), ...(dAts ? { david: dAts === side ? ("agree" as const) : ("disagree" as const) } : {}) });
   }
   if (s.model !== 0) {
     const home = s.model < 0;
@@ -108,10 +120,40 @@ export function nbaBets(g: NbaTracked): NbaBet[] {
   if (s.total !== undefined && s.modelTotal !== undefined && s.modelTotal !== s.total) {
     const over = s.modelTotal > s.total;
     const ourOver = g.ours && g.ours.total !== s.total ? g.ours.total > s.total : undefined;
-    out.push({ market: "ou", side: over ? "over" : "under", line: s.total, price: over ? s.overPrice : s.underPrice, edge: r1(Math.abs(s.modelTotal - s.total)), dog: false, ...(ourOver !== undefined ? { ours: ourOver === over ? ("agree" as const) : ("disagree" as const) } : {}) });
+    out.push({ market: "ou", side: over ? "over" : "under", line: s.total, price: over ? s.overPrice : s.underPrice, edge: r1(Math.abs(s.modelTotal - s.total)), dog: false, ...(ourOver !== undefined ? { ours: ourOver === over ? ("agree" as const) : ("disagree" as const) } : {}), ...(dOver !== undefined ? { david: dOver === over ? ("agree" as const) : ("disagree" as const) } : {}) });
   }
   return g.final ? out.map((b) => settleNba(b, g.final!)) : out;
 }
+
+/**
+ * David's bets on a game from the same latest pregame copy, built exactly as
+ * Sam's are: his side from his own posted line (samSpreadSide), graded at the
+ * saved DraftKings line and price. Tagged by: "david".
+ */
+export function davidBets(g: NbaTracked): NbaBet[] {
+  const s = g.last;
+  const d = s.david;
+  if (!d) return [];
+  const out: NbaBet[] = [];
+  if (s.line !== undefined && (s.line !== d.model || (d.line !== undefined && d.line !== d.model))) {
+    const { side, edge, crossed } = samSpreadSide(s.line, d.model, d.line);
+    const home = side === "home";
+    out.push({ by: "david", market: "ats", side, line: home ? s.line : -s.line, price: home ? s.homePrice : s.awayPrice, edge: r1(edge), crossed, dog: home ? s.line > 0 : s.line < 0 });
+  }
+  if (d.model !== 0) {
+    const home = d.model < 0;
+    const fav = s.line === undefined ? null : s.line < 0 ? "home" : s.line > 0 ? "away" : null;
+    out.push({ by: "david", market: "su", side: home ? "home" : "away", line: 0, price: home ? s.mlHome : s.mlAway, edge: r1(Math.abs(d.model)), dog: fav !== null && fav !== (home ? "home" : "away") });
+  }
+  if (s.total !== undefined && d.total !== undefined && d.total !== s.total) {
+    const over = d.total > s.total;
+    out.push({ by: "david", market: "ou", side: over ? "over" : "under", line: s.total, price: over ? s.overPrice : s.underPrice, edge: r1(Math.abs(d.total - s.total)), dog: false });
+  }
+  return g.final ? out.map((b) => settleNba(b, g.final!)) : out;
+}
+
+/** Sam's bets then David's: what the record, the cuts and the rule are built from. */
+export const nbaAllBets = (g: NbaTracked): NbaBet[] => [...nbaBets(g), ...davidBets(g)];
 
 export function settleNba(b: NbaBet, f: { home: number; away: number }): NbaBet {
   let x: number;
@@ -134,8 +176,13 @@ export interface NbaCut {
   research?: { parent: string };
   /** Tested by the review but never activated by it: a person decides (the market signals, 2026-10-21). */
   reportOnly?: true;
+  /** Whose bets the cut reads: David's, or Sam's when missing. */
+  by?: "david";
   test: (b: NbaBet) => boolean;
 }
+
+/** A cut takes a bet only in its market and only from its own model. */
+export const applies = (c: NbaCut, b: NbaBet) => b.market === c.market && (b.by ?? "sam") === (c.by ?? "sam") && c.test(b);
 
 const absLine = (b: NbaBet) => Math.abs(b.line);
 
@@ -163,7 +210,23 @@ export const NBA_CUTS: NbaCut[] = [
   // Consensus with our own game model (Jack, 2026-11-04): tracked research vs its parent.
   { id: "ats:ours-agree", market: "ats", label: "Sam and our model agree", research: { parent: "ats:all" }, test: (b) => b.ours === "agree" },
   { id: "ats:ours-disagree", market: "ats", label: "Sam's side, our model disagrees", research: { parent: "ats:all" }, test: (b) => b.ours === "disagree" },
+  // Sam with David (2026-11-09): tracked research vs its parent, like our model's consensus.
+  { id: "ats:david-agree", market: "ats", label: "Sam and David on the same side", research: { parent: "ats:all" }, test: (b) => b.david === "agree" },
+  { id: "ats:david-disagree", market: "ats", label: "Sam's side, David on the other", research: { parent: "ats:all" }, test: (b) => b.david === "disagree" },
+  // David's own record (Jack, 2026-11-09: "track like we do Sam"): core cuts, rule candidates like Sam's.
+  { id: "ats:d-all", market: "ats", by: "david", label: "Every David side", test: () => true },
+  { id: "ats:d-edge2", market: "ats", by: "david", label: "David's edge 2+ pts", test: (b) => b.edge >= 2 },
+  { id: "ats:d-edge3", market: "ats", by: "david", label: "David's edge 3+ pts", test: (b) => b.edge >= 3 },
+  { id: "ats:d-dog", market: "ats", by: "david", label: "David on the underdog", test: (b) => b.dog },
+  { id: "ats:d-fav", market: "ats", by: "david", label: "David on the favorite", test: (b) => !b.dog && b.line !== 0 },
   { id: "ou:all", market: "ou", label: "Every Sam total", test: () => true },
+  { id: "ou:david-agree", market: "ou", label: "Sam and David agree on the total", research: { parent: "ou:all" }, test: (b) => b.david === "agree" },
+  { id: "ou:david-disagree", market: "ou", label: "Sam's total, David on the other side", research: { parent: "ou:all" }, test: (b) => b.david === "disagree" },
+  { id: "ou:d-all", market: "ou", by: "david", label: "Every David total", test: () => true },
+  { id: "ou:d-edge3", market: "ou", by: "david", label: "David's total edge 3+ pts", test: (b) => b.edge >= 3 },
+  { id: "ou:d-edge5", market: "ou", by: "david", label: "David's total edge 5+ pts", test: (b) => b.edge >= 5 },
+  { id: "ou:d-over", market: "ou", by: "david", label: "David on the over", test: (b) => b.side === "over" },
+  { id: "ou:d-under", market: "ou", by: "david", label: "David on the under", test: (b) => b.side === "under" },
   { id: "ou:ours-agree", market: "ou", label: "Sam and our model agree on the total", research: { parent: "ou:all" }, test: (b) => b.ours === "agree" },
   { id: "ou:edge3", market: "ou", label: "Total edge 3+ pts", test: (b) => b.edge >= 3 },
   { id: "ou:edge5", market: "ou", label: "Total edge 5+ pts", test: (b) => b.edge >= 5 },
@@ -173,6 +236,7 @@ export const NBA_CUTS: NbaCut[] = [
   { id: "su:all", market: "su", label: "Sam's winner, every game", test: () => true },
   { id: "su:dog", market: "su", label: "Sam picks the underdog to win", test: (b) => b.dog },
   { id: "su:fav", market: "su", label: "Sam picks the favorite", test: (b) => !b.dog },
+  { id: "su:d-all", market: "su", by: "david", label: "David's winner, every game", test: () => true },
 ];
 export const NBA_CUT = new Map(NBA_CUTS.map((c) => [c.id, c]));
 
@@ -181,6 +245,8 @@ export interface NbaCutRecord {
   label: string;
   market: NbaMarket;
   research: boolean;
+  /** David's cut (else Sam's). */
+  david: boolean;
   w: number;
   l: number;
   p: number;
@@ -197,19 +263,20 @@ export interface NbaRow {
   bet: NbaBet;
 }
 
-/** Every settled bet, one row per game and market. */
+/** Every settled bet, one row per game, market and model. */
 export function settledRows(games: NbaTracked[]): NbaRow[] {
-  return games.flatMap((g) => (g.final ? nbaBets(g).filter((b) => b.result).map((bet) => ({ game: g, bet })) : []));
+  return games.flatMap((g) => (g.final ? nbaAllBets(g).filter((b) => b.result).map((bet) => ({ game: g, bet })) : []));
 }
 
 export function cutRecord(cut: NbaCut, rows: NbaRow[]): NbaCutRecord {
-  const hit = rows.filter((r) => r.bet.market === cut.market && cut.test(r.bet));
+  const hit = rows.filter((r) => applies(cut, r.bet));
   const t = tally(hit.map((r) => r.bet.result!));
   return {
     id: cut.id,
     label: cut.label,
     market: cut.market,
     research: !!cut.research,
+    david: cut.by === "david",
     w: t.w,
     l: t.l,
     p: t.p,
@@ -240,7 +307,9 @@ export function nbaRule(rows: NbaRow[], market: "ats" | "ou", activated: string[
   if (!tier1) return { market, tier1: null, tier2: null };
   // Tier 2: judged only on the games tier 1 doesn't already take.
   const t1 = NBA_CUT.get(tier1.id)!;
-  const rest = rows.filter((r) => !(r.bet.market === market && t1.test(r.bet)));
+  // A game tier 1 bets (either model) is taken, for both models' rows.
+  const taken = new Set(rows.filter((r) => applies(t1, r.bet)).map((r) => r.game.id));
+  const rest = rows.filter((r) => !(r.bet.market === market && taken.has(r.game.id)));
   const second = pool
     .filter((c) => c.id !== tier1.id)
     .map((c) => ({ ...cutRecord(c, rest), id: c.id }))
@@ -252,8 +321,8 @@ export function nbaRule(rows: NbaRow[], market: "ats" | "ou", activated: string[
 /** Which tier (if any) an unsettled bet falls in. */
 export function tierOf(b: NbaBet, rule: NbaRule): 1 | 2 | null {
   if (b.market !== rule.market) return null;
-  if (rule.tier1 && NBA_CUT.get(rule.tier1.id)!.test(b)) return 1;
-  if (rule.tier2 && NBA_CUT.get(rule.tier2.id)!.test(b)) return 2;
+  if (rule.tier1 && applies(NBA_CUT.get(rule.tier1.id)!, b)) return 1;
+  if (rule.tier2 && applies(NBA_CUT.get(rule.tier2.id)!, b)) return 2;
   return null;
 }
 
@@ -422,8 +491,8 @@ export function compareCut(rows: NbaRow[], cutId: string, since: string): NbaCom
   const weeks = new Set<number>();
   for (const r of rows) {
     if (r.bet.market !== cut.market || Date.parse(r.game.tip || r.game.first.at) < Date.parse(since)) continue;
-    const pBets = parent.test(r.bet);
-    const cBets = cut.test(r.bet);
+    const pBets = applies(parent, r.bet);
+    const cBets = applies(cut, r.bet);
     if (!pBets && !cBets) continue;
     d.push((cBets ? r.bet.net ?? 0 : 0) - (pBets ? r.bet.net ?? 0 : 0));
     weeks.add(r.game.week);

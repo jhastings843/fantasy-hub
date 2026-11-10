@@ -3,8 +3,8 @@ import { ourNbaGameModel } from "../model-records";
 import { nbaSeasonOfDate } from "@/lib/props/parse";
 import { etDay, getNbaBoard, NBA_SOURCES, type NbaBoard, type NbaBoardGame } from "@/lib/picks/nba-store";
 import { getNbaPicksView, type NbaPicksView } from "@/lib/picks/nba-track-store";
-import { nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord, type NbaRule, type NbaTracked } from "@/lib/picks/nba-track";
-import { readNba } from "@/lib/picks/nba";
+import { davidBets, nbaBets, NBA_GO_LIVE, NBA_LIMITS, tierOf, type NbaBet, type NbaCutRecord, type NbaRule, type NbaTracked } from "@/lib/picks/nba-track";
+import { readDavid, readNba } from "@/lib/picks/nba";
 import { decimal, shrunk } from "@/lib/picks/staking";
 import pv from "../game/preview.module.css";
 import { CRITERIA } from "@/lib/picks/learning/model";
@@ -19,7 +19,7 @@ import { scopeGroups, viewTabs } from "../tab-sets";
 import s from "../picks.module.css";
 import n from "./nba.module.css";
 
-// The NBA tab. One model (Sam) against the DraftKings line, tracked like
+// The NBA tab. Two models (Sam, and David from 2026-11-09) against the DraftKings line, tracked like
 // football (nba-track.ts): saved before tip, graded, sliced into cuts, a rule
 // chosen the football way and a learning review after each night. Not staked
 // until the go-live gate clears, then under NBA's own limits; never in
@@ -59,9 +59,17 @@ function samLine(b: NbaBoard): string {
   return `Couldn't reach Sam's NBA page (${sam.error}). DraftKings lines only.`;
 }
 
+/** David's board state, one short sentence after Sam's. */
+function davidLine(b: NbaBoard): string {
+  const d = b.david;
+  if (d.state === "live") return d.rows.length ? " David's side is tracked the same way beside it." : " David hasn't posted today's games yet.";
+  if (d.state === "unread") return " David's NBA page is up but laid out differently, so his numbers are missing.";
+  return ` Couldn't reach David's NBA page (${d.error}).`;
+}
+
 /** A board game's current numbers as a tracker snapshot, so the board reads bets the way grading will. */
 function snapOf(g: NbaBoardGame): NbaTracked | null {
-  if (!g.read) return null;
+  if (!g.read && !g.david) return null;
   const snap = {
     at: "",
     line: g.line?.home,
@@ -72,9 +80,8 @@ function snapOf(g: NbaBoardGame): NbaTracked | null {
     underPrice: g.total?.underPrice,
     mlHome: g.ml?.home,
     mlAway: g.ml?.away,
-    model: g.read.model,
-    samLine: g.read.samLine,
-    modelTotal: g.read.modelTotal,
+    ...(g.read ? { model: g.read.model, samLine: g.read.samLine, modelTotal: g.read.modelTotal } : {}),
+    ...(g.david ? { david: { model: g.david.model, line: g.david.davidLine, total: g.david.modelTotal } } : {}),
   };
   return { id: g.id, day: g.day, week: 0, tip: g.tip, home: g.home.abbr, away: g.away.abbr, first: snap, last: snap };
 }
@@ -92,7 +99,11 @@ function asSaved(g: NbaBoardGame, t: NbaTracked | undefined): NbaBoardGame {
     total: x.total !== undefined ? { points: x.total, overPrice: x.overPrice, underPrice: x.underPrice } : g.total,
     ml: x.mlHome !== undefined || x.mlAway !== undefined ? { home: x.mlHome, away: x.mlAway } : g.ml,
   };
-  return { ...out, read: readNba(out, { home: g.home.abbr, away: g.away.abbr, model: x.model, vegas: x.samLine ?? NaN, ...(x.modelTotal !== undefined ? { total: x.modelTotal } : {}) }) };
+  return {
+    ...out,
+    read: x.model !== undefined ? readNba(out, { home: g.home.abbr, away: g.away.abbr, model: x.model, vegas: x.samLine ?? NaN, ...(x.modelTotal !== undefined ? { total: x.modelTotal } : {}) }) : null,
+    david: x.david ? readDavid(out, x.david) : null,
+  };
 }
 
 const ruleOf = (v: NbaPicksView, m: Market): NbaRule | null => (m === "ats" ? v.ats : m === "ou" ? v.ou : null);
@@ -107,14 +118,16 @@ export function readMarket(raw: NbaBoardGame, v: NbaPicksView | null, m: Market)
   const g = asSaved(raw, saved);
   const t = snapOf(g);
   const bet: NbaBet | null = t ? (nbaBets(t).find((b) => b.market === m) ?? null) : null;
+  const dBet: NbaBet | null = t ? (davidBets(t).find((b) => b.market === m) ?? null) : null;
   const rule = v ? ruleOf(v, m) : null;
+  const dTier = dBet && rule && g.state === "pre" ? tierOf(dBet, rule) : null;
   const tier = bet && rule && g.state === "pre" ? tierOf(bet, rule) : null;
   const stake = tier && v?.gate.live && m === "ats" ? (saved?.stake ?? null) : null;
   // The record behind the cover chance: the tier's cut, else every Sam pick in this market.
   const cut = bet && v ? (tier === 1 ? rule?.tier1 : tier === 2 ? rule?.tier2 : v.cuts.find((c) => c.id === `${m}:all`)) ?? null : null;
   const p = cut && cut.w + cut.l > 0 ? shrunk(cut.w, cut.l, NBA_LIMITS.SHRINK_GAMES) : null;
   const edgePct = p !== null && bet?.price !== undefined ? (p * decimal(bet.price) - 1) * 100 : null;
-  return { g, bet, tier, stake, cut, p, edgePct };
+  return { g, bet, tier, stake, cut, p, edgePct, dBet, dTier };
 }
 type Read = ReturnType<typeof readMarket>;
 
@@ -132,6 +145,17 @@ function betText(b: NbaBet, home: string, away: string): string {
   if (b.market === "ats") return `${team} ${line(b.line)}`;
   if (b.market === "ou") return `${b.side === "over" ? "Over" : "Under"} ${b.line}`;
   return `${team} to win`;
+}
+
+/** David's side in this market in a few words, for under Sam's number: "LAL +1.5", "Under 237.5", "LAL to win". */
+function davidCell(x: Read, m: Market): string | undefined {
+  const d = x.g.david;
+  if (!d) return undefined;
+  const b = x.dBet;
+  const tier = x.dTier ? ` · tier ${x.dTier}` : "";
+  if (m === "ats") return b ? `${b.side === "home" ? x.g.home.abbr : x.g.away.abbr} ${line(b.line)} · ${b.edge.toFixed(1)}${tier}` : `${x.g.home.abbr} ${line(d.model)}`;
+  if (m === "ou") return d.modelTotal === undefined ? undefined : b ? `${d.modelTotal} · ${b.side} ${b.edge.toFixed(1)}${tier}` : `${d.modelTotal}`;
+  return `${d.model < 0 ? x.g.home.abbr : x.g.away.abbr} by ${Math.abs(d.model).toFixed(1)}`;
 }
 
 /** The market's number, Sam's number, the bet and its edge, for one row. */
@@ -168,7 +192,7 @@ function readChip(x: Read, m: Market): [string, string] {
   const { g, bet, tier, stake } = x;
   if (g.state === "in") return ["Live", s.readLive];
   if (g.state === "post") return [bet ? "Final · grading" : "Final", s.readPass];
-  if (!g.read) return [g.line ? "No model yet" : "No line yet", s.readPass];
+  if (!g.read) return x.dTier ? [`David · tier ${x.dTier}`, s.readPend] : [g.line ? (g.david ? "David only so far" : "No model yet") : "No line yet", s.readPass];
   if (!bet) return [m === "ats" && g.read.crossed ? "DK crossed" : "No side", s.readPass];
   if (m === "su") return ["Tracked · pick'em", s.readTrack];
   if (tier) return stake ? [`Tier ${tier} · ${stake}u`, s.readBet] : [`Tier ${tier} · no stake`, s.readPend];
@@ -206,6 +230,20 @@ export function NbaWhy({ g }: { g: NbaBoardGame }) {
             <>
               <dt>Sam total</dt>
               <dd className={s.num}>{`${r.modelTotal} (${r.totalSide} by ${r.totalEdge?.toFixed(1)})`}</dd>
+            </>
+          )}
+        </>
+      )}
+      {g.david && (
+        <>
+          <dt>David line</dt>
+          <dd className={s.num}>
+            {`${g.home.short} ${line(g.david.model)}${g.david.davidLine !== undefined ? ` vs his posted ${line(g.david.davidLine)}` : ""} (${g.david.side === "home" ? g.home.short : g.away.short} by ${g.david.edge.toFixed(1)}${g.david.crossed ? ", DK crossed" : ""})`}
+          </dd>
+          {g.david.modelTotal !== undefined && (
+            <>
+              <dt>David total</dt>
+              <dd className={s.num}>{`${g.david.modelTotal} (${g.david.totalSide} by ${g.david.totalEdge?.toFixed(1)})`}</dd>
             </>
           )}
         </>
@@ -291,6 +329,7 @@ function NbaRow({ x, m, day }: { x: Read; m: Market; day: string }) {
         </span>
         <span className={s.gNum} data-k="Sam">
           <span className={s.cSam} style={{ whiteSpace: "nowrap" }}>{c.sam === "·" ? "·" : `Sam ${c.sam}`}</span>
+          {davidCell(x, m) && <small className={s.cDavid}>{`David ${davidCell(x, m)}`}</small>}
         </span>
         <span className={s.gNum} data-k="Side">
           {c.pick}
@@ -320,7 +359,7 @@ function RowsTable({ rows, m }: { rows: { x: Read; day: string }[]; m: Market })
       <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
         <span>Game</span>
         <span>{m === "su" ? "Moneyline" : "DraftKings"}</span>
-        <span>Sam</span>
+        <span>Sam · David</span>
         <span>Side</span>
         <span>Read</span>
         <span />
@@ -364,6 +403,7 @@ function NbaResults({ v, m, pending }: { v: NbaPicksView; m: Market; pending: Re
     .map((g) => ({ g, b: nbaBets(g).find((x) => x.market === m) }))
     .filter((x): x is { g: NbaTracked; b: NbaBet } => !!x.b?.result);
   const all = v.cuts.find((c) => c.id === `${m}:all`);
+  const dAll = v.cuts.find((c) => c.id === `${m}:d-all`);
   const rule = ruleOf(v, m);
   const weeks = [...new Set(graded.map((x) => x.g.week))].sort((a, b) => a - b);
   const byWeek = weeks.map((w) => {
@@ -426,6 +466,10 @@ function NbaResults({ v, m, pending }: { v: NbaPicksView; m: Market; pending: Re
           <div className={`${s.tileV} ${s.num}`}>{rule?.tier1 ? units(ruleUnits) : m === "su" ? "No rule" : "None yet"}</div>
           <div className={s.tileK}>{rule?.tier1 ? `Rule tier 1 · ${rule.tier1.label} · ${rec(ruleRec)}` : m === "su" ? "Straight up is tracked, never staked" : "No cut clears the bar yet"}</div>
         </div>
+        <div className={`${s.tile} ${dAll && dAll.w + dAll.l ? (dAll.units >= 0 ? s.good : s.bad) : ""}`}>
+          <div className={`${s.tileV} ${s.num}`}>{dAll && dAll.w + dAll.l + dAll.p ? units(dAll.units) : "none yet"}</div>
+          <div className={s.tileK}>{`Every David ${m === "su" ? "winner" : "side"} · ${dAll ? rec(dAll) : "0-0"} (tracked from Nov 9)`}</div>
+        </div>
       </div>
 
       {startedPending.length > 0 && (
@@ -447,7 +491,9 @@ function NbaResults({ v, m, pending }: { v: NbaPicksView; m: Market; pending: Re
               <span className={`${s.num} ${s.betWeekNet} ${w.units < 0 ? s.neg : s.pos}`}>{units(w.units)}</span>
             </summary>
             <div className={s.betWeekBody}>
-              {w.xs.map(({ g, b }) => (
+              {w.xs.map(({ g, b }) => {
+                const db = davidBets(g).find((x) => x.market === m && x.result);
+                return (
                 <div key={g.id} className={n.gameRow}>
                   <span className={n.when}>{shortDate(g.tip)}</span>
                   <span>{`${g.away} at ${g.home}`}</span>
@@ -456,10 +502,12 @@ function NbaResults({ v, m, pending }: { v: NbaPicksView; m: Market; pending: Re
                     {betText(b, g.home, g.away)}
                     {b.price !== undefined ? <span className={s.dim}>{` ${price(b.price)}`}</span> : null}
                     {rule && tierOf(b, rule) ? <span className={`${s.tag} ${s.tagRule}`}>{`tier ${tierOf(b, rule)}`}</span> : null}
+                    {db ? <small className={s.cDavid} style={{ display: "block" }}>{`David ${betText(db, g.home, g.away)} · ${db.result}`}</small> : null}
                   </span>
                   <span className={`${n.res} ${b.result === "W" ? s.resW : b.result === "L" ? s.resL : s.resP}`}>{`${b.result} ${(b.net ?? 0) >= 0 ? "+" : "−"}${Math.abs(b.net ?? 0).toFixed(2)}`}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </details>
         ))}
@@ -565,10 +613,18 @@ function NbaResearch({ v, m }: { v: NbaPicksView; m: Market }) {
             </span>
             <span>Units: 1u a bet at the saved price</span>
           </div>
-          <div className={s.grp}>Core cuts</div>
-          {cuts.filter((c) => !c.research).map((c) => (
+          <div className={s.grp}>Sam&apos;s core cuts</div>
+          {cuts.filter((c) => !c.research && !c.david).map((c) => (
             <CutBar key={c.id} c={c} mark={markOf(c.id)} />
           ))}
+          {cuts.some((c) => c.david) && (
+            <>
+              <div className={s.grp}>David&apos;s core cuts (tracked from Nov 9, rule candidates like Sam&apos;s)</div>
+              {cuts.filter((c) => c.david).map((c) => (
+                <CutBar key={c.id} c={c} mark={markOf(c.id)} />
+              ))}
+            </>
+          )}
           {cuts.some((c) => c.research) && (
             <>
               <div className={s.grp}>Research cuts (join the rule only through the review)</div>
@@ -705,10 +761,18 @@ function NbaLog({ v, m }: { v: NbaPicksView; m: Market }) {
 
 function lineup(v: NbaPicksView, m: Market): ModelRow[] {
   const sam: ModelRow = { name: "Sam's NBA reads", role: "Spreads, totals and winners, outside source", status: "input", note: "The input behind NBA tier picks. Never stakes on its own." };
+  const dAll = v.cuts.find((c) => c.id === `${m}:d-all`);
+  const david: ModelRow = {
+    name: "David's NBA reads",
+    role: "Spreads, totals and winners, outside source",
+    status: "input",
+    note: `Added Nov 9, graded at the same DraftKings line and price as Sam. His cuts can become the rule the same way Sam's can.${dAll && dAll.w + dAll.l ? ` So far ${rec(dAll)}, ${units(dAll.units)}.` : " No graded games yet."}`,
+  };
   if (m === "su")
     return [
       { name: "Straight-up picks", role: "Sam's winner, every game", status: "projections", note: "Tracked at the moneyline. No NBA pool, so nothing here is entered or staked." },
       sam,
+      david,
     ];
   const rule = ruleOf(v, m)!;
   const t1 = rule.tier1;
@@ -725,6 +789,7 @@ function lineup(v: NbaPicksView, m: Market): ModelRow[] {
         : "Every Sam total is tracked at the saved price with no stake.",
     },
     sam,
+    david,
     { name: "Our NBA game model", role: "Spreads and totals, forward test", status: "collecting", note: "Built Oct 26. No edge at the close in the backtest, so it is tracked at the first price we had a number, with no stake. See Research." },
   ];
 }
@@ -805,7 +870,7 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
               title={MARKET_NAME[m]}
               aside={m === "su" ? `${todayGames} game${todayGames === 1 ? "" : "s"} left today` : `${inTier ? `${inTier} in the rule's tier` : todayGames ? `${todayGames} left today, none in the rule's tier` : "No games left today"}`}
             />
-            <p className={s.p}>{samLine(b)}</p>
+            <p className={s.p}>{`${samLine(b)}${davidLine(b)}`}</p>
             <BoardLegend m={m} />
             <RowsTable rows={upcoming} m={m} />
             <p className={s.p}>
@@ -829,7 +894,7 @@ export default async function NbaView({ view = "week", market = "ats" }: { view?
 
         <footer className={s.footer}>
           <span>
-            Sources: <a href={NBA_SOURCES.samBoard}>Sam&apos;s Models</a>. Lines: DraftKings via ESPN. Model output, not betting advice.
+            Sources: <a href={NBA_SOURCES.samBoard}>Sam&apos;s Models</a>, <a href={NBA_SOURCES.davidBoard}>David Sasser</a>. Lines: DraftKings via ESPN. Model output, not betting advice.
           </span>
           {b?.unmatched.length ? <span>{`Sam games not matched to ESPN: ${b.unmatched.join(", ")}`}</span> : null}
           {b?.problems.map((t) => (

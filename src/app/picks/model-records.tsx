@@ -84,6 +84,7 @@ export async function NbaModelRecords({ v, market }: { v: NbaPicksView; market: 
     ...(rule ? row(rule.tier1 ? `Tier 1: ${rule.tier1.label}` : "Tier 1", rule.tier1) : []),
     ...(rule ? row(rule.tier2 ? `Tier 2: ${rule.tier2.label}` : "Tier 2", rule.tier2) : []),
     ...row(market === "ats" ? "Sam, every side" : market === "ou" ? "Sam, every total" : "Sam's winner, every game", cut(`${market}:all`), market === "su" ? undefined : BREAK_EVEN),
+    ...row(market === "ats" ? "David, every side" : market === "ou" ? "David, every total" : "David's winner, every game", cut(`${market}:d-all`), market === "su" ? undefined : BREAK_EVEN),
     ...row(market === "ats" ? "Our NBA model, every spread (tracked)" : "Our NBA model, every total (tracked)", mine),
   ];
   return <CutRanges title="Model records" aside={rows.length ? `${rows.length} models · tap to open` : "No graded games yet"} rows={rows} />;

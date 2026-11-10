@@ -1,15 +1,15 @@
 // NBA on the Picks tab: the parsing half (pure, tested). The fetching half is
 // nba-store.ts.
 //
-// Sam's NBA board is new (his /nba/ page said "coming 10/19" on the day this
-// was built) and David has no NBA page, so this is one model against the
-// DraftKings line, shown and not staked. NBA stays out of the NFL/college
-// engine (weekly rule, tiers, budget, emails) until Sam's NBA picks have a
-// record to judge.
+// Two models against the DraftKings line, shown and tracked, not staked until
+// the go-live gate clears: Sam (his /nba/ board, from 10/19) and David Sasser
+// (davidsasser.com/nba spreads and totals, from 2026-11-09). NBA stays out of
+// the NFL/college engine (weekly rule, tiers, budget, emails).
 //
 // Lines are written from the home side, like the rest of Picks: negative
 // means the home team is favored.
 import { decode } from "./parse";
+import { objectAt, rscText } from "@/lib/rsc";
 import { spreadFlipped } from "./orient";
 
 export type NbaTeam = { abbr: string; name: string; short: string };
@@ -234,6 +234,100 @@ export function readNba(g: NbaGame, sam?: SamNbaRow): NbaRead | null {
   if (sam.total !== undefined && g.total) {
     const t = sam.total - g.total.points;
     r.modelTotal = sam.total;
+    r.totalSide = t >= 0 ? "over" : "under";
+    r.totalEdge = Math.round(Math.abs(t) * 10) / 10;
+  }
+  return r;
+}
+
+/* ----------------------------------------------------------------- David -- */
+
+/** One game on David's NBA board, home side, keyed by ESPN's event id (his page uses the same ids). */
+export type DavidNbaRow = {
+  id: string;
+  home: string;
+  away: string;
+  /** His projected home spread, to a tenth. */
+  model: number;
+  /** His projected total, to a tenth. */
+  total?: number;
+  /** The DraftKings home spread his page posted beside it; his side is taken against it, as Sam's is. */
+  line?: number;
+  /** The DraftKings total his page posted. */
+  postedTotal?: number;
+};
+
+export type DavidNbaStatus =
+  | { state: "live"; rows: DavidNbaRow[]; updatedAt?: string }
+  /** The page answered but no game slate was found in it: he rebuilt the page. */
+  | { state: "unread" }
+  | { state: "down"; error: string };
+
+const fin = (x: unknown): number | undefined => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+
+/**
+ * David's NBA game board (davidsasser.com/nba, new 2026-11-09). The slate
+ * rides in the page's RSC payload as {"slate": {"games": [...]}}: each game
+ * has ESPN's id, `projection.homeSpread` and `projection.total` (his model)
+ * and `market.homeSpread` / `market.total` (DraftKings when he posted).
+ */
+export function parseDavidNbaGames(html: string): DavidNbaStatus {
+  const rsc = rscText(html);
+  let at = rsc.indexOf('{"slate":');
+  while (at >= 0) {
+    const raw = objectAt(rsc, at);
+    try {
+      const sl = raw ? (JSON.parse(raw) as { slate?: { games?: unknown; updatedAt?: string } }).slate : undefined;
+      if (sl && Array.isArray(sl.games)) {
+        type G = { id?: unknown; home?: { abbreviation?: string }; away?: { abbreviation?: string }; projection?: { homeSpread?: unknown; total?: unknown }; market?: { homeSpread?: unknown; total?: unknown } };
+        const rows: DavidNbaRow[] = [];
+        for (const g of sl.games as G[]) {
+          const model = fin(g?.projection?.homeSpread);
+          if (g?.id === undefined || model === undefined || !g.home?.abbreviation || !g.away?.abbreviation) continue;
+          const total = fin(g.projection?.total);
+          const line = fin(g.market?.homeSpread);
+          const postedTotal = fin(g.market?.total);
+          rows.push({
+            id: String(g.id),
+            home: g.home.abbreviation,
+            away: g.away.abbreviation,
+            model: Math.round(model * 10) / 10,
+            ...(total !== undefined ? { total: Math.round(total * 10) / 10 } : {}),
+            ...(line !== undefined ? { line } : {}),
+            ...(postedTotal !== undefined ? { postedTotal } : {}),
+          });
+        }
+        return { state: "live", rows, ...(sl.updatedAt ? { updatedAt: sl.updatedAt } : {}) };
+      }
+    } catch {
+      /* not this object */
+    }
+    at = rsc.indexOf('{"slate":', at + 1);
+  }
+  return { state: "unread" };
+}
+
+export type DavidRead = {
+  /** David's home line. */
+  model: number;
+  /** Points between David's line and DraftKings', on his side; negative when DK has crossed his number. */
+  edge: number;
+  side: "home" | "away";
+  /** The home line his page posted beside his model. */
+  davidLine?: number;
+  crossed: boolean;
+  modelTotal?: number;
+  totalSide?: "over" | "under";
+  totalEdge?: number;
+};
+
+/** David's side and edge at the DraftKings line, the same way as Sam's (samSpreadSide against his posted line). */
+export function readDavid(g: Pick<NbaGame, "line" | "total">, d?: Pick<DavidNbaRow, "model" | "total" | "line">): DavidRead | null {
+  if (!d || !g.line) return null;
+  const r: DavidRead = { model: d.model, ...samSpreadSide(g.line.home, d.model, d.line), ...(d.line !== undefined ? { davidLine: d.line } : {}) };
+  if (d.total !== undefined && g.total) {
+    const t = d.total - g.total.points;
+    r.modelTotal = d.total;
     r.totalSide = t >= 0 ? "over" : "under";
     r.totalEdge = Math.round(Math.abs(t) * 10) / 10;
   }
