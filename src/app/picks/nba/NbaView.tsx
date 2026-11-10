@@ -153,8 +153,10 @@ function davidCell(x: Read, m: Market): string | undefined {
   if (!d) return undefined;
   const b = x.dBet;
   const tier = x.dTier ? ` · tier ${x.dTier}` : "";
-  if (m === "ats") return b ? `${b.side === "home" ? x.g.home.abbr : x.g.away.abbr} ${line(b.line)} · ${b.edge.toFixed(1)}${tier}` : `${x.g.home.abbr} ${line(d.model)}`;
-  if (m === "ou") return d.modelTotal === undefined ? undefined : b ? `${d.modelTotal} · ${b.side} ${b.edge.toFixed(1)}${tier}` : `${d.modelTotal}`;
+  // Only his own model number, home team, the same way as Sam's cell (Jack 2026-11-10: the old
+  // "BOS -1.5 · 5.1" was his side at DraftKings' line, which read as a different number from Sam's).
+  if (m === "ats") return `${x.g.home.abbr} ${line(Math.round(d.model * 10) / 10)}${b ? tier : ""}`;
+  if (m === "ou") return d.modelTotal === undefined ? undefined : `${d.modelTotal}${b ? tier : ""}`;
   return `${d.model < 0 ? x.g.home.abbr : x.g.away.abbr} by ${Math.abs(d.model).toFixed(1)}`;
 }
 
@@ -246,7 +248,7 @@ export function NbaWhy({ g, m }: { g: NbaBoardGame; m?: Market }) {
       {r && sides && (
         <>
           <dt>Sam line</dt>
-          <dd className={s.num}>{`${g.home.short} ${line(r.model)}${r.samLine !== undefined ? ` vs his posted ${line(r.samLine)}` : ""}`}</dd>
+          <dd className={s.num}>{`${g.home.short} ${line(r.model)}`}</dd>
         </>
       )}
       {r && totals && r.modelTotal !== undefined && (
@@ -259,7 +261,7 @@ export function NbaWhy({ g, m }: { g: NbaBoardGame; m?: Market }) {
         <>
           <dt>David line</dt>
           <dd className={s.num}>
-            {`${g.home.short} ${line(d.davidLine ?? d.model)}`}
+            {`${g.home.short} ${line(Math.round(d.model * 10) / 10)}`}
           </dd>
         </>
       )}
