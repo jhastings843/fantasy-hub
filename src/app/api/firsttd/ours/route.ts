@@ -1,3 +1,4 @@
+import { logRun } from "@/lib/money/activity";
 import { watchProblems } from "@/lib/notify/problems";
 import { runOurFirstTd } from "@/lib/models/nfl/ftd-store";
 
@@ -16,5 +17,6 @@ export async function GET(request: Request) {
   }
   const report = await runOurFirstTd();
   await watchProblems("Our First TD and Anytime TD", report.problems);
+  await logRun("props", "Our First TD and Anytime TD", report, report.problems);
   return Response.json({ ok: report.problems.length === 0, report });
 }

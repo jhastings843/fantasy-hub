@@ -1,3 +1,4 @@
+import { logRun } from "@/lib/money/activity";
 import { getPicksReport, refreshPicks } from "@/lib/picks/report";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,9 @@ export async function GET(request: Request) {
     if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
       return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
-    return Response.json({ ok: true, report: await refreshPicks(league) });
+    const report = await refreshPicks(league);
+    await logRun("picks", `${league === "cfb" ? "College" : "NFL"} picks refresh`, report, (report as { problems?: string[] } | null)?.problems ?? []);
+    return Response.json({ ok: true, report });
   }
   const fresh = await getPicksReport(league);
   return Response.json({ ok: !!fresh.value, stale: fresh.stale, at: fresh.at, report: fresh.value });

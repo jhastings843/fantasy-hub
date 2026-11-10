@@ -1,3 +1,4 @@
+import { logRun } from "@/lib/money/activity";
 import { getMyLeagues } from "@/lib/league/discover";
 import { getUser } from "@/lib/sleeper/client";
 import { getRosterGrades } from "@/lib/rosteraudit/client";
@@ -172,6 +173,11 @@ export async function GET(request: Request) {
       nbaPicks = { error: message };
       failures.push(`nba picks: ${message}`);
     }
+
+    // The morning run's prop and pick work, one feed line each.
+    const fails = (k: string) => failures.filter((f) => f.startsWith(`${k}: `));
+    await logRun("props", "Morning props run (NFL, NBA, First TD)", { ...(props as object), ...(nbaProps as object) }, [...fails("props"), ...fails("nba props"), ...fails("first td")]);
+    await logRun("picks", "Morning NBA picks run", nbaPicks, fails("nba picks"));
 
     return Response.json({
       ok: failures.length === 0,

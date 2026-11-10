@@ -1,3 +1,4 @@
+import { addLine } from "@/lib/money/activity";
 import { watchProblems } from "@/lib/notify/problems";
 import "server-only";
 import { runNbaNews } from "@/lib/models/nba/news-store";
@@ -516,6 +517,9 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
   }
 }
 
+/** Pulse jobs that read or save pick sources, for the Picks line on Today's feed. */
+const PICK_JOBS = new Set(["picks-data", "picks-review", "harris-feed", "harris-cbb", "tracker", "nba-sam", "splits-skip", "pool-watch", "cbb", "sam-cbb-watch"]);
+
 export async function runPulse(
   options: { now?: Date; tier?: PulseTier; sends?: boolean } = {},
 ): Promise<PulseReceipt> {
@@ -588,6 +592,17 @@ export async function runPulse(
   jobs.push(news, sam, skips, pool, cbb, samCbb, staked);
   // A job failing three pulses in a row pushes once (notify/problems.ts).
   await Promise.all(jobs.map((j) => watchProblems(`Pulse ${j.job}`, j.ok ? [] : [j.error ?? "failed"])));
+  // One Picks line on Today's feed per pulse (Jack, 2026-11-09: every pick scan shows). Same text folds into one row.
+  const pickJobs = jobs.filter((j) => PICK_JOBS.has(j.job));
+  if (pickJobs.length) {
+    const failed = pickJobs.filter((j) => !j.ok).map((j) => j.job);
+    await addLine({
+      at: new Date().toISOString(),
+      desk: "picks",
+      done: true,
+      text: `Rechecked ${pickJobs.length} pick sources${failed.length ? `, ${failed.join(", ")} failed` : ""}${sam.ok && sam.detail ? `. NBA: ${sam.detail}` : ""}`.slice(0, 200),
+    }).catch(() => {});
+  }
 
   const receipt: PulseReceipt = {
     at: new Date().toISOString(),

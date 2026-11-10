@@ -56,3 +56,29 @@ export async function loadChecks(snap: MoneySnapshot | null): Promise<Partial<Re
   for (const [d, c] of Object.entries(live)) put(d as DeskId, c);
   return out;
 }
+
+/**
+ * One finished run of the hub's own jobs (prop captures, pick saves, the
+ * pulse) as a feed line. Counts come from the run's report: every non-empty
+ * list but `problems`, e.g. "NBA picks: saved 5, settled 2". Never throws.
+ */
+export async function logRun(desk: DeskId, name: string, report: unknown, problems: string[] = []): Promise<void> {
+  try {
+    await addLine({ at: new Date().toISOString(), desk, text: runText(name, report, problems), done: true });
+  } catch {
+    /* the feed is a nicety; the run never notices */
+  }
+}
+
+export function runText(name: string, report: unknown, problems: string[] = []): string {
+  const parts: string[] = [];
+  if (report && typeof report === "object") {
+    for (const [k, v] of Object.entries(report as Record<string, unknown>)) {
+      if (k === "problems" || !Array.isArray(v) || !v.length) continue;
+      parts.push(`${k.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()} ${v.length}`);
+    }
+  }
+  const body = parts.length ? parts.slice(0, 4).join(", ") : "nothing new";
+  const bad = problems.length ? `, ${problems.length} problem${problems.length === 1 ? "" : "s"}` : "";
+  return `${name}: ${body}${bad}`.slice(0, 200);
+}

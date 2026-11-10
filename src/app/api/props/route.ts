@@ -1,3 +1,4 @@
+import { logRun } from "@/lib/money/activity";
 import { watchProblems } from "@/lib/notify/problems";
 import { runProps } from "@/lib/props/store";
 
@@ -16,5 +17,6 @@ export async function GET(request: Request) {
   }
   const report = await runProps();
   await watchProblems("Props capture", report.problems);
+  await logRun("props", "NFL props", report, report.problems);
   return Response.json({ ok: report.problems.length === 0, report });
 }

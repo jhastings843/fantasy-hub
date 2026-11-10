@@ -30,7 +30,7 @@ import { PortfolioToday } from "./portfolio";
 
 // Today (redesign, 2026-11-03): what to do right now. Answer first: one spotlight
 // for the single action that matters (the next bet, else the top claim), then
-// what is live, what is next, claims and lineup changes, and the record. Model
+// what is live and next beside the research desks' live feed, portfolio and the record, then claims and lineup changes. Model
 // drivers and per-bet staking notes sit behind disclosures. Every stake shown is
 // one the picks emails issued (or the allocator has ready to issue), never a
 // tracked edge. Bets data assembly is unchanged from the Ledger version.
@@ -454,9 +454,19 @@ export default async function TodayPage() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-8">
-          <Suspense fallback={<FantasySkeleton />}>
-            <FantasySection skipTop={!spot} />
+        <Section
+          id="t-research"
+          label="Research desks"
+          aside={
+            <Link href="/money" className="inline-flex min-h-11 items-center gap-0.5 font-semibold text-hh-accent-ink hover:underline">
+              Money<ChevronRight size={14} aria-hidden />
+            </Link>
+          }
+        >
+          <Suspense fallback={<div className="h-24 animate-pulse rounded bg-hh-line" aria-hidden />}>
+            <ResearchFeed />
           </Suspense>
+        </Section>
 
           <Suspense fallback={null}>
             <PortfolioToday />
@@ -497,19 +507,9 @@ export default async function TodayPage() {
         </div>
       </div>
 
-      <Section
-        id="t-research"
-        label="Research desks"
-        aside={
-          <Link href="/money" className="inline-flex min-h-11 items-center gap-0.5 font-semibold text-hh-accent-ink hover:underline">
-            Money<ChevronRight size={14} aria-hidden />
-          </Link>
-        }
-      >
-        <Suspense fallback={<div className="h-24 animate-pulse rounded bg-hh-line" aria-hidden />}>
-          <ResearchFeed />
-        </Suspense>
-      </Section>
+      <Suspense fallback={<FantasySkeleton />}>
+        <FantasySection skipTop={!spot} />
+      </Suspense>
 
       <Section id="t-drivers" label="Details">
         <Disclosure summary="What drives each section">

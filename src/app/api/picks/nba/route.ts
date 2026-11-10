@@ -1,3 +1,4 @@
+import { logRun } from "@/lib/money/activity";
 import { watchProblems } from "@/lib/notify/problems";
 import { runNbaPicks } from "@/lib/picks/nba-track-store";
 
@@ -15,5 +16,6 @@ export async function GET(request: Request) {
   }
   const report = await runNbaPicks();
   await watchProblems("NBA picks", report.problems);
+  await logRun("picks", "NBA picks", report, report.problems);
   return Response.json({ ok: report.problems.length === 0, report });
 }

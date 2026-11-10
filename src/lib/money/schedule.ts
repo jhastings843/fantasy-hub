@@ -10,8 +10,10 @@
 //   options   10:05am and 3:55pm, weekdays
 //   phil, gus every hour (StartInterval 3600, so an hour after the last check)
 //   weather   every hour at :20
+//   portfolio stocks repo: premarket 8:45, monitor 10:00 1:00 3:15 4:15, advice 6pm, price refresh 8:30pm, weekdays
+//   props, picks  the hub's own capture and pick runs (GitHub Actions and the 15-minute pulse): no fixed slot
 
-export type DeskId = "intraday" | "books" | "trends" | "options" | "phil" | "gus" | "weather";
+export type DeskId = "intraday" | "books" | "trends" | "options" | "phil" | "gus" | "weather" | "portfolio" | "props" | "picks";
 
 export const DESK_NAMES: Record<DeskId, string> = {
   intraday: "Day Trader",
@@ -21,6 +23,9 @@ export const DESK_NAMES: Record<DeskId, string> = {
   phil: "Phil",
   gus: "Gus",
   weather: "Weather",
+  portfolio: "Portfolio",
+  props: "Props",
+  picks: "Picks",
 };
 
 export const CADENCE: Record<DeskId, string> = {
@@ -31,6 +36,9 @@ export const CADENCE: Record<DeskId, string> = {
   phil: "Checks every hour",
   gus: "Checks every hour",
   weather: "Checks every hour at :20",
+  portfolio: "Pre-market 8:45am, trade checks through the day, advice at 6pm, prices again at 8:30pm, weekdays",
+  props: "Saves prop boards before each game and grades them after",
+  picks: "Saves pick reads before each game, grades finals, rechecks sources every 15 minutes",
 };
 
 export const isDesk = (x: unknown): x is DeskId => typeof x === "string" && x in DESK_NAMES;
@@ -70,6 +78,8 @@ function slots(desk: DeskId, wd: number): number[] {
       return weekday ? [10 * 60 + 5, 15 * 60 + 55] : [];
     case "weather":
       return Array.from({ length: 24 }, (_, h) => h * 60 + 20);
+    case "portfolio":
+      return weekday ? [8 * 60 + 45, 10 * 60, 13 * 60, 15 * 60 + 15, 16 * 60 + 15, 18 * 60, 20 * 60 + 30] : [];
     default:
       return [];
   }
