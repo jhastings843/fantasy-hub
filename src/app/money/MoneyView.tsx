@@ -724,9 +724,10 @@ function ExtraRow({ p }: { p: Extra }) {
 const STATUS_TAG: Record<TrendSlice["status"], { label: string; cls?: string }> = {
   edge: { label: "edge", cls: m.tagOpen }, losing: { label: "losing", cls: m.tagRetire }, "no edge": { label: "no edge" }, collecting: { label: "collecting", cls: m.tagWatch },
 };
-/** trend_learner slice keys read "link=direct", "rank=rank 1", "set=extra"; say them plainly. */
+/** trend_learner slice keys read "link=direct", "rank=rank 1", "set=extra", "set=declined"; say them plainly. */
 const sliceName = (k: string) => {
   if (k === "set=extra") return "Picks past the cap";
+  if (k === "set=declined") return "Watch only (picker passed)";
   if (k === "set=in cap") return "Picks inside the cap";
   const [d, v] = k.split("=");
   const dim: Record<string, string> = { link: "Link", conviction: "Conviction", horizon: "Hold", rank: "Rank", source: "Source", run_up: "Run-up" };
@@ -751,7 +752,7 @@ function TrendLearner({ tr }: { tr: Trends }) {
       </div>
       <p className={m.sub}>
         {r
-          ? `The picker still names picks past the cap; those are graded only. If picks past the cap beat SPY (${r.minN}+ picks over ${r.minWeeks}+ weeks, t ${r.edgeT} or better, and still ahead on the newer half), the cap goes up one. If the last pick inside the cap loses to SPY, it goes down one. At most one move every ${r.capCooldownDays} days. Each kind of bet is judged the same way.`
+          ? `The picker still names picks past the cap; those are graded only. Picks it names on a day with buy slots still open are watch only: the picker passed, the cap did not stop them, so they never move the cap. If picks past the cap beat SPY (${r.minN}+ picks over ${r.minWeeks}+ weeks, t ${r.edgeT} or better, and still ahead on the newer half), the cap goes up one. If the last pick inside the cap loses to SPY, it goes down one. At most one move every ${r.capCooldownDays} days. Each kind of bet is judged the same way.`
           : "The cap moves only when graded picks show the extra picks beat SPY, or the last one inside the cap loses to it."}
       </p>
       {rows.length ? (
@@ -812,7 +813,7 @@ function TrendPending({ tr }: { tr: Trends }) {
           <li key={p.id} className={m.grade}>
             <span className={s.play}>
               {p.ticker}
-              {p.extra && <span className={m.tag} style={{ marginLeft: 8 }}>past the cap</span>}
+              {p.extra && <span className={m.tag} style={{ marginLeft: 8 }}>{p.declined ? "watch only" : "past the cap"}</span>}
             </span>
             <span className={m.gateCell}>
               <span className={m.gateBar}><span style={{ width: `${Math.min(1, (p.horizon - p.sessionsLeft) / p.horizon) * 100}%`, background: "var(--accent)" }} /></span>
@@ -829,6 +830,8 @@ function TrendPending({ tr }: { tr: Trends }) {
 function TrendsTab({ tr }: { tr: Trends }) {
   const b = tr.book ?? null;
   const latest = tr.latest ?? null;
+  const overCap = (latest?.extras ?? []).filter((p) => !p.declined);
+  const watchOnly = (latest?.extras ?? []).filter((p) => p.declined);
   const ret = b ? b.equity / b.start - 1 : null;
   const spy = b && b.spyEquity !== null ? b.spyEquity / b.start - 1 : null;
   const benched = tr.benched ?? [];
@@ -870,10 +873,16 @@ function TrendsTab({ tr }: { tr: Trends }) {
             <span className={m.sub}>No picks: nothing trending had a listed company with a clear, unpriced link. That is a normal day.</span>
           )}
           {latest && latest.picks.length > 0 && <ul className={m.holdList}>{latest.picks.map((p) => <PickRow key={p.id} p={p} />)}</ul>}
-          {latest && (latest.extras ?? []).length > 0 && (
+          {latest && overCap.length > 0 && (
             <details className={m.inner}>
-              <summary>{`Past the cap of ${latest.cap ?? tr.learner?.cap ?? 3}: graded only, not bought (${latest.extras!.length})`}</summary>
-              <ul className={m.holdList}>{latest.extras!.map((p) => <ExtraRow key={p.id} p={p} />)}</ul>
+              <summary>{`Past the cap of ${latest.cap ?? tr.learner?.cap ?? 3}: graded only, not bought (${overCap.length})`}</summary>
+              <ul className={m.holdList}>{overCap.map((p) => <ExtraRow key={p.id} p={p} />)}</ul>
+            </details>
+          )}
+          {latest && watchOnly.length > 0 && (
+            <details className={m.inner}>
+              <summary>{`Watch only: the picker passed with slots open, graded only (${watchOnly.length})`}</summary>
+              <ul className={m.holdList}>{watchOnly.map((p) => <ExtraRow key={p.id} p={p} />)}</ul>
             </details>
           )}
           {latest && latest.exits.length > 0 && <span className={m.why}>{`Selling: ${latest.exits.map((e) => `${e.ticker} (${e.why})`).join("; ")}`}</span>}

@@ -310,7 +310,7 @@ export interface Trends {
     exits: { ticker: string; why: string }[];
     /** The pick cap that day, and the picks past it, graded but not bought (added 2026-10-28). */
     cap?: number | null;
-    extras?: { id: string; ticker: string; topic: string | null; link: string; conviction: number; horizon: number; why: string | null }[];
+    extras?: { id: string; ticker: string; topic: string | null; link: string; conviction: number; horizon: number; why: string | null; declined?: boolean }[];
   } | null;
   history?: { day: string; tickers: string[] }[];
   graded?: TrendGraded[];
@@ -328,7 +328,7 @@ export interface Trends {
   /** First day the book buys picks; before it every pick is graded only. */
   liveFrom?: string;
   /** Picks waiting for their horizon, counted in trading sessions. */
-  pending?: { id: string; ticker: string; day: string; horizon: number; sessionsLeft: number; extra: boolean }[];
+  pending?: { id: string; ticker: string; day: string; horizon: number; sessionsLeft: number; extra: boolean; declined?: boolean }[];
 }
 
 export interface TrendSlice {
