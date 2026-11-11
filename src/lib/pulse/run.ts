@@ -508,7 +508,11 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
   }
   try {
     const state = await getNflState();
-    const week = state.display_week ?? state.week;
+    // Sleeper moves `week` on Tuesday but can leave `display_week` on last week
+    // into Tuesday night (2026-11-10: week 10, display_week 9). Reading
+    // display_week found week 9's log and skipped week 10's midweek email at
+    // every pulse from 8pm. The senders build on the newer week, so check that.
+    const week = Math.max(state.week ?? 0, state.display_week ?? 0);
     if (!week || !state.season) return false;
     if (id === "thursday") return (await thursdayAlreadySent(state.season, week)) !== null;
     return (await sharedAlreadySent(id, state.season, week)) !== null;
