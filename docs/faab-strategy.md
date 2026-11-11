@@ -12,6 +12,43 @@ The leagues this is for:
 | 2026 Half PPR | redraft, half PPR, starts DEF | 12 | $100 | Wed 3:00am ET |
 | Sunday Scaries #2 | redraft, full PPR | 12 | $100 | Wed 5:05am ET |
 
+## Standing rule: waiver email sources and deadline (Jack, 2026-11-10)
+
+Every waiver/FAAB email and every run that builds one follows this without
+being told again.
+
+1. **Deadline first.** Jack enters claims Tuesday night. The midweek email
+   must reach him Tuesday evening (the pulse backstop sends at 10pm ET). Never
+   hold the email waiting for a source that has not posted.
+2. **Jingles and Flock are the preferred redraft sources.** When Jingles'
+   week N waiver post or Flock Fantasy's week N waiver email is stored by send
+   time, it leads the redraft list. Jingles first; Flock when Jingles is
+   missing (`src/lib/waivers/build.ts`).
+3. **Fall back only for what is missing.** If one or both have not posted by
+   send time, the redraft list runs on the week's redraft web research and
+   Sleeper's most-added, and the email says which source was missing.
+4. **Dynasty and redraft are researched separately.** Each has its own
+   research pass (`waivers:v1:research:<season>:w<N>:dynasty` and `:redraft`)
+   and its own recommendations. A dynasty league never reads the redraft
+   research, Jingles or Flock (all three are redraft sources). With no dynasty
+   pass for the week, dynasty runs on Dynasty Nerds and Sleeper's most-added.
+5. **One send per week.** If the week already went out
+   (`email:v1:sent:midweek:<season>:w<N>`), resend only when the sent email
+   broke rules 2 to 4, never just because a source posted later.
+
+Worked examples:
+
+- Tuesday 9pm, Jingles week 10 stored, Flock not. Redraft leagues: Jingles
+  leads, redraft research fills in. Dynasty: dynasty research plus Dynasty
+  Nerds. Send at 10pm.
+- Tuesday 10pm, neither posted (week 10, 2026). Redraft: redraft research
+  plus most-added, note says Jingles and Flock had not posted. Dynasty: its own
+  pass. Send now; do not wait.
+- Tuesday 10pm, Flock week 10 stored, Jingles not. Redraft: Flock leads (no
+  bids, the app prices), redraft research behind it. Dynasty unchanged.
+- Wednesday 1am, Jingles posts after the email went out with redraft
+  research. No resend: the email followed the rule at send time.
+
 ## The one rule that survives every source
 
 Price the points a player adds to your STARTING lineup, not his projection.

@@ -229,16 +229,15 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     source = { label: lab.title, fresh: true, note: null };
   } else {
     const format = profile.type === "dynasty" ? "dynasty" : "redraft";
-    const [trending, ownResearch, redraftResearch, nerds] = await Promise.all([
+    // Each format reads only its own research. Jack's rule (2026-11-10):
+    // dynasty and redraft waivers are researched and recommended separately,
+    // never one blended list. A dynasty league with no dynasty pass this week
+    // runs on Dynasty Nerds and Sleeper's most-added, not the redraft list.
+    const [trending, research, nerds] = await Promise.all([
       getTrendingAdds(100).catch(() => []),
       readWaiverResearch(season, nflWeek, format),
-      format === "dynasty" ? readWaiverResearch(season, nflWeek, "redraft") : Promise.resolve(null),
       format === "dynasty" ? readDynastyNerds(season, nflWeek) : Promise.resolve(null),
     ]);
-    // The redraft consensus is a fair second-best for dynasty when the
-    // dynasty pass has not run: the role changes are the same players.
-    const research = ownResearch ?? redraftResearch;
-    const borrowed = !ownResearch && !!redraftResearch;
 
     // The week's web consensus, matched to Sleeper ids by name, position and
     // team. Anyone owned in this league or at a position it cannot start is
@@ -306,7 +305,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
         ? `Dynasty Nerds' week ${nerds.week} FAAB guide leads the list`
         : null;
     const researched = research
-      ? ` ${lead ? `${lead}; this` : "This"} week's ${borrowed ? "redraft " : ""}waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and ${lead ? "follow it" : "lead the list"}; Sleeper's most-added players fill in behind them.`
+      ? ` ${lead ? `${lead}; this` : "This"} week's ${format} waiver columns were researched ${new Date(research.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })} and ${lead ? "follow it" : "lead the list"}; Sleeper's most-added players fill in behind them.`
       : lead
         ? ` ${lead}; no web research has run for this week, so Sleeper's most-added players, filtered by who actually played, fill in behind it.`
         : " No web research has run for this week yet, so the list is Sleeper's most-added players, filtered by who actually played.";

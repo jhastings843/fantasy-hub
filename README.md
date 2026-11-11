@@ -3,6 +3,13 @@
 Fantasy football tools built on Sleeper league data plus RosterAudit, FantasyCalc,
 and KeepTradeCut player values.
 
+## Waiver email rule
+
+Claims go in Tuesday night, so the midweek waiver email never waits on a
+source. Jingles and Flock lead redraft when posted; other sources fill in only
+when they have not. Dynasty and redraft are researched and recommended
+separately. Full rule and examples: `docs/faab-strategy.md` ("Standing rule").
+
 ## Sections
 
 | Route | What it does |
