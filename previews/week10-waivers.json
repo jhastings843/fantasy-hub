@@ -1,0 +1,442 @@
+{
+  "season": "2026",
+  "week": 10,
+  "generatedAt": "2026-11-11T04:54:02.891Z",
+  "leagues": [
+    {
+      "name": "Dah Chopped League 🪓",
+      "skip": "guillotine"
+    },
+    {
+      "trendingFree": [
+        {
+          "name": "Konata Mumpfield",
+          "position": "WR",
+          "team": "LAR",
+          "adds": 2629188
+        },
+        {
+          "name": "Fernando Mendoza",
+          "position": "QB",
+          "team": "LV",
+          "adds": 938144
+        },
+        {
+          "name": "Tutu Atwell",
+          "position": "WR",
+          "team": "LAR",
+          "adds": 763987
+        },
+        {
+          "name": "Kyle McCord",
+          "position": "QB",
+          "team": "MIA",
+          "adds": 542088
+        },
+        {
+          "name": "Pierre Strong Jr.",
+          "position": "RB",
+          "team": "GB",
+          "adds": 458361
+        }
+      ],
+      "name": "Sunday Scaries #2",
+      "type": "redraft",
+      "budget": 100,
+      "left": 33,
+      "teams": 12,
+      "researchedAt": "2026-11-10T14:09:51.861Z",
+      "total": 21,
+      "rows": [
+        {
+          "name": "Corey Kiner",
+          "team": "NE",
+          "position": "RB",
+          "tier": "multiweek",
+          "faabPercent": 20,
+          "note": "Rhamondre Stevenson's knee injury plus TreVeyon Henderson's absence leaves Kiner as the early-down back projected for 15+ touches, with Lan Larison handling passing downs.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/",
+            "sports.yahoo.com/articles/week-10-fantasy-waiver-wire-080000375.html",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/",
+            "bleacherreport.com/articles/25531587",
+            "nfl.com/news/2026-nfl-fantasy-football-waiver-wire-week-10-jordyn-tyson-tank-dell-headline-top-15-targets"
+          ],
+          "bid": 20,
+          "matched": true
+        },
+        {
+          "name": "Kaleb Johnson",
+          "team": "GB",
+          "position": "RB",
+          "tier": "multiweek",
+          "faabPercent": 10,
+          "note": "With Josh Jacobs (fractured finger) and MarShawn Lloyd banged up, Johnson led the Packers backfield with 14-68-1 and finished RB11 on the week.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "sports.yahoo.com/articles/week-10-fantasy-waiver-wire-080000375.html",
+            "sports.yahoo.com/fantasy/article/week-10-fantasy-football-waiver-wire-seth-mcgowan-corey-kiner-among-top-pickups-190327664.html",
+            "athlonsports.com/fantasy/fantasy-football-waiver-wire-2026-nfl-week10-free-agents"
+          ],
+          "bid": 10,
+          "matched": true
+        },
+        {
+          "name": "Tank Dell",
+          "team": "HOU",
+          "position": "WR",
+          "tier": "starter",
+          "faabPercent": 6,
+          "note": "With Jaylin Noel on season-ending IR, Dell led Houston with nine targets and a team-high 148 air yards in his second game back, turning it into 4-105-1.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "rotoballer.com/week-10-fantasy-football-waiver-wire-pickups-stashes-all-positions-2026/1987979",
+            "sports.yahoo.com/articles/fantasy-football-faab-report-corey-134152845.html",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/",
+            "espn.com/fantasy/football/story/_/page/FFWaiverWirePickUp-50431710/"
+          ],
+          "bid": 6,
+          "matched": true
+        },
+        {
+          "name": "Jordan Watkins",
+          "team": "SF",
+          "position": "WR",
+          "tier": "filler",
+          "faabPercent": 2.5,
+          "note": "Went 4-86-1 with Mike Evans and Deebo Samuel Sr. out; his Week 10 value is tied strictly to those two remaining sidelined.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "sports.yahoo.com/articles/fantasy-football-faab-report-corey-134152845.html",
+            "si.com/fantasy/week-10-waiver-wire-targets",
+            "sports.yahoo.com/fantasy/article/week-10-fantasy-football-waiver-wire-seth-mcgowan-corey-kiner-among-top-pickups-190327664.html"
+          ],
+          "bid": 3,
+          "matched": true
+        },
+        {
+          "name": "Xavier Hutchinson",
+          "team": "HOU",
+          "position": "WR",
+          "tier": "stash",
+          "faabPercent": 1,
+          "note": "With Jaylin Noel out, FantasyPros prefers the overlooked third Houston receiver to Dell or Boutte and expects him to cost nothing.",
+          "sources": [
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/"
+          ],
+          "bid": 1,
+          "matched": true
+        },
+        {
+          "name": "Chigoziem Okonkwo",
+          "team": "WAS",
+          "position": "TE",
+          "tier": "starter",
+          "faabPercent": 5,
+          "note": "With Terry McLaurin out, Okonkwo ran a route on 78.6% of dropbacks in Week 9 (fifth among TEs) and has 24 targets over four games.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "nfl.com/news/2026-nfl-fantasy-football-waiver-wire-week-10-jordyn-tyson-tank-dell-headline-top-15-targets",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/",
+            "si.com/fantasy/week-10-waiver-wire-targets",
+            "athlonsports.com/fantasy/fantasy-football-waiver-wire-2026-nfl-week10-free-agents"
+          ],
+          "bid": 5,
+          "matched": true
+        },
+        {
+          "name": "Darren Waller",
+          "team": "CAR",
+          "position": "TE",
+          "tier": "streamer",
+          "faabPercent": 3,
+          "note": "Season-high 10 targets for 8-90-1 against Denver after a quiet three-game stretch, with a soft Saints matchup ahead.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "nfl.com/news/2026-nfl-fantasy-football-waiver-wire-week-10-jordyn-tyson-tank-dell-headline-top-15-targets",
+            "sports.yahoo.com/articles/fantasy-football-faab-report-corey-134152845.html",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/"
+          ],
+          "bid": 3,
+          "matched": true
+        },
+        {
+          "name": "Aaron Rodgers",
+          "team": "PIT",
+          "position": "QB",
+          "tier": "streamer",
+          "faabPercent": 1,
+          "note": "Bye-week drop who returns to lineups at Cincinnati, a defense he beat for nearly 300 yards and three TDs earlier this season.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/",
+            "sports.yahoo.com/fantasy/article/week-10-fantasy-football-waiver-wire-seth-mcgowan-corey-kiner-among-top-pickups-190327664.html",
+            "si.com/fantasy/week-10-waiver-wire-targets",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/"
+          ],
+          "bid": 1,
+          "matched": true
+        }
+      ],
+      "scoring": "full PPR"
+    },
+    {
+      "trendingFree": [
+        {
+          "name": "Konata Mumpfield",
+          "position": "WR",
+          "team": "LAR",
+          "adds": 2629188
+        },
+        {
+          "name": "Fernando Mendoza",
+          "position": "QB",
+          "team": "LV",
+          "adds": 938144
+        },
+        {
+          "name": "Tutu Atwell",
+          "position": "WR",
+          "team": "LAR",
+          "adds": 763987
+        },
+        {
+          "name": "Kyle McCord",
+          "position": "QB",
+          "team": "MIA",
+          "adds": 542088
+        },
+        {
+          "name": "Baltimore Ravens",
+          "position": "DEF",
+          "team": "BAL",
+          "adds": 507570
+        }
+      ],
+      "name": "2026 Half PPR",
+      "type": "redraft",
+      "budget": 100,
+      "left": 22,
+      "teams": 12,
+      "researchedAt": "2026-11-10T14:09:51.861Z",
+      "total": 21,
+      "rows": [
+        {
+          "name": "Kaleb Johnson",
+          "team": "GB",
+          "position": "RB",
+          "tier": "multiweek",
+          "faabPercent": 10,
+          "note": "With Josh Jacobs (fractured finger) and MarShawn Lloyd banged up, Johnson led the Packers backfield with 14-68-1 and finished RB11 on the week.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "sports.yahoo.com/articles/week-10-fantasy-waiver-wire-080000375.html",
+            "sports.yahoo.com/fantasy/article/week-10-fantasy-football-waiver-wire-seth-mcgowan-corey-kiner-among-top-pickups-190327664.html",
+            "athlonsports.com/fantasy/fantasy-football-waiver-wire-2026-nfl-week10-free-agents"
+          ],
+          "bid": 10,
+          "matched": true
+        },
+        {
+          "name": "Tank Dell",
+          "team": "HOU",
+          "position": "WR",
+          "tier": "starter",
+          "faabPercent": 6,
+          "note": "With Jaylin Noel on season-ending IR, Dell led Houston with nine targets and a team-high 148 air yards in his second game back, turning it into 4-105-1.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "rotoballer.com/week-10-fantasy-football-waiver-wire-pickups-stashes-all-positions-2026/1987979",
+            "sports.yahoo.com/articles/fantasy-football-faab-report-corey-134152845.html",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/",
+            "espn.com/fantasy/football/story/_/page/FFWaiverWirePickUp-50431710/"
+          ],
+          "bid": 6,
+          "matched": true
+        },
+        {
+          "name": "Jordan Watkins",
+          "team": "SF",
+          "position": "WR",
+          "tier": "filler",
+          "faabPercent": 2.5,
+          "note": "Went 4-86-1 with Mike Evans and Deebo Samuel Sr. out; his Week 10 value is tied strictly to those two remaining sidelined.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "sports.yahoo.com/articles/fantasy-football-faab-report-corey-134152845.html",
+            "si.com/fantasy/week-10-waiver-wire-targets",
+            "sports.yahoo.com/fantasy/article/week-10-fantasy-football-waiver-wire-seth-mcgowan-corey-kiner-among-top-pickups-190327664.html"
+          ],
+          "bid": 3,
+          "matched": true
+        },
+        {
+          "name": "Xavier Hutchinson",
+          "team": "HOU",
+          "position": "WR",
+          "tier": "stash",
+          "faabPercent": 1,
+          "note": "With Jaylin Noel out, FantasyPros prefers the overlooked third Houston receiver to Dell or Boutte and expects him to cost nothing.",
+          "sources": [
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/"
+          ],
+          "bid": 1,
+          "matched": true
+        },
+        {
+          "name": "Chigoziem Okonkwo",
+          "team": "WAS",
+          "position": "TE",
+          "tier": "starter",
+          "faabPercent": 5,
+          "note": "With Terry McLaurin out, Okonkwo ran a route on 78.6% of dropbacks in Week 9 (fifth among TEs) and has 24 targets over four games.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "nfl.com/news/2026-nfl-fantasy-football-waiver-wire-week-10-jordyn-tyson-tank-dell-headline-top-15-targets",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/",
+            "si.com/fantasy/week-10-waiver-wire-targets",
+            "athlonsports.com/fantasy/fantasy-football-waiver-wire-2026-nfl-week10-free-agents"
+          ],
+          "bid": 5,
+          "matched": true
+        },
+        {
+          "name": "Darren Waller",
+          "team": "CAR",
+          "position": "TE",
+          "tier": "streamer",
+          "faabPercent": 3,
+          "note": "Season-high 10 targets for 8-90-1 against Denver after a quiet three-game stretch, with a soft Saints matchup ahead.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "nfl.com/news/2026-nfl-fantasy-football-waiver-wire-week-10-jordyn-tyson-tank-dell-headline-top-15-targets",
+            "sports.yahoo.com/articles/fantasy-football-faab-report-corey-134152845.html",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/"
+          ],
+          "bid": 3,
+          "matched": true
+        },
+        {
+          "name": "Aaron Rodgers",
+          "team": "PIT",
+          "position": "QB",
+          "tier": "streamer",
+          "faabPercent": 1,
+          "note": "Bye-week drop who returns to lineups at Cincinnati, a defense he beat for nearly 300 yards and three TDs earlier this season.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/",
+            "sports.yahoo.com/fantasy/article/week-10-fantasy-football-waiver-wire-seth-mcgowan-corey-kiner-among-top-pickups-190327664.html",
+            "si.com/fantasy/week-10-waiver-wire-targets",
+            "playerprofiler.com/article/week-10-waiver-wire-top-fantasy-football-pickups-2026/"
+          ],
+          "bid": 1,
+          "matched": true
+        },
+        {
+          "name": "Washington Commanders D/ST",
+          "team": "WAS",
+          "position": "DEF",
+          "tier": "streamer",
+          "faabPercent": 1,
+          "note": "Matchup streamer only for a trip to the Giants, at 12-15% rostered with no usage change behind it.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/"
+          ],
+          "bid": 1,
+          "matched": true
+        },
+        {
+          "name": "Baltimore Ravens D/ST",
+          "team": "BAL",
+          "position": "DEF",
+          "tier": "streamer",
+          "faabPercent": 1,
+          "note": "Alternative defense stream versus the Chargers, rostered in 38% of Yahoo and 47% of ESPN leagues.",
+          "sources": [
+            "fantasypros.com/2026/11/fantasy-football-waiver-wire-advice-players-to-add-stash-drop-week-10-2026/"
+          ],
+          "bid": 1,
+          "matched": true
+        }
+      ],
+      "scoring": "half PPR"
+    },
+    {
+      "trendingFree": [
+        {
+          "name": "Konata Mumpfield",
+          "position": "WR",
+          "team": "LAR",
+          "adds": 2629188
+        },
+        {
+          "name": "Darren Waller",
+          "position": "TE",
+          "team": "CAR",
+          "adds": 945315
+        },
+        {
+          "name": "Tutu Atwell",
+          "position": "WR",
+          "team": "LAR",
+          "adds": 763987
+        },
+        {
+          "name": "Kyle McCord",
+          "position": "QB",
+          "team": "MIA",
+          "adds": 542088
+        },
+        {
+          "name": "Pierre Strong Jr.",
+          "position": "RB",
+          "team": "GB",
+          "adds": 458361
+        }
+      ],
+      "name": "Dah Dynasty League",
+      "type": "dynasty",
+      "budget": 1000,
+      "left": 731,
+      "teams": 12,
+      "researchedAt": "2026-11-10T14:05:00.831Z",
+      "total": 16,
+      "rows": [
+        {
+          "name": "Audric Estimé",
+          "team": "NO",
+          "position": "RB",
+          "tier": "multiweek",
+          "faabPercent": 16,
+          "note": "With Kendre Miller released, Estimé led the backfield with 15 carries for 72 yards and a TD while Kamara got six; Travis Etienne's IR return caps the upside.",
+          "sources": [
+            "fftoday.com/articles/woods/26-touch-transfer-wk10.html",
+            "bleacherreport.com/articles/25531587-corey-kiner-and-best-week-10-fantasy-football-waiver-wire-pickups",
+            "nfl.com/news/2026-nfl-fantasy-football-waiver-wire-week-10-jordyn-tyson-tank-dell-headline-top-15-targets"
+          ],
+          "bid": 160,
+          "matched": true
+        },
+        {
+          "name": "Kaleb Johnson",
+          "team": "GB",
+          "position": "RB",
+          "tier": "multiweek",
+          "faabPercent": 16,
+          "note": "Josh Jacobs will miss weeks after finger surgery and Johnson stepped into the lead role for 14-68-1, though a committee with Strong and Lloyd is possible.",
+          "sources": [
+            "rotoballer.com/faab-waiver-wire-advice-week-10-fantasy-pickups-2026/1988730",
+            "sports.yahoo.com/articles/week-10-fantasy-waiver-wire-080000375.html",
+            "sports.yahoo.com/articles/week-10-waiver-wire-faab-124326976.html"
+          ],
+          "bid": 160,
+          "matched": true
+        }
+      ],
+      "scoring": "full PPR"
+    }
+  ]
+}
