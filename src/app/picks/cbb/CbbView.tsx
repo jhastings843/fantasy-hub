@@ -385,7 +385,7 @@ export function CbbRowBody({ x, m }: { x: CbbBoardRow; m?: Market }) {
           <dt>David</dt>
           <dd className={`${s.num} ${s.cDavid}`}>
             {(sides ? dHome !== null : dTotal !== null)
-              ? `${both(`${g.home.short} ${line(dHome ?? 0)}`, `total ${dTotal?.toFixed(1) ?? "·"}`)} · read ${shortDate(x.david!.at)} ${tipTime(x.david!.at)}`
+              ? `${both(`${g.home.short} ${line(dHome ?? 0)}`, `total ${dTotal?.toFixed(1) ?? "·"}`)}`
               : "not posted (his page lists only some games, today only)"}
           </dd>
           {sides && (
@@ -393,7 +393,7 @@ export function CbbRowBody({ x, m }: { x: CbbBoardRow; m?: Market }) {
               <dt>Harris</dt>
               <dd className={`${s.num} ${s.cHarris}`}>
                 {harrisHome(x) !== null
-                  ? `${g.home.short} ${line(harrisHome(x)!)}${x.harris!.trigger ? " · Trigger on" : ""} · read ${shortDate(x.harris!.at)} ${tipTime(x.harris!.at)}`
+                  ? `${g.home.short} ${line(harrisHome(x)!)}${x.harris!.trigger ? " · Trigger on" : ""}`
                   : "not on his sheet"}
               </dd>
             </>
