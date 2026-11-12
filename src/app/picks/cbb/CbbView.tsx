@@ -300,12 +300,22 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
       </summary>
   );
   // The numbers under each game load when it opens (UX pass item 4: ~94 games a day).
-  return <LazyDetails className={cls} summary={summary} load={loadCbbGame.bind(null, g.id)} loadingClass={s.gBody} />;
+  return <LazyDetails className={cls} summary={summary} load={loadCbbGame.bind(null, g.id, m)} loadingClass={s.gBody} />;
 }
 
-/** One game's numbers: projections, lines, ratings, where, what was saved. */
-export function CbbRowBody({ x }: { x: CbbBoardRow }) {
+/**
+ * One game's numbers for the market being viewed: a spreads row shows only spread numbers, a totals row only
+ * totals (Jack: never a total on the spread page). `m` undefined shows every market.
+ */
+export function CbbRowBody({ x, m }: { x: CbbBoardRow; m?: Market }) {
   const { g, read: r } = x;
+  const ats = m === undefined || m === "ats";
+  const ou = m === undefined || m === "ou";
+  const su = m === undefined || m === "su";
+  const sides = m !== "ou";
+  const dHome = davidHome(x);
+  const dTotal = x.david?.total ?? null;
+  const both = (margin: string, total: string) => [sides ? margin : "", ou ? total : ""].filter(Boolean).join(", ");
   return (
       <div className={s.gBody}>
         <div className={c.stats}>
@@ -313,36 +323,54 @@ export function CbbRowBody({ x }: { x: CbbBoardRow }) {
             <span>Projected score</span>
             <b className={s.num}>{`${g.away.short} ${r.proj.awayPts.toFixed(0)}, ${g.home.short} ${r.proj.homePts.toFixed(0)}`}</b>
           </div>
-          <div>
-            <span>Win chance</span>
-            <b className={s.num}>{`${r.proj.homeWin >= 0.5 ? g.home.short : g.away.short} ${pctOf(Math.max(r.proj.homeWin, 1 - r.proj.homeWin))}`}</b>
-          </div>
-          <div>
-            <span>Cover chance</span>
-            <b className={s.num}>{r.homeCover !== null ? `${g.home.short} ${pctOf(r.homeCover)}` : "no line"}</b>
-          </div>
-          <div>
-            <span>Over chance</span>
-            <b className={s.num}>{r.over !== null ? pctOf(r.over) : "no line"}</b>
-          </div>
+          {su && (
+            <div>
+              <span>Win chance</span>
+              <b className={s.num}>{`${r.proj.homeWin >= 0.5 ? g.home.short : g.away.short} ${pctOf(Math.max(r.proj.homeWin, 1 - r.proj.homeWin))}`}</b>
+            </div>
+          )}
+          {ats && (
+            <div>
+              <span>Cover chance</span>
+              <b className={s.num}>{r.homeCover !== null ? `${g.home.short} ${pctOf(r.homeCover)}` : "no line"}</b>
+            </div>
+          )}
+          {ou && (
+            <div>
+              <span>Over chance</span>
+              <b className={s.num}>{r.over !== null ? pctOf(r.over) : "no line"}</b>
+            </div>
+          )}
         </div>
         <dl className={s.kv}>
-          <dt>Spread</dt>
-          <dd className={s.num}>{r.line?.spread != null ? `${g.home.short} ${line(r.line.spread)} (${price(r.line.homePrice)} / ${price(r.line.awayPrice)})` : "not posted"}</dd>
-          <dt>Total</dt>
-          <dd className={s.num}>{r.line?.total != null ? `${r.line.total} (o ${price(r.line.overPrice)} / u ${price(r.line.underPrice)})` : "not posted"}</dd>
-          <dt>Moneyline</dt>
-          <dd className={s.num}>{r.line?.mlHome !== undefined || r.line?.mlAway !== undefined ? `${g.away.abbr} ${price(r.line?.mlAway)} · ${g.home.abbr} ${price(r.line?.mlHome)}` : "not posted"}</dd>
+          {ats && (
+            <>
+              <dt>Spread</dt>
+              <dd className={s.num}>{r.line?.spread != null ? `${g.home.short} ${line(r.line.spread)} (${price(r.line.homePrice)} / ${price(r.line.awayPrice)})` : "not posted"}</dd>
+            </>
+          )}
+          {ou && (
+            <>
+              <dt>Total</dt>
+              <dd className={s.num}>{r.line?.total != null ? `${r.line.total} (o ${price(r.line.overPrice)} / u ${price(r.line.underPrice)})` : "not posted"}</dd>
+            </>
+          )}
+          {su && (
+            <>
+              <dt>Moneyline</dt>
+              <dd className={s.num}>{r.line?.mlHome !== undefined || r.line?.mlAway !== undefined ? `${g.away.abbr} ${price(r.line?.mlAway)} · ${g.home.abbr} ${price(r.line?.mlHome)}` : "not posted"}</dd>
+            </>
+          )}
           <dt>Our ratings</dt>
-          <dd className={s.num}>{`${g.home.short} ${signed(r.parts.ours.margin)}, total ${r.parts.ours.total.toFixed(1)}`}</dd>
+          <dd className={s.num}>{both(`${g.home.short} ${signed(r.parts.ours.margin)}`, `total ${r.parts.ours.total.toFixed(1)}`)}</dd>
           <dt>T-Rank</dt>
-          <dd className={s.num}>{r.parts.trank ? `${g.home.short} ${signed(r.parts.trank.margin)}, total ${r.parts.trank.total.toFixed(1)}${r.rank.home || r.rank.away ? ` (ranks ${r.rank.away ?? "·"} at ${r.rank.home ?? "·"})` : ""}` : "not rated (non-Division I side)"}</dd>
+          <dd className={s.num}>{r.parts.trank ? `${both(`${g.home.short} ${signed(r.parts.trank.margin)}`, `total ${r.parts.trank.total.toFixed(1)}`)}${r.rank.home || r.rank.away ? ` (ranks ${r.rank.away ?? "·"} at ${r.rank.home ?? "·"})` : ""}` : "not rated (non-Division I side)"}</dd>
           <dt>Blend</dt>
-          <dd className={s.num}>{`${g.home.short} ${line(r.proj.spread)}, total ${r.proj.total}`}</dd>
+          <dd className={s.num}>{both(`${g.home.short} ${line(r.proj.spread)}`, `total ${r.proj.total}`)}</dd>
           <dt>David</dt>
           <dd className={`${s.num} ${s.cDavid}`}>
-            {davidHome(x) !== null
-              ? `${g.home.short} ${line(davidHome(x)!)}, total ${x.david!.total?.toFixed(1) ?? "·"} · read ${shortDate(x.david!.at)} ${tipTime(x.david!.at)}${x.david!.spread !== null ? ` (his consensus line ${line(x.david!.homeId === g.home.id ? x.david!.spread : -x.david!.spread || 0)}${x.david!.postedTotal !== null ? `, ${x.david!.postedTotal}` : ""})` : ""}`
+            {(sides ? dHome !== null : dTotal !== null)
+              ? `${both(`${g.home.short} ${line(dHome ?? 0)}`, `total ${dTotal?.toFixed(1) ?? "·"}`)} · read ${shortDate(x.david!.at)} ${tipTime(x.david!.at)}`
               : "not posted (his page lists only some games, today only)"}
           </dd>
           {(g.venue || g.note) && (
@@ -354,7 +382,7 @@ export function CbbRowBody({ x }: { x: CbbBoardRow }) {
           {x.saved && (
             <>
               <dt>Saved</dt>
-              <dd className={s.num}>{`First read ${shortDate(x.saved.first.at)} ${tipTime(x.saved.first.at)} at ${x.saved.first.spread !== null ? `${g.home.abbr} ${line(x.saved.first.spread)}` : "no spread"}, total ${x.saved.first.total ?? "·"}`}</dd>
+              <dd className={s.num}>{`First read ${shortDate(x.saved.first.at)} ${tipTime(x.saved.first.at)} at ${both(x.saved.first.spread !== null ? `${g.home.abbr} ${line(x.saved.first.spread)}` : "no spread", `total ${x.saved.first.total ?? "·"}`)}`}</dd>
             </>
           )}
         </dl>
