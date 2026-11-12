@@ -240,9 +240,15 @@ export function mergeDay(prior: HarrisCbbRow[] | undefined, fresh: HarrisCbbRow[
   return out;
 }
 
-/** One day's picks table from his feed. One request. */
-export async function fetchHarrisCbb(date: string, url = HARRIS_CBB_URL): Promise<CbbFeedTable> {
-  const res = await fetch(`${url}?picks_date=${encodeURIComponent(date)}`, { redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(60_000) });
+/** His feed is a Google Apps Script: about 24 s on a cold read, 1-3 s warm (timed 2026-11-12). */
+export const HARRIS_CBB_SLOW_MS = 18_000;
+
+/** One day's picks table from his feed. One request. Throws HarrisCbbSlow past timeoutMs. */
+export async function fetchHarrisCbb(date: string, url = HARRIS_CBB_URL, timeoutMs = 60_000): Promise<CbbFeedTable> {
+  const res = await fetch(`${url}?picks_date=${encodeURIComponent(date)}`, { redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) }).catch((e) => {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new HarrisCbbSlow(date, timeoutMs);
+    throw e;
+  });
   if (!res.ok) throw new Error(`Harris CBB feed answered ${res.status}`);
   const j = (await res.json()) as { tabs?: { picks?: CbbFeedTable } };
   const table = j.tabs?.picks;
@@ -251,6 +257,14 @@ export async function fetchHarrisCbb(date: string, url = HARRIS_CBB_URL): Promis
   const other = table.rows.find((r) => (r[iDate] ?? "").trim() !== date);
   if (other) throw new Error(`Harris CBB feed sent ${other[iDate]} when asked for ${date}`);
   return table;
+}
+
+/** His feed did not answer in time (usually a cold start); the next pulse retries. */
+export class HarrisCbbSlow extends Error {
+  constructor(date: string, ms: number) {
+    super(`his feed took over ${Math.round(ms / 1000)}s for ${date}`);
+    this.name = "HarrisCbbSlow";
+  }
 }
 
 /** Usable days for the Learning page: verified days of days on file. */

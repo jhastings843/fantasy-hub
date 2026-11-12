@@ -875,3 +875,12 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - The method in force shows an "In force" tag with no progress bars. Report-only rows have no bars either (board.tsx TrackingProgress).
 - Health check 2026-11-03: all 14 learner states reviewed today, journals current. /learning now lists the CBB model.
 - Waiver research: GitHub secrets ANTHROPIC_API_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN set from .env.local (same app), so the workflow takes the runner path. Forced redraft run 41692386467 passed (about 5 min). Its list replaced the morning's cached one (20 targets, was 25).
+
+# 2026-11-10 11:35pm: Week 10 midweek email skipped, fixed (1fd78ae)
+- Cause: pulse alreadyWentOut used Sleeper display_week (still 9 Tuesday night; week was 10), found the week 9 log, and skipped midweek at every pulse from 8pm. Now uses max(week, display_week). Sent by hand via pulse dispatch at 11:36pm: "Week 10 midweek: 2 claims worth making".
+- Side note: Jingles had no week 10 list yet, so the email ran on week 9 ranks plus the 9am research (dynasty 16 targets, redraft 21). The jingles relay log shows an IMAP read timeout.
+
+# 2026-11-12: Harris CBB pulse job "failing" was a timeout, fixed (NOT pushed)
+- Data was fine: every day Nov 3-12 on file and verified. The failure was "harris-cbb took longer than 25000ms" (last at 17:45Z, ok again the hour before).
+- Cause: his Apps Script feed takes ~24 s on a cold read (timed 11-10 and 11-11 at 24.0 s and 24.5 s), 1-3 s warm. The job read yesterday, then today, then ESPN, in a row under the pulse's 25 s job cap. When the pulse cut it off, the claim was never released, so yesterday could sit unread up to 6 h.
+- Fix: both days read at once (Promise.allSettled); his feed gets its own 18 s limit (HARRIS_CBB_SLOW_MS); a slow read throws HarrisCbbSlow, releases its claim, retries next pulse, and goes to watchProblems("Harris CBB feed") so 3 slow runs in a row still push. The job itself reports ok. Manual POST /api/picks/harris keeps the 60 s limit. Tests: harris.test.ts "slow feed".

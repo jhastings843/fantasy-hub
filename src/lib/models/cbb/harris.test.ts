@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { checkCbbRow, feedRows, modelSide, fixText, matchRows, mergeDay, nameKey, preOf, usableDays, type BoardTeams, type CbbFeedTable } from "./harris";
+import { HarrisCbbSlow, checkCbbRow, fetchHarrisCbb, feedRows, modelSide, fixText, matchRows, mergeDay, nameKey, preOf, usableDays, type BoardTeams, type CbbFeedTable } from "./harris";
 import { cbbCandidates, harrisRead, CBB_SLICES } from "./learn";
 import type { TrackedCbbGame } from "./track";
 
@@ -171,3 +171,17 @@ describe("matchRows with a typo row", () => {
   });
 });
 
+
+describe("fetchHarrisCbb: slow feed", () => {
+  it("a timed-out read throws HarrisCbbSlow (the pulse retries it, not a failure)", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("timed out", "TimeoutError"));
+    await expect(fetchHarrisCbb("2026-11-11", "https://x.test", 18_000)).rejects.toThrow(HarrisCbbSlow);
+    await expect(fetchHarrisCbb("2026-11-11", "https://x.test", 18_000)).rejects.toThrow("his feed took over 18s for 2026-11-11");
+    spy.mockRestore();
+  });
+  it("any other network error passes through unchanged", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+    await expect(fetchHarrisCbb("2026-11-11", "https://x.test")).rejects.toThrow(TypeError);
+    spy.mockRestore();
+  });
+});

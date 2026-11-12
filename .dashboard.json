@@ -14,8 +14,9 @@
   "blockers": [
     "Dah Chopped drop TIME is still unknown. Jack confirmed the chopped roster goes to WAIVERS (not open free agency), which is what the advisor assumes, but the commissioner has not said when he force-drops it. The email currently goes out Tuesday morning; FAAB_EMAIL_DAY changes that with no deploy once he answers."
   ],
-  "last_worked": "2026-11-10",
+  "last_worked": "2026-11-12",
   "notes": [
+    "2026-11-12: Harris CBB job timeouts fixed (his feed cold-starts ~24s; reads now parallel with an 18s soft limit). Not pushed.",
     "2026-11-10: Money > Trends shows 'watch only' vs 'past the cap' for graded-only picks.",
     "2026-11-09: David Sasser NBA spreads/totals tracked like Sam (cuts, results, board); David NBA props URL fixed to /nba/props.",
     "2026-11-08: Venom total moved to the totals side (board row, totals research table, learner question nfl:ou:source:venom with a totals veto); fixed nfl:source:venom judging college games. TQQQ/SQQQ switch moved off the Options tab to Stock books + its book page (options bot kept, BIL kept on no-lean days).",

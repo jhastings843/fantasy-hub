@@ -2,7 +2,7 @@ import "server-only";
 import { redis } from "@/lib/redis/client";
 import { watchProblems } from "@/lib/notify/problems";
 import { boardFor, cbbSeason } from "./store";
-import { HARRIS_DAY, HARRIS_DAYS, HARRIS_PRE, feedRows, fetchHarrisCbb, matchRows, mergeDay, preOf, type HarrisCbbDay } from "./harris";
+import { HARRIS_CBB_SLOW_MS, HARRIS_DAY, HARRIS_DAYS, HARRIS_PRE, HarrisCbbSlow, feedRows, fetchHarrisCbb, matchRows, mergeDay, preOf, type HarrisCbbDay } from "./harris";
 
 // John Harris's daily CBB sheet into Redis (tracked only; harris.ts has the
 // feed and its signs). Each read is matched to that day's ESPN board, stored
@@ -29,10 +29,10 @@ const dayBefore = (date: string) => new Date(Date.parse(`${date}T12:00:00Z`) - 8
 const seasonOfDate = (date: string) => cbbSeason(new Date(`${date}T12:00:00Z`));
 
 /** One day from his feed: one request to him, one to ESPN's board. */
-export async function ingestHarrisCbb(date: string, now = new Date()): Promise<HarrisCbbDay | { skipped: string }> {
+export async function ingestHarrisCbb(date: string, now = new Date(), feedMs?: number): Promise<HarrisCbbDay | { skipped: string }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`Send the date as YYYY-MM-DD (got ${date}).`);
   const season = seasonOfDate(date);
-  const table = await fetchHarrisCbb(date);
+  const table = await fetchHarrisCbb(date, undefined, feedMs);
   const rows = feedRows(table);
   if (!rows.length) return { skipped: `his feed has no games on ${date} yet` };
   const board = await boardFor(date.replace(/-/g, ""));
@@ -61,15 +61,18 @@ export async function ingestHarrisCbb(date: string, now = new Date()): Promise<H
 /**
  * For the hourly pulse: today's sheet at most once an hour and yesterday's
  * every six hours until it is verified and was read after its last tip. Two
- * requests to his feed per run at most.
+ * requests to his feed per run at most, sent together: his feed can take
+ * ~24 s on a cold start and the pulse gives a job 25 s, so read in a row a
+ * cold one blew the budget and left its claim stuck. A read past
+ * HARRIS_CBB_SLOW_MS releases its claim and retries next pulse; it counts as a
+ * problem, so three slow runs in a row still push.
  */
 export async function harrisCbbIfDue(now = new Date()): Promise<string> {
   // May through October: no games (his pickDates start Nov 1).
   const month = Number(new Intl.DateTimeFormat("en-US", { timeZone: ET, month: "numeric" }).format(now));
   if (month >= 5 && month <= 10) return "Harris CBB: off season";
   const today = etDate(now);
-  const out: string[] = [];
-  const problems: string[] = [];
+  const due: string[] = [];
   for (const date of [dayBefore(today), today]) {
     const season = seasonOfDate(date);
     if (date < FIRST_DAY(season)) continue;
@@ -79,17 +82,29 @@ export async function harrisCbbIfDue(now = new Date()): Promise<string> {
       if (stored?.verified && lastTip && stored.at > lastTip) continue;
     }
     if ((await redis.set(CLAIM(season, date), now.toISOString(), { nx: true, ex: date < today ? YESTERDAY_EVERY_S : TODAY_EVERY_S })) !== "OK") continue;
-    try {
-      const r = await ingestHarrisCbb(date, now);
-      out.push("skipped" in r ? `${date} ${r.skipped}` : `${date} ${r.rows.length} games${r.verified ? "" : `, not verified (${r.problems.length} problems)`}`);
-      if (!("skipped" in r) && !r.verified) problems.push(`${date}: ${r.problems[0] ?? "no rows matched"}`);
-    } catch (e) {
-      // Let the next pulse try again rather than wait out the window.
-      await redis.del(CLAIM(season, date)).catch(() => {});
-      throw e;
-    }
+    due.push(date);
   }
-  // A day that reads but does not verify (usually a team name we fold differently) pushes Jack after a streak.
+  const results = await Promise.allSettled(due.map((date) => ingestHarrisCbb(date, now, HARRIS_CBB_SLOW_MS)));
+  const out: string[] = [];
+  const problems: string[] = [];
+  let hard: unknown = null;
+  for (const [i, res] of results.entries()) {
+    const date = due[i];
+    if (res.status === "rejected") {
+      // Let the next pulse try again rather than wait out the window.
+      await redis.del(CLAIM(seasonOfDate(date), date)).catch(() => {});
+      if (res.reason instanceof HarrisCbbSlow) {
+        out.push(`${date} ${res.reason.message}, retrying next pulse`);
+        problems.push(`${date}: ${res.reason.message}`);
+      } else hard ??= res.reason;
+      continue;
+    }
+    const r = res.value;
+    out.push("skipped" in r ? `${date} ${r.skipped}` : `${date} ${r.rows.length} games${r.verified ? "" : `, not verified (${r.problems.length} problems)`}`);
+    if (!("skipped" in r) && !r.verified) problems.push(`${date}: ${r.problems[0] ?? "no rows matched"}`);
+  }
+  if (hard) throw hard;
+  // A day that reads but does not verify (usually a team name we fold differently), or a feed slow three runs running, pushes Jack.
   if (out.length) await watchProblems("Harris CBB feed", problems);
   return out.length ? `Harris CBB: ${out.join("; ")}` : "Harris CBB: nothing due";
 }
