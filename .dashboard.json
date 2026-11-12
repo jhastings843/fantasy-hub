@@ -338,7 +338,8 @@
     "2026-11-06: Harris CBB as an outside source: daily sheet from his Apps Script feed matched to ESPN (127 of 127 games Nov 3-6 plus 44 of 44 for Nov 7, one alias), 6 Harris slices on the CBB engine (his side vs our saved line, agree/split, 3+/5+, Trigger), pregame reads only. Harris route accepts CFB week 0.",
     "2026-11-06: Portfolio Refresh button (Mac polls every minute, re-prices newest Fidelity export); 8:30pm price refresh; lean scheduled runs.",
     "2026-11-06: Portfolio plan tracking + trade status, Harris website feeds (CFB+CBB), props NFL over rule (-120), UX walkthrough; next: freshness/status page, tab fold, speed, plain words (HANDOFF top)",
-    "2026-11-09: Money tabs show 'Checked X ago, found Y, next check Z' per desk; Today has a live Research desks feed. trade-bot tradebot/activity.py posts lines to /api/money/activity (Day Trader, Trends, Stock books, Options, Phil); Gus and Weather use their snapshot times."
+    "2026-11-09: Money tabs show 'Checked X ago, found Y, next check Z' per desk; Today has a live Research desks feed. trade-bot tradebot/activity.py posts lines to /api/money/activity (Day Trader, Trends, Stock books, Options, Phil); Gus and Weather use their snapshot times.",
+    "2026-11-12: David Sasser CBB tracked beside ours (board, pop-up, Results, 9 learner slices, Learning row); Sam CBB still coming soon."
   ],
   "tags": [
     "personal",
