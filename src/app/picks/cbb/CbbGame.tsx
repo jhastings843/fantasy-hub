@@ -181,6 +181,19 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
     }
     return `${g.home.short} ${line(dHome)}${side}`;
   })();
+  // John Harris (spreads only): his line for this row's home team, his side at the line above.
+  const hp = x.harris;
+  const hHome = !hp ? null : hp.homeId === g.home.id ? hp.model : hp.homeId === g.away.id ? -hp.model || 0 : null;
+  const harrisLine = (() => {
+    if (hHome === null) return null;
+    let side = "";
+    if (r.spread !== null && r.spread - hHome !== 0) {
+      const home = r.spread - hHome > 0;
+      const cov = margin !== null && final ? (margin + r.spread) * (home ? 1 : -1) : null;
+      side = ` · his side ${home ? `${g.home.short} ${line(r.spread)}` : `${g.away.short} ${line(-r.spread)}`}${cov === null ? "" : cov > 0 ? " (covered)" : cov < 0 ? " (missed)" : " (push)"}`;
+    }
+    return `${g.home.short} ${line(hHome)}${hp!.trigger ? " · Trigger on" : ""}${side}`;
+  })();
   const davidTotal = (() => {
     if (!d || d.total === null) return null;
     if (r.total === null || d.total === r.total) return d.total.toFixed(1);
@@ -274,6 +287,8 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
           <dd className={s.num}>{`${Math.round(CBB_PARAMS.blend.margin.ours * 100)}% ours, ${Math.round(CBB_PARAMS.blend.margin.trank * 100)}% T-Rank on the margin; ${g.home.short} ${line(now.proj.spread)}, total ${now.proj.total} today`}</dd>
           <dt>David line</dt>
           <dd className={`${s.num} ${s.cDavid}`}>{davidLine ?? "not posted (his page lists some games, today only)"}</dd>
+          <dt>Harris line</dt>
+          <dd className={`${s.num} ${s.cHarris}`}>{harrisLine ?? "not on his sheet"}</dd>
           {davidTotal && (
             <>
               <dt>David total</dt>

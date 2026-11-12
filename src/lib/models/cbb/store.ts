@@ -514,6 +514,8 @@ export interface CbbBoardRow {
   saved?: TrackedCbbGame;
   /** David Sasser's last pregame read of this game (david.ts), when he posted it. */
   david?: DavidPre;
+  /** John Harris's last pregame read (harris.ts; spreads only, his sheet has no totals). */
+  harris?: HarrisPre;
 }
 
 export interface CbbBoard {
@@ -546,7 +548,12 @@ export async function getCbbBoard(now = new Date(), back = 0, only?: string): Pr
   ]);
   // David's pregame reads for just these games (his season hash grows all winter).
   const ids = boards.flat().map((g) => g.id);
-  const davidBy: { [event: string]: DavidPre } = ids.length ? ((await redis.hmget<{ [event: string]: DavidPre }>(DAVID_PRE(season), ...ids).catch(() => null)) ?? {}) : {};
+  const [davidBy, harrisBy] = ids.length
+    ? await Promise.all([
+        redis.hmget<{ [event: string]: DavidPre }>(DAVID_PRE(season), ...ids).then((x) => x ?? {}).catch(() => ({}) as { [event: string]: DavidPre }),
+        redis.hmget<{ [event: string]: HarrisPre }>(HARRIS_PRE(season), ...ids).then((x) => x ?? {}).catch(() => ({}) as { [event: string]: HarrisPre }),
+      ])
+    : [{} as { [event: string]: DavidPre }, {} as { [event: string]: HarrisPre }];
   const tracked = trackedRaw ?? {};
   const names = Object.fromEntries(teams.map((t) => [t.id, t.location]));
   const [{ r, finals, complete, stale }, tr] = await Promise.all([ratingsNow(season, today, 8), trankById(season, now, names)]);
@@ -572,7 +579,8 @@ export async function getCbbBoard(now = new Date(), back = 0, only?: string): Pr
       const saved = tracked[g.id] ? orientTracked(tracked[g.id], g.home.id) : undefined;
       const line = (g.state === "pre" ? liveLines.get(g.id) : undefined) ?? (saved ? lineOfSnap(saved.last) : null);
       const david = davidBy[g.id] ?? undefined;
-      return { g, read: readGame(g, r, tr, line), saved, ...(david ? { david } : {}) };
+      const harris = harrisBy[g.id] ?? undefined;
+      return { g, read: readGame(g, r, tr, line), saved, ...(david ? { david } : {}), ...(harris ? { harris } : {}) };
     });
     out.push({ day: days[i], rows });
   }
@@ -590,6 +598,8 @@ export interface CbbRecord {
   section: SectionView;
   /** David Sasser's pregame reads by event (his record and per-game results on Results). */
   david: { [event: string]: DavidPre };
+  /** John Harris's pregame reads by event (spreads only). */
+  harris: { [event: string]: HarrisPre };
 }
 
 export async function getCbbRecord(now = new Date()): Promise<CbbRecord> {
@@ -597,7 +607,7 @@ export async function getCbbRecord(now = new Date()): Promise<CbbRecord> {
   const [raw, state, journal, harris, david] = await Promise.all([redis.hgetall<{ [id: string]: TrackedCbbGame }>(TRACK(season)), loadSection(CBB_SECTION, season), loadJournal(CBB_SECTION, season, 40), harrisPre(season), davidPre(season)]);
   const games = Object.values(raw ?? {}).sort((a, b) => b.tip.localeCompare(a.tip));
   const strong = { strong: P.strong, strongTotal: P.strongTotal };
-  return { season, games, records: signalRecords(games, strong), strong, section: sectionView(CBB_MODEL_GATE, state, cbbCandidates(games, season, harris, david), journal), david };
+  return { season, games, records: signalRecords(games, strong), strong, section: sectionView(CBB_MODEL_GATE, state, cbbCandidates(games, season, harris, david), journal), david, harris };
 }
 
 export { signalsOf };

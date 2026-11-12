@@ -45,6 +45,7 @@
   /* Position marks (dataviz reference palette, slots 1-6, validated on paper and on #0e1116). Marks only; labels stay in ink. */
   --pos-qb: #2a78d6; --pos-rb: #eb6834; --pos-wr: #1baf7a; --pos-te: #eda100; --pos-k: #e87ba4; --pos-def: #008300;
   --hh-david: #3f6584; /* cool slate blue: apart from Sam's rust (5.5:1 on paper) */
+  --hh-harris: #6b4a7a; /* plum: apart from Sam's rust and David's blue (6.5:1 on paper) */
   --hh-live: #a3333a;
 
   /* Spotlight: the single action that matters right now */
@@ -89,6 +90,7 @@
   --hh-gold-soft: rgb(236 194 94 / 0.12);
   --pos-qb: #3987e5; --pos-rb: #d95926; --pos-wr: #199e70; --pos-te: #c98500; --pos-k: #d55181; --pos-def: #008300;
   --hh-david: #93b4e0;
+  --hh-harris: #c4a5d6;
   --hh-live: #f87171;
   --hh-spot-bg: #131820;
   --hh-spot-border: #5eead4;
