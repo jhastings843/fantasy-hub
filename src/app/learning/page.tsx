@@ -18,6 +18,7 @@ import { pemWeeks } from "@/lib/picks/pem";
 import { harrisWeeks } from "@/lib/picks/harris";
 import { usableWeeks, type UsableWeeks } from "@/lib/picks/source-weeks";
 import { harrisCbbDays } from "@/lib/models/cbb/harris-store";
+import { davidCbbDays } from "@/lib/models/cbb/david-store";
 import { usableDays } from "@/lib/models/cbb/harris";
 import { whenEt } from "../picks/ui";
 import { PageHead, Section, Row as StatusRow, Chip, Disclosure, Num } from "@/components/hh/ui";
@@ -93,7 +94,7 @@ function engineRow(st: SectionState): Pick<Row, "live" | "collecting" | "last"> 
 export default async function LearningPage() {
   const season = seasonOf(new Date());
   const nbaSeason = nbaSeasonOfDate(new Date());
-  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel, pemOnFile, harrisOnFile, harrisCbbOnFile] = await Promise.all([
+  const [state, policy, nba, nflProps, ourNbaProps, ourFb, ourNflProps, ourFtd, attd, lotto, kotc, cfbModel, cbbModel, pemOnFile, harrisOnFile, harrisCbbOnFile, davidCbbOnFile] = await Promise.all([
     redisStore.state().catch(() => null),
     loadActivePolicy(),
     getNbaPicksView().catch(() => null),
@@ -110,10 +111,13 @@ export default async function LearningPage() {
     pemWeeks(season),
     harrisWeeks(season),
     harrisCbbDays(cbbSeason(new Date())),
+    davidCbbDays(cbbSeason(new Date())),
   ]);
   const usable: { pem: UsableWeeks; harris: UsableWeeks } = { pem: usableWeeks(pemOnFile), harris: usableWeeks(harrisOnFile) };
   // John Harris's CBB slices live in the CBB section; his row reports them apart.
   const harrisCbb = Object.values(cbbModel.entries).filter((e) => e.id.startsWith("cbb:harris"));
+  // David Sasser's CBB slices too (cbb:david*), from Nov 12.
+  const davidCbb = Object.values(cbbModel.entries).filter((e) => e.id.startsWith("cbb:david"));
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
   const PICKS = "Picks review: 7am ET after each slate (Fri, Sun, Mon, Tue), one change per part per week, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
@@ -175,6 +179,15 @@ export default async function LearningPage() {
           usable: { ...usableDays(harrisCbbOnFile), unit: "day" as const },
           live: harrisCbb.some((e) => e.status === "active") ? harrisCbb.filter((e) => e.status === "active").map((e) => e.label).join("; ") : "Not used on any bet",
           collecting: harrisCbb.length ? `${harrisCbb.filter((e) => e.status === "collecting").length} of ${harrisCbb.length} slices collecting` : "Registers at the next CBB review",
+          last: cbbModel.lastReviewAt ?? null,
+        },
+        {
+          name: "David Sasser (CBB, his website)",
+          loop: "Shared engine, same college hoops gate: his side and his total against our saved line, his 3+ and 5+ point edges, our side and our total when he agrees or disagrees, and his side when Harris agrees, each a paper bet at the saved price on games after it registered, using only his last read before tip. His page shows today only, so the pulse saves it every 25 minutes. Nothing staked until a slice clears the gate.",
+          href: "/picks/cbb?v=research",
+          usable: { ...usableDays(davidCbbOnFile), unit: "day" as const },
+          live: davidCbb.some((e) => e.status === "active") ? davidCbb.filter((e) => e.status === "active").map((e) => e.label).join("; ") : "Not used on any bet",
+          collecting: davidCbb.length ? `${davidCbb.filter((e) => e.status === "collecting").length} of ${davidCbb.length} slices collecting` : "Registers at the next CBB review",
           last: cbbModel.lastReviewAt ?? null,
         },
       ],

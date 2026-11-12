@@ -168,6 +168,24 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
         : "No read was saved before tip (no line yet when the tracker looked), so this is today's read for reference. It isn't graded.";
   const lean = (h: boolean, a: string, b: string) => (h ? a : b);
 
+  // David Sasser (tracked beside ours from Nov 12): his line turned to this row's home team, his side at the line above.
+  const d = x.david;
+  const dHome = !d ? null : d.homeId === g.home.id ? d.model : d.homeId === g.away.id ? -d.model || 0 : null;
+  const davidText = (() => {
+    if (dHome === null) return "not posted (his page lists some games, today only)";
+    const parts = [`${g.home.short} ${line(dHome)}`, d!.total !== null ? `total ${d!.total.toFixed(1)}` : ""];
+    if (r.spread !== null && r.spread - dHome !== 0) {
+      const home = r.spread - dHome > 0;
+      const cov = margin !== null && final ? (margin + r.spread) * (home ? 1 : -1) : null;
+      parts.push(`his side ${home ? `${g.home.short} ${line(r.spread)}` : `${g.away.short} ${line(-r.spread)}`}${cov === null ? "" : cov > 0 ? " (covered)" : cov < 0 ? " (missed)" : " (push)"}`);
+    }
+    if (r.total !== null && d!.total !== null && d!.total !== r.total) {
+      const o = d!.total > r.total;
+      parts.push(`${o ? "over" : "under"} ${r.total}${pts !== null && final ? (pts === r.total ? " (push)" : (pts > r.total) === o ? " (hit)" : " (missed)") : ""}`);
+    }
+    return parts.filter(Boolean).join(" · ");
+  })();
+
   return (
     <div className={`${s.page} ${p.root}`}>
       <span className={s.eyebrow}>{`CBB · ${status}${g.neutral ? " · neutral site" : ""}`}</span>
@@ -252,6 +270,8 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
           <dd className={s.num}>{now.parts.trank ? `${g.home.short} ${signed(now.parts.trank.margin)}, total ${now.parts.trank.total.toFixed(1)}${now.rank.home || now.rank.away ? ` (ranks ${now.rank.away ?? "·"} at ${now.rank.home ?? "·"})` : ""}` : "not rated (non-Division I side)"}</dd>
           <dt>Blend</dt>
           <dd className={s.num}>{`${Math.round(CBB_PARAMS.blend.margin.ours * 100)}% ours, ${Math.round(CBB_PARAMS.blend.margin.trank * 100)}% T-Rank on the margin; ${g.home.short} ${line(now.proj.spread)}, total ${now.proj.total} today`}</dd>
+          <dt>David Sasser</dt>
+          <dd className={`${s.num} ${s.cDavid}`}>{davidText}</dd>
           {(g.venue || g.note) && (
             <>
               <dt>Where</dt>
