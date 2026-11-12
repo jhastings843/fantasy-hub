@@ -1,3 +1,8 @@
+# 2026-11-12 evening: no totals on CBB Spreads; Harris on the CBB board (15adc42 + next, pushed)
+- Jack: "again why is total being shown on the spread page... i have said this like 100 times". CbbRowBody now takes the market like NBA's NbaWhy (Spreads: spread, cover chance, margins as lines; Totals: total, over chance, totals; Straight up: moneyline, win chance). loadCbbGame(id, m). Legend market-specific. Rule saved to project memory.
+- Harris CBB was background only; now on the board like David: plum --hh-harris, line under ours (ats/su), agree note, details/pop-up row, Results tile + column (Spreads only). CbbBoardRow.harris, CbbRecord.harris.
+- Jack asked why the 5+ backtest row (65-54, t 1.01, 2025-26 at the close) isn't staked: backtest never counts; live cbb:edge5 is 36-36 -3.36u t -0.41 over 72 games (needs 150 games, 3 weeks, t 2.33, beat edge3). CBB has no staking path at all yet. Jack: keep the bar.
+
 # 2026-11-12 afternoon: David Sasser on CBB, tracked like Harris (a8e2ce5, pushed, live)
 - Jack: "david has a cbb page now, make sure he is being tracked and looked at across all 4 sports. sam for the three he has posted" + "shown on the board pages, flows nicely, learner log, back test where we can".
 - Checked first: David's NFL, CFB, NBA game readers and NFL/NBA props readers all parse today's pages; Sam's NFL (14), CFB (61), NBA boards parse. Sam's /cbb/ still "Coming soon" (sam-cbb-watch keeps watching).
