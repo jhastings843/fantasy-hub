@@ -69,6 +69,10 @@ export async function loadStatus(now = new Date()): Promise<StatusView> {
 export interface Fresh {
   label: string;
   at: string;
+  /** Shown instead of "N ago" (the weekly league refresh reads as its day). */
+  text?: string;
+  /** Hours before it reads as stale; the line's default when absent. */
+  staleH?: number;
 }
 
 /**
@@ -94,7 +98,13 @@ export async function loadFreshness(what: ("lines" | "props" | "leagues" | "puls
   const props = latest(ok("Props capture"), ok("NBA props capture"));
   if (props) out.push({ label: "Props", at: props });
   const leagues = latest(ok("Pulse refresh-all-early"), ok("Pulse refresh-all-late"));
-  if (leagues) out.push({ label: "Leagues synced", at: leagues });
+  // Rosters are re-read from Sleeper every 5 minutes (sleeper/client.ts TTL.rosters); the
+  // weekly Wednesday refresh only busts the slow caches, so it shows as its day, not "2 days ago".
+  if (want.has("leagues")) out.push({ label: "Rosters", at: new Date().toISOString(), text: "live (5 min)" });
+  if (leagues) {
+    const day = new Date(leagues).toLocaleDateString("en-US", { weekday: "short", timeZone: "America/New_York" });
+    out.push({ label: "Full league refresh", at: leagues, text: day, staleH: 8 * 24 });
+  }
   if (pulse?.at) out.push({ label: "Checked", at: pulse.at });
   return out;
 }

@@ -18,12 +18,12 @@ async function Line({ what }: { what: What[] }) {
   return (
     <p className="hh-num flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-hh-muted">
       {items.map((x, i) => {
-        const stale = (now.getTime() - Date.parse(x.at)) / 3_600_000 > STALE_H;
+        const stale = (now.getTime() - Date.parse(x.at)) / 3_600_000 > (x.staleH ?? STALE_H);
         return (
           <span key={x.label} className="inline-flex items-center gap-2">
             {i > 0 && <span aria-hidden>·</span>}
             <span className={stale ? "font-semibold text-hh-neg" : undefined}>
-              {x.label} <time dateTime={x.at}>{ago(x.at, now)}</time>
+              {x.label} <time dateTime={x.at}>{x.text ?? ago(x.at, now)}</time>
             </span>
           </span>
         );
