@@ -72,6 +72,13 @@ export interface Gate {
   rollbackT: number;
   /** Units a live slice may lose in one section week before it pauses for the rest of that week. */
   weeklyLossCap: number;
+  /**
+   * Early go-live at a small stake (Jack, 2026-11-13, long-price sections): a
+   * slice that passes every check but t, with t at least `minT`, goes live at
+   * `stake` units. It moves to full stake once it passes the real t bar, and
+   * stops (rolled back) if its t since registering falls below 0.
+   */
+  probation?: { minT: number; stake: number };
 }
 
 /** "retired": a collecting slice that lost at the go-live confidence, the other way (Jack, 2026-11-03). Still graded; returns to collecting if it climbs back to even. */
@@ -97,7 +104,12 @@ export interface Entry {
   pausedWeek?: number;
   /** Every pause, kept after it lifts, so the money record skips bets made while paused (from 2026-11-02). */
   pauses?: { week: number; at: string }[];
+  /** Went live on probation at `stake` units (gate.probation); `until` is when it moved to full stake. */
+  probation?: { stake: number; until?: string };
 }
+
+/** Units a live slice stakes on a bet starting at `at`: its probation stake until it was promoted, else 1. */
+export const stakeAt = (e: Pick<Entry, "probation">, at: string): number => (e.probation && (!e.probation.until || at < e.probation.until) ? e.probation.stake : 1);
 
 export interface SectionState {
   v: 1;
@@ -272,7 +284,7 @@ export function evidence(gate: Gate, c: Candidate, since: string, parent?: Candi
     { name: "bets", pass: bets.length >= gate.minBets, note: `${bets.length} of ${gate.minBets} bets`, have: `${bets.length} bets`, need: `${gate.minBets}` },
     ...(gate.minWins > 0 ? [{ name: "wins", pass: wins >= gate.minWins, note: `${wins} of ${gate.minWins} winners`, have: `${wins} winners`, need: `${gate.minWins}` }] : []),
     { name: "units", pass: units > 0, note: `${units >= 0 ? "+" : ""}${units}u`, have: `${units >= 0 ? "+" : "−"}${Math.abs(units)}u`, need: "a profit" },
-    { name: "t", pass: t >= gate.minT, note: `t ${t} vs ${gate.minT}`, have: `t ${signT(t)}`, need: `${gate.minT}+` },
+    { name: "t", pass: t >= gate.minT, note: `t ${t} vs ${gate.minT}`, have: `t ${signT(t)}`, need: gate.probation ? `${gate.probation.minT}+ for ${gate.probation.stake}u, ${gate.minT}+ for full stake` : `${gate.minT}+` },
     ...(parent
       ? [{ name: "parent", pass: (pairedT ?? 0) >= gate.minPairedT, note: `beats ${parent.label.toLowerCase()} at t ${pairedT} vs ${gate.minPairedT}`, have: `t ${signT(pairedT ?? 0)} vs ${parent.label.toLowerCase().replace(/ \(.*\)$/, "")}`, need: `${gate.minPairedT}+` }]
       : []),
@@ -357,6 +369,20 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
   }
 
   let rolled = 0;
+  // Probation: up to full stake at the real bar, out once it is losing overall.
+  for (const e of Object.values(entries)) {
+    if (e.status !== "active" || !e.probation || e.probation.until) continue;
+    const x = ev.get(e.id);
+    if (!x) continue;
+    if (x.t < 0) {
+      Object.assign(e, { status: "rolled-back", endedAt: now, endedWeek: week, reason: `on probation and below even since registering: ${x.games} games, ${x.units}u, t ${x.t}` });
+      journal.push({ at: now, week, kind: "rolled back", id: e.id, text: `Rolled back ${e.label}: ${e.reason}.` });
+      rolled++;
+    } else if (x.ready) {
+      e.probation = { ...e.probation, until: now };
+      journal.push({ at: now, week, kind: "activated", id: e.id, text: `Promoted ${e.label} to full stake: ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t} (bar ${gate.minT}).` });
+    }
+  }
   for (const e of Object.values(entries)) {
     if (e.status !== "active") continue;
     const c = byId.get(e.id);
@@ -398,6 +424,24 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     const x = ev.get(e.id)!;
     Object.assign(e, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units } });
     journal.push({ at: now, week, kind: "activated", id: e.id, text: `Activated ${e.label}: ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t}. Bets in it are marked from now on.` });
+  }
+  // Probation: every check but t passes and t clears the lower bar. Shares gate.maxNew.
+  const pb = gate.probation;
+  if (pb) {
+    const liveNow = new Set(Object.values(entries).filter((e) => e.status === "active").map((e) => e.id));
+    const used = Object.values(entries).filter((e) => e.activeWeek === week && e.activatedAt).length;
+    const early = Object.values(entries)
+      .filter((e) => {
+        const x = ev.get(e.id);
+        return e.status === "collecting" && x && !x.ready && x.t >= pb.minT && x.checks.every((c) => c.pass || c.name === "t") && !(e.parent && liveNow.has(e.parent));
+      })
+      .sort((a, b) => ev.get(b.id)!.t - ev.get(a.id)!.t)
+      .slice(0, Math.max(0, gate.maxNew - used));
+    for (const e of early) {
+      const x = ev.get(e.id)!;
+      Object.assign(e, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units }, probation: { stake: pb.stake } });
+      journal.push({ at: now, week, kind: "activated", id: e.id, text: `Activated ${e.label} at ${pb.stake}u (probation): ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t}. Full stake at t ${gate.minT}; stops if t falls below 0.` });
+    }
   }
 
   const collecting = Object.values(entries).filter((e) => e.status === "collecting");
@@ -483,6 +527,13 @@ export const FTD_GATE: Gate = {
 };
 
 /**
+ * NBA First Basket: FTD_GATE's samples (one market per game, long prices),
+ * but t 1.645 and a 0.25u probation from t 1.0 (Jack, 2026-11-13: at 1.96 a
+ * real edge on these prices takes seasons). NFL First TD and Lottos keep FTD_GATE.
+ */
+export const FB_GATE: Gate = { ...FTD_GATE, minT: 1.645, probation: { minT: 1, stake: 0.25 } };
+
+/**
  * NFL Anytime TD at DraftKings' price. Prices run -200 to +600, between props
  * and first TD, and a game has 10 to 20 bets that move together (a shootout
  * lifts every over), so it takes the props sample sizes plus 25 actual winners.
@@ -492,7 +543,10 @@ export const ATTD_GATE: Gate = {
   minWeeks: 3,
   minBets: 100,
   minWins: 25,
-  minT: 1.96,
+  // Jack, 2026-11-13: long prices need years at 1.96, so 1.645 (about 1 in 20
+  // no-edge slices pass by luck) with a 0.25u probation from t 1.0.
+  minT: 1.645,
+  probation: { minT: 1, stake: 0.25 },
   minPairedT: 1.645,
   maxNew: 2,
   ddSd: 3,
@@ -618,19 +672,22 @@ export function sectionView(gate: Gate, s: SectionState, base: Candidate[], jour
  */
 export function liveBets(s: SectionState, base: Candidate[]): Bet[] {
   const byId = new Map(expand(s, base).map((c) => [c.id, c]));
-  const seen = new Set<string>();
-  return Object.values(s.entries).flatMap((e) =>
-    e.activatedAt
-      ? (byId.get(e.id)?.bets ?? []).filter((b) => {
-          if (b.carried) return false;
-          if (b.at < e.activatedAt! || (e.endedAt && b.at >= e.endedAt)) return false;
-          if ((e.pauses ?? []).some((p) => b.week === p.week && b.at >= p.at)) return false;
-          // Only bets with an identity can be matched across slices; unkeyed ones always count (two different -1u bets in one game look alike).
-          if (!b.key) return true;
-          if (seen.has(b.key)) return false;
-          seen.add(b.key);
-          return true;
-        })
-      : [],
-  );
+  const keyed = new Map<string, Bet>();
+  const out: Bet[] = [];
+  for (const e of Object.values(s.entries)) {
+    if (!e.activatedAt) continue;
+    for (const b of byId.get(e.id)?.bets ?? []) {
+      if (b.carried) continue;
+      if (b.at < e.activatedAt || (e.endedAt && b.at >= e.endedAt)) continue;
+      if ((e.pauses ?? []).some((p) => b.week === p.week && b.at >= p.at)) continue;
+      // Probation bets count at their stake (net is per 1u risked).
+      const stake = stakeAt(e, b.at);
+      const bet = stake === 1 ? b : { ...b, net: r2(b.net * stake) };
+      // Only bets with an identity can be matched across slices; unkeyed ones always count (two different -1u bets in one game look alike).
+      // A keyed bet in two live slices is one bet, at the bigger stake.
+      if (!b.key) out.push(bet);
+      else if (!keyed.has(b.key) || Math.abs(keyed.get(b.key)!.net) < Math.abs(bet.net)) keyed.set(b.key, bet);
+    }
+  }
+  return [...out, ...keyed.values()];
 }

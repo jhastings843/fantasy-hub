@@ -5,7 +5,7 @@ import { redis } from "@/lib/redis/client";
 import { etDate, shiftDay, nbaSeasonOfDate, nbaWeek, type PropsGame } from "@/lib/props/parse";
 import { gradeGame, type EspnBoxTeam, type GradedGame } from "@/lib/props/grade";
 import { davidNbaFor, fetchDavidNba, type DavidNbaSlate } from "@/lib/props/david-nba";
-import { FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
+import { FB_GATE, FTD_GATE, PROPS_GATE, sectionView, type SectionView } from "@/lib/learning/engine";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import type { GradedPropsGame } from "@/lib/props/trends";
 import type { StoredProps } from "@/lib/props/store";
@@ -471,7 +471,7 @@ export async function runOurNbaProps(now = new Date(), opts: RunOptions = {}): P
   try {
     const cands = ourPropCandidates(await gradedList(season), ["pts", "reb", "ast", "threes"]);
     for (const j of await reviewIfDue(OUR_SECTION.nbaProps, season, nbaWeek(now, season), PROPS_GATE, cands, now)) if (j.kind !== "registered") report.learning.push(j.text);
-    for (const j of await reviewIfDue(OUR_SECTION.nbaFirstBasket, season, nbaWeek(now, season), FTD_GATE, fbCandidates(await fbGraded(season)), now)) if (j.kind !== "registered") report.learning.push(`First Basket: ${j.text}`);
+    for (const j of await reviewIfDue(OUR_SECTION.nbaFirstBasket, season, nbaWeek(now, season), FB_GATE, fbCandidates(await fbGraded(season)), now)) if (j.kind !== "registered") report.learning.push(`First Basket: ${j.text}`);
     const every = await allBoards(season);
     for (const j of await reviewIfDue(SECTIONS.nbaLotto, season, nbaWeek(now, season), FTD_GATE, lottoFor(every, season), now)) if (j.kind !== "registered") report.learning.push(`Lottos: ${j.text}`);
     for (const j of await reviewIfDue(SECTIONS.nbaKotc, season, nbaWeek(now, season), PROPS_GATE, kotcCandidates(await getKotcNights(season), every, season), now)) if (j.kind !== "registered") report.learning.push(`King of the Court: ${j.text}`);
@@ -566,7 +566,7 @@ export async function getOurNbaView(season: number, now = new Date()): Promise<O
     board,
     graded,
     learning: sectionView(PROPS_GATE, state, ourPropCandidates(graded, ["pts", "reb", "ast", "threes"]), journal),
-    fb: { graded: fbList, learning: sectionView(FTD_GATE, fbState, fbCandidates(fbList), fbJournal) },
+    fb: { graded: fbList, learning: sectionView(FB_GATE, fbState, fbCandidates(fbList), fbJournal) },
   };
 }
 

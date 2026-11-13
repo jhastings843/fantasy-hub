@@ -208,7 +208,7 @@ export function record(bets: { bet: GradedBet }[]): { w: number; l: number; p: n
   return r;
 }
 
-// First Basket: one market per game, long prices, so it runs on FTD_GATE.
+// First Basket: one market per game, long prices, so it runs on FB_GATE (FTD_GATE samples, t 1.645, 0.25u probation).
 
 export interface FbGradedBoard {
   event: string;

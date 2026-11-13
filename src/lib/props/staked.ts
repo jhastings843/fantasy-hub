@@ -41,7 +41,7 @@ const nflSeasonOf = (d: Date) => (d.getUTCMonth() < 7 ? d.getUTCFullYear() - 1 :
 
 /** A section's slices as the views show them: a live slice past its weekly cap reads "paused". */
 export function liveEntries(s: SectionState): LiveEntry[] {
-  return Object.values(s.entries).map((e) => ({ id: e.id, label: e.label, status: e.status === "active" && e.pausedWeek !== undefined ? "paused" : e.status, activatedAt: e.activatedAt }));
+  return Object.values(s.entries).map((e) => ({ id: e.id, label: e.label, status: e.status === "active" && e.pausedWeek !== undefined ? "paused" : e.status, activatedAt: e.activatedAt, ...(e.probation ? { probation: e.probation } : {}) }));
 }
 
 const live = (es: LiveEntry[]) => es.some((e) => e.status === "active");

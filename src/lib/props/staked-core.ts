@@ -15,7 +15,7 @@
 //   ourPropsStaked({ section: "nba-props-ours", sport: "NBA", boards, entries, now })
 //     -> [{ pick: "Jalen Brunson Under 27.5 pts", price: -110, book: "DraftKings", stake: 1, slice: "Edges on the under", ... }]
 
-import type { ViewStatus } from "@/lib/learning/engine";
+import { stakeAt, type Entry, type ViewStatus } from "@/lib/learning/engine";
 import { playPrice, type PropMarket, type Side } from "./parse";
 import { isPlay } from "./grade";
 import { rwSide, type GradedPropsGame } from "./trends";
@@ -99,7 +99,7 @@ export interface FreshCheck {
   note?: string;
 }
 
-export type LiveEntry = { id: string; label: string; status: ViewStatus; activatedAt?: string };
+export type LiveEntry = { id: string; label: string; status: ViewStatus; activatedAt?: string; probation?: Entry["probation"] };
 
 const am = (p: number) => (p > 0 ? `+${p}` : `${p}`);
 const SHORT: { [k: string]: string } = { pts: "pts", reb: "reb", ast: "ast", threes: "threes", pass_yds: "pass yds", rush_yds: "rush yds", rec_yds: "rec yds", rec: "rec" };
@@ -126,6 +126,20 @@ export function liveKeeping(entries: LiveEntry[], at: string, keeps: (id: string
 }
 
 const anyLive = (entries: LiveEntry[]) => entries.some((e) => e.status === "active");
+
+/**
+ * Units for a play the live slices keep: 1 when any of them is at full stake,
+ * else the probation stake (0.25u, gate.probation). Matches liveKeeping's test.
+ *   liveStake([{ id: "a", status: "active", activatedAt, probation: { stake: 0.25 } }], at, () => true) -> 0.25
+ */
+export function liveStake(entries: LiveEntry[], at: string, keeps: (id: string) => boolean): number {
+  const t = Date.parse(at);
+  const stakes = entries
+    .filter((e) => e.status === "active" && e.activatedAt && t >= Date.parse(e.activatedAt))
+    .filter((e) => (e.id.startsWith("gen:") ? e.id.slice(4).split("&").every((x) => keeps(x)) : keeps(e.id)))
+    .map((e) => stakeAt(e, at));
+  return stakes.length ? Math.max(...stakes) : 1;
+}
 
 // ---------------------------------------------------------------- our props
 
@@ -357,7 +371,7 @@ export function attdStakedBets(input: { boards: { game: FtdGame; kickoff?: strin
           book: "DraftKings",
           kickoff: g.kickoff!,
           slice: slices.join("; ") || "Live Anytime TD slice",
-          stake: 1,
+          ...probationStake(liveStake(input.entries, g.kickoff!, (id) => inSlice(ATTD_MEMBERS, id, play))),
           chance: { p: r.anytime, price: r.dk },
           href: "/props?m=attd",
           ...(g.espnId ? { quote: { event: g.espnId, home: g.game.home, away: g.game.away, stat: "anytime" } } : {}),
@@ -399,7 +413,7 @@ export function fbStaked(input: { boards: (OurStoredProps | (StoredProps & { fb?
           book: "DraftKings",
           kickoff: g.kickoff!,
           slice: slices.join("; "),
-          stake: 1,
+          ...probationStake(liveStake(input.entries, g.kickoff!, (id) => !!FB_SLICES.find(([s]) => s === id)?.[2](board, bet))),
           chance: { p: x.p, price: x.price },
           href: "/props?m=fb",
         },
@@ -551,6 +565,9 @@ export const stakeText = (b: Pick<StakedBet, "stake" | "stakeNote">) => `${b.sta
  *   sizeStakes([{ section: "nfl-attd-ours", stake: 1, chance: { p: 0.4, price: 150 } }], new Map([["nfl-attd-ours", "kelly25"]]))
  *     -> { bets: [{ ..., stake: 0.75, stakeNote: "quarter Kelly" }], cut: [] }
  */
+/** A stake under 1u says why on the bet. sizeStakes leaves it alone (it only resizes 1u bets). */
+const probationStake = (stake: number): Pick<StakedBet, "stake" | "stakeNote"> => (stake < 1 ? { stake, stakeNote: "probation" } : { stake: 1 });
+
 export function sizeStakes(bets: StakedBet[], schemes: Map<string, SchemeId>): { bets: StakedBet[]; cut: string[] } {
   const cut: string[] = [];
   const out: StakedBet[] = [];

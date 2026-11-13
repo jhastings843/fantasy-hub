@@ -57,6 +57,10 @@ export function alertFor(section: string, j: JournalLine, rec?: { w: number; l: 
   if (!kind) return null;
   const name = sectionName(section);
   const what = label ?? j.id!;
+  if (kind === "live" && j.text.startsWith("Promoted"))
+    return { title: `Full stake: ${name}`, message: `${name}: ${j.text} Its bets are now 1u.` };
+  if (kind === "live" && j.text.includes("(probation)"))
+    return { title: `Live at 0.25u: ${name}`, message: `${name}: ${j.text}` };
   if (kind === "live")
     return { title: `Now live: ${name}`, message: `${name}: ${what} is now live${rec ? ` (${rec.w}-${rec.l}, ${signed(rec.units)})` : ""}. Its bets are sized by the section's staking scheme (flat 1u unless it has switched).` };
   if (kind === "stake") return { title: `Stake change: ${name}`, message: `${name}: ${j.text}` };
