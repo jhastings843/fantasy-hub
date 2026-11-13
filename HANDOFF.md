@@ -1,3 +1,10 @@
+# 2026-11-12 night: go-live t bar 2.33 -> 1.96, slices carry across seasons (6ff7e86, pushed, deployed)
+- Jack worried slices won't pass before seasons end. Math (scripts in session): a real 5% edge needs ~1,960 bets at t 2.33 (~1,390 at 1.96); a ~150 bets/season slice (NFL props, CFB, ATTD) needs ~13 seasons at 2.33. Nov 12 reviews: 0 of ~270 slices live; closest CBB "line moved our way" t 1.62 (32/150 games), NFL props "David agrees" t 1.57.
+- Jack chose t 1.96 (warned once: ~7 lucky passes of ~270 vs ~3). PROPS_GATE, FTD_GATE, ATTD_GATE, CFB_MODEL_GATE, CBB_MODEL_GATE minT 1.96; Picks CRITERIA.MIN_T_CUT 1.96. Retire-at-negative uses -minT so losers retire at -1.96 now. NBA_GO_LIVE (Wilson 90% low) untouched. Page text updated.
+- Carry-over (lib/learning/store.ts): each review saves every slice's bets since registration to learn:v1:{section}:{season}:bets (hash id -> compact rows [game, week, at, net, toward, key]). loadSection: no state for a season -> inherits last season's entries/generated/stake; always attaches last season's saved bets as state.carried (weeks -100, carried: true). engine.expand prepends carried bets; liveBets skips carried; saved state strips carried. Tests: src/lib/learning/store.test.ts.
+- Watch: size of learn:v1:cbb-model-ours:2026:bets after the first review (one write per section per slate, batched at 400 KB).
+- Sam's prop slices (nfl-props 68, nba-props 22) can't fill: his props pages are paywalled since Oct 21. Offered to retire them; Jack hasn't decided.
+
 # 2026-11-12 evening: no totals on CBB Spreads; Harris on the CBB board (15adc42 + next, pushed)
 - Jack: "again why is total being shown on the spread page... i have said this like 100 times". CbbRowBody now takes the market like NBA's NbaWhy (Spreads: spread, cover chance, margins as lines; Totals: total, over chance, totals; Straight up: moneyline, win chance). loadCbbGame(id, m). Legend market-specific. Rule saved to project memory.
 - Harris CBB was background only; now on the board like David: plum --hh-harris, line under ours (ats/su), agree note, details/pop-up row, Results tile + column (Spreads only). CbbBoardRow.harris, CbbRecord.harris.
