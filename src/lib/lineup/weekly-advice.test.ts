@@ -318,6 +318,10 @@ describe("adviseLineup", () => {
     expect(wr.reason).toContain("comes out of TE");
     expect(wr.reason).toContain("teA");
     expect(wr.reason).not.toContain("over teB");
+    // One scale for both (Jack, 2026-11-12): a WR in for a TE can only be
+    // compared on FLEX, and the TE keeps his own TE rank in brackets.
+    expect(wr.reason).toContain("wrIn (FLEX 60)");
+    expect(wr.reason).toContain("at FLEX 83 (TE 13)");
   });
 
   it("says nothing when the lineup is already right", () => {

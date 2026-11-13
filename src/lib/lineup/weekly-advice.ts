@@ -580,10 +580,35 @@ function reasonFor(
 
   if (!vacated) return `Start ${rec} over ${current.name}, ${why}.`;
 
+  // One scale for both men (Jack, 2026-11-12: "if we are switching flex you
+  // give both flex rankings, if ... an rb with another rb in the rb slot you
+  // show the rb rankings"). A shuffle quoted the starter at this slot's scale
+  // and the leaver at his own slot's, so "FLEX 40" sat against "RB 22". Same
+  // position and no flex slot in the move: his position. Otherwise the flex
+  // slot involved. The leaver's own slot rank stays in brackets when it
+  // differs, so a TE coming out of TE still reads as the TE he is.
+  const scale = shareScale(slot, vacated.slot, recommended, current);
+  const recOn = `${recommended.name} (${rankLabel(recommended, scale)})${matchup(recommended)}`;
+  const own = rankLabel(current, vacated.slot);
+  const onScale = rankLabel(current, scale);
+  const whyOn =
+    current.onBye || cannotPlay(current) || current.unranked
+      ? why
+      : `at ${onScale}${own !== onScale ? ` (${own})` : ""}`;
+
   // He is not in this slot, so he is not what this slot is "over". Naming his
   // slot, and who inherits it, is the whole move rather than half of it.
   const inherits = vacated.takenBy ? `, with ${vacated.takenBy.name} moving in` : "";
-  return `Start ${rec}. ${current.name}, ${why}, comes out of ${vacated.slot}${inherits}.`;
+  return `Start ${recOn}. ${current.name}, ${whyOn}, comes out of ${vacated.slot}${inherits}.`;
+}
+
+/** The slot whose ranking both men in a shuffle are quoted on: positional only when nothing about the move is flex. */
+function shareScale(slot: string, leaverSlot: string, incoming: AdvicePlayer, leaving: AdvicePlayer): string {
+  if (FLEX_SLOTS.has(slot)) return slot;
+  if (FLEX_SLOTS.has(leaverSlot)) return leaverSlot;
+  if (incoming.position === leaving.position) return slot;
+  // Two positions across two positional slots: the FLEX list is the only one that ranks both.
+  return "FLEX";
 }
 
 /**
