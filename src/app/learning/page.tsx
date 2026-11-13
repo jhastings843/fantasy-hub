@@ -121,7 +121,7 @@ export default async function LearningPage() {
   // David's slices only: the NFL props section also holds Sam's, no longer shown (paywalled 2026-10-21).
   const davidOnly = { ...nflProps, entries: Object.fromEntries(Object.entries(nflProps.entries).filter(([id]) => (id.startsWith("dplay:") || id.startsWith("dboard:")) && !id.includes("sam"))) };
   const PICKS = "Picks review: 7am ET after each slate (Fri, Sun, Mon, Tue), one change per part per week, paired t 1.645 vs the parent or method in force, 30+ games over 3+ weeks, CLV and drawdown checks, rollback";
-  const ENGINE = "Shared engine: reviewed after every slate, new live slices capped per week, judged per game, t 2.33, refinements must beat their parent, rollback";
+  const ENGINE = "Shared engine: reviewed after every slate, new live slices capped per week, judged per game, t 1.96, refinements must beat their parent, rollback";
   const nbaCount = (m: string) => (nba?.hyps ?? []).filter((h) => h.id.startsWith(`${m}:`));
   const nbaRow = (m: "ats" | "ou"): Pick<Row, "live" | "collecting" | "last"> => ({
     live: nbaCount(m).filter((h) => h.status === "active").length ? `Core cuts plus ${nbaCount(m).filter((h) => h.status === "active").map((h) => h.label).join(", ")}` : "Core cuts only",
@@ -157,13 +157,13 @@ export default async function LearningPage() {
       rows: [
         {
           name: "CFB spreads and totals (our ratings model)",
-          loop: "Shared engine, college model gate: paper bets at -110 on its own slices (edge size, home or road, favorite or dog, conference, line move, totals) and the learner's combinations; 30+ games over 3+ weeks at t 2.33, must beat its parent, rollback. Judged as a source; nothing staked",
+          loop: "Shared engine, college model gate: paper bets at -110 on its own slices (edge size, home or road, favorite or dog, conference, line move, totals) and the learner's combinations; 30+ games over 3+ weeks at t 1.96, must beat its parent, rollback. Judged as a source; nothing staked",
           href: "/picks/cfb?v=research",
           ...engineRow(cfbModel),
         },
         {
           name: "CBB spreads and totals (our blended rating)",
-          loop: "Shared engine, college hoops gate: paper bets at the saved price on its own slices and the learner's combinations; 150+ games and 150+ bets over 3+ weeks at t 2.33, must beat its parent, rollback. Nothing staked; every slice started 0-0 on opening night (Nov 3)",
+          loop: "Shared engine, college hoops gate: paper bets at the saved price on its own slices and the learner's combinations; 150+ games and 150+ bets over 3+ weeks at t 1.96, must beat its parent, rollback. Nothing staked; every slice started 0-0 on opening night (Nov 3)",
           href: "/picks/cbb?v=log",
           ...engineRow(cbbModel),
         },
@@ -226,10 +226,10 @@ export default async function LearningPage() {
       title: "Props",
       rows: [
         { name: "NFL player props (our model)", loop: ENGINE, href: "/props?v=results", ...engineRow(ourNflProps) },
-        { name: "NFL first TD (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 2.33", href: "/props?m=ftd&v=results", ...engineRow(ourFtd) },
+        { name: "NFL first TD (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at Kalshi's ask, t 1.96", href: "/props?m=ftd&v=results", ...engineRow(ourFtd) },
         { name: "NFL player props (David)", loop: ENGINE, href: "/props?v=research", ...engineRow(davidOnly) },
         { name: "NBA player props (our model)", loop: `${ENGINE}. Games are daily and graded overnight; the cap on new live slices runs Monday to Sunday`, href: "/props?m=nba&v=results", ...engineRow(ourNbaProps) },
-        { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 2.33", href: "/props?m=fb&v=results", ...engineRow(ourFb) },
+        { name: "NBA first basket (our model)", loop: "Shared engine, First TD gate: 60 games over 4 weeks, 12+ winners at DraftKings' price, t 1.96", href: "/props?m=fb&v=results", ...engineRow(ourFb) },
         { name: "NFL anytime TD (our model)", loop: "Shared engine, Anytime TD gate: 30+ games over 3+ weeks, 100+ bets and 25+ winners. A live slice's players are marked as bets", href: "/props?m=attd&v=log", ...engineRow(attd) },
         { name: "NBA lottos (our model)", loop: "Shared engine, long-price gate: 60+ games over 4+ weeks, 12+ winners. A live slice's rungs, or the nightly ticket, are marked as bets", href: "/props?m=lotto&v=log", ...engineRow(lotto) },
         { name: "NBA King of the Court (our model)", loop: `${ENGINE}. Judged per night; a live slice marks the tagged props of our top N as bets`, href: "/props?m=kotc&v=log", ...engineRow(kotc) },

@@ -54,9 +54,10 @@ export const CRITERIA = {
   /**
    * Game-bet slices (ATS and totals cuts) need this instead (Jack, 2026-11-04): up to
    * MAX_COLLECTING ideas test at once, and at 1.645 about 1 in 20 losers passes by luck.
-   * Same bar as props (PROPS_GATE.minT). Rollbacks and rejections still use MIN_T.
+   * Same bar as props (PROPS_GATE.minT): 2.33 until 2026-11-12, then 1.96 (Jack: a real
+   * edge took seasons to prove at 2.33). Rollbacks and rejections still use MIN_T.
    */
-  MIN_T_CUT: 2.33,
+  MIN_T_CUT: 1.96,
   /** Challenger CLV may not trail the incumbent's by more than this (points). */
   CLV_MARGIN: 0.25,
   /** Challenger drawdown at most this multiple of the incumbent's (plus 1u slack). */

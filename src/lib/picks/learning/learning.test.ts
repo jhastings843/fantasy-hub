@@ -12,7 +12,7 @@ const REPLAYED = { since: "2026-10-13T13:00:00Z", decisions: 20, gaps: 0, unsett
 describe("protected acceptance criteria", () => {
   it("are pinned: the review cannot weaken its own test", () => {
     expect(CRITERIA).toEqual({
-      MIN_OPPORTUNITIES: 30, MIN_WEEKS: 3, MIN_T: 1.645, MIN_T_CUT: 2.33, CLV_MARGIN: 0.25, DRAWDOWN_RATIO: 1.25,
+      MIN_OPPORTUNITIES: 30, MIN_WEEKS: 3, MIN_T: 1.645, MIN_T_CUT: 1.96, CLV_MARGIN: 0.25, DRAWDOWN_RATIO: 1.25,
       CALIBRATION_MIN_BETS: 50, CALIBRATION_TOLERANCE: 0.05, ROLLBACK_MIN_OPPORTUNITIES: 20, MAX_COLLECTING: 24, MAX_NEW_PER_REVIEW: 2,
     });
   });

@@ -14,8 +14,8 @@ function bets(games: number, net: (i: number) => number, start = 1): Bet[] {
 
 describe("gates are pinned", () => {
   it("props and First TD", () => {
-    expect(PROPS_GATE).toMatchObject({ minGames: 30, minWeeks: 3, minBets: 100, minT: 2.33, minPairedT: 1.645, maxNew: 2, rollbackGames: 20, rollbackT: 1.645 });
-    expect(FTD_GATE).toMatchObject({ minGames: 60, minWeeks: 4, minBets: 60, minWins: 12, minT: 2.33, maxNew: 1, rollbackGames: 30 });
+    expect(PROPS_GATE).toMatchObject({ minGames: 30, minWeeks: 3, minBets: 100, minT: 1.96, minPairedT: 1.645, maxNew: 2, rollbackGames: 20, rollbackT: 1.645 });
+    expect(FTD_GATE).toMatchObject({ minGames: 60, minWeeks: 4, minBets: 60, minWins: 12, minT: 1.96, maxNew: 1, rollbackGames: 30 });
   });
 });
 

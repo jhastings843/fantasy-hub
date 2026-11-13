@@ -38,6 +38,8 @@ export interface Bet {
   p?: number;
   /** The saved American price the bet is graded at (cost-priced bets converted), for the same. */
   price?: number;
+  /** From an earlier season (lib/learning/store.ts carry-over): counts as evidence, never as a live bet this season. */
+  carried?: boolean;
 }
 
 export interface Candidate {
@@ -109,6 +111,12 @@ export interface SectionState {
   generated?: Generated[];
   /** How the section's live bets are staked (lib/props/staking.ts switch rule); absent = flat 1u. */
   stake?: StakeChoice;
+  /**
+   * Earlier seasons' bets per slice id, attached by loadSection and never saved
+   * in the state (Jack, 2026-11-12: slices keep their record across seasons).
+   * expand() puts them in front of each slice's bets.
+   */
+  carried?: { [id: string]: Bet[] };
 }
 
 /** A combined slice: the bets base slice `a` shares with base slice `b`, judged against `a`. */
@@ -126,6 +134,7 @@ const NEW_GENERATED = 2;
 
 /** The code's slices plus the learner's own combinations, rebuilt from the same bets each run. */
 export function expand(s: SectionState, cands: Candidate[]): Candidate[] {
+  if (s.carried) cands = cands.map((c) => (s.carried![c.id]?.length ? { ...c, bets: [...s.carried![c.id], ...c.bets] } : c));
   const byId = new Map(cands.map((c) => [c.id, c]));
   const out = [...cands];
   for (const g of s.generated ?? []) {
@@ -428,16 +437,18 @@ export const activeIds = (s: SectionState) => Object.values(s.entries).filter((e
 
 /**
  * Props (NFL and NBA). About 50 slices per section are checked at once, so
- * the t bar is the one-sided 99% value (2.33), not Picks' 1.645: at 1.645 two
- * or three slices would clear by luck every few weeks. 30 games over 3 weeks
- * and 100 bets, the same sample sizes the old slice system and Picks used.
+ * the t bar is the one-sided 97.5% value (1.96), not Picks' 1.645. It was 2.33
+ * (99%) until 2026-11-12; Jack lowered it because a real 3-5% edge needs about
+ * 2,000 bets at 2.33, years for a low-volume slice. Cost, accepted: about 1 in 40
+ * no-edge slices passes by luck (about 7 of ~270) until rollback catches it.
+ * 30 games over 3 weeks and 100 bets, the same sample sizes Picks used.
  */
 export const PROPS_GATE: Gate = {
   minGames: 30,
   minWeeks: 3,
   minBets: 100,
   minWins: 0,
-  minT: 2.33,
+  minT: 1.96,
   minPairedT: 1.645,
   maxNew: 2,
   ddSd: 3,
@@ -459,7 +470,7 @@ export const FTD_GATE: Gate = {
   minWeeks: 4,
   minBets: 60,
   minWins: 12,
-  minT: 2.33,
+  minT: 1.96,
   minPairedT: 1.645,
   maxNew: 1,
   ddSd: 3,
@@ -481,7 +492,7 @@ export const ATTD_GATE: Gate = {
   minWeeks: 3,
   minBets: 100,
   minWins: 25,
-  minT: 2.33,
+  minT: 1.96,
   minPairedT: 1.645,
   maxNew: 2,
   ddSd: 3,
@@ -495,7 +506,7 @@ export const ATTD_GATE: Gate = {
 /**
  * Our college model's edge hunt (lib/models/cfb/track.ts): one spread or
  * total bet per game per slice at -110, so bets equal games. Picks' sample
- * (30 games over 3 weeks) with the props t bar (2.33), since about 14 slices
+ * (30 games over 3 weeks) with the props t bar (1.96), since about 14 slices
  * plus the learner's combinations are checked at once. One activation per review.
  */
 export const CFB_MODEL_GATE: Gate = {
@@ -503,7 +514,7 @@ export const CFB_MODEL_GATE: Gate = {
   minWeeks: 3,
   minBets: 30,
   minWins: 0,
-  minT: 2.33,
+  minT: 1.96,
   minPairedT: 1.645,
   maxNew: 1,
   ddSd: 3,
@@ -517,7 +528,7 @@ export const CFB_MODEL_GATE: Gate = {
 /**
  * Our college basketball model's slices (lib/models/cbb/learn.ts). A full
  * slate is 50 to 150 priced games a night, so the sample bar is games, not
- * weeks: 150 games over 3+ weeks, with the props t bar (2.33) since about 21
+ * weeks: 150 games over 3+ weeks, with the props t bar (1.96) since about 21
  * slices plus the learner's combinations are checked at once. A refinement
  * must beat its parent (paired t 1.645). One activation per review.
  */
@@ -526,7 +537,7 @@ export const CBB_MODEL_GATE: Gate = {
   minWeeks: 3,
   minBets: 150,
   minWins: 0,
-  minT: 2.33,
+  minT: 1.96,
   minPairedT: 1.645,
   maxNew: 1,
   ddSd: 3,
@@ -611,6 +622,7 @@ export function liveBets(s: SectionState, base: Candidate[]): Bet[] {
   return Object.values(s.entries).flatMap((e) =>
     e.activatedAt
       ? (byId.get(e.id)?.bets ?? []).filter((b) => {
+          if (b.carried) return false;
           if (b.at < e.activatedAt! || (e.endedAt && b.at >= e.endedAt)) return false;
           if ((e.pauses ?? []).some((p) => b.week === p.week && b.at >= p.at)) return false;
           // Only bets with an identity can be matched across slices; unkeyed ones always count (two different -1u bets in one game look alike).

@@ -27,8 +27,8 @@ export function betRecordTile(v: SectionView | null): { value: string; label: st
 const sinceDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
 
 /**
- * What a slice is short, in two lists (Jack, 2026-11-03): "t −1.09 (needs 2.33+) · lines moved our way 69, against us 77 (needs at least even)".
- * Games and weeks have their own columns. t is how sure the edge is real: 2.33 is about a 1-in-100 chance it's luck.
+ * What a slice is short, in two lists (Jack, 2026-11-03): "t −1.09 (needs 1.96+) · lines moved our way 69, against us 77 (needs at least even)".
+ * Games and weeks have their own columns. t is how sure the edge is real: 1.96 is about a 1-in-40 chance it's luck.
  */
 export function hasNeeds(short: Check[]): string {
   // Units sit in their own column, and a t past the bar already means a profit.
