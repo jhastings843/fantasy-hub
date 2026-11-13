@@ -391,7 +391,11 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     source = { ...source, note: (source.note ?? "") + flockNoteText };
   }
 
-  const roster = (mine.players ?? []).map(toPlayer);
+  // Taxi squad players are out: Sleeper won't drop one to process a claim and
+  // they can't start (week 10 dynasty kept naming taxi Kevin Coleman Jr. as the
+  // drop). Their seats don't count against the roster either.
+  const taxi = new Set(mine.taxi ?? []);
+  const roster = (mine.players ?? []).filter((id) => !taxi.has(id)).map(toPlayer);
 
   const budgetTotal = profile.faab;
   const used = mine.settings?.waiver_budget_used ?? null;
