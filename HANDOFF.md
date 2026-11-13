@@ -64,6 +64,11 @@ Live after deploy (Nov 6, late): /props 149 KB (was 2.98 MB), ttfb 0.9 s; /picks
 Next session: check /status after a pulse (Harris CBB day check should be green), compare live page sizes and times to the numbers below, then the lotto cap sweep around Nov 20.
 
 
+
+## 2026-11-13: First TD most likely, lottos cut (d73b0ba, 8c8ea7d)
+- First TD: ftdb:pick (most likely scorer) has no parent now; register() syncs a collecting slice's parent to its definition, so it kept its record since Oct 28 (+10.9u on 30 bets, t 0.75; ftdb:value -104.9u on 130). New ftdb:pickedge (most likely and an edge, parent ftdb:pick). Week page: "Most likely to score first" cards per game first, "Edges, tracked" below.
+- Lottos: LOTTO_SLICES is just lotto:checked-cap (standalone); the rest moved to RETIRED_LOTTO_SLICES (records stay in Redis). DEFAULT_RECIPE is l3-checked (checkedEv, +700 cap); ticket slice id is lotto:ticket-checked (fresh record). Lotto page lists only checked-cap rungs.
+
 ## 2026-11-13: probation for long-price learners (f05f8b3)
 - FB_GATE (new, NBA First Basket) and ATTD_GATE: minT 1.645 plus `probation: { minT: 1, stake: 0.25 }`. FTD_GATE (NFL First TD, Lottos) unchanged at 1.96.
 - engine.ts review(): a collecting slice passing every check but t, with t >= 1.0, goes active with `entry.probation = { stake }`. Promoted (probation.until set) once it is fully ready; rolled back if its t since registering drops below 0. Shares gate.maxNew.

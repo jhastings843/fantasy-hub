@@ -20,6 +20,8 @@
   ],
   "last_worked": "2026-11-13",
   "notes": [
+    "2026-11-13: lottos cut to market-checked +700 rungs and a checked-legs ticket (8c8ea7d).",
+    "2026-11-13: First TD leads with our most likely scorer (ftdb:pick standalone, new ftdb:pickedge), edges tracked below (d73b0ba).",
     "2026-11-13: First Basket and Anytime TD go live at 0.25u probation from t 1.0, full stake at t 1.645, out below t 0 (f05f8b3).",
     "2026-11-13: waiver claims skip taxi squad players as drops (322fe67); Coleman Jr. was being named.",
     "2026-11-12 late: Harris CBB feed read moved to after() (55 s limit) after 5 failing runs; lineup swaps quote both players on one ranking scale.",
