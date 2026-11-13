@@ -63,6 +63,14 @@ Live after deploy (Nov 6, late): /props 149 KB (was 2.98 MB), ttfb 0.9 s; /picks
 
 Next session: check /status after a pulse (Harris CBB day check should be green), compare live page sizes and times to the numbers below, then the lotto cap sweep around Nov 20.
 
+
+## 2026-11-13: probation for long-price learners (f05f8b3)
+- FB_GATE (new, NBA First Basket) and ATTD_GATE: minT 1.645 plus `probation: { minT: 1, stake: 0.25 }`. FTD_GATE (NFL First TD, Lottos) unchanged at 1.96.
+- engine.ts review(): a collecting slice passing every check but t, with t >= 1.0, goes active with `entry.probation = { stake }`. Promoted (probation.until set) once it is fully ready; rolled back if its t since registering drops below 0. Shares gate.maxNew.
+- liveBets scales net by stakeAt(); one keyed bet counts once at the bigger stake. staked-core liveStake() sizes ATTD and FB bets (stakeNote "probation"); pushes, email and Today show "0.25u, probation".
+- Narrow slices still need paired t 1.645 against their parent, so today only attd:value (21 of 25 winners, t 0.76) and fb:all (t 0.49) are in reach. Jack chose to keep that check.
+- Tests: src/lib/learning/probation.test.ts.
+
 ## Item 3: folded headers (app/picks/tabs.tsx, tab-sets.ts, ScopeScroll.tsx)
 - Picks (NFL/CFB/NBA/CBB) and Props: row 1 = sport + market in one sideways-scrolling line (current tab scrolled into view on load, right-edge fade under 640px); row 2 = Board/Today, Results, Lab. Lab shows a sub-row: Research, Learner log, How it works (football), Bracket lab (CBB). Old ?v=research / ?v=log URLs open inside Lab. /picks/model uses the same header with How it works lit.
 - League home page: Season plan / Players / Draft buttons removed (tab row has them); Refresh + Trade analyzer stay.
