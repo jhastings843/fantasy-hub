@@ -41,9 +41,10 @@ function Explainer() {
       </p>
       <p className={s.p}>
         So the real test is the rung table on Results: every long rung DraftKings posts (+250 to +2000 on the full-game ladder) graded
-        against the box score, thousands a week. The nightly ticket is the fun part: the best-value rung in each game (our chance times
-        DK&apos;s payout), one per player, top {LEGS} games, {STAKE}u at the product of the prices. Since Nov 5 no leg is
-        longer than +{CAP}: DraftKings&apos; cut on the ladder jumps past +800. It is built from each game&apos;s
+        against the box score, thousands a week. The nightly ticket is the fun part: the rung in each game with the best market-checked value (our chance
+        blended toward DK&apos;s de-vigged ladder, times DK&apos;s payout), one per player, top {LEGS} games, {STAKE}u at the product of the prices,
+        no leg longer than +{CAP}. Since Nov 13 that is also the only slice tracked: every raw-value rung slice lost 14 to 41 cents on the dollar,
+        and only market-checked rungs at +{CAP} or shorter ran near even. It is built from each game&apos;s
         last pregame read, so a late game&apos;s leg can carry news from after the first tip. Never emailed, and not a bet until its learner slice goes live.
       </p>
     </Background>
@@ -175,9 +176,10 @@ export async function LottoToday({ season }: { season: number }) {
   const t = d.tickets.find((x) => x.date === today) ?? null;
   const todays = d.rungs.filter((r) => r.date === today);
   // A live slice's rungs are bets and always shown; tracked rungs fill the rest of the top.
-  const open = todays.filter((r) => r.hit === null && r.ev > 0 && Date.parse(r.at) > now);
+  // Only the slice still tracked (Nov 13): the best market-checked rung at +700 or shorter.
+  const open = todays.filter((r) => r.hit === null && r.checkedEv > 0 && r.bestCheckedCapped === true && Date.parse(r.at) > now);
   const bets = open.filter((r) => rungStaked(learning.entries, r)).length;
-  const best = open.sort((a, b) => Number(rungStaked(learning.entries, b)) - Number(rungStaked(learning.entries, a)) || b.ev - a.ev).slice(0, Math.max(TOP, bets));
+  const best = open.sort((a, b) => Number(rungStaked(learning.entries, b)) - Number(rungStaked(learning.entries, a)) || b.checkedEv - a.checkedEv).slice(0, Math.max(TOP, bets));
   const ticketBet = !!t && ticketStaked(learning.entries, t.legs[0]?.at);
   const live = learning.entries.filter((e) => e.status === "active").map((e) => e.label);
   const byGame = new Map<string, Rung[]>();

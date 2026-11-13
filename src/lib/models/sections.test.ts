@@ -29,34 +29,17 @@ describe("Anytime TD slices", () => {
 });
 
 describe("Lotto slices", () => {
-  it("grades rungs by slice and the ticket at its stake", () => {
-    const rung = (game: string, over: number, ev: number, hit: boolean, stat = "pts"): Rung =>
-      ({ line: 19.5, over, ours: 0.3, raw: 0.3, date: "2026-10-27", at: "2026-10-27T23:00:00Z", game, matchup: "A@B", id: `${stat}|x`, player: "x", stat, ev, hit, actual: 0 }) as Rung;
-    const rungs = [rung("g1", 400, 0.2, true), rung("g2", 800, 0.1, false, "reb"), rung("g3", 300, -0.1, true)];
+  // Cut to one rung slice and the market-checked ticket (Jack, 2026-11-13).
+  const rung = (game: string, capped: boolean, hit: boolean, over = 600): Rung =>
+    ({ line: 19.5, over, ours: 0.3, raw: 0.3, checked: 0.2, checkedEv: 0.4, bestOfLadder: false, bestCheckedCapped: capped, bestOursCapped: false, date: "2026-10-27", at: "2026-10-27T23:00:00Z", game, matchup: "A@B", id: "pts|x", player: "x", stat: "pts", ev: 0.8, hit, actual: 0 }) as Rung;
+  it("only the market-checked +700 slice and the ticket, the slice on its own", () => {
     const ticket = { date: "2026-10-27", legs: [], price: 22676, chance: 0.01, book: 0.004, outcome: "L" as const };
-    const c = Object.fromEntries(lottoCandidates(rungs, [ticket], 2026).map((x) => [x.id, x]));
-    expect(c["lotto:value"].bets.map((b) => b.net)).toEqual([4, -1]);
-    expect(c["lotto:long"].bets).toHaveLength(1);
-    expect(c["lotto:reb"].bets).toHaveLength(1);
-    expect(c["lotto:ticket"].bets[0].net).toBeCloseTo(-0.1, 6);
-  });
-  it("market-checked slices keep only each ladder's best rung, and stand on their own", () => {
-    const rung = (game: string, best: boolean, stat = "pts"): Rung =>
-      ({ line: 19.5, over: 600, ours: 0.3, raw: 0.3, checked: 0.2, checkedEv: 0.4, bestOfLadder: best, date: "2026-10-27", at: "2026-10-27T23:00:00Z", game, matchup: "A@B", id: `${stat}|x`, player: "x", stat, ev: 0.8, hit: false, actual: 0 }) as Rung;
-    const c = Object.fromEntries(lottoCandidates([rung("g1", true), rung("g1", false), rung("g2", true, "reb")], [], 2026).map((x) => [x.id, x]));
-    expect(c["lotto:checked"].bets).toHaveLength(2);
-    expect(c["lotto:checked-noreb"].bets).toHaveLength(1);
-    expect(c["lotto:checked"].parent).toBeUndefined();
-    expect(c["lotto:checked-noreb"].parent).toBe("lotto:checked");
-  });
-  it("capped slices keep the flagged +700-or-shorter rung", () => {
-    const rung = (game: string, checked: boolean, ours: boolean): Rung =>
-      ({ line: 19.5, over: 600, ours: 0.3, raw: 0.3, checked: 0.2, checkedEv: 0.4, bestOfLadder: false, bestCheckedCapped: checked, bestOursCapped: ours, date: "2026-10-27", at: "2026-10-27T23:00:00Z", game, matchup: "A@B", id: "pts|x", player: "x", stat: "pts", ev: 0.8, hit: false, actual: 0 }) as Rung;
-    const c = Object.fromEntries(lottoCandidates([rung("g1", true, false), rung("g2", false, true), rung("g3", true, true)], [], 2026).map((x) => [x.id, x]));
-    expect(c["lotto:checked-cap"].bets).toHaveLength(2);
-    expect(c["lotto:ours-cap"].bets).toHaveLength(2);
-    expect(c["lotto:checked-cap"].parent).toBe("lotto:checked");
-    expect(c["lotto:ours-cap"].parent).toBe("lotto:value");
+    const cs = lottoCandidates([rung("g1", true, true), rung("g2", false, false), rung("g3", true, false)], [ticket], 2026);
+    expect(cs.map((c) => c.id)).toEqual(["lotto:checked-cap", "lotto:ticket-checked"]);
+    const c = Object.fromEntries(cs.map((x) => [x.id, x]));
+    expect(c["lotto:checked-cap"].bets.map((x) => x.net)).toEqual([6, -1]);
+    expect(c["lotto:checked-cap"].parent).toBeUndefined();
+    expect(c["lotto:ticket-checked"].bets[0].net).toBeCloseTo(-0.1, 6);
   });
 });
 
@@ -95,12 +78,13 @@ describe("Live slices mark bets", () => {
     expect(attdStaked([entry("attd:edge10", "rolled-back", live)], "2026-10-28T17:00:00Z", 0.5, 150)).toBe(false);
   });
 
-  it("Lottos: rung slices and the ticket", () => {
-    const rung = { over: 800, ev: 0.2, stat: "reb", at: "2026-10-28T23:00:00Z" } as never;
-    expect(rungStaked([entry("lotto:long", "active", live)], rung)).toBe(true);
-    expect(rungStaked([entry("lotto:pts", "active", live)], rung)).toBe(false);
-    expect(ticketStaked([entry("lotto:ticket", "active", live)], "2026-10-28T23:00:00Z")).toBe(true);
-    expect(ticketStaked([entry("lotto:value", "active", live)], "2026-10-28T23:00:00Z")).toBe(false);
+  it("Lottos: the capped slice and the ticket", () => {
+    const at = "2026-10-28T23:00:00Z";
+    expect(rungStaked([entry("lotto:checked-cap", "active", live)], { over: 600, ev: 0.2, stat: "reb", at, checkedEv: 0.1, bestCheckedCapped: true } as never)).toBe(true);
+    expect(rungStaked([entry("lotto:checked-cap", "active", live)], { over: 800, ev: 0.2, stat: "reb", at, checkedEv: 0.1, bestCheckedCapped: false } as never)).toBe(false);
+    expect(rungStaked([entry("lotto:long", "active", live)], { over: 800, ev: 0.2, stat: "reb", at } as never)).toBe(false); // retired
+    expect(ticketStaked([entry("lotto:ticket-checked", "active", live)], at)).toBe(true);
+    expect(ticketStaked([entry("lotto:ticket", "active", live)], at)).toBe(false);
   });
 
   it("Anytime TD: a live Venom slice stakes, only when his board is in", () => {
@@ -131,13 +115,6 @@ describe("Live slices mark bets", () => {
       const kept = new Set(c.bets.map((b) => b.key!.split("|")[1]));
       for (const r of rows) expect([c.id, r.key, attdStaked([entry(c.id, "active", live)], at, r.anytime, r.dk, picks.has(r.key))]).toEqual([c.id, r.key, kept.has(r.key)]);
     }
-  });
-
-  it("Lottos: a live learner combination of two rung slices", () => {
-    const rung = { over: 800, ev: 0.2, stat: "reb", at: "2026-10-28T23:00:00Z" } as never;
-    expect(rungStaked([entry("gen:lotto:long&lotto:reb", "active", live)], rung)).toBe(true);
-    expect(rungStaked([entry("gen:lotto:long&lotto:pts", "active", live)], rung)).toBe(false);
-    expect(rungStaked([entry("gen:lotto:unknown&lotto:reb", "active", live)], rung)).toBe(false);
   });
 
   it("King of the Court: the widest live top-N, 0 when none", () => {

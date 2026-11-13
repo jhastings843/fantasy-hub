@@ -159,7 +159,7 @@ export function rungsOf(boards: LottoBoard[]): Rung[] {
  * - long:   the game's longest price, games ranked by price
  * The list is fixed up front so a lucky recipe can't be picked after the fact.
  */
-export type Pick = "value" | "chance" | "long" | "raw";
+export type Pick = "value" | "chance" | "long" | "raw" | "checked";
 export interface Recipe {
   id: string;
   label: string;
@@ -172,7 +172,7 @@ export interface Recipe {
   /** Water-down: the same players as `of`, each on his shortest rung of the stat. */
   water?: string;
 }
-const PICK_LABEL: { [k in Pick]: string } = { value: "best value", chance: "likeliest", long: "longest price", raw: "best raw value" };
+const PICK_LABEL: { [k in Pick]: string } = { value: "best value", chance: "likeliest", long: "longest price", raw: "best raw value", checked: "best market-checked value, +700 or shorter" };
 /**
  * Sam style (Jack, 2026-10-28, after @TheModelManSam cashed +19,300): 3 legs,
  * points only, legs +300 to +700 so a ticket lands near +20,000, picked on our
@@ -190,13 +190,15 @@ export const RECIPES: Recipe[] = [
     (["value", "chance", "long"] as const).map((pick) => ({ id: `l${legs}-${pick}`, label: `${legs} legs, ${PICK_LABEL[pick]}`, legs, pick })),
   ),
   ...SAM,
+  // Jack, 2026-11-13: every raw-value rung slice lost (-27% on 4,257 rungs); only market-checked +700-capped rungs ran near even.
+  { id: `l${LEGS}-checked`, label: `${LEGS} legs, ${PICK_LABEL.checked}`, legs: LEGS, pick: "checked" },
 ];
-/** The original nightly ticket, the one the learner and the Today page follow. */
-export const DEFAULT_RECIPE: Recipe = RECIPES.find((r) => r.id === `l${LEGS}-value`)!;
+/** The nightly ticket the learner and the Today page follow: market-checked legs, +700 or shorter (from 2026-11-13; it was l3-value). */
+export const DEFAULT_RECIPE: Recipe = RECIPES.find((r) => r.id === `l${LEGS}-checked`)!;
 
 /** A rung's value on our raw model, before the blend toward DK. */
 const rawEv = (r: Rung) => r.raw * dec(r.over) - 1;
-const score: { [k in Pick]: (r: Rung) => number } = { value: (r) => r.ev, chance: (r) => r.ours, long: (r) => r.over, raw: rawEv };
+const score: { [k in Pick]: (r: Rung) => number } = { value: (r) => r.ev, chance: (r) => r.ours, long: (r) => r.over, raw: rawEv, checked: (r) => r.checkedEv };
 
 /** The night's ticket under a recipe: one positive-value rung per game, the top games. Null when too few games qualify. */
 export function ticket(date: string, rungs: Rung[], recipe: Recipe = DEFAULT_RECIPE): Ticket | null {
@@ -204,7 +206,8 @@ export function ticket(date: string, rungs: Rung[], recipe: Recipe = DEFAULT_REC
   const by = score[recipe.pick];
   const best = new Map<string, Rung>();
   for (const r of rungs) {
-    if (r.date !== date || (recipe.pick === "raw" ? rawEv(r) : r.ev) <= 0) continue;
+    if (r.date !== date || (recipe.pick === "raw" ? rawEv(r) : recipe.pick === "checked" ? r.checkedEv : r.ev) <= 0) continue;
+    if (recipe.pick === "checked" && r.over > CAP) continue;
     if (recipe.stat && r.stat !== recipe.stat) continue;
     if (recipe.band && (r.over < recipe.band[0] || r.over > recipe.band[1])) continue;
     if (date >= CAP_FROM && r.over > CAP) continue;

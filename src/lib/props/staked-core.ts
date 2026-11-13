@@ -467,7 +467,7 @@ export function lottoStaked(input: { rungs: Rung[]; ticket: Ticket | null; entri
       priceText: `${am(t.price)} DraftKings`,
       book: "DraftKings",
       kickoff: first,
-      slice: input.entries.find((e) => e.id === "lotto:ticket")?.label ?? "The nightly ticket",
+      slice: input.entries.find((e) => e.id === "lotto:ticket-checked")?.label ?? "The nightly ticket",
       stake: LOTTO_STAKE,
       href: "/props?m=lotto",
     });

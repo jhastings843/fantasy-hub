@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAP, CAP_FROM, LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
+import { CAP, CAP_FROM, DEFAULT_RECIPE, LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
 import { implied } from "@/lib/props/parse";
 import { LONG_MAX, LONG_MIN, longRungs } from "./market";
 import PARAMS from "./params.json";
@@ -41,8 +41,10 @@ describe("lotto ticket", () => {
     board("4", tip, "Nobody", [{ line: 19.5, over: 400, ours: 0.1 }]), // no value
   ];
 
+  // The old default (3 legs, best value); the default is market-checked from 2026-11-13.
+  const V = RECIPES.find((r) => r.id === "l3-value")!;
   it("takes each game's best-value rung, top 3 games, priced as the product", () => {
-    const t = ticket("2026-10-27", rungsOf(boards))!;
+    const t = ticket("2026-10-27", rungsOf(boards), V)!;
     expect(t.legs.map((l) => l.player)).toEqual(["Tyson", "Hardaway", "Jakucionis"]);
     expect(t.price).toBe(22676); // 5.2 x 6 x 7.3 = 227.76x, Sam's Oct 26 ticket
     expect(t.chance).toBeCloseTo(0.25 * 0.2 * 0.16, 6);
@@ -50,7 +52,7 @@ describe("lotto ticket", () => {
   });
 
   it("needs 3 games with value", () => {
-    expect(ticket("2026-10-27", rungsOf(boards.slice(0, 2).concat(boards[3])))).toBeNull();
+    expect(ticket("2026-10-27", rungsOf(boards.slice(0, 2).concat(boards[3])), V)).toBeNull();
   });
 
   it("grades: a void leg drops out and the rest pay", () => {
@@ -59,7 +61,7 @@ describe("lotto ticket", () => {
       board("2", tip, "Hardaway", [{ line: 14.5, over: 500, ours: 0.2 }], null),
       board("3", tip, "Jakucionis", [{ line: 14.5, over: 630, ours: 0.16 }], 15),
     ];
-    const t = tickets(rungsOf(g))[0];
+    const t = tickets(rungsOf(g), V)[0];
     expect(t.outcome).toBe("W");
     expect(t.price).toBe(3696); // 5.2 x 7.3 = 37.96x
     const sum = summarize(rungsOf(g), [t]);
@@ -74,7 +76,7 @@ describe("lotto ticket", () => {
       board("2", tip, "Hardaway", [{ line: 14.5, over: 500, ours: 0.2 }], 20),
       board("3", tip, "Jakucionis", [{ line: 14.5, over: 630, ours: 0.16 }], 15),
     ];
-    const t = tickets(rungsOf(g))[0];
+    const t = tickets(rungsOf(g), V)[0];
     expect(t.outcome).toBe("L");
     expect(summarize(rungsOf(g), [t]).tickets.net).toBeCloseTo(-0.1, 6);
   });
@@ -90,9 +92,19 @@ describe("ticket recipes", () => {
   const rungs = rungsOf(boards);
   const by = (id: string) => RECIPES.find((r) => r.id === id)!;
 
-  it("is a fixed list of 12 plus the two Sam-style tickets, the original first", () => {
-    expect(RECIPES).toHaveLength(14);
-    expect(recipeRecords(rungs)[0].recipe.id).toBe("l3-value");
+  it("is a fixed list of 12, the two Sam-style tickets and the market-checked default", () => {
+    expect(RECIPES).toHaveLength(15);
+    expect(DEFAULT_RECIPE.id).toBe("l3-checked");
+    expect(recipeRecords(rungs)[0].recipe.id).toBe("l3-checked");
+  });
+
+  it("the market-checked ticket takes only checked value at +700 or shorter", () => {
+    const all = rungsOf(boards);
+    const t = ticket("2026-10-27", all, DEFAULT_RECIPE);
+    for (const l of t?.legs ?? []) expect(l.over <= 700 && l.checkedEv > 0).toBe(true);
+    // With every rung past +700 nothing qualifies.
+    const long = rungsOf([board("1", tip, "A", [{ line: 30.5, over: 900, ours: 0.3 }]), board("2", tip, "B", [{ line: 30.5, over: 900, ours: 0.3 }]), board("3", tip, "C", [{ line: 30.5, over: 900, ours: 0.3 }])]);
+    expect(ticket("2026-10-27", long, DEFAULT_RECIPE)).toBeNull();
   });
   it("picks each game's leg by the recipe", () => {
     expect(ticket("2026-10-27", rungs, by("l2-chance"))!.legs.map((l) => `${l.player} ${l.line}`)).toEqual(["Tyson 14.5", "Hardaway 14.5"]);
