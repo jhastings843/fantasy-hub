@@ -326,7 +326,15 @@ export function register(prev: SectionState, base: Candidate[], now: string, wee
   const entries: { [id: string]: Entry } = Object.fromEntries(Object.entries(prev.entries).map(([k, v]) => [k, { ...v }]));
   const fresh: string[] = [];
   for (const c of cands) {
-    if (entries[c.id]) continue;
+    if (entries[c.id]) {
+      // A collecting slice follows its definition's parent (First TD's most likely scorer stood alone from 2026-11-13).
+      const e = entries[c.id];
+      if (e.status === "collecting" && e.parent !== c.parent) {
+        if (c.parent) e.parent = c.parent;
+        else delete e.parent;
+      }
+      continue;
+    }
     entries[c.id] = { id: c.id, label: c.label, ...(c.parent ? { parent: c.parent } : {}), status: "collecting", registeredAt: now, registeredWeek: week };
     fresh.push(c.label);
   }

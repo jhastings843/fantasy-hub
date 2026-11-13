@@ -82,3 +82,13 @@ describe("probation", () => {
     expect(liveStake([e("a", { stake: 0.25, until: at(1) })], at(3), () => true)).toBe(1);
   });
 });
+
+describe("a slice follows its definition's parent", () => {
+  it("First TD's most likely scorer drops its parent and keeps its clock (2026-11-13)", () => {
+    const old = register(emptyState("s"), [{ id: "v", label: "V", bets: [] }, { id: "pick", label: "P", parent: "v", bets: [] }], T0, 7).state;
+    const now = register(old, [{ id: "v", label: "V", bets: [] }, { id: "pick", label: "P", bets: [] }, { id: "pe", label: "PE", parent: "pick", bets: [] }], "2026-11-13T12:00:00.000Z", 10).state;
+    expect(now.entries.pick.parent).toBeUndefined();
+    expect(now.entries.pick.registeredAt).toBe(T0);
+    expect(now.entries.pe).toMatchObject({ parent: "pick", registeredAt: "2026-11-13T12:00:00.000Z" });
+  });
+});

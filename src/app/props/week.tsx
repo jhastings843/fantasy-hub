@@ -915,6 +915,46 @@ async function FirstTdWeek({ season }: { season: number }) {
       }),
     )
     .sort((a, b) => b.gap - a.gap);
+  // The strategy (Jack, 2026-11-13): our most likely scorer in each game, soonest first, edge or not.
+  // The edge cards stay below as the tracked second read.
+  const favs: Edge[] = ahead
+    .flatMap((g): Edge[] => {
+      const pk = g.game.pick;
+      const p = pk ? pricedPlayers(g.game).find((x) => x.name === pk.name && x.team === pk.team) : undefined;
+      if (!p) return [];
+      const b = best(g, p.name);
+      const c = b?.cost ?? null;
+      const team = g.game.teams.find((t) => t.team === p.team)!;
+      const k = kalshi(g, p.name);
+      const d = dkPrice(g, p.name);
+      const staked = c !== null && keepsFor(g.kickoff).some((keep) => keep(p, c, g.game));
+      return [
+        {
+          staked,
+          key: `fav|${g.game.slug}|${p.key}`,
+          player: p.name,
+          game: `${g.game.away} at ${g.game.home}`,
+          playerHref: playerPropHref("nfl", p.team, p.name, g.espnId ?? g.game.slug),
+          gameHref: footballGameHref("nfl", g.game.away, g.game.home),
+          when: g.kickoff,
+          bet: `Most likely first TD · ${p.team}${c === null ? "" : p.p > c ? " · also an edge" : " · no edge"}`,
+          ours: p.p,
+          mkt: c ?? 0,
+          mktLabel: c === null ? "No price yet" : "Cheapest price",
+          price: b ? b.where : "no price yet",
+          gap: c === null ? 0 : p.p - c,
+          more: [
+            ["Kalshi cost (fee in)", k !== null ? `${Math.round(k * 100)}¢` : "no market"],
+            ["DraftKings", d !== null ? `${am(d)} (breaks even at ${pct(implied(d))})` : g.dk ? "not listed" : "read the morning of game day"],
+            ["FanDuel", fdPrice(g, p.name) !== null ? `${am(fdPrice(g, p.name)!)} (breaks even at ${pct(implied(fdPrice(g, p.name)!))})` : g.fd ? "not listed" : "read the morning of game day"],
+            [`${p.team} scores first`, pct(team.pFirst)],
+            ["Touches, TDs (this season and last)", `${p.touches}, ${p.tds}`],
+            ["No offensive TD first", pct(g.game.none)],
+          ],
+        },
+      ];
+    })
+    .sort((a, b) => (a.when ?? "").localeCompare(b.when ?? ""));
   const graded = ftdBestRecord(v.graded);
   // The board holds games still to finish, soonest first; a graded game moves to Results (Jack, 2026-10-26).
   const open = v.board.filter((g) => !g.result).sort((a, b) => (a.kickoff ?? "").localeCompare(b.kickoff ?? ""));
@@ -994,16 +1034,35 @@ async function FirstTdWeek({ season }: { season: number }) {
       <Hero
         eyebrow={`NFL First TD${v.week ? ` · Week ${v.week}` : ""} · Kalshi and DraftKings`}
         title={<span id="ftd-week">{v.learning.entries.some((e) => e.status === "active") ? "First TD bets live" : "No First TD bets yet"}</span>}
-        sub={`Which team scores first comes from the market's total and spread, drive by drive; the scorer from each team's TD shares. Priced against Kalshi and, from the morning of game day, DraftKings. ${edges.length ? `${edges.length} players beat the cheaper price.` : "Nobody beats the cheaper price right now."}`}
+        sub={`Our most likely first TD scorer in each game leads; edges are tracked below. Which team scores first comes from the market's total and spread, drive by drive; the scorer from each team's TD shares. Priced against Kalshi and, from the morning of game day, DraftKings. ${edges.length ? `${edges.length} players beat the cheaper price.` : "Nobody beats the cheaper price right now."}`}
       />
       {/* "Every edge so far" is already the bet-every-value record, so it isn't repeated. */}
       <PropStats edges={edges.length} graded={graded} learning={v.learning} logHref="/props?m=ftd&v=log" unit="on games still to play" extra={favTile} />
+      {favs.length > 0 && (
+        <div className={s.section}>
+          <div className={s.sectionHead}>
+            <h3 className={s.h2}>Most likely to score first</h3>
+            <p className={s.p}>One per game, soonest first: the player we give the best chance, at the cheapest price, and whether that price is also an edge.</p>
+          </div>
+          <ul className={s.edgeGrid} data-first-pick>
+            {favs.map((e) => (
+              <EdgeCard key={e.key} e={e} />
+            ))}
+          </ul>
+        </div>
+      )}
       {edges.length > 0 && (
-        <ul className={s.edgeGrid} data-first-pick>
-          {edges.slice(0, TOP).map((e) => (
-            <EdgeCard key={e.key} e={e} />
-          ))}
-        </ul>
+        <div className={s.section}>
+          <div className={s.sectionHead}>
+            <h3 className={s.h2}>Edges, tracked</h3>
+            <p className={s.p}>Players whose chance beats the cheapest price by the edge rule, biggest first.</p>
+          </div>
+          <ul className={s.edgeGrid}>
+            {edges.slice(0, TOP).map((e) => (
+              <EdgeCard key={e.key} e={e} />
+            ))}
+          </ul>
+        </div>
       )}
       <div className={s.section}>
         <div className={s.sectionHead}>

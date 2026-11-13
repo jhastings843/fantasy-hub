@@ -248,7 +248,9 @@ export const OUR_FTD_SLICES: [string, string, Keep][] = [
   ["ftdb:value", "Our chance above the best price (Kalshi, DK or FanDuel)", (p, c) => p.p > c],
   ["ftdb:value3", "Above the best price by 3+ points", (p, c) => p.p >= c + 0.03],
   ["ftdb:gate", "The edge rule: best price 6%+ and ours above it by 2+ points (from Nov 2, 2026)", (p, c) => ftdEdge(p.p, c)],
+  // Jack, 2026-11-13: the most likely scorer is the strategy, judged on its own (no parent); the edge slices are tracked beside it.
   ["ftdb:pick", "Our most likely scorer, at the best price", (p, _c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team],
+  ["ftdb:pickedge", "Our most likely scorer when he is also an edge at the best price", (p, c, g) => !!g.pick && g.pick.name === p.name && g.pick.team === p.team && p.p > c],
   ["ftdb:short", "Best price 10% or less, ours above it", (p, c) => c <= 0.1 && p.p > c],
   ["ftdb:long", "Best price above 10%, ours above it", (p, c) => c > 0.1 && p.p > c],
 ];
@@ -257,7 +259,7 @@ export function ourFtdCandidates(list: (FtdGradedGame & Books)[]): Candidate[] {
   return OUR_FTD_SLICES.map(([id, label, keep]) => ({
     id,
     label,
-    ...(id === "ftdb:value" ? {} : { parent: "ftdb:value" }),
+    ...(id === "ftdb:value" || id === "ftdb:pick" ? {} : { parent: id === "ftdb:pickedge" ? "ftdb:pick" : "ftdb:value" }),
     bets: bestBets(list, keep).map((b): Bet => ({ game: b.game.slug, key: `${b.game.week}|${b.game.slug}|${b.player}`, week: b.game.week, at: b.kickoff ?? "", net: Math.round(b.net * 1000) / 1000, p: b.p, price: costToAmerican(b.cost) })),
   }));
 }
