@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { redis } from "@/lib/redis/client";
 import { watchProblems } from "@/lib/notify/problems";
 import { boardFor, cbbSeason } from "./store";
@@ -84,6 +85,24 @@ export async function harrisCbbIfDue(now = new Date()): Promise<string> {
     if ((await redis.set(CLAIM(season, date), now.toISOString(), { nx: true, ex: date < today ? YESTERDAY_EVERY_S : TODAY_EVERY_S })) !== "OK") continue;
     due.push(date);
   }
+  if (!due.length) return "Harris CBB: nothing due";
+  const read = () => readDue(due, now);
+  // His feed takes ~40 s cold (timed 2026-11-12: 41.8 s cold, 1.5 s warm) and the
+  // pulse gives a job ~25 s, so a cold read always failed at the old 18 s limit.
+  // Read after the pulse answers instead (pulse route maxDuration 120); outside
+  // a request (scripts, tests) after() throws, so read inline.
+  try {
+    after(async () => {
+      await read().catch((e) => console.error("Harris CBB background read failed", e));
+    });
+    return `Harris CBB: reading ${due.join(", ")} after the pulse`;
+  } catch {
+    return read();
+  }
+}
+
+/** Reads the claimed days (up to HARRIS_CBB_SLOW_MS each), releases slow claims, records problems for /status. */
+async function readDue(due: string[], now: Date): Promise<string> {
   const results = await Promise.allSettled(due.map((date) => ingestHarrisCbb(date, now, HARRIS_CBB_SLOW_MS)));
   const out: string[] = [];
   const problems: string[] = [];
@@ -106,7 +125,7 @@ export async function harrisCbbIfDue(now = new Date()): Promise<string> {
   if (hard) throw hard;
   // A day that reads but does not verify (usually a team name we fold differently), or a feed slow three runs running, pushes Jack.
   if (out.length) await watchProblems("Harris CBB feed", problems);
-  return out.length ? `Harris CBB: ${out.join("; ")}` : "Harris CBB: nothing due";
+  return `Harris CBB: ${out.join("; ")}`;
 }
 
 /** Every day on file this season, oldest first: games and whether it verified. */

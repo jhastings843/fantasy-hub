@@ -240,8 +240,8 @@ export function mergeDay(prior: HarrisCbbRow[] | undefined, fresh: HarrisCbbRow[
   return out;
 }
 
-/** His feed is a Google Apps Script: about 24 s on a cold read, 1-3 s warm (timed 2026-11-12). */
-export const HARRIS_CBB_SLOW_MS = 18_000;
+/** His feed is a Google Apps Script: 24-42 s on a cold read, 1-3 s warm (timed 2026-11-12). Read after the pulse answers (harris-store.ts), so it gets 55 s. */
+export const HARRIS_CBB_SLOW_MS = 55_000;
 
 /** One day's picks table from his feed. One request. Throws HarrisCbbSlow past timeoutMs. */
 export async function fetchHarrisCbb(date: string, url = HARRIS_CBB_URL, timeoutMs = 60_000): Promise<CbbFeedTable> {

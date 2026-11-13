@@ -5,7 +5,8 @@ export const dynamic = "force-dynamic";
 // The live tier rebuilds two survivor boards, four lineups and the Jingles
 // ingest in one call. Sixty seconds is Vercel's ceiling on this plan and the
 // jobs time out at 25 apiece, so a bad upstream cannot hold the whole run.
-export const maxDuration = 60;
+// 120, not 60: Harris CBB's feed read runs in after() and takes up to ~45 s cold.
+export const maxDuration = 120;
 
 // GET /api/pulse - the heartbeat.
 //
