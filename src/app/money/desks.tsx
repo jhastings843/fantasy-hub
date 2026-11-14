@@ -6,7 +6,7 @@ import { Disclosure } from "@/components/hh/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { getMoneyView } from "@/lib/money/store";
-import type { Book, Phil, Weather } from "@/lib/money/types";
+import type { Book, Phil, Satellite, Weather } from "@/lib/money/types";
 import { Hero, LearnerLog, Stats, type LogEntry, type Stat } from "../picks/board";
 export { LearnerLog, Stats };
 import s from "../picks/picks.module.css";
@@ -95,6 +95,30 @@ function weatherDesk(w: Weather): Desk {
   };
 }
 
+/** Settled bets before the satellite desk's record means anything. */
+const SATELLITE_MIN = 20;
+
+/** The satellite desk, judged on its paper P&L against the $1,000 it started with. */
+export function satelliteDesk(d: Satellite): Desk {
+  const pnl = d.equity - d.bankroll;
+  const open = (d.bets ?? []).filter((b) => b.status === "open").length;
+  const read = d.settled < SATELLITE_MIN ? "Too early" : pnl >= 0 ? "Up" : "Down";
+  return {
+    money: "usd",
+    id: "satellite",
+    name: "Satellite",
+    what: "Temperature and sea ice markets",
+    result: usd(pnl, true),
+    rec: d.settled ? `${d.wins}-${d.settled - d.wins}` : `${open} open, ${usd(d.openCost)} staked`,
+    tone: toneOf(pnl),
+    ours: `Book ${usd(d.equity)}`,
+    yard: `Started at ${usd(d.bankroll)}`,
+    read,
+    readTone: read === "Up" ? "good" : read === "Down" ? "bad" : "neutral",
+    href: "/money?v=satellite",
+  };
+}
+
 export function desks(v: View): Desk[] {
   const out: Desk[] = [];
   const snap = v.snapshot;
@@ -119,6 +143,7 @@ export function desks(v: View): Desk[] {
   }
   if (snap?.phil && !snap.phil.error) out.push(philDesk(snap.phil, "phil", "Phil", "Claude agent, Polymarket", "/money?v=phil"));
   if (snap?.weather) out.push(weatherDesk(snap.weather));
+  if (snap?.satellite) out.push(satelliteDesk(snap.satellite));
   if (snap?.books.length) {
     const b = booksTotals(snap.books);
     out.push({

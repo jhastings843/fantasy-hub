@@ -12,6 +12,7 @@ import m from "./money.module.css";
 import { Term } from "./Term";
 import { IntradayHero, IntradayTab } from "./IntradayTab";
 import { OptionsHero, OptionsTab } from "./OptionsTab";
+import { SatelliteHero, SatelliteTab } from "./SatelliteTab";
 import { SWITCH_ID, SwitchLean } from "./SwitchLean";
 import { PopLink } from "@/components/hh/PopLink";
 import { teamHref } from "../picks/hrefs";
@@ -26,7 +27,7 @@ import type { DeskId } from "@/lib/money/schedule";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "options" | "weather";
+export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "options" | "weather" | "satellite";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -42,6 +43,7 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "intraday", label: "Day Trader" },
   { id: "options", label: "Options" },
   { id: "weather", label: "Weather" },
+  { id: "satellite", label: "Satellite" },
 ];
 export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
 const href = (t: MoneyTab) => (t === "overview" ? "/money" : t === "portfolio" ? "/portfolio" : `/money?v=${t}`);
@@ -1800,6 +1802,8 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
         )}
         {v && tab === "weather" && snap?.weather && <WeatherHero w={snap.weather} />}
         {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The weather desk hasn&apos;t posted yet.</p>)}
+        {v && tab === "satellite" && snap?.satellite && <SatelliteHero d={snap.satellite} />}
+        {v && tab === "satellite" && (snap?.satellite ? <SatelliteTab d={snap.satellite} /> : <p className={s.calm}>The satellite desk hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
         {v && tab === "books" && snap && snap.books.length > 0 && <BooksHero books={snap.books} />}
         {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} rs={snap.researchSwitch} />}
         {v && tab === "trends" && snap?.trends && !snap.trends.error && <TrendsHero tr={snap.trends} />}

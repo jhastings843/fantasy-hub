@@ -214,6 +214,8 @@ export interface MoneySnapshot {
   gradeLog?: GradeDay[] | null;
   /** The weather desk (~/Projects/weather-desk). Missing before 2026-10-19. */
   weather?: Weather | null;
+  /** The satellite desk (~/Projects/site-watch data/status.json, passed through untouched). Missing before 2026-11-14. */
+  satellite?: Satellite | null;
   /** The trend book, tracked apart from the stock books (trade-bot tradebot/trends.py). Missing before 2026-10-21. */
   trends?: Trends | null;
   /** The intraday desk (trade-bot tradebot/intraday.py export()): opening-range breakouts on 5-minute bars,
@@ -504,6 +506,123 @@ export interface Weather {
   weatherModel?: { halfLifeDays: number; fitted: string | null; sameDay: WeatherModelTest; dayAhead: WeatherModelTest };
 }
 
+/** One live market the satellite desk priced. p is the model's chance of YES; best is the side worth buying, if either is. */
+export interface SatelliteSignal {
+  id: string;
+  family: "global-temp" | "sea-ice";
+  venue: "kalshi" | "polymarket";
+  ticker: string;
+  title: string;
+  label: string;
+  url: string;
+  p: number;
+  yesBid: number | null;
+  yesAsk: number | null;
+  best?: { side: "yes" | "no"; ask: number; edge: number } | null;
+  /** "bet", or why it skipped (like "edge +1.8c under 5c"). */
+  action: string;
+  why: string;
+  /** The model's working numbers; the keys differ by family. */
+  model: Record<string, unknown>;
+  closes: string;
+}
+
+/** One paper bet on the satellite desk. p is the chance the bet's own side wins. */
+export interface SatelliteBet {
+  id: string;
+  placed: string;
+  venue: "kalshi" | "polymarket";
+  event: string;
+  ticker: string;
+  title: string;
+  label: string;
+  signal?: string;
+  side: "yes" | "no";
+  price: number;
+  contracts: number;
+  cost: number;
+  fee: number;
+  p: number;
+  edge: number;
+  why: string;
+  url: string;
+  status: "open" | "won" | "lost";
+  settled?: string;
+  payout?: number;
+  pnl?: number;
+}
+
+/** Predicted against actual, one row per chance range, from the desk's backtest. */
+export interface SatelliteCalRow {
+  range: string;
+  n: number;
+  predicted: number;
+  actual: number;
+}
+
+export interface SatelliteCalTest {
+  cases: number;
+  brier: number;
+  logloss?: number;
+  calibration: SatelliteCalRow[];
+}
+
+/** One construction site watched in Sentinel-2 photos. Unlocated sites carry only a note. */
+export interface SatelliteSite {
+  id: string;
+  name: string;
+  promise: string;
+  watch_for: string;
+  located: boolean;
+  note?: string;
+  ticker?: string;
+  verdict?: string;
+  baseline?: string;
+  latest?: string;
+  vsDay?: string;
+  /** Change in greenness (NDVI) and brightness since vsDay, as fractions. */
+  ndviChange?: number;
+  brightChange?: number;
+  photoBaseline?: string;
+  photoLatest?: string;
+  points?: { day: string; ndvi: number; bright: number }[];
+}
+
+export interface SatelliteIdea {
+  name: string;
+  status: string;
+  cadence: string;
+  why: string;
+  data?: string;
+}
+
+/** Satellite desk status (site-watch data/status.json): its own $1,000 paper book on Kalshi and Polymarket. */
+export interface Satellite {
+  version: 1;
+  generatedAt: string;
+  bankroll: number;
+  cash: number;
+  equity: number;
+  realizedPnl: number;
+  fees: number;
+  openCost: number;
+  settled: number;
+  wins: number;
+  curve: { day: string; equity: number }[];
+  rules: { minEdge: number; kelly: number; maxPerMarket: number; maxPerEvent: number; maxOpenShare: number };
+  signals: SatelliteSignal[];
+  bets: SatelliteBet[];
+  calibration?: {
+    ran: string;
+    temp?: SatelliteCalTest & { calibration_raw?: SatelliteCalRow[]; brier_raw?: number; base_rate?: number; [k: string]: unknown };
+    ice?: { kernel?: number; reg_inflate?: number; regression?: SatelliteCalTest; analog?: SatelliteCalTest };
+  } | null;
+  sites: SatelliteSite[];
+  notes: string[];
+  /** Empty until site-watch adds ideas.json. */
+  ideas?: SatelliteIdea[];
+}
+
 /** Graded breakouts: count, average result in R (1R = the planned loss), share that made money, t-stat. */
 export interface IntradayStats {
   n: number;
@@ -594,5 +713,6 @@ export function isSnapshot(x: unknown): x is MoneySnapshot {
     && (s.phil === null || typeof s.phil === "object")
     && (s.intraday === undefined || s.intraday === null || typeof s.intraday === "object")
     && (s.options === undefined || s.options === null || (typeof s.options === "object" && Array.isArray(s.options.curve)))
-    && (s.researchSwitch === undefined || s.researchSwitch === null || Array.isArray(s.researchSwitch.log));
+    && (s.researchSwitch === undefined || s.researchSwitch === null || Array.isArray(s.researchSwitch.log))
+    && (s.satellite === undefined || s.satellite === null || typeof s.satellite === "object");
 }
