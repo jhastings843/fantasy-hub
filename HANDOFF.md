@@ -923,3 +923,9 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Data was fine: every day Nov 3-12 on file and verified. The failure was "harris-cbb took longer than 25000ms" (last at 17:45Z, ok again the hour before).
 - Cause: his Apps Script feed takes ~24 s on a cold read (timed 11-10 and 11-11 at 24.0 s and 24.5 s), 1-3 s warm. The job read yesterday, then today, then ESPN, in a row under the pulse's 25 s job cap. When the pulse cut it off, the claim was never released, so yesterday could sit unread up to 6 h.
 - Fix: both days read at once (Promise.allSettled); his feed gets its own 18 s limit (HARRIS_CBB_SLOW_MS); a slow read throws HarrisCbbSlow, releases its claim, retries next pulse, and goes to watchProblems("Harris CBB feed") so 3 slow runs in a row still push. The job itself reports ok. Manual POST /api/picks/harris keeps the 60 s limit. Tests: harris.test.ts "slow feed".
+
+## 2026-11-13: Today box + one live slice
+- Today spotlight (9001f53): next best bet; lib/today/spotlight.ts lets a slice activation/rollback or a do-now portfolio trade (unlocked only, portfolioBig) take it for 3h. Claims/lineups never take it; FantasySpot is now unused.
+- Learning engine (b436516): one live slice per section. Ready slice replaces the live one only at t >= live t + REPLACE_MARGIN (0.5); replaced slice goes to collecting with `stints` so its live record survives (liveWindows). Pre-existing extra live slices step down at next review. Probation only fills an empty slot. maxNew now caps changes per week.
+- Reviews are automatic: QStash pulse + GH workflows + /api/snapshot cron (no page view needed). Spreads rule re-picked weekly (7am ET Fri/Sun/Mon/Tue), frozen per week; GRANDFATHERED road-dog (NFL) / near-vegas (CFB) for 2026 in chosen-store.ts; cut thresholds are code constants.
+- Open: Jack's alt-line lotto idea (no alt spread/total prices are pulled today).
