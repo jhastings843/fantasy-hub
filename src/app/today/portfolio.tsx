@@ -70,3 +70,19 @@ export async function PortfolioToday({ now = new Date() }: { now?: Date }) {
     </Section>
   );
 }
+
+/**
+ * For Today's spotlight: the do-now portfolio trades and when they were posted,
+ * only on Jack's unlocked devices (null otherwise, so locked pages never hint).
+ */
+export async function portfolioBig(now = new Date()): Promise<{ at?: string; moves: TodayMove[] } | null> {
+  const open = await canSeePortfolio({
+    secret: process.env.HH_SESSION_SECRET,
+    token: (await cookies()).get(SESSION_COOKIE)?.value,
+    nodeEnv: process.env.NODE_ENV,
+  });
+  if (!open) return null;
+  const s = await getPortfolio();
+  if (!s) return null;
+  return { at: s.movesAt ?? s.asOf, moves: todayMoves(s, etDate(now)) };
+}

@@ -25,11 +25,14 @@ import { Call, Chip, Disclosure, Empty, Num, PageHead, Section, Spotlight, Stat,
 import { Meter, Sparkline } from "@/components/hh/charts";
 import { TeamEdge } from "@/components/hh/team";
 import { LiveScore } from "@/components/hh/LiveScore";
-import { FantasySection, FantasySkeleton, FantasySpot, getFantasyNow } from "./fantasy";
-import { PortfolioToday } from "./portfolio";
+import { FantasySection, FantasySkeleton } from "./fantasy";
+import { PortfolioToday, portfolioBig } from "./portfolio";
+import { bigNews, type BigNews } from "@/lib/today/spotlight";
 
 // Today (redesign, 2026-11-03): what to do right now. Answer first: one spotlight
-// for the single action that matters (the next bet, else the top claim), then
+// for the next best bet, taken over only by something big from the last 3 hours
+// (a props slice going live or rolled back, a do-now portfolio trade; Jack,
+// 2026-11-13: claims never take it, they stay at the bottom), then
 // what is live and next beside the research desks' live feed, portfolio and the record, then claims and lineup changes. Model
 // drivers and per-bet staking notes sit behind disclosures. Every stake shown is
 // one the picks emails issued (or the allocator has ready to issue), never a
@@ -41,17 +44,6 @@ export const metadata: Metadata = {
   title: "Today · Hobby Hub",
   description: "What to bet, claim and change right now, and what is live.",
 };
-
-/**
- * Waiver window: every waiver league processes claims at 3am Wednesday ET (lib/midweek/run.ts),
- * so from Tuesday until then the top claim takes the spotlight from the next bet (Jack, 2026-11-03).
- */
-function waiverWindow(d: Date): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(d);
-  const day = parts.find((p) => p.type === "weekday")?.value;
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  return day === "Tue" || (day === "Wed" && hour < 3);
-}
 
 const seasonOf = (d: Date) => (d.getMonth() < 7 ? d.getFullYear() - 1 : d.getFullYear());
 const u = (x: number) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(2)}u`;
@@ -302,8 +294,7 @@ const STATUS: Record<ModelRow["status"], { tone: Tone; text: string }> = {
 export default async function TodayPage() {
   const season = seasonOf(new Date());
   const nowDate = new Date();
-  // In the waiver window the claims are read alongside the bets (same cached read the sections use).
-  const fantasyFirst = waiverWindow(nowDate) ? getFantasyNow().catch(() => null) : null;
+  const big = portfolioBig().catch(() => null);
   const [nfl, cfb, board, nbaView, nflProducts, nbaProducts, stakedProps, stakedNba] = await Promise.all([
     getPicksReport("nfl").catch(() => null),
     getPicksReport("cfb").catch(() => null),
@@ -362,9 +353,13 @@ export default async function TodayPage() {
 
   // The spotlight: the biggest issued bet not yet started (soonest breaks ties), else one ready to send.
   const betSpot = [...issuedNext].sort((a, b) => (b.stake ?? 0) - (a.stake ?? 0) || a.kickoff.localeCompare(b.kickoff))[0] ?? readyNext[0] ?? null;
-  // Waiver window with a claim worth making: the claim takes the box and every bet stays in Next up.
-  const claimFirst = !!(fantasyFirst && (await fantasyFirst)?.claims.length);
-  const spot = claimFirst ? null : betSpot;
+  // Something big in the last 3 hours takes the box; otherwise the bet keeps it (claims never do).
+  const news = bigNews(
+    [...(nflProducts ?? []), ...(nbaProducts ?? [])].map((p) => ({ name: p.name, href: "/props", journal: p.learning.journal ?? [] })),
+    await big,
+    nowDate,
+  );
+  const spot = news ? null : betSpot;
   const nextRest = spot ? next.filter((x) => x.key !== spot.key) : next;
 
   // Which model drives each section, from the same data each page reads.
@@ -425,13 +420,7 @@ export default async function TodayPage() {
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-8">
-          {spot ? (
-            <BetSpot x={spot} />
-          ) : (
-            <Suspense fallback={<div className="hh-spot h-40 animate-pulse" aria-busy="true" />}>
-              <FantasySpot />
-            </Suspense>
-          )}
+          {news ? <NewsSpot n={news} /> : spot ? <BetSpot x={spot} /> : <QuietSpot />}
 
           <Section
             id="t-live"
@@ -508,7 +497,7 @@ export default async function TodayPage() {
       </div>
 
       <Suspense fallback={<FantasySkeleton />}>
-        <FantasySection skipTop={!spot} />
+        <FantasySection skipTop={false} />
       </Suspense>
 
       <Section id="t-drivers" label="Details">
@@ -544,6 +533,31 @@ export default async function TodayPage() {
         </Disclosure>
       </Section>
     </main>
+  );
+}
+
+/** Something big from the last 3 hours (lib/today/spotlight.ts). */
+function NewsSpot({ n }: { n: BigNews }) {
+  const t = new Date(n.at).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+  return (
+    <Spotlight label={n.label} aside={`${t} ET`}>
+      <Call verb={n.verb} reason={n.reason} />
+      <Link href={n.href} className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-hh-accent-ink">
+        Open <ChevronRight size={15} aria-hidden />
+      </Link>
+    </Spotlight>
+  );
+}
+
+/** No bet waiting and nothing big: say so plainly. Claims and lineups are further down. */
+function QuietSpot() {
+  return (
+    <Spotlight label="Next best bet">
+      <Call verb="No bet is waiting right now." reason="The next one lands here when the picks email issues it. Claims and lineup changes are at the bottom of the page." />
+      <Link href="/picks" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-hh-accent-ink">
+        Open Picks <ChevronRight size={15} aria-hidden />
+      </Link>
+    </Spotlight>
   );
 }
 
