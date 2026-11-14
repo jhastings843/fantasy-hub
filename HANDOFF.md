@@ -929,3 +929,11 @@ The pool page showed the market total of the week's last game; Jack's 10/17 rule
 - Learning engine (b436516): one live slice per section. Ready slice replaces the live one only at t >= live t + REPLACE_MARGIN (0.5); replaced slice goes to collecting with `stints` so its live record survives (liveWindows). Pre-existing extra live slices step down at next review. Probation only fills an empty slot. maxNew now caps changes per week.
 - Reviews are automatic: QStash pulse + GH workflows + /api/snapshot cron (no page view needed). Spreads rule re-picked weekly (7am ET Fri/Sun/Mon/Tue), frozen per week; GRANDFATHERED road-dog (NFL) / near-vegas (CFB) for 2026 in chosen-store.ts; cut thresholds are code constants.
 - Alt-line value (137c9da): boards save DK +100..+249 rungs (`plus`); altRungsOf + ALT_SLICES (alt:best, alt:short) in the lotto section, market-checked, line below our mean, +100..+700. Lotto slices and ticket unchanged. Alt spreads/totals not built: Odds API free plan (450 stop) is nearly used by NFL props; Jack chose free part first.
+
+## Satellite desk tab (2026-11-14, f1c519c, deployed)
+Money > Satellite (`/money?v=satellite`) and an overview row. Data: ~/Projects/site-watch/data/status.json,
+passed through by trade-bot `money_export.satellite()` as `snapshot.satellite` (like weather). Types in
+`src/lib/money/types.ts` (`Satellite`), view in `src/app/money/SatelliteTab.tsx`, fixture + tests in
+`src/lib/money/satellite.*`. First Vercel build failed on a Turbopack next/font/google lookup error unrelated
+to the change; `vercel redeploy` of the same commit went Ready in 54s. Not yet: a schedule.ts entry
+("Checked N min ago") and an overview chart panel.
