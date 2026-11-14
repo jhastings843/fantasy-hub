@@ -69,7 +69,8 @@ export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
 
 export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
   const g = v.gate;
-  const live = v.entries.filter((e) => e.activatedAt).sort((a, b) => (b.activatedAt ?? "").localeCompare(a.activatedAt ?? ""));
+  const lastLive = (e: (typeof v.entries)[number]) => e.activatedAt ?? e.stints?.at(-1)?.from ?? "";
+  const live = v.entries.filter((e) => e.activatedAt || e.stints?.length).sort((a, b) => lastLive(b).localeCompare(lastLive(a)));
   const closest = v.entries
     .filter((e) => e.status === "collecting" && e.ev && e.ev.games > 0)
     .sort((a, b) => b.ev!.t - a.ev!.t)

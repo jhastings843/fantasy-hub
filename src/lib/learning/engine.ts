@@ -106,6 +106,21 @@ export interface Entry {
   pauses?: { week: number; at: string }[];
   /** Went live on probation at `stake` units (gate.probation); `until` is when it moved to full stake. */
   probation?: { stake: number; until?: string };
+  /** Past live stretches, kept when a stronger slice took its place (it went back to collecting and can win the slot back). */
+  stints?: { from: string; to: string; probation?: { stake: number; until?: string } }[];
+}
+
+/**
+ * One live slice per section (Jack, 2026-11-13): only the best slice stakes.
+ * A ready slice takes the slot from the live one only when its t (evidence
+ * since registering) beats the live one's by this much, so noise doesn't flip
+ * the slot every slate. The one it replaces goes back to collecting.
+ */
+export const REPLACE_MARGIN = 0.5;
+
+/** Every stretch a slice was live: past stints, then the current one. */
+export function liveWindows(e: Pick<Entry, "activatedAt" | "endedAt" | "probation" | "stints">): { from: string; to?: string; probation?: Entry["probation"] }[] {
+  return [...(e.stints ?? []), ...(e.activatedAt ? [{ from: e.activatedAt, to: e.endedAt, probation: e.probation }] : [])];
 }
 
 /** Units a live slice stakes on a bet starting at `at`: its probation stake until it was promoted, else 1. */
@@ -422,33 +437,51 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     }
   }
 
-  const activeIds = new Set(Object.values(entries).filter((e) => e.status === "active").map((e) => e.id));
-  const ready = Object.values(entries)
-    .filter((e) => e.status === "collecting" && ev.get(e.id)?.ready && !(e.parent && activeIds.has(e.parent)))
-    .sort((a, b) => ev.get(b.id)!.t - ev.get(a.id)!.t)
-    // gate.maxNew is per section week, however many reviews the week has.
-    .slice(0, Math.max(0, gate.maxNew - Object.values(entries).filter((e) => e.activeWeek === week && e.activatedAt).length));
-  for (const e of ready) {
-    const x = ev.get(e.id)!;
-    Object.assign(e, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units } });
-    journal.push({ at: now, week, kind: "activated", id: e.id, text: `Activated ${e.label}: ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t}. Bets in it are marked from now on.` });
+  // One live slice per section: extra live ones (from before this rule) step down, strongest stays.
+  const tOf = (e: Entry) => ev.get(e.id)?.t ?? -Infinity;
+  const stepDown = (e: Entry, why: string) => {
+    e.stints = [...(e.stints ?? []), { from: e.activatedAt!, to: now, ...(e.probation ? { probation: e.probation } : {}) }];
+    e.status = "collecting";
+    delete e.activatedAt;
+    delete e.activation;
+    delete e.probation;
+    delete e.pausedWeek;
+    journal.push({ at: now, week, kind: "rolled back", id: e.id, text: `Stepped down ${e.label}: ${why}. Back to collecting; it can win the slot back.` });
+  };
+  const live = Object.values(entries).filter((e) => e.status === "active").sort((a, b) => tOf(b) - tOf(a));
+  for (const e of live.slice(1)) stepDown(e, `only the best slice stakes, and ${live[0].label} is stronger (t ${tOf(live[0])} vs ${tOf(e)})`);
+  let cur: Entry | undefined = live[0];
+  // gate.maxNew is per section week, however many reviews the week has.
+  let budget = Math.max(0, gate.maxNew - Object.values(entries).filter((e) => e.activeWeek === week).length);
+  let activated = 0;
+  const top = Object.values(entries)
+    .filter((e) => e.status === "collecting" && ev.get(e.id)?.ready)
+    .sort((a, b) => tOf(b) - tOf(a))[0];
+  if (top && budget > 0 && (!cur || tOf(top) >= tOf(cur) + REPLACE_MARGIN)) {
+    if (cur) stepDown(cur, `${top.label} beats it (t ${tOf(top)} vs ${tOf(cur)}, needs +${REPLACE_MARGIN})`);
+    const x = ev.get(top.id)!;
+    Object.assign(top, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units } });
+    delete top.endedAt;
+    delete top.endedWeek;
+    journal.push({ at: now, week, kind: "activated", id: top.id, text: `Activated ${top.label}: ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t}. Bets in it are marked from now on.${cur ? ` It replaces ${cur.label} as the section's one live slice.` : ""}` });
+    cur = top;
+    budget--;
+    activated++;
   }
-  // Probation: every check but t passes and t clears the lower bar. Shares gate.maxNew.
+  // Probation: every check but t passes and t clears the lower bar. Only when the section has no live slice.
   const pb = gate.probation;
-  if (pb) {
-    const liveNow = new Set(Object.values(entries).filter((e) => e.status === "active").map((e) => e.id));
-    const used = Object.values(entries).filter((e) => e.activeWeek === week && e.activatedAt).length;
+  if (pb && !cur && budget > 0) {
     const early = Object.values(entries)
       .filter((e) => {
         const x = ev.get(e.id);
-        return e.status === "collecting" && x && !x.ready && x.t >= pb.minT && x.checks.every((c) => c.pass || c.name === "t") && !(e.parent && liveNow.has(e.parent));
+        return e.status === "collecting" && x && !x.ready && x.t >= pb.minT && x.checks.every((c) => c.pass || c.name === "t");
       })
-      .sort((a, b) => ev.get(b.id)!.t - ev.get(a.id)!.t)
-      .slice(0, Math.max(0, gate.maxNew - used));
-    for (const e of early) {
-      const x = ev.get(e.id)!;
-      Object.assign(e, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units }, probation: { stake: pb.stake } });
-      journal.push({ at: now, week, kind: "activated", id: e.id, text: `Activated ${e.label} at ${pb.stake}u (probation): ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t}. Full stake at t ${gate.minT}; stops if t falls below 0.` });
+      .sort((a, b) => tOf(b) - tOf(a))[0];
+    if (early) {
+      const x = ev.get(early.id)!;
+      Object.assign(early, { status: "active", activatedAt: now, activeWeek: week, activation: { t: x.t, games: x.games, bets: x.bets, units: x.units }, probation: { stake: pb.stake } });
+      journal.push({ at: now, week, kind: "activated", id: early.id, text: `Activated ${early.label} at ${pb.stake}u (probation): ${x.bets} bets over ${x.games} games, ${x.units >= 0 ? "+" : ""}${x.units}u, t ${x.t}. Full stake at t ${gate.minT}; stops if t falls below 0.` });
+      activated++;
     }
   }
 
@@ -458,7 +491,7 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     at: now,
     week,
     kind: "review",
-    text: `Reviewed ${Object.keys(entries).length} slices: ${Object.values(entries).filter((e) => e.status === "active").length} active, ${collecting.length} collecting${ready.length ? `, ${ready.length} activated` : ""}${rolled ? `, ${rolled} rolled back` : ""}${retired ? `, ${retired} retired` : ""}.${
+    text: `Reviewed ${Object.keys(entries).length} slices: ${Object.values(entries).filter((e) => e.status === "active").length} active, ${collecting.length} collecting${activated ? `, ${activated} activated` : ""}${rolled ? `, ${rolled} rolled back` : ""}${retired ? `, ${retired} retired` : ""}.${
       best ? ` Closest: ${entries[best.id].label} (${best.checks.filter((c) => !c.pass).map((c) => c.note).join("; ") || "ready"}).` : " No games since registration yet."
     }`,
   });
@@ -652,13 +685,14 @@ export function sectionView(gate: Gate, s: SectionState, base: Candidate[], jour
   const cands = expand(s, base);
   const byId = new Map(cands.map((c) => [c.id, c]));
   // A slice whose definition was retired never gathers evidence again; only a live one (its record) stays in view.
-  const entries = Object.values(s.entries).filter((e) => byId.has(e.id) || e.activatedAt).map((e): EntryView => {
+  const entries = Object.values(s.entries).filter((e) => byId.has(e.id) || e.activatedAt || e.stints?.length).map((e): EntryView => {
     const c = byId.get(e.id);
     const status: ViewStatus = e.status === "active" && e.pausedWeek !== undefined ? "paused" : e.status;
     if (!c) return { ...e, status };
     const ev = evidence(gate, c, e.registeredAt, e.parent ? byId.get(e.parent) : undefined);
-    if (!e.activatedAt) return { ...e, status, ev };
-    const bets = c.bets.filter((b) => b.at >= e.activatedAt! && (!e.endedAt || b.at < e.endedAt));
+    const wins = liveWindows(e);
+    if (!wins.length) return { ...e, status, ev };
+    const bets = c.bets.filter((b) => wins.some((w) => b.at >= w.from && (!w.to || b.at < w.to)));
     const w = bets.filter((b) => b.net > 0).length;
     const l = bets.filter((b) => b.net < 0).length;
     return { ...e, status, ev, live: { bets: bets.length, w, l, p: bets.length - w - l, units: r2(bets.reduce((a, b) => a + b.net, 0)), games: new Set(bets.map((b) => b.game)).size } };
@@ -668,7 +702,7 @@ export function sectionView(gate: Gate, s: SectionState, base: Candidate[], jour
   const placed = liveBets(s, base);
   const w = placed.filter((b) => b.net > 0).length;
   const l = placed.filter((b) => b.net < 0).length;
-  const since = Object.values(s.entries).map((e) => e.activatedAt).filter((x): x is string => !!x).sort()[0];
+  const since = Object.values(s.entries).flatMap((e) => liveWindows(e).map((w) => w.from)).sort()[0];
   const record: BetRecord = { bets: placed.length, w, l, p: placed.length - w - l, units: r2(placed.reduce((a, b) => a + b.net, 0)), ...(since ? { since } : {}) };
   return { section: s.section, gate, lastReviewAt: s.lastReviewAt, lastReviewWeek: s.lastReviewWeek, entries, journal, record, ...(staking ? { staking } : {}) };
 }
@@ -683,13 +717,15 @@ export function liveBets(s: SectionState, base: Candidate[]): Bet[] {
   const keyed = new Map<string, Bet>();
   const out: Bet[] = [];
   for (const e of Object.values(s.entries)) {
-    if (!e.activatedAt) continue;
+    const wins = liveWindows(e);
+    if (!wins.length) continue;
     for (const b of byId.get(e.id)?.bets ?? []) {
       if (b.carried) continue;
-      if (b.at < e.activatedAt || (e.endedAt && b.at >= e.endedAt)) continue;
+      const w = wins.find((w) => b.at >= w.from && (!w.to || b.at < w.to));
+      if (!w) continue;
       if ((e.pauses ?? []).some((p) => b.week === p.week && b.at >= p.at)) continue;
       // Probation bets count at their stake (net is per 1u risked).
-      const stake = stakeAt(e, b.at);
+      const stake = stakeAt({ probation: w.probation }, b.at);
       const bet = stake === 1 ? b : { ...b, net: r2(b.net * stake) };
       // Only bets with an identity can be matched across slices; unkeyed ones always count (two different -1u bets in one game look alike).
       // A keyed bet in two live slices is one bet, at the bigger stake.

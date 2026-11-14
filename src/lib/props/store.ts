@@ -110,12 +110,12 @@ async function saveGame(season: number, week: number, slug: string, g: StoredPro
 /** Slices that went live on the learning engine, in the old system's shape (the old props:...:system hash is no longer written). */
 export function systemOf(v: SectionView): SystemRecord[] {
   return v.entries
-    .filter((e) => e.activatedAt)
+    .filter((e) => e.activatedAt || e.stints?.length)
     .map((e) => ({
       id: e.id,
       label: e.label,
       since: e.activeWeek ?? 0,
-      at: e.activatedAt!,
+      at: e.activatedAt ?? e.stints![0].from,
       z: e.activation?.t ?? 0,
       n: e.activation?.games ?? 0,
       ...(e.status === "rolled-back" ? { retired: { week: e.endedWeek ?? 0, at: e.endedAt ?? "", z: e.ev?.t ?? 0 } } : {}),

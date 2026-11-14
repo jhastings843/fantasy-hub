@@ -79,19 +79,54 @@ describe("review", () => {
     expect(r2.state.entries.l.endedAt).toBeUndefined();
   });
 
-  it("caps activations at maxNew, strongest first", () => {
+  it("only the strongest ready slice goes live (one per section, Jack 2026-11-13)", () => {
     const cs = ["a", "b", "c"].map((id, k): Candidate => ({ id, label: id, bets: bets(8, (i) => 1 + k * 0.5 + (i % 2) * 0.3) }));
     const r = review({ ...G, maxNew: 2 }, emptyState("t"), cs, T0, 7);
-    expect(Object.values(r.state.entries).filter((e) => e.status === "active").map((e) => e.id).sort()).toEqual(["b", "c"]);
+    expect(Object.values(r.state.entries).filter((e) => e.status === "active").map((e) => e.id)).toEqual(["c"]);
   });
 
-  it("skips a refinement whose parent is already live", () => {
+  it("a newcomer takes the slot only by beating the live slice's t by the margin, and the old one keeps its record", () => {
+    const live: Candidate = { id: "a", label: "A", bets: bets(8, (i) => 1 + (i % 2) * 0.3) };
+    const r1 = review(G, emptyState("t"), [live], T0, 7);
+    expect(r1.state.entries.a.status).toBe("active");
+    const tA = evidence(G, live, T0).t;
+    // B registers on the next review (Oct 21); its games start Oct 22.
+    const regB = review(G, r1.state, [live, { id: "b", label: "B", bets: [] }], "2026-10-21T00:00:00.000Z", 7).state;
+    // About as good as A: stays out.
+    const close: Candidate = { id: "b", label: "B", bets: bets(8, (i) => 1 + (i % 2) * 0.31, 2).map((x) => ({ ...x, game: `b${x.game}` })) };
+    const r2 = review(G, regB, [live, close], "2026-10-29T00:00:00.000Z", 9);
+    expect(r2.state.entries.a.status).toBe("active");
+    expect(r2.state.entries.b.status).toBe("collecting");
+    // Clearly better: replaces it; A goes back to collecting with its live stint kept.
+    const strong: Candidate = { ...close, bets: bets(8, (i) => 1 + (i % 2) * 0.02, 2).map((x) => ({ ...x, game: `b${x.game}` })) };
+    expect(evidence(G, strong, regB.entries.b.registeredAt).t).toBeGreaterThan(tA + 0.5);
+    const r3 = review(G, r2.state, [live, strong], "2026-10-30T00:00:00.000Z", 10);
+    expect(r3.state.entries.b.status).toBe("active");
+    expect(r3.state.entries.a.status).toBe("collecting");
+    expect(r3.state.entries.a.stints).toHaveLength(1);
+    expect(r3.journal.some((j) => j.kind === "rolled back" && j.id === "a" && /Stepped down/.test(j.text))).toBe(true);
+    const v = sectionView(G, r3.state, [live, strong], []);
+    expect(v.entries.find((e) => e.id === "a")!.live!.bets).toBe(16);
+  });
+
+  it("two slices live from before the rule: the weaker steps down", () => {
+    const a: Candidate = { id: "a", label: "A", bets: bets(8, (i) => 1 + (i % 2) * 0.3) };
+    const b: Candidate = { id: "b", label: "B", bets: bets(8, (i) => 1 + (i % 2) * 0.6) };
+    const st = review(G, emptyState("t"), [a], T0, 7).state;
+    st.entries.b = { id: "b", label: "B", status: "active", registeredAt: T0, registeredWeek: 7, activatedAt: T0, activeWeek: 7 };
+    const r = review(G, st, [a, b], at(40), 8);
+    expect(Object.values(r.state.entries).filter((e) => e.status === "active")).toHaveLength(1);
+  });
+
+  it("a refinement replaces its live parent only when it beats it by the margin", () => {
     const parent: Candidate = { id: "p:all", label: "P", bets: bets(8, (i) => 1 + (i % 2) * 0.3) };
     const r1 = review(G, emptyState("t"), [parent], T0, 7);
     expect(r1.state.entries["p:all"].status).toBe("active");
     const child: Candidate = { id: "p:x", label: "X", parent: "p:all", bets: bets(8, (i) => 3 + (i % 2) * 0.3, 20) };
     const r2 = review(G, r1.state, [{ ...parent, bets: [...parent.bets, ...bets(8, () => 0.1, 20)] }, child], "2026-10-21T00:00:00.000Z", 8);
-    expect(r2.state.entries["p:x"].status).toBe("collecting");
+    // The child wins its games by far more: it takes the one slot and the parent steps down.
+    expect(r2.state.entries["p:x"].status).toBe("active");
+    expect(r2.state.entries["p:all"].status).toBe("collecting");
   });
 
   it("rolls back a live slice that loses after going live, and journals it", () => {
@@ -184,8 +219,8 @@ describe("reviews every slate, activations capped per week", () => {
     const active = (s: typeof r2.state) => Object.values(s.entries).filter((e) => e.status === "active").length;
     expect(active(r1.state)).toBe(1);
     expect(active(r2.state)).toBe(1);
-    // Next week the cap resets.
-    expect(active(review(one, r2.state, ready, at(13), 9, "2026-11-02").state)).toBe(active(r1.state) + 1);
+    // Next week still one: equal slices never replace each other.
+    expect(active(review(one, r2.state, ready, at(13), 9, "2026-11-02").state)).toBe(1);
   });
 });
 
