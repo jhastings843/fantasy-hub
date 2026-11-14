@@ -139,7 +139,13 @@ export const RETIRED_LOTTO_SLICES: [string, string, RungKeep][] = [
 ];
 
 /** Graded rungs (with kickoff) and nightly tickets into candidates. Season sets the week numbers. */
-export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number): Candidate[] {
+/** Alt-line value slices (Jack, 2026-11-13), from altRungsOf: 1u singles, tracked until one wins the section's slot. */
+export const ALT_SLICES: [string, string, (r: Rung) => boolean][] = [
+  ["alt:best", "Alt line up to our number: best market-checked rung, +100 to +700", () => true],
+  ["alt:short", "Alt line up to our number, priced +100 to +249", (r) => r.over < 250],
+];
+
+export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number, alt: Rung[] = []): Candidate[] {
   const graded = rungs.filter((r) => r.hit === true || r.hit === false);
   const rungSlices = LOTTO_SLICES.map(([id, label]): Candidate => ({
     id,
@@ -158,7 +164,13 @@ export function lottoCandidates(rungs: Rung[], tickets: Ticket[], season: number
         return { game: `ticket:${t.date}`, week: nbaWeek(new Date(at), season), at, net: r3(t.outcome === "W" ? STAKE * payout(t.price) : -STAKE) };
       }),
   };
-  return [...rungSlices, ticket];
+  const altGraded = alt.filter((r) => r.bestAlt && (r.hit === true || r.hit === false));
+  const altSlices = ALT_SLICES.map(([id, label, keep]): Candidate => ({
+    id,
+    label,
+    bets: altGraded.filter(keep).map((r) => ({ game: r.game, key: `${r.game}|${r.id}|${r.line}`, week: nbaWeek(new Date(r.at), season), at: r.at, net: r3(r.hit ? payout(r.over) : -1), p: r.checked, price: r.over })),
+  }));
+  return [...rungSlices, ticket, ...altSlices];
 }
 
 // ------------------------------------------------------- King of the Court

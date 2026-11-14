@@ -50,6 +50,8 @@ export interface Rung extends LongRung {
   /** The same, among rungs priced CAP or shorter: best checked value, and best value at our chance. */
   bestCheckedCapped: boolean;
   bestOursCapped: boolean;
+  /** The alt-line value pick for this player-stat-night (altRungsOf only). */
+  bestAlt?: boolean;
   /** Null until graded; "void" when he didn't play. */
   hit: boolean | "void" | null;
   actual: number | null;
@@ -103,6 +105,48 @@ export const LOTTO_CHECK = { hold: 1.255, w: 0.4 } as const;
 export const checkedChance = (raw: number, over: number): number =>
   Math.round(blend(raw, Math.min(0.99, implied(over) / LOTTO_CHECK.hold), LOTTO_CHECK.w) * 1000) / 1000;
 const toAmerican = (d: number) => Math.round(d >= 2 ? (d - 1) * 100 : -100 / (d - 1));
+
+/**
+ * Alt-line value (Jack, 2026-11-13): "find the most value, bet an alt line up
+ * to what we think it should be, get plus money, and track it." One rung per
+ * player-stat-night: among DK's over rungs priced +100 to CAP whose line sits
+ * below our projected mean, the one with the best market-checked value
+ * (checkedChance; the raw model's value lost 27% on long rungs, so the check
+ * is on from day one). Kept apart from rungsOf so the lotto slices and the
+ * ticket see exactly what they saw before.
+ *
+ *   altRungsOf(boards) -> rungs with bestAlt marked (at most one per player-stat-night)
+ */
+export function altRungsOf(boards: LottoBoard[]): Rung[] {
+  const out: Rung[] = [];
+  for (const b of boards) {
+    if (!b.kickoff || !b.espnId) continue;
+    const date = etDate(new Date(b.kickoff));
+    const actual = new Map((b.result?.markets ?? []).map((m) => [m.id, m.actual]));
+    for (const m of b.game.markets) {
+      const x = b.extra[m.id];
+      if (!x || x.mean === undefined || (x.games ?? 0) < MIN_GAMES) continue;
+      const a = b.result ? actual.get(m.id) ?? null : null;
+      const ladder: Rung[] = [...(x.plus ?? []), ...(x.longs ?? [])]
+        .filter((r) => r.over <= CAP && r.line < x.mean!)
+        .map((r) => {
+          const checked = checkedChance(r.raw, r.over);
+          return {
+            ...r, date, at: b.kickoff!, game: b.espnId!, matchup: `${b.away}@${b.home}`, id: m.id, player: m.player, stat: m.stat ?? m.statLabel,
+            ev: Math.round((r.ours * dec(r.over) - 1) * 1000) / 1000,
+            checked,
+            checkedEv: Math.round((checked * dec(r.over) - 1) * 1000) / 1000,
+            bestOfLadder: false, bestCheckedCapped: false, bestOursCapped: false,
+            hit: !b.result ? null : a === null ? "void" : a > r.line,
+            actual: a,
+          };
+        });
+      const top = ladder.filter((r) => r.checkedEv > 0).sort((p, q) => q.checkedEv - p.checkedEv || p.over - q.over)[0];
+      if (top) out.push({ ...top, bestAlt: true });
+    }
+  }
+  return out;
+}
 
 /** Every long rung on the boards, graded where the game is final. */
 export function rungsOf(boards: LottoBoard[]): Rung[] {

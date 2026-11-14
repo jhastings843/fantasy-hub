@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAP, CAP_FROM, DEFAULT_RECIPE, LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
+import { CAP, altRungsOf, CAP_FROM, DEFAULT_RECIPE, LOTTO_CHECK, RECIPES, checkedChance, recipeRecords, rungsOf, summarize, ticket, tickets, type LottoBoard } from "./lotto";
 import { implied } from "@/lib/props/parse";
 import { LONG_MAX, LONG_MIN, longRungs } from "./market";
 import PARAMS from "./params.json";
@@ -183,5 +183,40 @@ describe("+700 cap (2026-11-05)", () => {
     expect(ours.map((r) => r.player).sort()).toEqual(["Hardaway", "Jakucionis", "Tyson"]);
     expect(ours.every((r) => r.over <= CAP)).toBe(true);
     expect(rungs.filter((r) => r.bestCheckedCapped).every((r) => r.over <= CAP)).toBe(true);
+  });
+});
+
+describe("altRungsOf (alt-line value, 2026-11-13)", () => {
+  const board = (mean: number, result?: number) => ({
+    espnId: "g1",
+    kickoff: "2026-11-14T00:00:00.000Z",
+    away: "BOS",
+    home: "NYK",
+    game: { markets: [{ id: "pts|Jay Doe", player: "Jay Doe", stat: "pts", statLabel: "Points" }] },
+    extra: {
+      "pts|Jay Doe": {
+        over: 0.5, under: 0.5, min: 34, mean, games: 10,
+        plus: [{ line: 24.5, over: 120, ours: 0.6, raw: 0.6 }, { line: 26.5, over: 180, ours: 0.5, raw: 0.5 }],
+        longs: [{ line: 29.5, over: 300, ours: 0.35, raw: 0.35 }, { line: 34.5, over: 900, ours: 0.2, raw: 0.2 }],
+      },
+    },
+    ...(result !== undefined ? { result: { markets: [{ id: "pts|Jay Doe", actual: result }] } as never } : {}),
+  });
+
+  it("one pick per player-stat-night, line below our mean, +700 or shorter", () => {
+    const r = altRungsOf([board(31)]);
+    expect(r).toHaveLength(1);
+    expect(r[0].bestAlt).toBe(true);
+    expect(r[0].line).toBeLessThan(31);
+    expect(r[0].over).toBeLessThanOrEqual(700);
+  });
+
+  it("nothing when every rung sits above our number", () => {
+    expect(altRungsOf([board(20)])).toHaveLength(0);
+  });
+
+  it("grades against the box score", () => {
+    const [r] = altRungsOf([board(31, 40)]);
+    expect(r.hit).toBe(true);
   });
 });

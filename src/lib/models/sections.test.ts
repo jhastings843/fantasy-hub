@@ -35,7 +35,9 @@ describe("Lotto slices", () => {
   it("only the market-checked +700 slice and the ticket, the slice on its own", () => {
     const ticket = { date: "2026-10-27", legs: [], price: 22676, chance: 0.01, book: 0.004, outcome: "L" as const };
     const cs = lottoCandidates([rung("g1", true, true), rung("g2", false, false), rung("g3", true, false)], [ticket], 2026);
-    expect(cs.map((c) => c.id)).toEqual(["lotto:checked-cap", "lotto:ticket-checked"]);
+    // The lotto slices are unchanged; the alt-line slices (2026-11-13) sit after them, empty without alt rungs.
+    expect(cs.map((c) => c.id)).toEqual(["lotto:checked-cap", "lotto:ticket-checked", "alt:best", "alt:short"]);
+    expect(cs.slice(2).every((c) => c.bets.length === 0)).toBe(true);
     const c = Object.fromEntries(cs.map((x) => [x.id, x]));
     expect(c["lotto:checked-cap"].bets.map((x) => x.net)).toEqual([6, -1]);
     expect(c["lotto:checked-cap"].parent).toBeUndefined();

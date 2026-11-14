@@ -37,6 +37,8 @@ export interface OurMarketExtra {
   main?: { line: number; over: number | null; under: number | null };
   /** DK's long-shot rungs on the full-game ladder (+250 and longer, boards from 2026-10-26 on), for the lotto shadow. */
   longs?: LongRung[];
+  /** DK's plus-money rungs short of the long band (+100 to +249, boards from 2026-11-13 on), for the alt-line value slices. */
+  plus?: LongRung[];
 }
 
 /** One "N+" rung DK prices at LONG_MIN or longer: our chance of the over, blended and raw. */
@@ -50,6 +52,8 @@ export interface LongRung {
 /** The long-shot band the lotto shadow tracks: +250 to +2000 (Sam's legs ran +300 to +830). */
 export const LONG_MIN = 250;
 export const LONG_MAX = 2000;
+/** The plus-money rungs below the long band, saved for the alt-line value slices (Jack, 2026-11-13). */
+export const PLUS_MIN = 100;
 
 /**
  * Our chance on each long rung of the ladder. DK prices these over-only, so the
@@ -58,9 +62,9 @@ export const LONG_MAX = 2000;
  *
  *   longRungs([{ line: 19.5, over: 400 }], 1.05, pts mean 14) -> [{ line: 19.5, over: 400, ours, raw }]
  */
-export function longRungs(stat: NbaStat, mean: number, ladder: { line: number; over: number }[], round: number | null, p: NbaParams): LongRung[] {
+export function longRungs(stat: NbaStat, mean: number, ladder: { line: number; over: number }[], round: number | null, p: NbaParams, band: [number, number] = [LONG_MIN, LONG_MAX]): LongRung[] {
   return ladder
-    .filter((r) => r.over >= LONG_MIN && r.over <= LONG_MAX)
+    .filter((r) => r.over >= band[0] && r.over <= band[1])
     .map((r) => {
       const raw = overUnder(stat, Math.max(mean, 0.01), r.line, p).over;
       const fair = round ? Math.min(0.99, implied(r.over) / round) : null;
@@ -144,6 +148,7 @@ export function ourMarkets(
     const mean = pr.mean[stat];
     const round = l.current.over !== null && l.current.under !== null ? implied(l.current.over) + implied(l.current.under) : null;
     const longs = longRungs(stat, mean, ladder, round, p);
+    const plus = longRungs(stat, mean, ladder, round, p, [PLUS_MIN, LONG_MIN - 1]);
     const raw = overUnder(stat, Math.max(mean, 0.01), line, p);
     const fair = pick.fairOver !== null ? { over: pick.fairOver, under: 1 - pick.fairOver } : null;
     const bo = blend(raw.over, fair?.over ?? null, p.marketW ?? 1);
@@ -184,6 +189,7 @@ export function ourMarkets(
       ...(games.has(l.athlete) ? { games: games.get(l.athlete)! } : {}),
       ...(pick.alt ? { main: { line: l.current.line, over: l.current.over, under: l.current.under } } : {}),
       ...(longs.length ? { longs } : {}),
+      ...(plus.length ? { plus } : {}),
     };
   }
   markets.sort((a, b) => (b.gap ?? -1) - (a.gap ?? -1) || a.id.localeCompare(b.id));

@@ -19,7 +19,7 @@ import { posOf, projectGame, projectMinutes, type NbaParams, type PlayerInput } 
 import { emptyTables, fbBets, fbBoard, firstBasketOf, foldFbOnce, type FbBoard, type FbParams, type FbTables } from "./firstbasket";
 import { getKotcNights, runKotc, type KotcGameInput } from "./kotc-store";
 import { SECTIONS, kotcCandidates, lottoCandidates } from "../sections";
-import { rungsOf, tickets as lottoTickets } from "./lotto";
+import { altRungsOf, rungsOf, tickets as lottoTickets } from "./lotto";
 import { gradeGameModel, ratingsNow, saveGameModel } from "./game-store";
 import type { GameRatings } from "./game";
 import PARAMS from "./params.json";
@@ -572,7 +572,7 @@ export async function getOurNbaView(season: number, now = new Date()): Promise<O
 
 const lottoFor = (boards: OurStoredProps[], season: number) => {
   const rungs = rungsOf(boards);
-  return lottoCandidates(rungs, lottoTickets(rungs), season);
+  return lottoCandidates(rungs, lottoTickets(rungs), season, altRungsOf(boards));
 };
 
 /** The lotto and King of the Court learners: each section, judged on its gate (lottos on the long-price gate). */
