@@ -336,3 +336,4 @@
 .satMap figcaption { font-family: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--ink2); }
 @media (max-width: 560px) { .satMarkets .satPhotos { grid-template-columns: 1fr; } }
 .satMarkets .satPhotos { max-width: 620px; }
+.satRetro { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--surface2); }

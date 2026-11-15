@@ -1,24 +1,24 @@
 import type { Satellite } from "./types";
 
-// A real site-watch data/status.json (2026-11-14 evening, with market cards), the exact shape trade-bot passes through as snapshot.satellite.
+// A real site-watch data/status.json (2026-11-14 night, with market cards and the learner), the exact shape trade-bot passes through as snapshot.satellite.
 // The type annotation makes tsc check it against the Satellite type.
 export const satelliteFixture: Satellite = {
   "version": 1,
-  "generatedAt": "2026-11-15T00:26:10+00:00",
+  "generatedAt": "2026-11-15T00:47:34+00:00",
   "bankroll": 1000.0,
-  "cash": 911.95,
-  "equity": 981.69,
+  "cash": 865.1,
+  "equity": 983.08,
   "realizedPnl": 0,
-  "fees": 3.99,
-  "openCost": 84.06,
-  "openValue": 69.74,
-  "openFees": 3.99,
+  "fees": 4.04,
+  "openCost": 130.86,
+  "openValue": 117.98,
+  "openFees": 4.04,
   "settled": 0,
   "wins": 0,
   "curve": [
     {
       "day": "2026-11-14",
-      "equity": 981.69
+      "equity": 983.08
     }
   ],
   "rules": {
@@ -38,12 +38,12 @@ export const satelliteFixture: Satellite = {
       "label": "Hottest ever",
       "url": "https://kalshi.com/markets/kxhmonth",
       "p": 0.8118,
-      "yesBid": 0.88,
-      "yesAsk": 0.9,
+      "yesBid": 0.87,
+      "yesAsk": 0.89,
       "best": {
         "side": "no",
-        "ask": 0.12,
-        "edge": 0.0608
+        "ask": 0.13,
+        "edge": 0.0502
       },
       "action": "already holding",
       "why": "ERA5 has 12 of 30 days; NOAA November est 1.53 +/- 0.09 C vs record 1.40",
@@ -70,14 +70,14 @@ export const satelliteFixture: Satellite = {
       "label": "Hottest",
       "url": "https://kalshi.com/markets/kxgtemp",
       "p": 0.9713,
-      "yesBid": 0.91,
-      "yesAsk": 0.92,
+      "yesBid": 0.9,
+      "yesAsk": 0.91,
       "best": {
         "side": "yes",
-        "ask": 0.92,
-        "edge": 0.0461
+        "ask": 0.91,
+        "edge": 0.0555
       },
-      "action": "edge +4.6c under 5c",
+      "action": "already holding",
       "why": "GISS 2026 annual est 1.323 +/- 0.020 C (months forecast: [11, 12]) vs needed above 1.28",
       "model": {
         "mu": 1.3235,
@@ -96,12 +96,12 @@ export const satelliteFixture: Satellite = {
       "label": "Hottest",
       "url": "https://kalshi.com/markets/kxgtemp",
       "p": 0.9713,
-      "yesBid": 0.865,
-      "yesAsk": 0.873,
+      "yesBid": 0.864,
+      "yesAsk": 0.87,
       "best": {
         "side": "yes",
-        "ask": 0.873,
-        "edge": 0.0905
+        "ask": 0.87,
+        "edge": 0.0933
       },
       "action": "already holding",
       "why": "GISS 2026 annual est 1.323 +/- 0.020 C (months forecast: [11, 12]) vs needed above 1.28",
@@ -189,13 +189,13 @@ export const satelliteFixture: Satellite = {
       "url": "https://polymarket.com/event/november-2026-temperature-increase-c",
       "p": 0.0537,
       "yesBid": 0.01,
-      "yesAsk": 0.032,
+      "yesAsk": 0.037,
       "best": {
         "side": "yes",
-        "ask": 0.032,
-        "edge": 0.0217
+        "ask": 0.037,
+        "edge": 0.0167
       },
-      "action": "edge +2.2c under 5c",
+      "action": "edge +1.7c under 5c",
       "why": "GISS November est 1.63 +/- 0.10 C (recent GISS bias +0.04)",
       "model": {
         "mu": 1.6281,
@@ -256,6 +256,282 @@ export const satelliteFixture: Satellite = {
         "hi": null
       },
       "closes": "2027-01-02T04:59:00Z"
+    },
+    {
+      "id": "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-1",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-november-2026-be-the-1st-hottest-on-record",
+      "title": "November 2026 1st, 2nd, or 3rd hottest on record?",
+      "label": "1st hottest",
+      "url": "https://polymarket.com/event/november-2026-1st-2nd-or-3rd-hottest-on-record",
+      "p": 0.993,
+      "yesBid": 0.955,
+      "yesAsk": 0.992,
+      "best": {
+        "side": "no",
+        "ask": 0.04500000000000004,
+        "edge": -0.038
+      },
+      "action": "edge -3.8c under 5c",
+      "why": "GISS November 2026 est 1.63 +/- 0.10 C vs the top so far 1.40, 1.29, 1.21",
+      "model": {
+        "mu": 1.6281,
+        "sd": 0.0951,
+        "top": [
+          1.4,
+          1.29,
+          1.21
+        ],
+        "place": 1
+      },
+      "closes": "2026-12-29T05:00:00Z"
+    },
+    {
+      "id": "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-2",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-november-2026-be-the-2nd-hottest-on-record",
+      "title": "November 2026 1st, 2nd, or 3rd hottest on record?",
+      "label": "2nd hottest",
+      "url": "https://polymarket.com/event/november-2026-1st-2nd-or-3rd-hottest-on-record",
+      "p": 0.0069,
+      "yesBid": 0.003,
+      "yesAsk": 0.036,
+      "best": {
+        "side": "yes",
+        "ask": 0.036,
+        "edge": -0.0291
+      },
+      "action": "edge -2.9c under 5c",
+      "why": "GISS November 2026 est 1.63 +/- 0.10 C vs the top so far 1.40, 1.29, 1.21",
+      "model": {
+        "mu": 1.6281,
+        "sd": 0.0951,
+        "top": [
+          1.4,
+          1.29,
+          1.21
+        ],
+        "place": 2
+      },
+      "closes": "2026-12-29T05:00:00Z"
+    },
+    {
+      "id": "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-3",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-november-2026-be-the-3rd-hottest-on-record",
+      "title": "November 2026 1st, 2nd, or 3rd hottest on record?",
+      "label": "3rd hottest",
+      "url": "https://polymarket.com/event/november-2026-1st-2nd-or-3rd-hottest-on-record",
+      "p": 0.0001,
+      "yesBid": 0.002,
+      "yesAsk": 0.012,
+      "best": null,
+      "action": "no usable price",
+      "why": "GISS November 2026 est 1.63 +/- 0.10 C vs the top so far 1.40, 1.29, 1.21",
+      "model": {
+        "mu": 1.6281,
+        "sd": 0.0951,
+        "top": [
+          1.4,
+          1.29,
+          1.21
+        ],
+        "place": 3
+      },
+      "closes": "2026-12-29T05:00:00Z"
+    },
+    {
+      "id": "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-4",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-november-2026-be-the-4th-or-lower-on-record",
+      "title": "November 2026 1st, 2nd, or 3rd hottest on record?",
+      "label": "4th or lower ",
+      "url": "https://polymarket.com/event/november-2026-1st-2nd-or-3rd-hottest-on-record",
+      "p": 0.0,
+      "yesBid": 0.001,
+      "yesAsk": 0.01,
+      "best": null,
+      "action": "no usable price",
+      "why": "GISS November 2026 est 1.63 +/- 0.10 C vs the top so far 1.40, 1.29, 1.21",
+      "model": {
+        "mu": 1.6281,
+        "sd": 0.0951,
+        "top": [
+          1.4,
+          1.29,
+          1.21
+        ],
+        "place": 4
+      },
+      "closes": "2026-12-29T05:00:00Z"
+    },
+    {
+      "id": "rank-where-will-2026-rank-among-the-hottest-years-on-record-1",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-2026-be-the-hottest-year-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "1",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "p": 0.992,
+      "yesBid": 0.93,
+      "yesAsk": 0.943,
+      "best": {
+        "side": "yes",
+        "ask": 0.943,
+        "edge": 0.049
+      },
+      "action": "edge +4.9c under 5c",
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "model": {
+        "mu": 1.3235,
+        "sd": 0.0202,
+        "top": [
+          1.28,
+          1.19,
+          1.17
+        ],
+        "place": 1
+      },
+      "closes": "2027-03-02T04:59:00Z"
+    },
+    {
+      "id": "rank-where-will-2026-rank-among-the-hottest-years-on-record-2",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-2026-be-the-second-hottest-year-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "2",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "p": 0.008,
+      "yesBid": 0.059,
+      "yesAsk": 0.07,
+      "best": {
+        "side": "no",
+        "ask": 0.9410000000000001,
+        "edge": 0.051
+      },
+      "action": "bet",
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "model": {
+        "mu": 1.3235,
+        "sd": 0.0202,
+        "top": [
+          1.28,
+          1.19,
+          1.17
+        ],
+        "place": 2
+      },
+      "closes": "2027-03-02T04:59:00Z"
+    },
+    {
+      "id": "rank-where-will-2026-rank-among-the-hottest-years-on-record-3",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-2026-be-the-third-hottest-year-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "3",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "p": 0.0,
+      "yesBid": 0.001,
+      "yesAsk": 0.002,
+      "best": null,
+      "action": "no usable price",
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "model": {
+        "mu": 1.3235,
+        "sd": 0.0202,
+        "top": [
+          1.28,
+          1.19,
+          1.17
+        ],
+        "place": 3
+      },
+      "closes": "2027-03-02T04:59:00Z"
+    },
+    {
+      "id": "rank-where-will-2026-rank-among-the-hottest-years-on-record-4",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-2026-be-the-fourth-hottest-year-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "4",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "p": 0.0,
+      "yesBid": null,
+      "yesAsk": 0.001,
+      "best": null,
+      "action": "no usable price",
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "model": {
+        "mu": 1.3235,
+        "sd": 0.0202,
+        "top": [
+          1.28,
+          1.19,
+          1.17
+        ],
+        "place": 4
+      },
+      "closes": "2027-03-02T04:59:00Z"
+    },
+    {
+      "id": "rank-where-will-2026-rank-among-the-hottest-years-on-record-5",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-2026-be-the-fifth-hottest-year-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "5",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "p": 0.0,
+      "yesBid": null,
+      "yesAsk": 0.001,
+      "best": null,
+      "action": "no usable price",
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "model": {
+        "mu": 1.3235,
+        "sd": 0.0202,
+        "top": [
+          1.28,
+          1.19,
+          1.17
+        ],
+        "place": 5
+      },
+      "closes": "2027-03-02T04:59:00Z"
+    },
+    {
+      "id": "rank-where-will-2026-rank-among-the-hottest-years-on-record-6",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "ticker": "will-2026-rank-as-the-sixth-hottest-year-on-record-or-lower",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "6 or lower",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "p": 0.0,
+      "yesBid": null,
+      "yesAsk": 0.001,
+      "best": null,
+      "action": "no usable price",
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "model": {
+        "mu": 1.3235,
+        "sd": 0.0202,
+        "top": [
+          1.28,
+          1.19,
+          1.17
+        ],
+        "place": 6
+      },
+      "closes": "2026-12-31T00:00:00Z"
     },
     {
       "id": "icemax-2027-15.2",
@@ -386,14 +662,14 @@ export const satelliteFixture: Satellite = {
       "label": "Above 14.4 million sq km",
       "url": "https://kalshi.com/markets/kxarcticicemax",
       "p": 0.5637,
-      "yesBid": 0.48,
-      "yesAsk": 0.52,
+      "yesBid": 0.42,
+      "yesAsk": 0.51,
       "best": {
         "side": "yes",
-        "ask": 0.52,
-        "edge": 0.0262
+        "ask": 0.51,
+        "edge": 0.0362
       },
-      "action": "edge +2.6c under 5c",
+      "action": "edge +3.6c under 5c",
       "why": "Extent now 8.80M km2; past seasons' growth puts the max near 14.45M; level 14.4",
       "model": {
         "base": 8.802,
@@ -590,6 +866,46 @@ export const satelliteFixture: Satellite = {
   ],
   "bets": [
     {
+      "id": "will-2026-be-the-second-hottest-year-on-record:no:2026-11-15",
+      "placed": "2026-11-15T00:47:29+00:00",
+      "venue": "polymarket",
+      "event": "where-will-2026-rank-among-the-hottest-years-on-record",
+      "ticker": "will-2026-be-the-second-hottest-year-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "label": "2",
+      "signal": "rank-where-will-2026-rank-among-the-hottest-years-on-record-2",
+      "side": "no",
+      "price": 0.9410000000000001,
+      "contracts": 42,
+      "cost": 39.52,
+      "fee": 0.0,
+      "p": 0.992,
+      "edge": 0.051,
+      "why": "GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "status": "open"
+    },
+    {
+      "id": "KXGTEMP-27-P0:yes:2026-11-15",
+      "placed": "2026-11-15T00:40:04+00:00",
+      "venue": "kalshi",
+      "event": "KXGTEMP-27",
+      "ticker": "KXGTEMP-27-P0",
+      "title": "Will 2026 be the hottest year on record?",
+      "label": "Hottest",
+      "signal": "gtemp-2026-KXGTEMP-27-P0",
+      "side": "yes",
+      "price": 0.91,
+      "contracts": 8,
+      "cost": 7.28,
+      "fee": 0.05,
+      "p": 0.9713,
+      "edge": 0.0555,
+      "why": "GISS 2026 annual est 1.323 +/- 0.020 C (months forecast: [11, 12]) vs needed above 1.28",
+      "url": "https://kalshi.com/markets/kxgtemp",
+      "status": "open"
+    },
+    {
       "id": "KXGTEMP-26-P0:yes:2026-11-14",
       "placed": "2026-11-14T23:07:28+00:00",
       "venue": "kalshi",
@@ -780,13 +1096,14 @@ export const satelliteFixture: Satellite = {
       "venue": "kalshi",
       "url": "https://kalshi.com/markets/kxgtemp",
       "title": "Will 2026 be the hottest year on record?",
-      "read": "Bet Yes on Hottest: we give it 97%, it cost 92c.",
+      "read": "Bet Yes on Hottest (and 1 more): we give it 97%, it cost 92c.",
       "levels": [
         "gtemp-2026-KXGTEMP-27-P0",
         "gtemp-2026-KXGTEMP-26-P0"
       ],
       "bets": [
-        "KXGTEMP-26-P0:yes:2026-11-14"
+        "KXGTEMP-26-P0:yes:2026-11-14",
+        "KXGTEMP-27-P0:yes:2026-11-15"
       ],
       "images": [],
       "facts": [
@@ -849,6 +1166,29 @@ export const satelliteFixture: Satellite = {
         }
       ],
       "question": "Will 2026 be the hottest year on NASA's record?"
+    },
+    {
+      "event": "november-2026-1st-2nd-or-3rd-hottest-on-record",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "url": "https://polymarket.com/event/november-2026-1st-2nd-or-3rd-hottest-on-record",
+      "title": "November 2026 1st, 2nd, or 3rd hottest on record?",
+      "read": "We agree with the market here; no bet.",
+      "levels": [
+        "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-1",
+        "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-2",
+        "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-3",
+        "rank-november-2026-1st-2nd-or-3rd-hottest-on-record-4"
+      ],
+      "bets": [],
+      "images": [],
+      "facts": [
+        "Estimate on NASA's scale: 1.63 C, give or take 0.10. It comes from ERA5's daily satellite-based readings plus the months NASA has already published.",
+        "Warmest so far: 1.40, 1.29, 1.21. A tie takes the better place.",
+        "NASA publishes mid-month; the market settles on the first figure it posts."
+      ],
+      "series": [],
+      "question": "November 2026 1st, 2nd, or 3rd hottest on record?"
     },
     {
       "event": "november-2026-temperature-increase-c",
@@ -938,6 +1278,33 @@ export const satelliteFixture: Satellite = {
         }
       ],
       "question": "How warm will November 2026 come in on NASA's index?"
+    },
+    {
+      "event": "where-will-2026-rank-among-the-hottest-years-on-record",
+      "family": "global-temp",
+      "venue": "polymarket",
+      "url": "https://polymarket.com/event/where-will-2026-rank-among-the-hottest-years-on-record",
+      "title": "Where will 2026 rank among the hottest years on record?",
+      "read": "Bet No on 2: we give it 99%, it cost 94c.",
+      "levels": [
+        "rank-where-will-2026-rank-among-the-hottest-years-on-record-1",
+        "rank-where-will-2026-rank-among-the-hottest-years-on-record-2",
+        "rank-where-will-2026-rank-among-the-hottest-years-on-record-3",
+        "rank-where-will-2026-rank-among-the-hottest-years-on-record-4",
+        "rank-where-will-2026-rank-among-the-hottest-years-on-record-5",
+        "rank-where-will-2026-rank-among-the-hottest-years-on-record-6"
+      ],
+      "bets": [
+        "will-2026-be-the-second-hottest-year-on-record:no:2026-11-15"
+      ],
+      "images": [],
+      "facts": [
+        "Estimate on NASA's scale: 1.32 C, give or take 0.02. It comes from ERA5's daily satellite-based readings plus the months NASA has already published.",
+        "Warmest so far: 1.28, 1.19, 1.17. A tie takes the better place.",
+        "NASA publishes mid-month; the market settles on the first figure it posts."
+      ],
+      "series": [],
+      "question": "Where will 2026 rank among the hottest years on record?"
     },
     {
       "event": "KXARCTICICEMAX-27APR01",
@@ -2377,8 +2744,51 @@ export const satelliteFixture: Satellite = {
       "name": "Lake Victoria Gold (LVG): Imwelo",
       "promise": "CEO targeted first production around mid-2027 (2026-06-30); early earthworks only, no formal construction decision",
       "watch_for": "A pit, plant pad and tailings dam taking shape. Still mostly dirt and scrub by early 2027 = mid-2027 is unrealistic.",
-      "located": false,
-      "note": "NOT FOUND yet. Near Katoro / Imwelo village, Geita Region, Tanzania (around -3.0, 31.9). Needs a sourced location."
+      "located": true,
+      "ticker": "LVG.V",
+      "points": [
+        {
+          "day": "2026-11-09",
+          "ndvi": 0.2965,
+          "bright": 1631.4
+        }
+      ],
+      "baseline": "2026-11-09",
+      "latest": "2026-11-09",
+      "vsDay": "2026-11-09",
+      "ndviChange": 0.0,
+      "brightChange": 0.0,
+      "verdict": "Too few photos to judge yet",
+      "photoBaseline": "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/32.0576,-2.89889,32.1376,-2.81889.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20261109T080049_R035_T36MUB_20261109T115817&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&max_size=800",
+      "photoLatest": "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/32.0576,-2.89889,32.1376,-2.81889.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20261109T080049_R035_T36MUB_20261109T115817&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&max_size=800"
+    },
+    {
+      "id": "slvr-el-tigre",
+      "name": "Silver Tiger Metals (SLVR): El Tigre heap leach",
+      "promise": "First pour targeted for Q4 2027 (December 2027) after the EPCM contract with KCA was signed and the earthworks contract for the heap leach pad, solution ponds and crusher platforms was awarded, per https://www.cruxinvestor.com/posts/silver-tiger-metals-signs-epcm-contract-with-kca-sets-q4-2027-target-for-el-tigre-first-pour and https://www.cruxinvestor.com/posts/silver-tiger-advances-el-tigre-construction-with-key-infrastructure-milestones-achieved. Statement dates not confirmed in the pages I read.",
+      "watch_for": "Bare graded earth appearing in the pad and pond footprint, then a rectangular lined leach pad with solution ponds beside it, a levelled crusher platform, and new haul or access roads. Pad and ponds should look larger and more finished each scan through 2027, with ore stacking visible before the Q4 2027 pour.",
+      "located": true,
+      "ticker": "SLVR",
+      "points": [
+        {
+          "day": "2025-11-01",
+          "ndvi": 0.2996,
+          "bright": 1610.8
+        },
+        {
+          "day": "2026-11-11",
+          "ndvi": 0.3073,
+          "bright": 1560.9
+        }
+      ],
+      "baseline": "2025-11-01",
+      "latest": "2026-11-11",
+      "vsDay": "2025-11-01",
+      "ndviChange": 0.008,
+      "brightChange": -0.031,
+      "verdict": "Too few photos to judge yet",
+      "photoBaseline": "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-109.2581,30.5525,-109.1881,30.6225.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20251101T175409_R141_T12RXU_20251101T211526&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&max_size=800",
+      "photoLatest": "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-109.2581,30.5525,-109.1881,30.6225.png?collection=sentinel-2-l2a&item=S2C_MSIL2A_20261111T175551_R141_T12RXU_20261111T205007&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&max_size=800"
     }
   ],
   "notes": [
@@ -2463,5 +2873,244 @@ export const satelliteFixture: Satellite = {
       "why": "Kalshi has 40+ snow series, but they settle on a station's measured snowfall. Satellites see snow on the ground, not how much fell at one gauge, so radar and models beat them.",
       "data": "MODIS snow cover"
     }
-  ]
+  ],
+  "learner": {
+    "log": [
+      {
+        "ts": "2026-11-15T00:47:29+00:00",
+        "kind": "bet",
+        "title": "Bet No on 2 at 94c",
+        "detail": "Our chance 99%, edge 5.1c. GISS 2026 annual est 1.32 +/- 0.02 C vs the top so far 1.28, 1.19, 1.17",
+        "ticker": "will-2026-be-the-second-hottest-year-on-record"
+      },
+      {
+        "ts": "2026-11-15T00:47:18+00:00",
+        "kind": "site",
+        "title": "Now watching: Silver Tiger Metals (SLVR): El Tigre heap leach",
+        "detail": "First pour targeted for Q4 2027 (December 2027) after the EPCM contract with KCA was signed and the earthworks contract for the heap leach pad, solution ponds and crusher platforms was awarded, per https://www.cruxinvestor.com/posts/silver-tiger-metals-signs-epcm-contract-with-kca-sets-q4-2027-target-for-el-tigre-first-pour and https://www.cruxinvestor.com/posts/silver-tiger-advances-el-tigre-construction-with-key-infrastructure-milestones-achieved. Statement dates not confirmed in the pages I read. Coordinates: https://www.costmine.com/wp-content/uploads/2023/11/El-tigre.pdf (2023 NI 43-101 technical report by P&E Mining Consultants: 30°35'15\" N, 109°13'23\" W, UTM 12R 670,380 E 3,385,230 N). This is the project reference point, not the pad itself, so the pad may sit a few hundred metres to a couple of km away."
+      },
+      {
+        "ts": "2026-11-15T00:47:18+00:00",
+        "kind": "site",
+        "title": "Located: Lake Victoria Gold (LVG): Imwelo",
+        "detail": "https://nxt.l2b.co.za/projects/imwelo-gold-project-tanzania/37539 (project database, labelled approximate; consistent with Mining Weekly/Engineering News placing Imwelo about 12 km west of AngloGold's Geita mine). Not surveyed, so treat as a rough centre point."
+      },
+      {
+        "ts": "2026-11-15T00:45:03+00:00",
+        "kind": "market",
+        "title": "New market to model: November 2026 1st, 2nd, or 3rd hottest on record?",
+        "detail": "Polymarket, settles on rules name a satellite or climate agency. No model yet; the weekly review weighs whether to build one.",
+        "key": "poly:november-2026-1st-2nd-or-3rd-hottest-on-record"
+      },
+      {
+        "ts": "2026-11-15T00:45:03+00:00",
+        "kind": "market",
+        "title": "New market to model: Where will 2026 rank among the hottest years on record?",
+        "detail": "Polymarket, settles on rules name a satellite or climate agency. No model yet; the weekly review weighs whether to build one.",
+        "key": "poly:where-will-2026-rank-among-the-hottest-years-on-record"
+      },
+      {
+        "ts": "2026-11-15T00:45:03+00:00",
+        "kind": "market",
+        "title": "New market to model: CO2 level",
+        "detail": "Kalshi, settles on with data provided by NOAA Global Monitoring Laboratory the National Aeronautics and Space Administration. No model yet; the weekly review weighs whether to build one.",
+        "key": "kalshi:KXCO2LEVEL"
+      },
+      {
+        "ts": "2026-11-15T00:45:03+00:00",
+        "kind": "market",
+        "title": "New market to model: Global warming",
+        "detail": "Kalshi, settles on Berkeley Earth NASA Goddard\nInstitute for Space Studies NCEI UK Met Office Hadley Centre (HadCRUT). No model yet; the weekly review weighs whether to build one.",
+        "key": "kalshi:KXWARMING"
+      },
+      {
+        "ts": "2026-11-15T00:40:04+00:00",
+        "kind": "bet",
+        "title": "Bet Yes on Hottest at 91c",
+        "detail": "Our chance 97%, edge 5.5c. GISS 2026 annual est 1.323 +/- 0.020 C (months forecast: [11, 12]) vs needed above 1.28",
+        "ticker": "KXGTEMP-27-P0"
+      },
+      {
+        "ts": "2026-11-14T23:07:28+00:00",
+        "kind": "bet",
+        "title": "Bet Yes on Hottest at 92c",
+        "detail": "Our chance 97%, edge 5.1c. GISS 2026 annual est 1.323 +/- 0.020 C (months forecast: [11, 12]) vs needed above 1.28",
+        "ticker": "KXGTEMP-26-P0"
+      },
+      {
+        "ts": "2026-11-14T23:05:02+00:00",
+        "kind": "bet",
+        "title": "Bet No on Above 14.1 million sq km at 9c",
+        "detail": "Our chance 15%, edge 5.4c. Extent now 8.80M km2; past seasons' growth puts the max near 14.45M; level 14.1",
+        "ticker": "KXARCTICICEMAX-27APR01-T14.1"
+      },
+      {
+        "ts": "2026-11-14T23:05:02+00:00",
+        "kind": "bet",
+        "title": "Bet No on Hottest ever at 11c",
+        "detail": "Our chance 19%, edge 7.1c. ERA5 has 12 of 30 days; NOAA November est 1.53 +/- 0.09 C vs record 1.40",
+        "ticker": "KXHMONTH-26NOV"
+      },
+      {
+        "ts": "2026-11-14T23:05:02+00:00",
+        "kind": "bet",
+        "title": "Bet No on Above 14.2 million sq km at 14c",
+        "detail": "Our chance 23%, edge 8.0c. Extent now 8.80M km2; past seasons' growth puts the max near 14.45M; level 14.2",
+        "ticker": "KXARCTICICEMAX-27APR01-T14.2"
+      },
+      {
+        "ts": "2026-11-14T23:05:02+00:00",
+        "kind": "bet",
+        "title": "Bet No on >1.54ºC at 13c",
+        "detail": "Our chance 19%, edge 6.1c. GISS November est 1.63 +/- 0.10 C (recent GISS bias +0.04)",
+        "ticker": "will-global-temperature-increase-by-more-than-1pt54c-in-november-2026"
+      }
+    ],
+    "grades": {
+      "asOf": "2026-11-15T00:44:58+00:00",
+      "families": {
+        "hmonth": {
+          "label": "Hottest month (Kalshi, NOAA)",
+          "markets": 0,
+          "rows": 0,
+          "brierDesk": null,
+          "brierMarket": null,
+          "shadowBets": 0,
+          "shadowWins": 0,
+          "shadowRoi": null,
+          "shadowT": null,
+          "minEdge": 0.05,
+          "active": true
+        },
+        "gtemp": {
+          "label": "Hottest year (Kalshi, NASA)",
+          "markets": 0,
+          "rows": 0,
+          "brierDesk": null,
+          "brierMarket": null,
+          "shadowBets": 0,
+          "shadowWins": 0,
+          "shadowRoi": null,
+          "shadowT": null,
+          "minEdge": 0.05,
+          "active": true
+        },
+        "poly": {
+          "label": "Monthly temperature ranges (Polymarket, NASA)",
+          "markets": 0,
+          "rows": 0,
+          "brierDesk": null,
+          "brierMarket": null,
+          "shadowBets": 0,
+          "shadowWins": 0,
+          "shadowRoi": null,
+          "shadowT": null,
+          "minEdge": 0.05,
+          "active": true
+        },
+        "icemax": {
+          "label": "Sea ice peak (Kalshi, NSIDC)",
+          "markets": 0,
+          "rows": 0,
+          "brierDesk": null,
+          "brierMarket": null,
+          "shadowBets": 0,
+          "shadowWins": 0,
+          "shadowRoi": null,
+          "shadowT": null,
+          "minEdge": 0.05,
+          "active": true
+        }
+      },
+      "edges": {
+        "under 2c": {
+          "bets": 0,
+          "roi": null,
+          "t": null
+        },
+        "2 to 5c": {
+          "bets": 0,
+          "roi": null,
+          "t": null
+        },
+        "5 to 10c": {
+          "bets": 0,
+          "roi": null,
+          "t": null
+        },
+        "10c and up": {
+          "bets": 0,
+          "roi": null,
+          "t": null
+        }
+      },
+      "settledMarkets": 0
+    },
+    "rules": {
+      "hmonth": {
+        "min_edge": 0.05,
+        "active": true,
+        "label": "Hottest month (Kalshi, NOAA)"
+      },
+      "gtemp": {
+        "min_edge": 0.05,
+        "active": true,
+        "label": "Hottest year (Kalshi, NASA)"
+      },
+      "poly": {
+        "min_edge": 0.05,
+        "active": true,
+        "label": "Monthly temperature ranges (Polymarket, NASA)"
+      },
+      "icemax": {
+        "min_edge": 0.05,
+        "active": true,
+        "label": "Sea ice peak (Kalshi, NSIDC)"
+      },
+      "rank": {
+        "min_edge": 0.05,
+        "active": true,
+        "label": "Hottest-on-record rank (Polymarket, NASA)"
+      }
+    },
+    "candidates": [
+      {
+        "venue": "kalshi",
+        "id": "KXWARMING",
+        "title": "Global warming",
+        "source": "Berkeley Earth NASA Goddard\nInstitute for Space Studies NCEI UK Met Office Hadley Centre (HadCRUT)",
+        "open": 1,
+        "firstSeen": "2026-11-15T00:45:03+00:00",
+        "lastSeen": "2026-11-15T00:45:03+00:00"
+      },
+      {
+        "venue": "kalshi",
+        "id": "KXCO2LEVEL",
+        "title": "CO2 level",
+        "source": "with data provided by NOAA Global Monitoring Laboratory the National Aeronautics and Space Administration",
+        "open": 5,
+        "firstSeen": "2026-11-15T00:45:03+00:00",
+        "lastSeen": "2026-11-15T00:45:03+00:00"
+      },
+      {
+        "venue": "polymarket",
+        "id": "where-will-2026-rank-among-the-hottest-years-on-record",
+        "title": "Where will 2026 rank among the hottest years on record?",
+        "source": "rules name a satellite or climate agency",
+        "open": 6,
+        "firstSeen": "2026-11-15T00:45:03+00:00",
+        "lastSeen": "2026-11-15T00:45:03+00:00"
+      },
+      {
+        "venue": "polymarket",
+        "id": "november-2026-1st-2nd-or-3rd-hottest-on-record",
+        "title": "November 2026 1st, 2nd, or 3rd hottest on record?",
+        "source": "rules name a satellite or climate agency",
+        "open": 4,
+        "firstSeen": "2026-11-15T00:45:03+00:00",
+        "lastSeen": "2026-11-15T00:45:03+00:00"
+      }
+    ],
+    "retro": null
+  }
 };

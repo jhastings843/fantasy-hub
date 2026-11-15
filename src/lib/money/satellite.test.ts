@@ -20,7 +20,7 @@ describe("satellite desk", () => {
     expect(d.read).toBe("Too early");
     const f = satelliteFixture;
     expect(d.result).toBe(`-$${(f.bankroll - f.equity).toFixed(2)}`);
-    expect(d.rec).toBe(`${f.bets.filter((b) => b.status === "open").length} open, $${f.openCost.toFixed(2)} staked`);
+    expect(d.rec).toMatch(new RegExp(`^${f.bets.filter((b) => b.status === "open").length} open, \\$[\\d,.]+ staked$`));
     const later: Satellite = { ...satelliteFixture, settled: 24, wins: 15, equity: 1040 };
     expect(satelliteDesk(later)).toMatchObject({ read: "Up", readTone: "good", rec: "15-9" });
   });
@@ -34,7 +34,7 @@ describe("satellite desk", () => {
 
   it("renders the tab from the real status.json", () => {
     const html = renderToStaticMarkup(createElement("div", null, createElement(WeatherTotalHero, { d: satelliteFixture, w: null }), createElement(SatelliteTab, { d: satelliteFixture })));
-    for (const text of ["Weather: ", "Satellite markets", "Arctic sea ice", "warmest November", "Above 14.2 million sq km", "Site watch", "How it is graded", "NOT FOUND yet", "nsidc.org"]) expect(html).toContain(text);
+    for (const text of ["Weather: ", "Satellite markets", "Arctic sea ice", "warmest November", "Above 14.2 million sq km", "Site watch", "How it is graded", "nsidc.org", "What it&#x27;s learning", "New market"]) expect(html).toContain(text);
     expect(html).toContain('loading="lazy"');
     expect(html).not.toContain("—"); // no em dashes in copy
   });

@@ -626,6 +626,43 @@ export interface Satellite {
   openFees?: number;
   /** One card per market question, with its evidence (site-watch satdesk/evidence.py). Missing before 2026-11-14 evening. */
   events?: SatelliteEvent[];
+  /** The learning cycle (site-watch satdesk/learner.py). Missing before 2026-11-14 night. */
+  learner?: SatelliteLearner | null;
+}
+
+export interface SatelliteLogLine {
+  ts: string;
+  kind: "bet" | "close" | "settle" | "rule" | "market" | "site" | "lesson" | "check" | "reset";
+  title: string;
+  detail?: string;
+  ticker?: string;
+  family?: string;
+  key?: string;
+  file?: string;
+}
+
+export interface SatelliteFamilyGrade {
+  label: string;
+  markets: number;
+  rows: number;
+  /** Brier on settled markets: ours and the market's mid price. Lower wins. */
+  brierDesk: number | null;
+  brierMarket: number | null;
+  shadowBets: number;
+  shadowWins: number;
+  /** Average return per $1 bet at the family's bar, after fees. */
+  shadowRoi: number | null;
+  shadowT: number | null;
+  minEdge: number;
+  active: boolean;
+}
+
+export interface SatelliteLearner {
+  log: SatelliteLogLine[];
+  grades: { asOf: string; settledMarkets: number; families: { [k: string]: SatelliteFamilyGrade }; edges: { [bucket: string]: { bets: number; roi: number | null; t: number | null } } } | null;
+  rules: { [k: string]: { min_edge: number; active: boolean; label: string; changed?: string } };
+  candidates: { venue: string; id: string; title: string; source: string; open: number; firstSeen?: string; lastSeen?: string }[];
+  retro: { file: string; headline: string; worked: string[]; didnt: string[]; lessons: string[]; proposals: string[] } | null;
 }
 
 /** One market question on the Weather page: the read, the satellite evidence and its levels and bets (by id). */

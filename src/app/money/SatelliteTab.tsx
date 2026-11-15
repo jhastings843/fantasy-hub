@@ -1,4 +1,4 @@
-import type { Satellite, SatelliteBet, SatelliteCalRow, SatelliteEvent, SatelliteSignal, SatelliteSite, Weather } from "@/lib/money/types";
+import type { Satellite, SatelliteBet, SatelliteCalRow, SatelliteEvent, SatelliteLogLine, SatelliteSignal, SatelliteSite, Weather } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { DeskHero, Stats } from "./desks";
 import s from "../picks/picks.module.css";
@@ -335,6 +335,76 @@ function Grading({ d }: { d: Satellite }) {
   );
 }
 
+/* What it's learning (satdesk/learner.py): the weekly review, each market type's grade, and the desk's own log. */
+
+const LOG_KIND: { [k in SatelliteLogLine["kind"]]: [string, string] } = {
+  bet: ["Bet", s.kNew], close: ["Closed", ""], settle: ["Settled", ""], rule: ["Rule", s.kLive], market: ["New market", s.kNew],
+  site: ["Site", s.kNew], lesson: ["Lesson", s.kLive], check: ["Check", ""], reset: ["Reset", s.kBack],
+};
+const whenShort = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+
+function Learning({ d }: { d: Satellite }) {
+  const L = d.learner;
+  if (!L) return null;
+  const fams = Object.entries(L.grades?.families ?? {});
+  const graded = L.grades?.settledMarkets ?? 0;
+  return (
+    <details className={`${m.panel} ${m.fold}`} open>
+      <summary className={m.foldHead}>
+        <h2 className={m.panelTitle}>What it&apos;s learning</h2>
+        <span className={m.foldMeta}>{`${graded} ${graded === 1 ? "market" : "markets"} graded, ${L.log.length} log entries`}</span>
+      </summary>
+      <p className={m.sub}>
+        Every market it prices is logged once a day, bet or not. When a market settles, the learner scores its chance against the market&apos;s and what a bet at its bar would have made. Inside fixed limits it raises the bar on a type that loses, pauses one whose chances trail the market&apos;s, and lowers the bar on one that keeps winning. A weekly review writes lessons and proposals, and researches new sites to watch. It never changes its own code.
+      </p>
+      {L.retro && (
+        <div className={m.satRetro}>
+          <h3 className={m.subHead}>{`Latest review: ${L.retro.headline || L.retro.file}`}</h3>
+          {L.retro.lessons.length > 0 && <ul className={m.satFacts}>{L.retro.lessons.map((x) => <li key={x}>{x}</li>)}</ul>}
+          {L.retro.proposals.length > 0 && (
+            <>
+              <p className={m.sub}><b>Proposals for you to approve</b></p>
+              <ul className={m.satFacts}>{L.retro.proposals.map((x) => <li key={x}>{x}</li>)}</ul>
+            </>
+          )}
+        </div>
+      )}
+      {fams.length > 0 && (
+        <div className={m.scroll}><table className={s.table}>
+          <thead><tr><th>Market type</th><th>Settled</th><th>Our score / market</th><th>Shadow bets</th><th>Bar</th></tr></thead>
+          <tbody>
+            {fams.map(([k, x]) => (
+              <tr key={k}>
+                <td>{x.label}{!x.active && <span className={`${m.tag} ${m.tagIdea}`}>paused</span>}</td>
+                <td className={s.num}>{x.markets}</td>
+                <td className={s.num}>{x.brierDesk != null && x.brierMarket != null ? <span className={x.brierDesk < x.brierMarket ? s.pos : s.neg}>{`${x.brierDesk.toFixed(3)} / ${x.brierMarket.toFixed(3)}`}</span> : "·"}</td>
+                <td className={s.num}>{x.shadowBets ? `${x.shadowWins}-${x.shadowBets - x.shadowWins}, ${x.shadowRoi != null ? `${x.shadowRoi >= 0 ? "+" : ""}${(x.shadowRoi * 100).toFixed(1)}¢ each` : ""}` : "·"}</td>
+                <td className={s.num}>{cents(x.minEdge)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      )}
+      {graded === 0 && <p className={s.thin}>Nothing has settled yet. The first temperature markets settle when NOAA and NASA publish November, around Dec 8 to 14; the sea ice peak settles after Apr 1.</p>}
+      {L.candidates.length > 0 && (
+        <details className={m.satLevels}>
+          <summary>{`${L.candidates.length} markets found that it could learn to price`}</summary>
+          <ul className={m.satFacts}>{L.candidates.map((c) => <li key={c.id}>{`${c.title} (${c.venue === "kalshi" ? "Kalshi" : "Polymarket"}): settles on ${c.source.replace(/\s+/g, " ")}`}</li>)}</ul>
+        </details>
+      )}
+      <ol className={s.log}>
+        {L.log.filter((x) => x.kind !== "check").slice(0, 15).map((e, i) => (
+          <li key={`${e.ts}|${i}`} className={s.logRow}>
+            <span className={s.logWhen}>{whenShort(e.ts)}</span>
+            <span className={`${s.logKind} ${LOG_KIND[e.kind]?.[1] ?? ""}`}>{LOG_KIND[e.kind]?.[0] ?? e.kind}</span>
+            <span className={s.logText}><b>{e.title}</b>{e.detail ? <span>{e.detail}</span> : null}</span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 function Ideas({ d }: { d: Satellite }) {
   const ideas = d.ideas ?? [];
   if (!ideas.length) return null;
@@ -361,6 +431,7 @@ export function SatelliteTab({ d }: { d: Satellite }) {
   return (
     <section className={s.section}>
       <Markets d={d} />
+      <Learning d={d} />
       <Settled d={d} />
       <Sites d={d} />
       <details className={`${m.panel} ${m.fold}`}>

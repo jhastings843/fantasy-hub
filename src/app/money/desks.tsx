@@ -361,6 +361,11 @@ export function moneyLog(v: View): LogEntry[] {
       title: `Weather desk: ${w.brake.level === "stop" ? "stopped betting" : "cut to quarter stakes"}`,
       detail: `Over the last week the market scored ${w.brake.market.toFixed(3)} to the desk's ${w.brake.desk.toFixed(3)} across ${w.brake.n} city-days. It bets again once its week beats the market's.`,
     });
+  // The satellite desk's learner: rule changes, lessons, new markets and sites (bets stay on the Weather page).
+  for (const e of snap?.satellite?.learner?.log ?? []) {
+    if (!["rule", "lesson", "market", "site", "reset"].includes(e.kind)) continue;
+    out.push({ at: e.ts, kind: e.kind === "rule" || e.kind === "lesson" ? "test" : e.kind === "reset" ? "back" : "new", title: `Satellite desk: ${e.title}`, detail: e.detail });
+  }
   if (w) out.push({ at: w.generatedAt, kind: "test", title: `Weather desk trusts its own forecast ${Math.round(w.trust.w * 100)}%`, detail: `Blended with the market for the rest, re-fit from ${w.trust.days} settled days.` });
   // Weather slices: re-judged every day; changes come from its journal (Jack, 2026-11-05).
   if (w?.slices?.length && w.sliceGate) {
