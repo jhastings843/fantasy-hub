@@ -5,6 +5,7 @@ import { LineChart } from "./Chart";
 import { DeskHero, Stats } from "./desks";
 import s from "../picks/picks.module.css";
 import m from "./money.module.css";
+import { ReboundPanel, ShadowPanel } from "./ReboundPanel";
 import { Term } from "./Term";
 
 // The intraday desk (trade-bot tradebot/intraday.py, added 2026-10-28): opening-range
@@ -249,6 +250,8 @@ export function IntradayTab({ d }: { d: Intraday }) {
         )}
       </div>
 
+      {d.vwapRebound && <ReboundPanel d={d.vwapRebound} />}
+
       {recent.length > 0 && (
         <details className={`${m.panel} ${m.fold}`}>
           <summary className={m.foldHead}>
@@ -273,6 +276,8 @@ export function IntradayTab({ d }: { d: Intraday }) {
           </table></div>
         </details>
       )}
+
+      {d.vwapShadow && <ShadowPanel d={d.vwapShadow} />}
 
       <Disclosure summary="The rule"><div className={m.panel}>
         <div className={m.panelHead}>

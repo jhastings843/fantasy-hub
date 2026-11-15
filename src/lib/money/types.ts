@@ -766,6 +766,64 @@ export interface Intraday {
   skills?: { skill: string; role: string }[];
   filter?: string;
   rules?: { max_loss_per_trade_usd: number; max_daily_loss_usd: number; max_trades_per_day: number; no_entries_after: string; flat_by: string };
+  /** trade-bot tradebot/vwap_rebound.py export(): the QQQ VWAP rebound paper book (added 2026-11-14). */
+  vwapRebound?: VwapRebound | null;
+  /** trade-bot tradebot/vwap_shadow.py export(): the VWAP/EMA9 cross graded with no money (added 2026-11-14). */
+  vwapShadow?: VwapShadow | null;
+}
+
+/** Trade results in basis points (0.01%), after costs. */
+export interface BpStats {
+  n: number;
+  meanBp: number | null;
+  hit: number | null;
+  t: number | null;
+  totalPct?: number | null;
+}
+
+/** One session of the VWAP rebound book. state: no-setup (yesterday did not qualify), waiting, open, closed,
+ *  skip (the first signal failed a filter), none (no signal by 1pm), missed (first seen after the close). */
+export interface VwapReboundRow {
+  day: string;
+  symbol: string;
+  setup: number | null;
+  setup_note: string | null;
+  state: "no-setup" | "waiting" | "open" | "closed" | "skip" | "none" | "missed";
+  why: string | null;
+  signal_time: string | null;
+  entry_time: string | null;
+  entry: number | null;
+  exit_time: string | null;
+  exit: number | null;
+  how: string | null;
+  shares: number | null;
+  pnl: number | null;
+  bp: number | null;
+  seen_entry_at: string | null;
+  seen_exit_at: string | null;
+}
+
+export interface VwapRebound {
+  book: string;
+  start: number;
+  equity: number;
+  symbols: string[];
+  record: BpStats;
+  curve: { day: string; equity: number }[];
+  setupDays: number;
+  days: number;
+  recent: VwapReboundRow[];
+  backtest: { source: string; symbol: string; n: number; hit: number; pf: number; meanBp: number; t: number; firstHalfT: number; secondHalfT: number; worstBp: number };
+  rules: string;
+}
+
+export interface VwapShadow {
+  name: string;
+  verdict: "collecting" | "candidate" | "no edge";
+  days: number;
+  /** "ema", "cross", "cross3m" pooled, and "<lane>:<SYMBOL>" per ticker. */
+  lanes: Record<string, BpStats>;
+  bar: string;
 }
 
 /** Enough of a check that a malformed post can't break the page. */
