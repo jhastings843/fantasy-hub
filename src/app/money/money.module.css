@@ -328,10 +328,11 @@
 .satCardHead { display: grid; gap: 4px; min-width: 0; }
 .satRead { color: var(--ink2); font-size: 13px; line-height: 1.4; }
 .satFacts { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ink2); font-size: 13px; line-height: 1.45; }
-.satFigure { margin: 6px 0 0; }
+.satFigure { margin: 6px 0 0; max-width: 620px; }
 .satFigure figcaption { color: var(--ink2); font-size: 12px; margin-top: 4px; }
 .satLevels { margin-top: 6px; }
 .satLevels > summary { cursor: pointer; color: var(--accent); font-size: 13px; }
 .satMap img { aspect-ratio: auto; object-fit: contain; }
 .satMap figcaption { font-family: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--ink2); }
 @media (max-width: 560px) { .satMarkets .satPhotos { grid-template-columns: 1fr; } }
+.satMarkets .satPhotos { max-width: 620px; }
