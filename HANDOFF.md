@@ -937,3 +937,15 @@ passed through by trade-bot `money_export.satellite()` as `snapshot.satellite` (
 `src/lib/money/satellite.*`. First Vercel build failed on a Turbopack next/font/google lookup error unrelated
 to the change; `vercel redeploy` of the same commit went Ready in 54s. Not yet: a schedule.ts entry
 ("Checked N min ago") and an overview chart panel.
+
+## Tier 1 stand-in + Today "Watching" (2026-11-14, e18c613; Weather satellite work 13f271e..ce6a4ea)
+- forward.ts `standIn`: while the weekly pick has <10 forward games (not failed), the previous Tier 1 keeps
+  staking if its own forward check passes and its season record >= break-even (grandfathered preferred,
+  then most recent). Tests in forward.test.ts. Board/email note: "X stays on while the new pick, Y, does its forward check".
+- Checked on live data the same night: no stand-in qualifies. NFL road-dog is 5-5 since chosen (Week 6),
+  CFB near-vegas 9-14 since Week 9, so neither passes its own forward check; the review swap was right.
+  Script: scratchpad standin-check.ts (runs forwardCheck/standIn on /api/picks JSON).
+- Today: "Watching, no stake" section (watchingSlips): held tier games and the tryout pick's games.
+- Weather tab: WeatherTotalHero (satellite + daily highs as one number), satellite market cards with
+  evidence (ERA5 chart, NSIDC maps), "What it's learning" (site-watch satdesk/learner.py), one Weather row
+  on the overview (weatherTotalDesk). Satellite open bets count at cost (Jack's call).
