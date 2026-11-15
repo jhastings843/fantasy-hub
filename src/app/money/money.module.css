@@ -336,4 +336,19 @@
 .satMap figcaption { font-family: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--ink2); }
 @media (max-width: 560px) { .satMarkets .satPhotos { grid-template-columns: 1fr; } }
 .satMarkets .satPhotos { max-width: 620px; }
+/* Weather > "why we bet" story on each market card (2026-11-15) */
+.satStory { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 6px; max-width: 680px; min-width: 0; }
+.satStory > * { min-width: 0; }
+.satPic a { display: block; }
+.satEyebrow { font-family: var(--font-plex-mono), monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); margin: 0; }
+.satLead { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink); }
+.satPic { margin: 0; display: grid; gap: 6px; }
+.satPic img { width: 100%; height: auto; display: block; border-radius: 8px; background: var(--surface2); border: 1px solid var(--rule); }
+.satPic figcaption { font-size: 12px; line-height: 1.45; color: var(--ink2); }
+.satBets { display: grid; gap: 8px; }
+.satBet { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; display: grid; gap: 2px; }
+.satBetBad .satBetNow { color: var(--neg); font-weight: 600; }
+.satBetHead { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+.satBetWhy { font-size: 13px; line-height: 1.45; color: var(--ink2); }
+.satBetNow { font-size: 12.5px; color: var(--mute); }
 .satRetro { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: var(--surface2); }

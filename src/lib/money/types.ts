@@ -681,6 +681,13 @@ export interface SatelliteEvent {
   /** Horizontal reference lines on the chart, in the series' units. */
   lines?: { label: string; value: number }[];
   images: { url: string; caption: string }[];
+  /** Plain-English "why we bet" (site-watch evidence.py, 2026-11-15): what the satellites show,
+   *  the map behind it, and one line per bet (what we paid against what we thought, and now). */
+  story?: {
+    lead: string[];
+    picture: { url: string; caption: string } | null;
+    bets: { bet: string; head: string; why: string; now?: string }[];
+  };
   /** Signal ids and bet ids that belong to this question. */
   levels: string[];
   bets: string[];

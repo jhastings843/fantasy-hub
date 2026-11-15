@@ -109,6 +109,38 @@ function worthNow(b: SatelliteBet, sig: SatelliteSignal | undefined) {
   return bid != null ? b.contracts * bid : null;
 }
 
+function Story({ e }: { e: SatelliteEvent }) {
+  const st = e.story!;
+  return (
+    <div className={m.satStory}>
+      <p className={m.satEyebrow}>What the satellites show</p>
+      {st.lead.map((l) => <p key={l} className={m.satLead}>{l}</p>)}
+      {st.picture && (
+        <figure className={m.satPic}>
+          {/* External NOAA / NSIDC satellite maps, not set up for next/image. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <a href={st.picture.url} target="_blank" rel="noreferrer"><img src={st.picture.url} alt={st.picture.caption} loading="lazy" /></a>
+          <figcaption>{st.picture.caption}</figcaption>
+        </figure>
+      )}
+      {st.bets.length > 0 && (
+        <>
+          <p className={m.satEyebrow}>Why we bet</p>
+          <div className={m.satBets}>
+            {st.bets.map((b) => (
+              <div key={b.bet} className={`${m.satBet} ${b.now?.includes("against us") ? m.satBetBad : ""}`}>
+                <span className={m.satBetHead}>{b.head}</span>
+                <span className={m.satBetWhy}>{b.why}</span>
+                {b.now && <span className={m.satBetNow}>{b.now}</span>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MarketCard({ e, d }: { e: SatelliteEvent; d: Satellite }) {
   const sigs = (d.signals ?? []).filter((x) => e.levels.includes(x.id));
   const bets = (d.bets ?? []).filter((b) => e.bets.includes(b.id));
@@ -122,6 +154,9 @@ function MarketCard({ e, d }: { e: SatelliteEvent; d: Satellite }) {
           <span className={m.satRead}><span className={`${m.tag} ${open.length ? m.tagOpen : ""}`}>{status}</span>{e.read}</span>
         </span>
       </summary>
+      {e.story && <Story e={e} />}
+      <details className={m.satLevels} open={!e.story}>
+        <summary>The numbers behind it</summary>
       <ul className={m.satFacts}>{e.facts.map((f) => <li key={f}>{f}</li>)}</ul>
       <EvidenceChart e={e} />
       {e.images?.length > 0 && (
@@ -136,6 +171,7 @@ function MarketCard({ e, d }: { e: SatelliteEvent; d: Satellite }) {
           ))}
         </div>
       )}
+      </details>
       {open.length > 0 && (
         <div className={m.scroll}><table className={s.table}>
           <thead><tr><th>Our bet</th><th>Cost</th><th>Worth now</th><th>Our chance</th></tr></thead>
