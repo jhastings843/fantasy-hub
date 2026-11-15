@@ -111,6 +111,34 @@ export function standIn(s: StrategyBoard, picked: CutResult & { forward: Forward
   return null;
 }
 
+/** A tryout this far along and below break-even has failed early enough to swap. */
+export const TRYOUT_FAIL_AT = 5;
+
+/**
+ * Owner's call (2026-11-15): the weekly review may not replace a Tier 1 or
+ * Tier 2 rule while it is on its forward check (fewer than 10 forward games,
+ * not grandfathered, not already staking), because every swap restarted the
+ * clock (NFL Tier 1 went dog, road-dog, gap3plus between Weeks 5 and 10).
+ * It can still be replaced once it is 5+ forward games in and below
+ * break-even, or (in strategies) when its season record stops qualifying.
+ * `prev`: the last week's frozen tiers. Returns the ids to hold.
+ */
+export function tryoutHold(prev: Pick<StrategyBoard, "rule" | "second"> | null | undefined, games: GradedGame[], chosen: ChosenMap | null, currentWeek: number | null): { t1?: string; t2?: string } {
+  if (!prev || !chosen) return {};
+  const onTryout = (cut: Cut, pool: GradedGame[]) => {
+    const c = chosen[cut.id];
+    if (!c || c.grandfathered) return false;
+    const f = forwardCheck(cut, c, pool, currentWeek);
+    if (f.stake || f.n >= MIN_SAMPLE) return false;
+    return !(f.n >= TRYOUT_FAIL_AT && f.w / f.n < BREAK_EVEN);
+  };
+  const out: { t1?: string; t2?: string } = {};
+  if (prev.rule && onTryout(prev.rule, games)) out.t1 = prev.rule.id;
+  const outside = prev.rule ? games.filter((g) => cutResult(g, prev.rule!) === undefined) : games;
+  if (prev.second && onTryout(prev.second, outside)) out.t2 = prev.second.id;
+  return out;
+}
+
 /**
  * The board with each tier's forward check attached. `chosen` null means the
  * dates couldn't be read: both tiers are tracked (fail closed, real money).

@@ -56,7 +56,7 @@ function Explainer() {
 
 type SavedParlay = Awaited<ReturnType<typeof loadAttdParlays>>[number];
 
-/** A ticket's legs: price, our chance, Venom's, the blend and DK's break-even. */
+/** A ticket's legs: price, our chance, Venom's, the chance used (ours from Nov 15, 2026; the blend before) and DK's break-even. */
 /** `current`: this week's open ticket, so each leg's game opens its pop-up (past games have none). */
 function ParlayLegs({ p, current = false }: { p: AttdParlay; current?: boolean }) {
   const gameHref = (slug: string) => {
@@ -72,7 +72,7 @@ function ParlayLegs({ p, current = false }: { p: AttdParlay; current?: boolean }
             <th>DK</th>
             <th>Ours</th>
             <th>Venom</th>
-            <th>Blend / DK</th>
+            <th>Chance / DK</th>
           </tr>
         </thead>
         <tbody>
@@ -109,7 +109,7 @@ async function ParlayToday({ season, week }: { season: number; week: number | nu
   if (cur && cur.outcome.status !== "open") return null;
   return (
     <div className={s.pageFrame}>
-      <SecHead title="Parlay of the day" aside={`Sundays · pick ${PARLAY_LEGS.min} to ${PARLAY_LEGS.max} anytime legs where our model and Venom agree · only the count the model is most confident in is tracked · paper, 1u`} />
+      <SecHead title="Parlay of the day" aside={`Sundays · pick ${PARLAY_LEGS.min} to ${PARLAY_LEGS.max} anytime legs where our model beats DK's break-even by 5+ points and Venom agrees · only the count the model is most confident in is tracked · paper, 1u`} />
       {cur ? (
         <ParlayPicker
           tickets={tickets(cur.parlay.pool ?? cur.parlay.legs)}
@@ -135,11 +135,11 @@ async function NightToday({ season, week }: { season: number; week: number | nul
   if (week_.length && !cur.length) return null;
   return (
     <div className={s.pageFrame}>
-      <SecHead title="TNF and MNF 2-leg" aside="Thursday and Monday · 2 anytime legs off that night's game where our model, Venom and the blend all beat DK's break-even · same game allowed · paper, 1u, its own record" />
+      <SecHead title="TNF and MNF 2-leg" aside="Thursday and Monday · 2 anytime legs off that night's game where our model and Venom both beat DK's break-even · same game allowed · paper, 1u, its own record" />
       {cur.length ? (
         cur.map(({ parlay: p, outcome: o }) => (
           <div key={p.slate}>
-            <p className={s.thin}>{`${SLATE_LABEL[p.slate ?? "sun"]} · 2 legs at ${am(p.price)} · blended chance ${(p.chance * 100).toFixed(1)}% · EV ${p.ev >= 0 ? "+" : "−"}${Math.abs(p.ev).toFixed(2)}u per 1u · ${outcomeText(o)}${p.voided ? `: ${p.voided}` : ""}`}</p>
+            <p className={s.thin}>{`${SLATE_LABEL[p.slate ?? "sun"]} · 2 legs at ${am(p.price)} · chance ${(p.chance * 100).toFixed(1)}% · EV ${p.ev >= 0 ? "+" : "−"}${Math.abs(p.ev).toFixed(2)}u per 1u · ${outcomeText(o)}${p.voided ? `: ${p.voided}` : ""}`}</p>
             <ParlayLegs p={p} current />
           </div>
         ))

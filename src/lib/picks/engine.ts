@@ -524,8 +524,10 @@ export function derivedCut(league: "nfl" | "cfb", withPem: boolean, id: string):
 export function strategies(
   league: "nfl" | "cfb",
   games: GradedGame[],
-  /** noPem: the strategy review dropped PEM (policy source "out"), so its cuts can't be the rule. */
-  opts: { activated?: string[]; noPem?: boolean } = {},
+  /** noPem: the strategy review dropped PEM (policy source "out"), so its cuts can't be the rule.
+   *  hold: cut ids to keep as Tier 1 / Tier 2 while their forward check runs (forward.ts tryoutHold),
+   *  as long as they still qualify on this week's games. */
+  opts: { activated?: string[]; noPem?: boolean; hold?: { t1?: string; t2?: string } } = {},
 ): StrategyBoard {
   const agreed = games.filter((g) => g.read.agree && g.result);
   const withPem = !opts.noPem && games.some((g) => g.pem);
@@ -574,8 +576,14 @@ export function strategies(
     .map((c) => ({ ...c, candidate: true, activated: true }));
   const pool = [...cuts.filter((x) => x.candidate), ...promoted];
   const eligible = pool.filter((x) => qualifies(x.record)).sort(rank);
-  const rule = eligible[0] ?? null;
-  const second = rule ? pickSecond(games, rule, pool) : null;
+  // A rule mid-tryout keeps its place (Jack, 2026-11-15): a new top cut would
+  // restart the 10-game forward clock, and weekly swaps meant none ever finished.
+  const held = (id?: string) => (id ? pool.find((x) => x.id === id) : undefined);
+  const h1 = held(opts.hold?.t1);
+  const rule = (h1 && qualifies(h1.record) ? h1 : null) ?? eligible[0] ?? null;
+  const h2 = held(opts.hold?.t2);
+  const keptSecond = rule && h2 && h2.id !== rule.id ? pickSecond(games, rule, [h2]) : null;
+  const second = rule ? keptSecond ?? pickSecond(games, rule, pool) : null;
 
   return {
     cuts,

@@ -40,8 +40,8 @@ import { matchSplits } from "./splits";
 import { boardWeek, carryStarted, gradeFinished, reviewedThisWeek, rowsFromForecasts } from "./finished";
 import { loadRuleFreeze, refreezeRule, saveRuleFreeze } from "./rule-freeze";
 import { priceShadow } from "./price-shadow";
-import { noteChosen, noteTotalsChosen } from "./chosen-store";
-import { applyForward, totalsForward } from "./forward";
+import { loadChosen, noteChosen, noteTotalsChosen } from "./chosen-store";
+import { applyForward, totalsForward, tryoutHold } from "./forward";
 import { redisStore } from "./learning/store";
 import {
   type BoardGame,
@@ -346,6 +346,16 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
   // the same games.
   const priorWeeks = week ? j.graded.filter((g) => g.week < week) : j.graded;
   let frozen = week ? await loadRuleFreeze(league, season, week) : null;
+  // A rule mid-tryout keeps its tier through the review (forward.ts tryoutHold):
+  // read from the most recent earlier freeze, within 4 weeks.
+  const holdFor = async () => {
+    if (!week) return {};
+    for (let w = week - 1; w >= Math.max(1, week - 4); w--) {
+      const f = await loadRuleFreeze(league, season, w);
+      if (f) return tryoutHold(f.board, priorWeeks, await loadChosen(league, season), week);
+    }
+    return {};
+  };
   // A slate review after the freeze changed the policy: rebuild on the same weeks.
   const stale = !!frozen && !!reviewState && frozen.policyId !== policy.id && reviewState.lastReviewAt > frozen.reviewAt;
   if ((!frozen || stale) && week && reviewState && reviewedThisWeek(league, reviewState.lastReviewAt, new Date())) {
@@ -358,7 +368,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
       reviewAt: reviewState.lastReviewAt,
       policyId: policy.id,
       throughWeek: priorWeeks.length ? Math.max(...priorWeeks.map((g) => g.week)) : null,
-      board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" }),
+      board: strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out", hold: await holdFor() }),
     });
     // A rebuild that couldn't be stored leaves the week's freeze as it was.
     if (stale && !frozen) frozen = before;
@@ -375,7 +385,7 @@ export async function buildPicksCore(league: League): Promise<PicksCore> {
     betKeys,
     league === "cfb" ? { pem: sourceState(policy, "pem") === "veto" } : {},
   );
-  const inForce = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out" });
+  const inForce = frozen?.board ?? strategies(league, priorWeeks, { activated: activatedFor(league, policy.atsCandidates), noPem: sourceState(policy, "pem") === "out", hold: await holdFor() });
   // The forward check (forward.ts): each tier stakes only on its record since
   // it was first chosen, on the same settled weeks the rule is chosen on.
   const chosen = await noteChosen(league, season, week, inForce, !!frozen, issued);

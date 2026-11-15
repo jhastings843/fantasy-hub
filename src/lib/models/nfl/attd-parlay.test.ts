@@ -7,19 +7,26 @@ const game = (slug: string, rows: AttdRow[]): ParlayGame => ({ slug, game: slug,
 const NOW = new Date("2026-11-01T14:00:00Z");
 
 describe("ATTD parlay of the day", () => {
-  it("needs Venom, our lean and a 5-point blended edge; one leg per game, best first", () => {
+  it("needs Venom above break-even and a 5-point edge on OUR number; one leg per game, best first", () => {
     const games = [
-      game("g1", [row("a", 0.55, 100), row("b", 0.6, 100)]), // a: blend .56 gap .06; b: blend .58 gap .08 -> b
-      game("g2", [row("c", 0.52, 120)]), // be .455, blend .515 gap .06
+      game("g1", [row("a", 0.55, 100), row("b", 0.6, 100)]), // a: gap .05; b: gap .10 -> b
+      game("g2", [row("c", 0.52, 120)]), // be .455, gap .065
       game("g3", [row("d", 0.4, 100)]), // ours below break-even: out even though Venom loves him
       game("g4", [row("e", 0.6, 100)]), // not a Venom pick
-      game("g5", [row("f", 0.47, 140)]), // be .417, blend .465 gap .048: under 5 pts
-      game("g6", [row("g", 0.5, 140)]), // blend .5 gap .083
+      game("g5", [row("f", 0.46, 140)]), // be .417, gap .043: under 5 pts
+      game("g6", [row("g", 0.5, 140)]), // gap .083
+      game("g7", [row("h", 0.6, 100)]), // Venom .45 under break-even: out
     ];
-    const venom = new Map([["a", 0.57], ["b", 0.56], ["c", 0.51], ["d", 0.9], ["f", 0.46], ["g", 0.5]]);
+    const venom = new Map([["a", 0.57], ["b", 0.56], ["c", 0.51], ["d", 0.9], ["f", 0.46], ["g", 0.5], ["h", 0.45]]);
     const legs = pickLegs(games, venom);
-    expect(legs.map((l) => l.key)).toEqual(["g", "b", "c"]);
-    expect(legs[1].chance).toBe(0.58);
+    expect(legs.map((l) => l.key)).toEqual(["b", "g", "c"]);
+    expect(legs[0].chance).toBe(0.6);
+  });
+
+  it("a backup Venom loves at a long price no longer qualifies on Venom's number (Holani, Week 10)", () => {
+    // ours .095 at +1200 (be .077): 1.8 pts over on ours, under the 5-pt bar. The old blend (.243) made it a 16.6-pt gap.
+    const legs = pickLegs([game("g1", [row("holani", 0.095, 1200)])], new Map([["holani", 0.39]]));
+    expect(legs).toEqual([]);
   });
 
   it("pools up to 6 legs and needs 2", () => {
@@ -60,9 +67,9 @@ describe("ATTD parlay of the day", () => {
     expect(gradeParlay(p, { g1: { a: null }, g2: { b: null }, g3: { c: null } })).toEqual({ status: "void", net: 0 });
   });
 
-  it("night ticket: 2 legs, same game allowed, blend and ours above break-even, no 5-point bar", () => {
+  it("night ticket: 2 legs, same game allowed, ours and Venom above break-even, no 5-point bar", () => {
     const g = game("chi_sea", [row("a", 0.55, 100), { ...row("b", 0.5, 120), team: "CHI" }, row("c", 0.4, 100), row("d", 0.6, 100), row("e", 0.46, 120)]);
-    // a blend .53 gap .03; b blend .48 gap .025; c ours under .5; d not Venom; e ours .46 > .455 but blend .45 under
+    // a gap .05; b gap .045; c ours under .5; d not Venom; e ours .46 > .455 but Venom .44 under
     const venom = new Map([["a", 0.51], ["b", 0.46], ["c", 0.7], ["e", 0.44]]);
     const pool = pickNightLegs([g], venom);
     expect(pool.map((l) => l.key)).toEqual(["a", "b"]);

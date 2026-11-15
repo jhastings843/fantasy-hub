@@ -27,7 +27,7 @@ export function ParlayPicker({ tickets, tracked, status }: { tickets: Ticket[]; 
         </div>
       )}
       <p className={s.thin}>
-        {`${t.legs.length} legs at ${am(t.price)} · blended chance ${(t.chance * 100).toFixed(1)}% · EV ${ev(t.ev)} per 1u`}
+        {`${t.legs.length} legs at ${am(t.price)} · chance ${(t.chance * 100).toFixed(1)}% · EV ${ev(t.ev)} per 1u`}
         {t.legs.length === tracked ? (status ?? "") : " · not tracked"}
       </p>
       <div className={s.tw}>
@@ -38,7 +38,7 @@ export function ParlayPicker({ tickets, tracked, status }: { tickets: Ticket[]; 
               <th>DK</th>
               <th>Ours</th>
               <th>Venom</th>
-              <th>Blend / DK</th>
+              <th>Chance / DK</th>
             </tr>
           </thead>
           <tbody>

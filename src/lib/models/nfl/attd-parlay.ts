@@ -3,19 +3,26 @@
 //
 // A leg needs all three:
 //   1. Venom picked him (his top 5 for the game) and gives him a chance p.
-//   2. Our chance beats DraftKings' break-even (we lean the same way).
-//   3. The blend, (ours + Venom's) / 2, beats the break-even by ATTD_EDGE (5 pts).
-// Each game's best leg (largest blended gap) makes the pool, games ranked by
-// that gap, up to 6. The page lets Jack pick 2 to 6 legs off the top of the
+//   2. Venom's chance beats DraftKings' break-even (he leans the same way).
+//   3. OUR chance alone beats the break-even by ATTD_EDGE (5 pts).
+// Our number decides (Jack, 2026-11-15). Until then the leg used the blend,
+// (ours + Venom) / 2, which kept picking the same backups (Tinsley, Holani,
+// McLaughlin): Venom rates long-shot backups far above us and the blend
+// turned that into a big fake gap. Weeks 1-9, 548 shared player-games: where
+// Venom ran 15+ pts over us (35), Venom said 36.5%, the blend 26.5%, we said
+// 16.5%, and 8.6% scored. Best log-loss weight on Venom was 0.1; ours alone
+// was as good. So Venom only confirms; the chance shown and used is ours.
+// Each game's best leg (largest gap on our number) makes the pool, games
+// ranked by that gap, up to 6. The page lets Jack pick 2 to 6 legs off the top of the
 // pool (Jack, 2026-11-01); only one ticket is tracked: the leg count the model
-// is most confident in, meaning the best long-run growth at our blended
+// is most confident in, meaning the best long-run growth at our
 // chances (the Kelly growth rate, which weighs the chance of cashing against
 // the payout, so it neither always takes the fewest legs nor the most).
 // Fewer than 2 qualifying games: no parlay that Sunday.
 // One leg per game because legs in the same game move together. A void leg
 // (player sat) drops out and the ticket pays on the rest, as DK does.
 //
-//   ticket(legs with blends 0.58, 0.52, 0.48 at +100, +120, +140)
+//   ticket(legs at our 0.58, 0.52, 0.48 at +100, +120, +140)
 //     -> price +956, chance 0.145, ev +0.53 a unit
 //
 // Pure. Stored and graded in attd-parlay-store.ts.
@@ -30,8 +37,8 @@ export const PARLAY_LEGS = { min: 2, max: 6 };
  * MNF (Jack, 2026-11-02) each get their own 2-leg ticket off that night's
  * game(s), tracked apart. A night slate is usually one game, so its legs can
  * share a game but not a team (Jack, 2026-11-02: two Seattle backs on one
- * ticket split the same carries), and the bar is lower: both our chance and the blend must beat
- * DK's break-even, with no 5-point margin (one game rarely has two 5-point legs).
+ * ticket split the same carries), and the bar is lower: both our chance and Venom's must beat
+ * DK's break-even, with no 5-point margin (one game rarely has two 5-point legs). Chance used: ours.
  * Priced as two singles multiplied; DK's same-game price can differ.
  */
 export type ParlaySlate = "sun" | "tnf" | "mnf";
@@ -49,7 +56,7 @@ export interface ParlayLeg {
   price: number;
   ours: number;
   venom: number;
-  /** (ours + venom) / 2. */
+  /** The chance the ticket uses: ours on tickets built from Nov 15, 2026; (ours + venom) / 2 before. */
   chance: number;
   /** chance minus DK's break-even. */
   gap: number;
@@ -62,9 +69,9 @@ export interface AttdParlay {
   legs: ParlayLeg[];
   /** American price of the ticket (product of the legs). */
   price: number;
-  /** Our blended chance that every leg hits. */
+  /** Our chance that every leg hits (blended with Venom on tickets before Nov 15, 2026). */
   chance: number;
-  /** Expected profit per unit at the blended chances. */
+  /** Expected profit per unit at the ticket's chances. */
   ev: number;
   /** Every qualifying leg, best first; legs is its top slice. Missing on tickets built before Nov 1, 2026 pm. */
   pool?: ParlayLeg[];
@@ -103,17 +110,16 @@ export function pickLegs(games: ParlayGame[], venom: Map<string, number>): Parla
       const v = venom.get(r.key);
       if (r.dk === undefined || v === undefined) continue;
       const be = implied(r.dk);
-      const chance = (r.anytime + v) / 2;
-      const gap = chance - be;
-      if (!(r.anytime > be) || gap < ATTD_EDGE) continue;
-      if (!top || gap > top.gap) top = { slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(chance), gap: r3(gap) };
+      const gap = r.anytime - be;
+      if (!(v > be) || gap < ATTD_EDGE) continue;
+      if (!top || gap > top.gap) top = { slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(r.anytime), gap: r3(gap) };
     }
     if (top) best.push(top);
   }
   return best.sort((a, b) => b.gap - a.gap).slice(0, PARLAY_LEGS.max);
 }
 
-/** A night (TNF/MNF) pool: every Venom pick our model and the blend both put above DK's break-even, best blended gap first, any game. */
+/** A night (TNF/MNF) pool: every Venom pick that we and Venom both put above DK's break-even, best gap on our number first, any game. */
 export function pickNightLegs(games: ParlayGame[], venom: Map<string, number>): ParlayLeg[] {
   const out: ParlayLeg[] = [];
   for (const g of games)
@@ -121,9 +127,8 @@ export function pickNightLegs(games: ParlayGame[], venom: Map<string, number>): 
       const v = venom.get(r.key);
       if (r.dk === undefined || v === undefined) continue;
       const be = implied(r.dk);
-      const chance = (r.anytime + v) / 2;
-      if (!(r.anytime > be) || !(chance > be)) continue;
-      out.push({ slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(chance), gap: r3(chance - be) });
+      if (!(r.anytime > be) || !(v > be)) continue;
+      out.push({ slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(r.anytime), gap: r3(r.anytime - be) });
     }
   out.sort((a, b) => b.gap - a.gap);
   const teams = new Set<string>();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Cut, type GradedGame, type StrategyBoard, gradeGame, key, strategies, tierBoard } from "./engine";
-import { applyForward, backfillEntries, forwardCheck, forwardNote, totalsBackfillEntries, totalsForward, totalsForwardNote, totalsStakes } from "./forward";
+import { applyForward, backfillEntries, forwardCheck, forwardNote, totalsBackfillEntries, totalsForward, totalsForwardNote, totalsStakes, tryoutHold } from "./forward";
 import { type TotalsSeen, totalsCutGames, totalsCuts } from "./totals";
 
 const agree: Cut = { id: "agree", label: "Both agree, any edge", group: "Agreement", test: {}, candidate: true };
@@ -185,5 +185,28 @@ describe("totalsBackfillEntries", () => {
   it("a pinned rule is grandfathered, from its earliest week or this week", () => {
     expect(totalsBackfillEntries([{ week: 8, totalsRule: { id: "t-over" } }], { week: 10, pinned: "t-over" }, "T")["t-over"]).toMatchObject({ week: 8, grandfathered: true });
     expect(totalsBackfillEntries([], { week: 10, pinned: "t-under" }, "T")["t-under"]).toMatchObject({ week: 10, grandfathered: true, source: "today" });
+  });
+});
+
+describe("no swaps mid-tryout (2026-11-15)", () => {
+  const prev = { rule: { ...agree, record: { w: 0, l: 0, p: 0, pct: 0, lo: 0 } } as unknown as StrategyBoard["rule"], second: null };
+  it("holds a rule with 3 of 10 forward games", () => {
+    expect(tryoutHold(prev, run(9, 2, 1), { agree: { week: 9, at: "", tier: "t1" } }, 10)).toEqual({ t1: "agree" });
+  });
+  it("lets the review swap it once 5+ forward games are below break-even", () => {
+    expect(tryoutHold(prev, run(9, 2, 4), { agree: { week: 9, at: "", tier: "t1" } }, 10)).toEqual({});
+  });
+  it("no hold once it has passed, for the grandfathered rule, or when dates can't be read", () => {
+    expect(tryoutHold(prev, run(9, 8, 2), { agree: { week: 9, at: "", tier: "t1" } }, 10)).toEqual({});
+    expect(tryoutHold(prev, run(9, 1, 1), { agree: { week: 9, at: "", tier: "t1", grandfathered: true } }, 10)).toEqual({});
+    expect(tryoutHold(prev, run(9, 1, 1), null, 10)).toEqual({});
+  });
+  it("strategies keeps a held rule over a new top cut while it still qualifies", () => {
+    const history = run(3, 14, 2);
+    const free = strategies("nfl", history);
+    const other = free.cuts.find((c) => c.candidate && c.id !== free.rule!.id && c.record.w + c.record.l >= 10 && c.record.pct > 0.5238);
+    expect(other).toBeDefined();
+    if (!other) return;
+    expect(strategies("nfl", history, { hold: { t1: other.id } }).rule!.id).toBe(other.id);
   });
 });
