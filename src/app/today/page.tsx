@@ -9,7 +9,7 @@ import { ChevronRight } from "lucide-react";
 import { getPicksReport, type PicksReport } from "@/lib/picks/report";
 import { getNbaBoard } from "@/lib/picks/nba-store";
 import { forwardNote, totalsForwardNote, totalsStakes } from "@/lib/picks/forward";
-import { tierStakes } from "@/lib/picks/engine";
+import { matches, tierStakes } from "@/lib/picks/engine";
 import { getNbaPicksView } from "@/lib/picks/nba-track-store";
 import { nbaGameHref, readGame } from "../picks/nba/NbaView";
 import { findGame, scoreboard } from "@/lib/live/espn";
@@ -132,6 +132,53 @@ function footballSlips(r: PicksReport): Slip[] {
     if (!g || g.final || !t.issued) continue;
     const kick = (g.ref ?? g.lastRef)?.kickoff ?? "";
     out.push({ href: `/picks/game?l=${r.league}&g=${encodeURIComponent(`${t.away}@${t.home}`)}`, key: `${r.league}-${t.home}-ou`, awayKey: t.away, homeKey: t.home, logos: { league: r.league, teams: [{ team: g.away, id: (g.ref ?? g.lastRef)?.awayId }, { team: g.home, id: (g.ref ?? g.lastRef)?.homeId }] }, league: LEAGUE_NAME[r.league], pick: `${t.issued.side === "over" ? "Over" : "Under"} ${t.issued.line}`, game: `${n(t.away)} at ${n(t.home)}`, when: kickoffEt(kick), kickoff: kick, state: g.basis === "started" ? "live" : "next", kind: "issued", tier: "Totals rule", stake: t.issued.units, price: t.issued.price });
+  }
+  return out;
+}
+
+/**
+ * Games a tier would take but can't stake yet: a tier on its forward check (a
+ * held game), or the new weekly pick while the old rule stands in for it
+ * (forward.ts standIn). Jack, 2026-11-14: show what it's eyeing, no stake.
+ */
+function watchingSlips(r: PicksReport): Slip[] {
+  const n = (k: string) => r.names[k] ?? k;
+  const st = r.strategies;
+  const si = st.rule?.standInFor;
+  const tryout = si ? st.cuts.find((c) => c.id === si.id) : undefined;
+  const out: Slip[] = [];
+  for (const g of r.board) {
+    if (g.final || g.issued || g.stake || g.basis === "started") continue;
+    const rd = g.read;
+    const side = g.side ?? rd?.side;
+    const ref = g.ref ?? g.lastRef;
+    if (!side || !ref) continue;
+    let tier: string | undefined;
+    let note: string | undefined;
+    if (g.forwardHold) {
+      const f = (g.forwardHold === "t1" ? st.rule : st.second)?.forward;
+      tier = `Fits ${g.forwardHold === "t1" ? "Tier 1" : "Tier 2"}`;
+      note = f?.reason;
+    } else if (tryout && rd?.agree && matches(rd, tryout.test)) {
+      tier = "New Tier 1 on tryout";
+      note = `${tryout.label}: ${si!.forward.n} of 10 tryout games${si!.forward.n ? ` (${si!.forward.w}-${si!.forward.l})` : ""}. ${st.rule!.label} keeps staking until it passes.`;
+    }
+    if (!tier) continue;
+    const kick = ref.kickoff ?? "";
+    out.push({
+      href: `/picks/game?l=${r.league}&g=${encodeURIComponent(`${g.away}@${g.home}`)}`,
+      key: `${r.league}-${g.home}-watch`,
+      logos: { league: r.league, teams: [side === "home" ? { team: g.home, id: ref.homeId } : { team: g.away, id: ref.awayId }] },
+      league: LEAGUE_NAME[r.league],
+      pick: side === "home" ? `${n(g.home)} ${line(ref.line)}` : `${n(g.away)} ${line(-ref.line)}`,
+      game: `${n(g.away)} at ${n(g.home)}`,
+      when: kickoffEt(kick),
+      kickoff: kick,
+      state: "next",
+      kind: "tracked",
+      tier,
+      note,
+    });
   }
   return out;
 }
@@ -344,6 +391,7 @@ export default async function TodayPage() {
     })
     .filter((x) => x.pick);
 
+  const watching = reports.flatMap(watchingSlips).sort((a, b) => a.kickoff.localeCompare(b.kickoff));
   const live = [...football.filter((x) => x.state === "live"), ...nbaLive, ...staked.filter((x) => x.state === "live")];
   const liveSorted = [...live.filter((x) => x.kind === "issued"), ...live.filter((x) => x.kind !== "issued")];
   const next = [...football.filter((x) => x.state === "next"), ...staked.filter((x) => x.state === "next")].sort((a, b) => a.kickoff.localeCompare(b.kickoff));
@@ -440,6 +488,13 @@ export default async function TodayPage() {
             {next.some((x) => x.note === READY_NOTE) && <p className="mt-3 text-xs leading-relaxed text-hh-muted">{`"Not sent" bets: ${READY_NOTE.replace("Not sent yet: it", "each")}`}</p>}
             {next.some((x) => x.note?.startsWith("Early look")) && <p className="mt-2 text-xs leading-relaxed text-hh-muted">An early look is sized now and locks at that morning&apos;s price, the time shown in gold.</p>}
           </Section>
+          {watching.length > 0 && (
+            <Section id="t-watch" label="Watching, no stake" aside={<Num>{`${watching.length} ${watching.length === 1 ? "game" : "games"}`}</Num>}>
+              <p className="mb-2 text-xs leading-relaxed text-hh-muted">Games a tier would take but can&apos;t stake yet, because that tier is still proving itself on games after it was picked. Shown so you can see what it&apos;s eyeing.</p>
+              {watching.slice(0, 12).map((x) => <BetRow key={x.key} x={x} />)}
+              {watching.length > 12 && <p className="mt-2 text-xs text-hh-muted">{`And ${watching.length - 12} more on the Bets page.`}</p>}
+            </Section>
+          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-8">

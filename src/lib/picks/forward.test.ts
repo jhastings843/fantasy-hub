@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Cut, type GradedGame, type StrategyBoard, gradeGame, key, strategies, tierBoard } from "./engine";
-import { applyForward, backfillEntries, forwardCheck, totalsBackfillEntries, totalsForward, totalsForwardNote, totalsStakes } from "./forward";
+import { applyForward, backfillEntries, forwardCheck, forwardNote, totalsBackfillEntries, totalsForward, totalsForwardNote, totalsStakes } from "./forward";
 import { type TotalsSeen, totalsCutGames, totalsCuts } from "./totals";
 
 const agree: Cut = { id: "agree", label: "Both agree, any edge", group: "Agreement", test: {}, candidate: true };
@@ -72,6 +72,41 @@ describe("a tier that fails the check stakes nowhere", () => {
   });
   it("unreadable dates fail closed", () => {
     expect(applyForward(board, history, null, 10).rule!.forward!.stake).toBe(false);
+  });
+});
+
+describe("the previous Tier 1 stands in while a new pick does its check (2026-11-14)", () => {
+  const history = run(3, 14, 2);
+  const board = strategies("nfl", history);
+  const row = { home: "NE", away: "NYJ", sam: { market: -3, model: -6 }, david: { market: -3, model: -7 }, ref: { line: -3, homePrice: -110, awayPrice: -110, source: "test", fetchedAt: "2026-11-01T00:00:00Z" } };
+  // Some winning cut other than the weekly pick, recorded as the old grandfathered rule.
+  const old = board.cuts.find((c) => c.id !== board.rule!.id && c.record.pct > 0.6 && c.games > 0)!;
+  const newPick = { [board.rule!.id]: { week: 10, at: "", tier: "t1" as const } };
+
+  it("the old rule keeps staking, and the board says which pick it stands in for", () => {
+    const b = applyForward(board, history, { ...newPick, [old.id]: { week: 3, at: "", tier: "t1", grandfathered: true } }, 10);
+    expect(b.rule!.id).toBe(old.id);
+    expect(b.rule!.forward!.stake).toBe(true);
+    expect(b.rule!.standInFor).toMatchObject({ id: board.rule!.id, forward: { n: 0, stake: false } });
+    expect(forwardNote(b)).toContain(`${old.label} stays on while the new pick, ${board.rule!.label}, does its forward check (0 of 10 games)`);
+  });
+  it("no stand-in once the new pick passes", () => {
+    const b = applyForward(board, history, { [board.rule!.id]: { week: 3, at: "", tier: "t1" }, [old.id]: { week: 2, at: "", tier: "t1", grandfathered: true } }, 10);
+    expect(b.rule!.id).toBe(board.rule!.id);
+    expect(b.rule!.standInFor).toBeUndefined();
+  });
+  it("an old rule below break-even does not stand in: the new pick's games stay tracked", () => {
+    const loser = board.cuts.find((c) => c.id !== board.rule!.id && c.record.pct < 0.5238);
+    if (!loser) return;
+    const b = applyForward(board, history, { ...newPick, [loser.id]: { week: 3, at: "", tier: "t1", grandfathered: true } }, 10);
+    expect(b.rule!.id).toBe(board.rule!.id);
+    expect(b.rule!.forward!.stake).toBe(false);
+    expect(tierBoard("nfl", [row], b)[0].forwardHold).toBe("t1");
+  });
+  it("no recorded old rule: tracked as before", () => {
+    const b = applyForward(board, history, newPick, 10);
+    expect(b.rule!.id).toBe(board.rule!.id);
+    expect(b.rule!.forward!.stake).toBe(false);
   });
 });
 

@@ -439,6 +439,8 @@ export interface CutResult extends Cut {
   activated?: boolean;
   /** Rule and Tier 2 only: its record since it was first chosen, and whether that lets it stake (forward.ts). */
   forward?: ForwardCheck;
+  /** Set when this cut is the previous Tier 1 standing in while the weekly pick (`standInFor`) does its forward check (forward.ts standIn). */
+  standInFor?: { id: string; label: string; forward: ForwardCheck };
 }
 
 /** Tier 2: judged only on the games it adds outside Tier 1. */

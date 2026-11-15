@@ -14,7 +14,7 @@
 // the tier's record is: the rule on every game it takes, Tier 2 only on the
 // games it adds outside the rule (pickSecond).
 
-import { BREAK_EVEN, type Cut, type GradedGame, MIN_SAMPLE, type Result, type StrategyBoard, cutResult } from "./engine";
+import { BREAK_EVEN, type Cut, type CutResult, type GradedGame, MIN_SAMPLE, type Result, type StrategyBoard, cutResult } from "./engine";
 
 /** When a cut was first chosen as Tier 1 or Tier 2 (chosen-store.ts). */
 export interface Chosen {
@@ -86,12 +86,39 @@ export function forwardJudge(games: { week: number; result?: Result }[], firstCh
 }
 
 /**
+ * Owner's call (2026-11-14): a rule swap must not switch staking off. While the
+ * weekly pick is still in its forward check (fewer than 10 forward games, not
+ * failed), the previous Tier 1 keeps the job if it still stakes on its own
+ * forward check and its season record is at or above break-even. The rule
+ * that was in force when the check went in (grandfathered) is preferred, then
+ * the most recently chosen. The weekly pick keeps being graded on every game
+ * it would have taken (forwardCheck reads graded games, not issued bets), so
+ * it takes over the week it passes. Returns null when nothing qualifies.
+ */
+export function standIn(s: StrategyBoard, picked: CutResult & { forward: ForwardCheck }, games: GradedGame[], chosen: ChosenMap, currentWeek: number | null): (CutResult & { forward: ForwardCheck }) | null {
+  if (picked.forward.stake || picked.forward.n >= MIN_SAMPLE) return null;
+  const pickedWeek = chosen[picked.id]?.week ?? currentWeek ?? Infinity;
+  const prior = Object.entries(chosen)
+    .filter(([id, c]) => c.tier === "t1" && id !== picked.id && (c.grandfathered || c.week <= pickedWeek))
+    .sort(([, a], [, b]) => Number(!!b.grandfathered) - Number(!!a.grandfathered) || b.week - a.week);
+  for (const [id, c] of prior) {
+    const cut = s.cuts.find((x) => x.id === id);
+    if (!cut || cut.record.pct < BREAK_EVEN) continue;
+    const forward = forwardCheck(cut, c, games, currentWeek);
+    if (!forward.stake) continue;
+    return { ...cut, forward, standInFor: { id: picked.id, label: picked.label, forward: picked.forward } };
+  }
+  return null;
+}
+
+/**
  * The board with each tier's forward check attached. `chosen` null means the
  * dates couldn't be read: both tiers are tracked (fail closed, real money).
  */
 export function applyForward(s: StrategyBoard, games: GradedGame[], chosen: ChosenMap | null, currentWeek: number | null): StrategyBoard {
   const unread: ForwardCheck = { stake: false, n: 0, w: 0, l: 0, since: currentWeek ?? 0, grandfathered: false, reason: "Could not read when this cut was chosen: tracked." };
-  const rule = s.rule ? { ...s.rule, forward: chosen ? forwardCheck(s.rule, chosen[s.rule.id], games, currentWeek) : unread } : null;
+  const picked = s.rule ? { ...s.rule, forward: chosen ? forwardCheck(s.rule, chosen[s.rule.id], games, currentWeek) : unread } : null;
+  const rule = picked && chosen ? standIn(s, picked, games, chosen, currentWeek) ?? picked : picked;
   const outside = s.rule ? games.filter((g) => cutResult(g, s.rule!) === undefined) : games;
   const second = s.second ? { ...s.second, forward: chosen ? forwardCheck(s.second, chosen[s.second.id], outside, currentWeek) : unread } : null;
   return { ...s, rule, second };
@@ -99,7 +126,11 @@ export function applyForward(s: StrategyBoard, games: GradedGame[], chosen: Chos
 
 /** One short plain line on both tiers' forward checks, or "" when neither has one. */
 export function forwardNote(s: Pick<StrategyBoard, "rule" | "second">): string {
-  return [s.rule?.forward ? `Tier 1: ${s.rule.forward.reason}` : "", s.second?.forward ? `Tier 2: ${s.second.forward.reason}` : ""].filter(Boolean).join(" ");
+  const si = s.rule?.standInFor;
+  const t1 = si
+    ? `Tier 1: ${s.rule!.label} stays on while the new pick, ${si.label}, does its forward check (${si.forward.n} of ${MIN_SAMPLE} games${si.forward.n ? `, ${recOf(si.forward.w, si.forward.l)}` : ""}).`
+    : s.rule?.forward ? `Tier 1: ${s.rule.forward.reason}` : "";
+  return [t1, s.second?.forward ? `Tier 2: ${s.second.forward.reason}` : ""].filter(Boolean).join(" ");
 }
 
 /** Board wording for a game whose tier failed its forward check. */
