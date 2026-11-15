@@ -621,8 +621,9 @@ export interface Satellite {
   notes: string[];
   /** Empty until site-watch adds ideas.json. */
   ideas?: SatelliteIdea[];
-  /** What the open bets would sell for now (at the bid); equity = cash + openValue. Missing before 2026-11-14 evening. */
+  /** What the open bets would sell for now (at the bid). Since 2026-11-14 night equity = cash + openCost (open bets at cost, `marking: "cost"`). */
   openValue?: number;
+  marking?: "cost" | "bid";
   openFees?: number;
   /** One card per market question, with its evidence (site-watch satdesk/evidence.py). Missing before 2026-11-14 evening. */
   events?: SatelliteEvent[];

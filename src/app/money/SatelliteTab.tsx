@@ -43,20 +43,19 @@ export function WeatherTotalHero({ d, w }: { d: Satellite; w: Weather | null | u
   const sat = d.equity - d.bankroll;
   const daily = w ? w.equity - w.start : 0;
   const total = sat + daily;
-  const openValue = d.openValue ?? d.equity - d.cash;
-  const gap = d.openCost - openValue;
+  const openValue = d.openValue ?? d.openCost;
   return (
     <>
       <DeskHero
         eyebrow="Weather · two paper books · satellite markets and daily highs"
         title={<>{"Weather: "}<span className={total >= 0 ? s.up : s.down}>{usd(total, true)}</span></>}
-        sub={`Satellite desk ${usd(sat, true)}, daily highs ${w ? usd(daily, true) : "not posted"}. Open satellite bets are counted at what they would sell for today, which is below what they cost until they settle.`}
+        sub={`Satellite desk ${usd(sat, true)}, daily highs ${w ? usd(daily, true) : "not posted"}. Open satellite bets count at what they cost until they settle or the desk sells them, so the satellite number moves with results and fees, not with daily price wiggles.`}
       />
       <Stats
         label="Weather at a glance"
         items={[
           { k: "Satellite desk", v: usd(sat, true), sub: d.settled ? `${d.wins}-${d.settled - d.wins} settled, ${usd(d.realizedPnl, true)}` : "nothing settled yet", tone: sat > 0 ? "up" : sat < 0 ? "down" : undefined },
-          { k: "Open satellite bets", v: usd(d.openCost), sub: `worth ${usd(openValue)} if sold now (${usd(gap)} buy/sell gap), ${usd(d.openFees ?? d.fees)} fees` },
+          { k: "Open satellite bets", v: usd(d.openCost), sub: `at cost; ${usd(openValue)} if sold right now. ${usd(d.fees)} fees paid` },
           ...(w ? [{ k: "Daily highs", v: usd(daily, true), sub: `${w.record.won}-${w.record.settled - w.record.won} settled`, tone: (daily > 0 ? "up" : daily < 0 ? "down" : undefined) as "up" | "down" | undefined }] : []),
         ]}
       />
