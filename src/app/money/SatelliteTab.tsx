@@ -1,4 +1,4 @@
-import type { Satellite, SatelliteBet, SatelliteCalRow, SatelliteSignal, SatelliteSite } from "@/lib/money/types";
+import type { Satellite, SatelliteBet, SatelliteCalRow, SatelliteEvent, SatelliteSignal, SatelliteSite, Weather } from "@/lib/money/types";
 import { LineChart } from "./Chart";
 import { DeskHero, Stats } from "./desks";
 import s from "../picks/picks.module.css";
@@ -21,10 +21,6 @@ const shortDay = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLo
 const t = (iso: string) => Date.parse(`${iso.slice(0, 10)}T16:00:00Z`);
 const tidy = (x: string) => x.replace(/\s+/g, " ").trim();
 const VENUE = { kalshi: "Kalshi", polymarket: "Polymarket" } as const;
-const FAMILY: Record<SatelliteSignal["family"], { name: string; about: string }> = {
-  "global-temp": { name: "Temperature", about: "Monthly and yearly global temperature records, read from ERA5 satellite reanalysis ahead of the NOAA and NASA releases that settle them." },
-  "sea-ice": { name: "Sea ice", about: "The Arctic sea ice winter peak, from NSIDC's daily satellite extent." },
-};
 
 function satelliteChart(d: Satellite, height?: number, width?: number) {
   const pts = (d.curve ?? []).map((c) => ({ x: t(c.day), y: c.equity }));
@@ -42,6 +38,33 @@ function satelliteChart(d: Satellite, height?: number, width?: number) {
   );
 }
 
+/** Weather's headline (2026-11-14): the satellite desk and the daily-high desk as one number, each shown apart below it. */
+export function WeatherTotalHero({ d, w }: { d: Satellite; w: Weather | null | undefined }) {
+  const sat = d.equity - d.bankroll;
+  const daily = w ? w.equity - w.start : 0;
+  const total = sat + daily;
+  const openValue = d.openValue ?? d.equity - d.cash;
+  const gap = d.openCost - openValue;
+  return (
+    <>
+      <DeskHero
+        eyebrow="Weather · two paper books · satellite markets and daily highs"
+        title={<>{"Weather: "}<span className={total >= 0 ? s.up : s.down}>{usd(total, true)}</span></>}
+        sub={`Satellite desk ${usd(sat, true)}, daily highs ${w ? usd(daily, true) : "not posted"}. Open satellite bets are counted at what they would sell for today, which is below what they cost until they settle.`}
+      />
+      <Stats
+        label="Weather at a glance"
+        items={[
+          { k: "Satellite desk", v: usd(sat, true), sub: d.settled ? `${d.wins}-${d.settled - d.wins} settled, ${usd(d.realizedPnl, true)}` : "nothing settled yet", tone: sat > 0 ? "up" : sat < 0 ? "down" : undefined },
+          { k: "Open satellite bets", v: usd(d.openCost), sub: `worth ${usd(openValue)} if sold now (${usd(gap)} buy/sell gap), ${usd(d.openFees ?? d.fees)} fees` },
+          ...(w ? [{ k: "Daily highs", v: usd(daily, true), sub: `${w.record.won}-${w.record.settled - w.record.won} settled`, tone: (daily > 0 ? "up" : daily < 0 ? "down" : undefined) as "up" | "down" | undefined }] : []),
+        ]}
+      />
+    </>
+  );
+}
+
+/** Kept for the one-day-old Satellite tab tests; Weather uses WeatherTotalHero. */
 export function SatelliteHero({ d }: { d: Satellite }) {
   const pnl = d.equity - d.bankroll;
   const open = (d.bets ?? []).filter((b) => b.status === "open").length;
@@ -54,130 +77,132 @@ export function SatelliteHero({ d }: { d: Satellite }) {
   );
 }
 
-/* What it sees: one table per family. A market's long title shows once, above its first row. */
+/* Markets: one short line per question; click for the reasoning, the satellite evidence and every level. */
 
-function SignalTable({ rows }: { rows: SatelliteSignal[] }) {
-  // Sea ice titles differ only in the threshold, so compare with the numbers taken out.
-  const key = (x: SatelliteSignal) => tidy(x.title).replace(/[\d.]+/g, "#");
+const xOf = (k: string, monthly?: boolean) => Date.parse(monthly ? `${k}-15T12:00:00Z` : `${k}T12:00:00Z`);
+
+function EvidenceChart({ e }: { e: SatelliteEvent }) {
+  if (!e.series?.length || !e.series[0].points.length) return null;
+  const ice = e.family === "sea-ice";
+  const line = e.lines?.[0];
   return (
-    <div className={m.scroll}><table className={s.table}>
-      <thead>
-        <tr><th>Market</th><th>Model</th><th>Price (yes)</th><th>Best edge</th><th>Action</th></tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => {
-          const head = i === 0 || key(rows[i - 1]) !== key(r);
-          const bid = r.yesBid != null ? cents(r.yesBid) : "·";
-          const ask = r.yesAsk != null ? cents(r.yesAsk) : "·";
-          return (
-            <tr key={r.id}>
-              <td>
-                {head && <span className={m.satTitle}>{`${tidy(r.title)} (${VENUE[r.venue]})`}</span>}
-                <a className={m.satLink} href={r.url} target="_blank" rel="noreferrer">{r.label}</a>
-              </td>
-              <td className={s.num}>{chance(r.p)}</td>
-              <td className={`${s.num} ${s.muted}`}>{`${bid} to ${ask}`}</td>
-              <td className={`${s.num} ${r.best ? tone(r.best.edge) : s.muted}`}>
-                {r.best ? `${r.best.side === "yes" ? "Yes" : "No"} at ${cents(r.best.ask)}, ${r.best.edge >= 0 ? "+" : "-"}${Math.abs(r.best.edge * 100).toFixed(1)}¢` : "·"}
-              </td>
-              <td title={r.why}>
-                {r.action === "bet" ? <span className={`${m.tag} ${m.tagOpen}`}>Bet</span>
-                  : r.action === "already holding" ? <span className={m.tag}>Holding</span>
-                  : <span className={s.muted}>{r.action}</span>}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table></div>
+    <figure className={m.satFigure}>
+      <LineChart
+        series={e.series.map((x, i) => ({ label: x.label, points: x.points.map(([k, v]) => ({ x: xOf(k, x.monthly), y: v })), tone: i === 0 ? (line ? "auto" : "pos") : "mute" }))}
+        baseline={line?.value}
+        format={(y) => (ice ? `${y.toFixed(1)}M` : `${y >= 0 ? "+" : ""}${y.toFixed(2)}`)}
+        height={180}
+        width={560}
+        ariaLabel={e.series[0].label}
+      />
+      <figcaption>
+        {ice
+          ? `Arctic sea ice extent since Sep 1, million km2: this year (solid) against the last three years (dashed).`
+          : `${e.series[0].label}${line ? `. Dotted line: ${line.label.charAt(0).toLowerCase()}${line.label.slice(1)}` : ""}.`}
+      </figcaption>
+    </figure>
   );
 }
 
-function Signals({ d }: { d: Satellite }) {
-  const sig = d.signals ?? [];
-  const families = (["global-temp", "sea-ice"] as const).filter((f) => sig.some((x) => x.family === f));
-  const bets = sig.filter((x) => x.action === "bet").length;
+function worthNow(b: SatelliteBet, sig: SatelliteSignal | undefined) {
+  if (!sig) return null;
+  const bid = b.side === "yes" ? sig.yesBid : sig.yesAsk != null ? 1 - sig.yesAsk : null;
+  return bid != null ? b.contracts * bid : null;
+}
+
+function MarketCard({ e, d }: { e: SatelliteEvent; d: Satellite }) {
+  const sigs = (d.signals ?? []).filter((x) => e.levels.includes(x.id));
+  const bets = (d.bets ?? []).filter((b) => e.bets.includes(b.id));
+  const open = bets.filter((b) => b.status === "open");
+  const status = open.length ? `${open.length} ${open.length === 1 ? "bet" : "bets"}` : bets.length ? "settled" : "watching";
   return (
-    <details className={`${m.panel} ${m.fold}`} open>
+    <details className={`${m.panel} ${m.fold}`}>
       <summary className={m.foldHead}>
-        <h2 className={m.panelTitle}>What it sees</h2>
-        <span className={m.foldMeta}>{`${sig.length} markets, ${bets} worth a bet`}</span>
+        <span className={m.satCardHead}>
+          <span className={m.panelTitle}>{e.question ?? tidy(e.title)}</span>
+          <span className={m.satRead}><span className={`${m.tag} ${open.length ? m.tagOpen : ""}`}>{status}</span>{e.read}</span>
+        </span>
       </summary>
-      <p className={m.sub}>
-        {`Model is the desk's chance the market settles yes. Price is what yes sells for now (bid to ask). Best edge is the cheaper side to buy and how far the desk's chance beats its price. It bets at ${cents(d.rules.minEdge)} or more.`}
-        {d.notes?.length ? ` Data: ${d.notes.join(", ")}.` : ""}
-      </p>
-      {families.length ? families.map((f) => (
-        <div key={f} className={m.satGroup}>
-          <h3 className={m.subHead}>{FAMILY[f].name}</h3>
-          <p className={m.sub}>{FAMILY[f].about}</p>
-          <SignalTable rows={sig.filter((x) => x.family === f)} />
+      <ul className={m.satFacts}>{e.facts.map((f) => <li key={f}>{f}</li>)}</ul>
+      <EvidenceChart e={e} />
+      {e.images?.length > 0 && (
+        <div className={m.satPhotos}>
+          {e.images.map((im) => (
+            <figure key={im.url} className={`${m.satPhoto} ${m.satMap}`}>
+              {/* External NSIDC satellite maps, not set up for next/image. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={im.url} alt={im.caption} loading="lazy" width={420} height={500} />
+              <figcaption>{im.caption}</figcaption>
+            </figure>
+          ))}
         </div>
-      )) : <p className={m.sub}>No markets priced on the last run.</p>}
+      )}
+      {open.length > 0 && (
+        <div className={m.scroll}><table className={s.table}>
+          <thead><tr><th>Our bet</th><th>Cost</th><th>Worth now</th><th>Our chance</th></tr></thead>
+          <tbody>
+            {bets.map((b) => {
+              const now = worthNow(b, sigs.find((x) => x.ticker === b.ticker));
+              return (
+                <tr key={b.id}>
+                  <td><a className={m.satLink} href={b.url} target="_blank" rel="noreferrer">{`${b.side === "yes" ? "Yes" : "No"} on ${b.label}`}</a><span className={m.satWhy}>{`${b.contracts.toLocaleString("en-US")} at ${cents(b.price)}`}</span></td>
+                  <td className={s.num}>{usd(b.cost + b.fee)}</td>
+                  <td className={s.num}>{b.status === "open" ? (now != null ? usd(now) : "·") : <span className={tone(b.pnl ?? 0)}>{`${b.status === "won" ? "Won" : "Lost"} ${usd(b.pnl ?? 0, true)}`}</span>}</td>
+                  <td className={s.num}>{chance(b.p)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      )}
+      <details className={m.satLevels}>
+        <summary>{`All ${sigs.length} ${sigs.length === 1 ? "price" : "prices"} we check (${VENUE[e.venue]})`}</summary>
+        <div className={m.scroll}><table className={s.table}>
+          <thead><tr><th>Market</th><th>Our chance (yes)</th><th>Price (yes)</th><th>Best edge</th></tr></thead>
+          <tbody>
+            {sigs.map((r) => (
+              <tr key={r.id}>
+                <td><a className={m.satLink} href={r.url} target="_blank" rel="noreferrer">{r.label}</a></td>
+                <td className={s.num}>{chance(r.p)}</td>
+                <td className={`${s.num} ${s.muted}`}>{`${r.yesBid != null ? cents(r.yesBid) : "·"} to ${r.yesAsk != null ? cents(r.yesAsk) : "·"}`}</td>
+                <td className={`${s.num} ${r.best ? tone(r.best.edge) : s.muted}`}>{r.best ? `${r.best.side === "yes" ? "Yes" : "No"} ${r.best.edge >= 0 ? "+" : "-"}${Math.abs(r.best.edge * 100).toFixed(1)}¢` : "·"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p className={s.thin}>{`Best edge: the cheaper side to buy and how far our chance beats its price after fees. It bets at ${cents(d.rules.minEdge)} or more.`}</p>
+      </details>
     </details>
   );
 }
 
-/* Bets */
-
-function BetTable({ rows }: { rows: SatelliteBet[] }) {
+function Markets({ d }: { d: Satellite }) {
+  const ev = d.events ?? [];
+  if (!ev.length) return <p className={m.sub}>No markets priced on the last run.</p>;
   return (
-    <div className={m.scroll}><table className={s.table}>
-      <thead>
-        <tr><th>Bet</th><th>Price</th><th>Contracts</th><th>Cost</th><th>Chance</th><th>Edge</th><th>Result</th></tr>
-      </thead>
-      <tbody>
-        {rows.map((b) => (
-          <tr key={b.id}>
-            <td>
-              <a className={m.satLink} href={b.url} target="_blank" rel="noreferrer">{`${b.side === "yes" ? "Yes" : "No"}: ${b.label}`}</a>
-              <span className={m.satWhy}>{`${tidy(b.title)} (${VENUE[b.venue]}). ${b.why}`}</span>
-            </td>
-            <td className={s.num}>{cents(b.price)}</td>
-            <td className={s.num}>{b.contracts.toLocaleString("en-US")}</td>
-            <td className={s.num}>{usd(b.cost + b.fee)}</td>
-            <td className={s.num}>{chance(b.p)}</td>
-            <td className={`${s.num} ${tone(b.edge)}`}>{`${b.edge >= 0 ? "+" : "-"}${Math.abs(b.edge * 100).toFixed(1)}¢`}</td>
-            <td className={s.num}>
-              {b.status === "open"
-                ? <span className={m.tag}>Open</span>
-                : <span className={tone(b.pnl ?? 0)}>{`${b.status === "won" ? "Won" : "Lost"} ${b.pnl !== undefined ? usd(b.pnl, true) : ""}`.trim()}</span>}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table></div>
+    <div className={m.satMarkets}>
+      <div className={m.venueHead}>
+        <h2 className={s.h2}>Satellite markets</h2>
+        <span className={m.foldMeta}>{`${ev.length} questions, settled by satellite-measured numbers. Tap one for the reasoning.`}</span>
+      </div>
+      {ev.map((e) => <MarketCard key={e.event} e={e} d={d} />)}
+    </div>
   );
 }
 
-function Bets({ d }: { d: Satellite }) {
-  const all = d.bets ?? [];
-  const open = all.filter((b) => b.status === "open");
-  const done = all.filter((b) => b.status !== "open");
+function Settled({ d }: { d: Satellite }) {
+  const done = (d.bets ?? []).filter((b) => b.status !== "open");
+  if (!done.length) return null;
   return (
-    <>
-      <details className={`${m.panel} ${m.fold}`} open>
-        <summary className={m.foldHead}>
-          <h2 className={m.panelTitle}>Open bets</h2>
-          <span className={m.foldMeta}>{`${open.length}, ${usd(d.openCost)} staked`}</span>
-        </summary>
-        {open.length ? (
-          <>
-            <p className={m.sub}>Cost includes the exchange fee. Chance is the desk&apos;s chance this side wins; edge is that chance minus the price paid.</p>
-            <BetTable rows={open} />
-          </>
-        ) : <p className={m.sub}>Nothing open. It bets when a market clears the edge bar.</p>}
-      </details>
-      {done.length > 0 && (
-        <details className={`${m.panel} ${m.fold}`}>
-          <summary className={m.foldHead}>
-            <h2 className={m.panelTitle}>Settled</h2>
-            <span className={m.foldMeta}>{`${d.wins}-${d.settled - d.wins}, ${usd(d.realizedPnl, true)}`}</span>
-          </summary>
-          <BetTable rows={done} />
-        </details>
-      )}
-    </>
+    <details className={`${m.panel} ${m.fold}`}>
+      <summary className={m.foldHead}>
+        <h2 className={m.panelTitle}>Settled satellite bets</h2>
+        <span className={m.foldMeta}>{`${d.wins}-${d.settled - d.wins}, ${usd(d.realizedPnl, true)}`}</span>
+      </summary>
+      <ul className={m.satFacts}>
+        {done.map((b) => <li key={b.id}><span className={tone(b.pnl ?? 0)}>{`${b.status === "won" ? "Won" : "Lost"} ${usd(b.pnl ?? 0, true)}`}</span>{`: ${b.side === "yes" ? "Yes" : "No"} on ${b.label} (${tidy(b.title)})`}</li>)}
+      </ul>
+    </details>
   );
 }
 
@@ -333,26 +358,18 @@ function Ideas({ d }: { d: Satellite }) {
 }
 
 export function SatelliteTab({ d }: { d: Satellite }) {
-  const pnl = d.equity - d.bankroll;
-  const open = (d.bets ?? []).filter((b) => b.status === "open").length;
   return (
     <section className={s.section}>
-      <Stats
-        label="Satellite desk at a glance"
-        items={[
-          { k: "Bankroll", v: usd(d.equity), sub: `${usd(pnl, true)} from ${usd(d.bankroll)}`, tone: pnl > 0 ? "up" : pnl < 0 ? "down" : undefined },
-          { k: "Record", v: `${d.wins}-${d.settled - d.wins}`, sub: d.settled ? `${usd(d.realizedPnl, true)} settled` : "nothing settled yet" },
-          { k: "Open", v: usd(d.openCost), sub: `${open} ${open === 1 ? "bet" : "bets"}, ${usd(d.cash)} cash` },
-          { k: "Fees paid", v: usd(d.fees), sub: "exchange fees, in the cost above" },
-        ]}
-      />
-      <div className={m.panel}>
-        <h2 className={m.panelTitle}>Bankroll</h2>
-        {satelliteChart(d, 220, 640)}
-      </div>
-      <Signals d={d} />
-      <Bets d={d} />
+      <Markets d={d} />
+      <Settled d={d} />
       <Sites d={d} />
+      <details className={`${m.panel} ${m.fold}`}>
+        <summary className={m.foldHead}>
+          <h2 className={m.panelTitle}>Satellite bankroll</h2>
+          <span className={m.foldMeta}>{`${usd(d.equity)} of ${usd(d.bankroll)}`}</span>
+        </summary>
+        {satelliteChart(d, 220, 640)}
+      </details>
       <Grading d={d} />
       <Ideas d={d} />
     </section>

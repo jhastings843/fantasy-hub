@@ -621,6 +621,31 @@ export interface Satellite {
   notes: string[];
   /** Empty until site-watch adds ideas.json. */
   ideas?: SatelliteIdea[];
+  /** What the open bets would sell for now (at the bid); equity = cash + openValue. Missing before 2026-11-14 evening. */
+  openValue?: number;
+  openFees?: number;
+  /** One card per market question, with its evidence (site-watch satdesk/evidence.py). Missing before 2026-11-14 evening. */
+  events?: SatelliteEvent[];
+}
+
+/** One market question on the Weather page: the read, the satellite evidence and its levels and bets (by id). */
+export interface SatelliteEvent {
+  event: string;
+  family: "global-temp" | "sea-ice";
+  venue: "kalshi" | "polymarket";
+  url?: string;
+  title: string;
+  question?: string;
+  read: string;
+  facts: string[];
+  /** Daily (or monthly) readings; x is an ISO day or "YYYY-MM". The first series is the subject. */
+  series: { label: string; points: [string, number][]; monthly?: boolean }[];
+  /** Horizontal reference lines on the chart, in the series' units. */
+  lines?: { label: string; value: number }[];
+  images: { url: string; caption: string }[];
+  /** Signal ids and bet ids that belong to this question. */
+  levels: string[];
+  bets: string[];
 }
 
 /** Graded breakouts: count, average result in R (1R = the planned loss), share that made money, t-stat. */

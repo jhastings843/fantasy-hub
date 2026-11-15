@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { satelliteDesk } from "@/app/money/desks";
-import { SatelliteHero, SatelliteTab } from "@/app/money/SatelliteTab";
+import { satelliteDesk, weatherTotalDesk } from "@/app/money/desks";
+import { SatelliteTab, WeatherTotalHero } from "@/app/money/SatelliteTab";
 import { satelliteFixture } from "./satellite.fixture";
 import { isSnapshot, type MoneySnapshot, type Satellite } from "./types";
 
@@ -25,15 +25,22 @@ describe("satellite desk", () => {
     expect(satelliteDesk(later)).toMatchObject({ read: "Up", readTone: "good", rec: "15-9" });
   });
 
+  it("adds both weather books into one overview row", () => {
+    const f = satelliteFixture;
+    const row = weatherTotalDesk(null, f)!;
+    expect(row).toMatchObject({ id: "weather", name: "Weather", result: `-$${(f.bankroll - f.equity).toFixed(2)}` });
+    expect(weatherTotalDesk(null, null)).toBeNull();
+  });
+
   it("renders the tab from the real status.json", () => {
-    const html = renderToStaticMarkup(createElement("div", null, createElement(SatelliteHero, { d: satelliteFixture }), createElement(SatelliteTab, { d: satelliteFixture })));
-    for (const text of ["What it sees", "Temperature", "Sea ice", "Open bets", "Site watch", "How it is graded", "Above 14.2 million sq km", "NOT FOUND yet"]) expect(html).toContain(text);
+    const html = renderToStaticMarkup(createElement("div", null, createElement(WeatherTotalHero, { d: satelliteFixture, w: null }), createElement(SatelliteTab, { d: satelliteFixture })));
+    for (const text of ["Weather: ", "Satellite markets", "Arctic sea ice", "warmest November", "Above 14.2 million sq km", "Site watch", "How it is graded", "NOT FOUND yet", "nsidc.org"]) expect(html).toContain(text);
     expect(html).toContain('loading="lazy"');
     expect(html).not.toContain("—"); // no em dashes in copy
   });
 
   it("renders a sparse satellite without crashing", () => {
     const bare = { ...satelliteFixture, signals: [], bets: [], sites: [], ideas: undefined, calibration: null, curve: [] } as Satellite;
-    expect(renderToStaticMarkup(createElement(SatelliteTab, { d: bare }))).toContain("Nothing open");
+    expect(renderToStaticMarkup(createElement(SatelliteTab, { d: { ...bare, events: [] } }))).toContain("No markets priced");
   });
 });

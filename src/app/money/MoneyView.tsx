@@ -12,7 +12,7 @@ import m from "./money.module.css";
 import { Term } from "./Term";
 import { IntradayHero, IntradayTab } from "./IntradayTab";
 import { OptionsHero, OptionsTab } from "./OptionsTab";
-import { SatelliteHero, SatelliteTab } from "./SatelliteTab";
+import { SatelliteTab, WeatherTotalHero } from "./SatelliteTab";
 import { SWITCH_ID, SwitchLean } from "./SwitchLean";
 import { PopLink } from "@/components/hh/PopLink";
 import { teamHref } from "../picks/hrefs";
@@ -1801,7 +1801,7 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
           </>
         )}
         {/* Weather (2026-11-14): the satellite desk leads; the daily-high desk keeps its full record below. */}
-        {v && tab === "weather" && snap?.satellite && <SatelliteHero d={snap.satellite} />}
+        {v && tab === "weather" && snap?.satellite && <WeatherTotalHero d={snap.satellite} w={snap.weather} />}
         {v && tab === "weather" && !snap?.satellite && snap?.weather && <WeatherHero w={snap.weather} />}
         {v && tab === "weather" && snap?.satellite && <SatelliteTab d={snap.satellite} />}
         {v && tab === "weather" && snap?.satellite && (

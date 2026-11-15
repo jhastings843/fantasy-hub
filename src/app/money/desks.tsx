@@ -119,6 +119,33 @@ export function satelliteDesk(d: Satellite): Desk {
   };
 }
 
+/** Weather on the overview (Jack, 2026-11-14: "just do one weather, put them together as one total number"):
+ *  the satellite desk and the daily-high desk added up; the Weather page breaks them apart. */
+export function weatherTotalDesk(w: Weather | null | undefined, d: Satellite | null | undefined): Desk | null {
+  if (!w && !d) return null;
+  if (!d) return weatherDesk(w!);
+  const sat = d.equity - d.bankroll;
+  const daily = w ? w.equity - w.start : 0;
+  const total = sat + daily;
+  const won = d.wins + (w?.record.won ?? 0);
+  const settled = d.settled + (w?.record.settled ?? 0);
+  const read = d.settled < SATELLITE_MIN ? "Too early" : total >= 0 ? "Up" : "Down";
+  return {
+    money: "usd",
+    id: "weather",
+    name: "Weather",
+    what: "Satellite markets and daily highs",
+    result: usd(total, true),
+    rec: `${won}-${settled - won}`,
+    tone: toneOf(total),
+    ours: `Satellite ${usd(sat, true)}`,
+    yard: w ? `Daily highs ${usd(daily, true)}` : "Daily highs not posted",
+    read,
+    readTone: read === "Up" ? "good" : read === "Down" ? "bad" : "neutral",
+    href: "/money?v=weather",
+  };
+}
+
 export function desks(v: View): Desk[] {
   const out: Desk[] = [];
   const snap = v.snapshot;
@@ -142,8 +169,8 @@ export function desks(v: View): Desk[] {
     });
   }
   if (snap?.phil && !snap.phil.error) out.push(philDesk(snap.phil, "phil", "Phil", "Claude agent, Polymarket", "/money?v=phil"));
-  if (snap?.satellite) out.push(satelliteDesk(snap.satellite));
-  if (snap?.weather) out.push(weatherDesk(snap.weather));
+  const wx = weatherTotalDesk(snap?.weather, snap?.satellite);
+  if (wx) out.push(wx);
   if (snap?.books.length) {
     const b = booksTotals(snap.books);
     out.push({
