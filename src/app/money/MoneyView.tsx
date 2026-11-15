@@ -27,7 +27,7 @@ import type { DeskId } from "@/lib/money/schedule";
 // same shape as Phil) and Phil's own Kalshi shadow record. Neither is ever
 // added into Phil's Polymarket numbers.
 
-export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "options" | "weather" | "satellite";
+export type MoneyTab = "overview" | "portfolio" | "bets" | "phil" | "kalshi" | "books" | "trends" | "intraday" | "options" | "weather";
 // My bets is hidden for now (Jack, 2026-10-15): the logged plays weren't
 // actually bet. The code and the logged data stay; flip this to bring it back.
 const SHOW_BETS = false;
@@ -43,9 +43,9 @@ const TABS: { id: MoneyTab; label: string }[] = [
   { id: "intraday", label: "Day Trader" },
   { id: "options", label: "Options" },
   { id: "weather", label: "Weather" },
-  { id: "satellite", label: "Satellite" },
 ];
-export const parseMoneyTab = (x: unknown): MoneyTab => (TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
+// The satellite desk lived on its own tab for one day (2026-11-14); it is now the lead of Weather (Jack: "integrate it into the weather page").
+export const parseMoneyTab = (x: unknown): MoneyTab => (x === "satellite" ? "weather" : TABS.some((t) => t.id === x) ? (x as MoneyTab) : "overview"); // hidden tabs fall back to Overview
 const href = (t: MoneyTab) => (t === "overview" ? "/money" : t === "portfolio" ? "/portfolio" : `/money?v=${t}`);
 
 /** The Money section row, shared with /portfolio so Portfolio reads as one of Money's sections. */
@@ -1800,10 +1800,17 @@ export default async function MoneyView({ tab }: { tab: MoneyTab }) {
               : <p className={s.calm}>The shadow check has not reported yet. It posts with Phil after his next cycle.</p>}
           </>
         )}
-        {v && tab === "weather" && snap?.weather && <WeatherHero w={snap.weather} />}
-        {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The weather desk hasn&apos;t posted yet.</p>)}
-        {v && tab === "satellite" && snap?.satellite && <SatelliteHero d={snap.satellite} />}
-        {v && tab === "satellite" && (snap?.satellite ? <SatelliteTab d={snap.satellite} /> : <p className={s.calm}>The satellite desk hasn&apos;t posted yet. It reports with trade-bot&apos;s next Money push.</p>)}
+        {/* Weather (2026-11-14): the satellite desk leads; the daily-high desk keeps its full record below. */}
+        {v && tab === "weather" && snap?.satellite && <SatelliteHero d={snap.satellite} />}
+        {v && tab === "weather" && !snap?.satellite && snap?.weather && <WeatherHero w={snap.weather} />}
+        {v && tab === "weather" && snap?.satellite && <SatelliteTab d={snap.satellite} />}
+        {v && tab === "weather" && snap?.satellite && (
+          <div className={m.venueHead}>
+            <h2 className={s.h2}>Daily highs on Kalshi, still tracking</h2>
+            <span className={m.foldMeta}>The original weather desk: tomorrow&apos;s high in each city, scored against the market</span>
+          </div>
+        )}
+        {v && tab === "weather" && (snap?.weather ? <WeatherTab w={snap.weather} /> : <p className={s.calm}>The daily-high desk hasn&apos;t posted yet.</p>)}
         {v && tab === "books" && snap && snap.books.length > 0 && <BooksHero books={snap.books} />}
         {v && tab === "books" && snap && <BooksTab books={snap.books} log={snap.learnLog ?? []} grades={snap.grades ?? null} rs={snap.researchSwitch} />}
         {v && tab === "trends" && snap?.trends && !snap.trends.error && <TrendsHero tr={snap.trends} />}

@@ -47,8 +47,8 @@ export function SatelliteHero({ d }: { d: Satellite }) {
   const open = (d.bets ?? []).filter((b) => b.status === "open").length;
   return (
     <DeskHero
-      eyebrow="Satellite desk · temperature and sea ice markets · paper"
-      title={<>{"Satellite desk: "}<span className={pnl >= 0 ? s.up : s.down}>{usd(pnl, true)}</span></>}
+      eyebrow="Weather · satellite desk · global temperature and sea ice · paper"
+      title={<>{"Weather, satellite desk: "}<span className={pnl >= 0 ? s.up : s.down}>{usd(pnl, true)}</span></>}
       sub={`${d.wins}-${d.settled - d.wins} settled, ${open} open. Most of these markets settle weeks or months out, so the record fills in slowly.`}
     />
   );

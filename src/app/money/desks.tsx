@@ -81,8 +81,8 @@ function weatherDesk(w: Weather): Desk {
   return {
     money: "usd",
     id: "weather",
-    name: "Weather",
-    what: "Daily highs on Kalshi",
+    name: "Weather: daily highs",
+    what: "Tomorrow's high on Kalshi",
     result: usd(w.equity - w.start, true),
     rec: `${w.record.won}-${w.record.settled - w.record.won}`,
     tone: toneOf(w.equity - w.start),
@@ -106,8 +106,8 @@ export function satelliteDesk(d: Satellite): Desk {
   return {
     money: "usd",
     id: "satellite",
-    name: "Satellite",
-    what: "Temperature and sea ice markets",
+    name: "Weather: satellite",
+    what: "Global temperature and sea ice markets",
     result: usd(pnl, true),
     rec: d.settled ? `${d.wins}-${d.settled - d.wins}` : `${open} open, ${usd(d.openCost)} staked`,
     tone: toneOf(pnl),
@@ -115,7 +115,7 @@ export function satelliteDesk(d: Satellite): Desk {
     yard: `Started at ${usd(d.bankroll)}`,
     read,
     readTone: read === "Up" ? "good" : read === "Down" ? "bad" : "neutral",
-    href: "/money?v=satellite",
+    href: "/money?v=weather",
   };
 }
 
@@ -142,8 +142,8 @@ export function desks(v: View): Desk[] {
     });
   }
   if (snap?.phil && !snap.phil.error) out.push(philDesk(snap.phil, "phil", "Phil", "Claude agent, Polymarket", "/money?v=phil"));
-  if (snap?.weather) out.push(weatherDesk(snap.weather));
   if (snap?.satellite) out.push(satelliteDesk(snap.satellite));
+  if (snap?.weather) out.push(weatherDesk(snap.weather));
   if (snap?.books.length) {
     const b = booksTotals(snap.books);
     out.push({
