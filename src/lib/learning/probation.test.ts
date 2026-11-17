@@ -19,7 +19,7 @@ const cand = (b: Bet[]): Candidate[] => [{ id: "a", label: "A", bets: b }];
 describe("probation", () => {
   it("pins the two gates that use it, and leaves First TD alone", () => {
     expect(ATTD_GATE).toMatchObject({ minT: 1.645, probation: { minT: 1, stake: 0.25 } });
-    expect(FB_GATE).toMatchObject({ minGames: 60, minWins: 12, minT: 1.645, probation: { minT: 1, stake: 0.25 } });
+    expect(FB_GATE).toMatchObject({ minGames: 60, minWins: 12, minT: 1.645, minPairedT: 1.645, probation: { minT: 1, stake: 0.25, minPairedT: 0 } });
     expect(FTD_GATE.minT).toBe(1.96);
     expect(FTD_GATE.probation).toBeUndefined();
   });
@@ -90,5 +90,39 @@ describe("a slice follows its definition's parent", () => {
     expect(now.entries.pick.parent).toBeUndefined();
     expect(now.entries.pick.registeredAt).toBe(T0);
     expect(now.entries.pe).toMatchObject({ parent: "pick", registeredAt: "2026-11-13T12:00:00.000Z" });
+  });
+});
+
+describe("probation parent bar (Jack, 2026-11-17)", () => {
+  // Child = MID; parent = MID plus five extra games it loses on balance, so the
+  // child beats it a little (paired t between 0 and 1.645) and the parent is under t 1.
+  const EXTRA = [-2, 1, -2, 1, -2];
+  const child = bets(MID);
+  const parent = [...child, ...bets(EXTRA, 30)];
+  const cands: Candidate[] = [
+    { id: "p", label: "P", bets: parent },
+    { id: "a", label: "A", parent: "p", bets: child },
+  ];
+  const begin = () => register(emptyState("s"), cands.map((c) => ({ ...c, bets: [] })), T0, 7).state;
+  const PG: Gate = { ...G, minPairedT: 1.645, probation: { minT: 1, stake: 0.25, minPairedT: 0 } };
+
+  it("a narrower slice that beats its parent at all starts at 0.25u", () => {
+    const r = review(PG, begin(), cands, "2026-11-01T12:00:00.000Z", 9);
+    const x = r.evidence.get("a")!;
+    expect(x.pairedT!).toBeGreaterThan(0);
+    expect(x.pairedT!).toBeLessThan(1.645);
+    expect(r.evidence.get("p")!.t).toBeLessThan(1);
+    expect(r.state.entries.a).toMatchObject({ status: "active", probation: { stake: 0.25 } });
+  });
+
+  it("without the trial parent bar it still needs t 1.645 over its parent", () => {
+    const strict: Gate = { ...PG, probation: { minT: 1, stake: 0.25 } };
+    expect(review(strict, begin(), cands, "2026-11-01T12:00:00.000Z", 9).state.entries.a.status).toBe("collecting");
+  });
+
+  it("marks t and parent as clearing the trial bar", () => {
+    const x = review(PG, begin(), cands, "2026-11-01T12:00:00.000Z", 9).evidence.get("a")!;
+    expect(x.checks.find((c) => c.name === "t")).toMatchObject({ pass: false, trial: true });
+    expect(x.checks.find((c) => c.name === "parent")).toMatchObject({ pass: false, trial: true, need: "0+ for 0.25u, 1.645+ for full stake" });
   });
 });

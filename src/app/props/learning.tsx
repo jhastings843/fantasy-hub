@@ -33,7 +33,13 @@ const sinceDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { mo
 export function hasNeeds(short: Check[]): string {
   // Units sit in their own column, and a t past the bar already means a profit.
   const rows = short.filter((c) => c.name !== "units");
-  return (rows.length ? rows : short).map((c) => (c.have && c.need ? `${c.have} (needs ${c.need})` : c.note)).join(" · ");
+  return (rows.length ? rows : short)
+    .map((c) => (c.have && c.need ? `${c.have}${c.trial ? " (clears the small-stake bar; " : " (needs "}${c.trial ? `full stake needs ${fullNeed(c.need)})` : `${c.need})`}` : c.note))
+    .join(" · ");
+}
+/** "1+ for 0.25u, 1.645+ for full stake" -> "1.645+". */
+function fullNeed(need: string): string {
+  return /([\d.]+\+) for full stake/.exec(need)?.[1] ?? need;
 }
 
 /** Every slice the engine is measuring, for the learner log's progress section. */
@@ -46,7 +52,13 @@ export function trackRows(v: SectionView, prefix = ""): TrackRow[] {
     const rec = e.live ? `${e.live.w}-${e.live.l}${e.live.p ? `-${e.live.p}` : ""}, ${u(e.live.units)} since it went live` : undefined;
     // Games and weeks have their own bars; the note lists what else is short.
     const short = ev?.checks.filter((c) => !c.pass && c.name !== "games" && c.name !== "weeks") ?? [];
-    const still = !ev?.games ? "No games yet: only games after it was first tracked count." : short.length ? hasNeeds(short) : ev.ready ? "Ready at the next review" : undefined;
+    // Only t / parent short, and both clear the probation bars: it starts at the small stake next review.
+    const trialReady = !!g.probation && !ev?.ready && short.length > 0 && !!ev?.checks.every((c) => c.pass || c.trial);
+    const still = !ev?.games
+      ? "No games yet: only games after it was first tracked count."
+      : trialReady
+        ? `Clears the ${g.probation!.stake}u bar: goes live at ${g.probation!.stake}u at the next review if the section has no live slice. Full stake needs ${hasNeeds(short)}`
+        : short.length ? hasNeeds(short) : ev.ready ? "Ready at the next review" : undefined;
     return {
       id: `${prefix}${e.id}`,
       label: `${prefix}${e.label}`,
@@ -83,7 +95,7 @@ export function LearningBlock({ v }: { v: SectionView; unit?: string }) {
         <Link href="/learning" className={s.dim} style={{ fontSize: 13 }}>
           Every section&apos;s learning on one page
         </Link>
-        <p className={s.p}>{`To go live a slice needs all of: ${g.minGames}+ games over ${g.minWeeks}+ weeks, ${g.minBets}+ bets${g.minWins ? `, ${g.minWins}+ winners` : ""}, a profit, and t ${g.minT}+ (t is how sure the edge is real; ${g.minT} is about ${g.minT >= 2.3 ? "a 1-in-100" : "a 1-in-20"} chance it's luck). A narrower slice must also beat the one it narrows. A live one is rolled back if it turns. ${
+        <p className={s.p}>{`To go live a slice needs all of: ${g.minGames}+ games over ${g.minWeeks}+ weeks, ${g.minBets}+ bets${g.minWins ? `, ${g.minWins}+ winners` : ""}, a profit, and t ${g.minT}+ (t is how sure the edge is real; ${g.minT} is about ${g.minT >= 2.3 ? "a 1-in-100" : "a 1-in-20"} chance it's luck). A narrower slice must also beat the one it narrows.${g.probation ? ` A slice with t ${g.probation.minT}+${g.probation.minPairedT !== undefined ? ` that does at least ${g.probation.minPairedT === 0 ? "as well as" : `t ${g.probation.minPairedT} better than`} the one it narrows` : ""} can start at ${g.probation.stake}u; it moves to full stake at the full bars and stops below t 0.` : ""} A live one is rolled back if it turns. ${
           v.lastReviewAt ? `Last review ${whenEt(v.lastReviewAt)}; ${collecting} collecting.` : "First review runs at the next data pull."
         }`}</p>
       </div>

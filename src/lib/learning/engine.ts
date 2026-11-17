@@ -78,7 +78,13 @@ export interface Gate {
    * `stake` units. It moves to full stake once it passes the real t bar, and
    * stops (rolled back) if its t since registering falls below 0.
    */
-  probation?: { minT: number; stake: number };
+  /**
+   * `minPairedT`: how far a narrower slice must beat its parent to start the
+   * trial (Jack, 2026-11-17, First Basket: 0, so "at least as good as the
+   * parent"; the full stake still needs the gate's minPairedT). Unset = the
+   * gate's own minPairedT.
+   */
+  probation?: { minT: number; stake: number; minPairedT?: number };
 }
 
 /** "retired": a collecting slice that lost at the go-live confidence, the other way (Jack, 2026-11-03). Still graded; returns to collecting if it climbs back to even. */
@@ -225,6 +231,8 @@ export interface Check {
   /** Plain words for the learner log (Jack, 2026-11-03: "say what it has now vs what it needs"). */
   have?: string;
   need?: string;
+  /** Short of the full bar but clears the 0.25u-style probation bar for this check. */
+  trial?: boolean;
 }
 
 export interface Evidence {
@@ -299,9 +307,9 @@ export function evidence(gate: Gate, c: Candidate, since: string, parent?: Candi
     { name: "bets", pass: bets.length >= gate.minBets, note: `${bets.length} of ${gate.minBets} bets`, have: `${bets.length} bets`, need: `${gate.minBets}` },
     ...(gate.minWins > 0 ? [{ name: "wins", pass: wins >= gate.minWins, note: `${wins} of ${gate.minWins} winners`, have: `${wins} winners`, need: `${gate.minWins}` }] : []),
     { name: "units", pass: units > 0, note: `${units >= 0 ? "+" : ""}${units}u`, have: `${units >= 0 ? "+" : "−"}${Math.abs(units)}u`, need: "a profit" },
-    { name: "t", pass: t >= gate.minT, note: `t ${t} vs ${gate.minT}`, have: `t ${signT(t)}`, need: gate.probation ? `${gate.probation.minT}+ for ${gate.probation.stake}u, ${gate.minT}+ for full stake` : `${gate.minT}+` },
+    { name: "t", pass: t >= gate.minT, trial: !!gate.probation && t >= gate.probation.minT, note: `t ${t} vs ${gate.minT}`, have: `t ${signT(t)}`, need: gate.probation ? `${gate.probation.minT}+ for ${gate.probation.stake}u, ${gate.minT}+ for full stake` : `${gate.minT}+` },
     ...(parent
-      ? [{ name: "parent", pass: (pairedT ?? 0) >= gate.minPairedT, note: `beats ${parent.label.toLowerCase()} at t ${pairedT} vs ${gate.minPairedT}`, have: `t ${signT(pairedT ?? 0)} vs ${parent.label.toLowerCase().replace(/ \(.*\)$/, "")}`, need: `${gate.minPairedT}+` }]
+      ? [{ name: "parent", pass: (pairedT ?? 0) >= gate.minPairedT, trial: !!gate.probation && (pairedT ?? 0) >= (gate.probation.minPairedT ?? gate.minPairedT), note: `beats ${parent.label.toLowerCase()} at t ${pairedT} vs ${gate.minPairedT}`, have: `t ${signT(pairedT ?? 0)} vs ${parent.label.toLowerCase().replace(/ \(.*\)$/, "")}`, need: gate.probation && gate.probation.minPairedT !== undefined ? `${gate.probation.minPairedT}+ for ${gate.probation.stake}u, ${gate.minPairedT}+ for full stake` : `${gate.minPairedT}+` }]
       : []),
     {
       name: "line move",
@@ -468,13 +476,13 @@ export function review(gate: Gate, prev: SectionState, base: Candidate[], now: s
     budget--;
     activated++;
   }
-  // Probation: every check but t passes and t clears the lower bar. Only when the section has no live slice.
+  // Probation: every check passes except t and parent, and those clear the probation bars. Only when the section has no live slice.
   const pb = gate.probation;
   if (pb && !cur && budget > 0) {
     const early = Object.values(entries)
       .filter((e) => {
         const x = ev.get(e.id);
-        return e.status === "collecting" && x && !x.ready && x.t >= pb.minT && x.checks.every((c) => c.pass || c.name === "t");
+        return e.status === "collecting" && x && !x.ready && x.checks.every((c) => c.pass || ((c.name === "t" || c.name === "parent") && c.trial));
       })
       .sort((a, b) => tOf(b) - tOf(a))[0];
     if (early) {
@@ -572,7 +580,7 @@ export const FTD_GATE: Gate = {
  * but t 1.645 and a 0.25u probation from t 1.0 (Jack, 2026-11-13: at 1.96 a
  * real edge on these prices takes seasons). NFL First TD and Lottos keep FTD_GATE.
  */
-export const FB_GATE: Gate = { ...FTD_GATE, minT: 1.645, probation: { minT: 1, stake: 0.25 } };
+export const FB_GATE: Gate = { ...FTD_GATE, minT: 1.645, probation: { minT: 1, stake: 0.25, minPairedT: 0 } };
 
 /**
  * NFL Anytime TD at DraftKings' price. Prices run -200 to +600, between props
