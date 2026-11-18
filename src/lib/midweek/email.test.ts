@@ -25,7 +25,7 @@ describe("midweek email sources line", () => {
   it("names each source once, in the order first seen", () => {
     const a = league({ sources: ["Flock Fantasy", "FantasyPros", "Sleeper"] });
     const b = league({ sources: ["Dynasty Nerds", "fantasypros", "Sleeper", "Reddit"] });
-    expect(pulledFrom([a, b])).toBe("Pulled from Flock Fantasy, FantasyPros, Sleeper, Dynasty Nerds, Reddit.");
+    expect(pulledFrom([a, b])).toBe("Pulled from Flock Fantasy, Dynasty Nerds, FantasyPros, Reddit, Sleeper.");
   });
 
   it("prints nothing when no league reports a source", () => {
@@ -38,6 +38,9 @@ describe("midweek email sources line", () => {
     expect(sourceName("https://sports.yahoo.com/fantasy/article/abc")).toBe("Yahoo Fantasy");
     expect(sourceName("https://www.someblog.net/post")).toBe("Someblog");
     expect(sourceName("Dynasty Daddy")).toBe("Dynasty Daddy");
+    expect(sourceName("bleacherreport.com/articles/25534250")).toBe("Bleacher Report");
+    expect(sourceName("https://www.nfl.com/news/x")).toBe("NFL.com");
+    expect(sourceName("https://lateround.substack.com/p/week-11")).toBe("Lateround");
   });
 });
 
@@ -58,6 +61,8 @@ describe("midweek email league with no claims", () => {
     expect(html).not.toContain("claims below still stand");
     expect(html).toContain("waits for his new post.");
     expect(html).toContain("Pulled from Flock Fantasy, Sleeper.");
+    // Very small text, above the league cards.
+    expect(html.indexOf("Pulled from")).toBeLessThan(html.indexOf("2026 Half PPR"));
   });
 
   it("says no bids on a clean league too", () => {
