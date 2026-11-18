@@ -56,6 +56,23 @@ describe("waiverTargets", () => {
       expect(r.startable[0].displaces?.playerId).toBe("wr3");
     });
 
+    it("never offers a free agent whose game has already been played", () => {
+      // Week 11 Sunday Scaries: Chig Okonkwo (TE13, WSH at NYG) was emailed as
+      // an add on Saturday, two days after that Thursday game went final.
+      const free = [
+        p({ playerId: "chig", position: "TE", positionalRank: 1, flexRank: 1, seasonRank: 3, locked: true }),
+      ];
+      const r = waiverTargets({ rosterPositions: SLOTS, roster, freeAgents: free });
+      expect(r.startable).toHaveLength(0);
+    });
+
+    it("never has a free agent push out a starter whose game is over", () => {
+      const lockedRoster = roster.map((x) => (x.playerId === "wr3" ? { ...x, locked: true } : x));
+      const free = [p({ playerId: "faStud", position: "WR", positionalRank: 1, flexRank: 1, seasonRank: 3 })];
+      const r = waiverTargets({ rosterPositions: SLOTS, roster: lockedRoster, freeAgents: free });
+      for (const t of r.startable) expect(t.displaces?.playerId).not.toBe("wr3");
+    });
+
     it("starts a free agent found only on his weekly list, ahead of a worse one on the board", () => {
       // Week 3 half PPR: Schultz (TE10, flex 76) was free and on nobody's
       // board, and the email recommended Freiermuth (TE11, flex 78) instead.

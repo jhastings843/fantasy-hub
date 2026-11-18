@@ -25,7 +25,7 @@ import { getWeekStats, scoreRows, type StatRows } from "@/lib/sleeper/stats";
 import { getWeekProjections, type ProjectionsByPlayer } from "@/lib/guillotine/projections";
 import type { ScoringSettings } from "@/lib/guillotine/scoring";
 import { getSeasonGames } from "@/lib/survivor/odds";
-import { fixtureMap } from "@/lib/nfl/week";
+import { fixtureMap, lockedTeams } from "@/lib/nfl/week";
 import { claimGain, type ClaimGain } from "./gain";
 import { isFreshForRun, mergeWire, rankWire, staleNote, usageFrom, type WireCandidate } from "./freshness";
 import { resolveNames, toCandidates } from "@/lib/jingles/resolve";
@@ -34,6 +34,7 @@ import { readDynastyNerds } from "./dynastynerds";
 import { strongerTier, type ClaimTier } from "./price";
 import { flockNote, flockTier } from "./flock";
 import { readFlock } from "./flock-store";
+import { sourceName, uniqueSources } from "./source-names";
 import {
   classifyClaim,
   pacingFor,
@@ -73,6 +74,8 @@ export interface WaiverContext {
   pacing: Pacing | null;
   /** Where the season-long ranking came from, and whether it is this week's. */
   source: { label: string; fresh: boolean; note: string | null };
+  /** Short names of every outside source that fed this league's board, for the email's "Pulled from" line. */
+  sources?: string[];
   blocked: string | null;
 }
 
@@ -157,6 +160,10 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     }
   }
 
+  // Teams whose game has kicked off or finished. Their players are no longer
+  // this week's adds or this week's benchings (same rule the lineup uses).
+  const locked = lockedTeams(games, new Date());
+
   const index = weeklyIndex(weekly);
   const toPlayer = (id: string): WaiverPlayer => {
     const raw = players[id] as
@@ -195,6 +202,10 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
         teamsPlaying: playing,
       }),
       unranked: pr === null && fr === null,
+      locked: (() => {
+        const t = normalizeTeam(raw?.team ?? null);
+        return t !== null && locked.has(t);
+      })(),
       lastWeek: usageFrom(stats[id], scored[id], lastWeekNum),
       seasonRank: onList?.rank ?? null,
       seasonPositionRank: onList ? `${onList.position}${onList.positionRank}` : null,
@@ -220,7 +231,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   const flock = isDynastyWire || jingles ? null : await readFlock(season, nflWeek);
   let freeAgents: WaiverPlayer[];
   let source: WaiverContext["source"];
+  const fedBy: (string | null)[] = [];
   if (labFresh) {
+    fedBy.push("Jingles");
     freeAgents = lab.list
       .filter((e) => !owned.has(e.sleeperId))
       .map((e) => toPlayer(e.sleeperId))
@@ -296,6 +309,9 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
           .filter((p) => isStartableIn(p.position, startable))
       : [];
     freeAgents = mergeWire(mergeWire(nerdsPlayers, researchPlayers), trendingPlayers);
+    if (nerds) fedBy.push("Dynasty Nerds");
+    if (research) fedBy.push(...research.sources.map(sourceName));
+    if (trending.length) fedBy.push("Sleeper");
 
     const lead = jingles
       ? "His waiver post leads the list"
@@ -325,6 +341,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // of trending adds. It is also the only source in this function that prints a
   // dollar figure, which is the thing the page had been missing.
   if (jingles) {
+    fedBy.unshift("Jingles");
     const priced = (row: (typeof jingles.rows)[number]) => ({
       rank: row.rank,
       faab: row.faab,
@@ -364,6 +381,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
   // his "don't chase" list is kept off the board entirely. Bids are the app's.
   const flockAvoid = new Set<string>();
   if (flock) {
+    fedBy.unshift("Flock Fantasy");
     const resolved = resolveNames(
       flock.rows.map((r) => ({ name: r.name, position: r.position, team: r.team, row: r })),
       toCandidates(players),
@@ -563,6 +581,7 @@ export async function buildWaivers(leagueId: string): Promise<WaiverContext> {
     report,
     pacing,
     source,
+    sources: uniqueSources([...(weekly ? ["Jingles"] : []), ...fedBy]),
     blocked: weekly
       ? null
       : latest

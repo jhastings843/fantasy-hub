@@ -196,13 +196,17 @@ export function waiverTargets(input: {
 
   const startable: StartableTarget[] = [];
   for (const fa of [...freeAgents, ...(input.weeklyOnly ?? [])]) {
-    if (cannotPlay(fa)) continue;
+    // A free agent whose game has kicked off cannot score for you this week,
+    // and a starter whose game is over cannot be benched for anyone. Week 11
+    // emailed Chig Okonkwo as an add two days after his Thursday game.
+    if (cannotPlay(fa) || fa.locked) continue;
     const { gain, displaces, slot } = marginalValue(
       available.map(toLineupPlayer),
       toLineupPlayer(fa),
       rosterPositions,
     );
     if (gain <= 0 || !slot) continue;
+    if (displaces && byId.get(displaces.playerId)?.locked) continue;
     startable.push({
       player: fa,
       slot,

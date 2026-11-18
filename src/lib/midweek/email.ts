@@ -1,6 +1,7 @@
 import { playerContext } from "@/lib/email/lineup-detail";
 import type { WaiverContext } from "@/lib/waivers/build";
 import { usageText } from "@/lib/waivers/freshness";
+import { uniqueSources } from "@/lib/waivers/source-names";
 import {
   card,
   emailPage,
@@ -127,6 +128,12 @@ function leagueCard(league: WaiverContext): string {
   // all they are the whole email: 2026-10-13 sent three league names and no
   // claims because this returned early.
   const blocked = league.blocked ? small(league.blocked, PALETTE.warn) : "";
+  // The same warning on a card with nothing under it must not point "below"
+  // (week 11: Half PPR said "The claims below still stand" over no claims).
+  const blockedAlone = league.blocked
+    ? small(league.blocked.replace(/\s*The (season-long )?claims below still stand\.?/, ""), PALETTE.warn)
+    : "";
+  const noBids = `<div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:6px;">No bids this week for this league.</div>`;
 
   const budget =
     league.budgetLeft != null && league.budgetTotal
@@ -175,9 +182,9 @@ function leagueCard(league: WaiverContext): string {
     .join("");
 
   if (!starts && !season) {
-    if (league.blocked) return card(`${head}${blocked}${budget}`, WARN);
+    if (league.blocked) return card(`${head}${blockedAlone}${noBids}${budget}`, WARN);
     return card(
-      `${head}<div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:6px;">Nothing on the wire beats what you have.</div>${budget}`,
+      `${head}<div style="font:600 13px/1.5 -apple-system,sans-serif;color:${PALETTE.good};padding-top:6px;">No bids this week for this league. Nothing on the wire beats what you have.</div>${budget}`,
       GOOD,
     );
   }
@@ -185,8 +192,18 @@ function leagueCard(league: WaiverContext): string {
   return card(`${head}${blocked}${stale}${budget}<div style="padding-top:4px;">${starts}${season}</div>`);
 }
 
+/** "Pulled from Flock Fantasy, FantasyPros, Sleeper." across every league, first-seen order. */
+export function pulledFrom(leagues: WaiverContext[]): string {
+  const names = uniqueSources(leagues.flatMap((l) => l.sources ?? []));
+  return names.length ? `Pulled from ${names.join(", ")}.` : "";
+}
+
 export function renderMidweekEmail(input: MidweekInput): string {
   const n = claimCount(input);
+  const pulled = pulledFrom(input.leagues);
+  const sourcesLine = pulled
+    ? `<div style="font:400 11px/1.4 -apple-system,sans-serif;color:${PALETTE.muted};padding-bottom:12px;">${escapeHtml(pulled)}</div>`
+    : "";
 
   const body = input.leagues.length
     ? input.leagues.map(leagueCard).join("")
@@ -212,7 +229,7 @@ export function renderMidweekEmail(input: MidweekInput): string {
       n === 0
         ? "No league has anything on the wire worth taking."
         : `${n} claim${n === 1 ? "" : "s"} across your leagues.`,
-    body: `${body}${guillotine}`,
+    body: `${sourcesLine}${body}${guillotine}`,
     cta: { href: `${input.appUrl}`, text: "Open fantasy hub" },
     footnote: `${
       list
