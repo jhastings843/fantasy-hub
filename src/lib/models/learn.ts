@@ -228,6 +228,11 @@ export const FB_SLICES: [string, string, (b: FbGradedBoard, x: FbGradedBoard["be
   ["fb:short", "Edges at +600 or shorter", (_, x) => x.price <= 600],
   ["fb:long", "Edges longer than +600", (_, x) => x.price > 600],
   ["fb:top", "Our top player in the game, when he is an edge", (b, x) => x.id === b.top],
+  // Jack, 2026-11-18: ~4 bets a day instead of ~15. In-sample (10/21-11/18) 114 bets, +67.4u, t 1.95; counts only games after it registers.
+  ["fb:tiptop", "Our most likely scorer among the game's edges, when he is on the team we favor to win the tip", (b, x) => {
+    const best = b.bets.reduce((m, y) => ((y.p ?? 0) > (m.p ?? 0) ? y : m), b.bets[0]);
+    return best?.id === x.id && (b.tip >= 0.5 ? x.team === b.home : x.team !== b.home);
+  }],
 ];
 
 export function fbCandidates(boards: FbGradedBoard[]): Candidate[] {
