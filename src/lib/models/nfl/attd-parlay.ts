@@ -60,6 +60,8 @@ export interface ParlayLeg {
   chance: number;
   /** chance minus DK's break-even. */
   gap: number;
+  /** A night leg that did not clear the bar, added so the night still gets its 2-leg ticket (Jack, 2026-11-19). */
+  belowBar?: boolean;
 }
 
 export interface AttdParlay {
@@ -133,6 +135,38 @@ export function pickNightLegs(games: ParlayGame[], venom: Map<string, number>): 
   out.sort((a, b) => b.gap - a.gap);
   const teams = new Set<string>();
   return out.filter((l) => !teams.has(l.team) && !!teams.add(l.team));
+}
+
+/**
+ * Every TNF and every MNF gets one 2-leg ticket (Jack, 2026-11-19: "I want 1
+ * two leg for the tnf game on thursday, and one mnf ticket on monday"). From
+ * Week 9 to 10 the bar above found 0 or 1 legs on all four nights, so none
+ * built. Legs that clear the bar go first; an open slot takes the next Venom
+ * pick by our chance minus DK's break-even, still one per team, marked
+ * belowBar so the record can tell the two apart.
+ *
+ *   W9 MNF BUF@MIN: Jones MIN clears; Mason MIN clears but same team;
+ *   best BUF pick is Cook (ours 45.4 vs 52.4) -> Jones + Cook (below the bar)
+ */
+export function fillNightLegs(games: ParlayGame[], venom: Map<string, number>, pool: ParlayLeg[]): ParlayLeg[] {
+  const out = pool.slice(0, NIGHT_LEGS);
+  const teams = new Set(out.map((l) => l.team));
+  const used = new Set(out.map((l) => l.key));
+  const rest: ParlayLeg[] = [];
+  for (const g of games)
+    for (const r of g.rows) {
+      const v = venom.get(r.key);
+      if (r.dk === undefined || v === undefined || used.has(r.key)) continue;
+      rest.push({ slug: g.slug, game: g.game, kickoff: g.kickoff, key: r.key, name: r.name, team: r.team, price: r.dk, ours: r.anytime, venom: v, chance: r3(r.anytime), gap: r3(r.anytime - implied(r.dk)), belowBar: true });
+    }
+  rest.sort((a, b) => b.gap - a.gap);
+  for (const l of rest) {
+    if (out.length >= NIGHT_LEGS) break;
+    if (teams.has(l.team)) continue;
+    teams.add(l.team);
+    out.push(l);
+  }
+  return out;
 }
 
 /** The night ticket: the pool's top NIGHT_LEGS legs, or null when fewer qualify. */

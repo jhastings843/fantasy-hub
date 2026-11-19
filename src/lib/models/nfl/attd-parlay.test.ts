@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { american, bestTicket, ticket, buildParlay, buildNightParlay, gradeParlay, pickLegs, pickNightLegs, tickets, type ParlayGame, type ParlayLeg } from "./attd-parlay";
+import { american, bestTicket, ticket, buildParlay, buildNightParlay, fillNightLegs, gradeParlay, pickLegs, pickNightLegs, tickets, type ParlayGame, type ParlayLeg } from "./attd-parlay";
 import type { AttdRow } from "./anytime";
 
 const row = (key: string, anytime: number, dk?: number): AttdRow => ({ id: key, name: key.toUpperCase(), team: "KC", key, m: 0.5, anytime, two: 0.1, dk });
@@ -86,5 +86,23 @@ describe("ATTD parlay of the day", () => {
     const g = game("chi_sea", [sea("w", 0.5, 350), sea("h", 0.3, 600), row("s", 0.55, 100)]);
     const pool = pickNightLegs([g], new Map([["w", 0.46], ["h", 0.34], ["s", 0.52]]));
     expect(pool.map((l) => l.key)).toEqual(["w", "s"]);
+  });
+  it("night ticket always gets 2 legs: the bar first, then the best Venom pick on the other team (W9 MNF)", () => {
+    const min = (k: string, a: number, dk: number): AttdRow => ({ ...row(k, a, dk), team: "MIN" });
+    const buf = (k: string, a: number, dk: number): AttdRow => ({ ...row(k, a, dk), team: "BUF" });
+    const g = game("buf_min", [min("jones", 0.413, 290), min("mason", 0.338, 230), buf("cook", 0.454, -110), buf("kincaid", 0.15, 300), buf("nopick", 0.6, 100)]);
+    const venom = new Map([["jones", 0.45], ["mason", 0.38], ["cook", 0.45], ["kincaid", 0.3]]);
+    const pool = pickNightLegs([g], venom);
+    expect(pool.map((l) => l.key)).toEqual(["jones"]);
+    const legs = fillNightLegs([g], venom, pool);
+    expect(legs.map((l) => l.key)).toEqual(["jones", "cook"]);
+    expect(legs.map((l) => !!l.belowBar)).toEqual([false, true]);
+    expect(buildNightParlay(2026, 9, "mnf", legs, NOW)!.legs).toHaveLength(2);
+  });
+  it("night fill keeps two legs that clear the bar, and finds nothing without Venom picks", () => {
+    const g = game("chi_sea", [row("a", 0.55, 100), { ...row("b", 0.5, 120), team: "CHI" }]);
+    const venom = new Map([["a", 0.51], ["b", 0.46]]);
+    expect(fillNightLegs([g], venom, pickNightLegs([g], venom)).map((l) => l.belowBar ?? false)).toEqual([false, false]);
+    expect(fillNightLegs([g], new Map(), [])).toEqual([]);
   });
 });

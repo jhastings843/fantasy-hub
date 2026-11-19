@@ -81,6 +81,7 @@ function ParlayLegs({ p, current = false }: { p: AttdParlay; current?: boolean }
               <td>
                 <PopLink href={playerPropHref("nfl", l.team, l.name, l.slug)}>{l.name}</PopLink>
                 {` ${l.team}`}
+                {l.belowBar ? <span className={s.dim}> (below the bar)</span> : null}
                 <br />
                 <span className={s.dim}>{gameHref(l.slug) ? <PopLink href={gameHref(l.slug)!}>{l.game}</PopLink> : l.game}</span>
               </td>

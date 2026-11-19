@@ -21,6 +21,7 @@
   ],
   "last_worked": "2026-11-19",
   "notes": [
+    "2026-11-19: TNF/MNF always get a 2-leg ATTD ticket: legs over the bar first, then the best Venom pick on the other team (marked below the bar), within 6h of kickoff. None had built since W8.",
     "2026-11-19: TD models drop players no longer on the team ESPN roster (Josh Downs IND->KC) and list traded-in players on the new team. Not pushed yet.",
     "2026-11-18: First Basket: added fb:tiptop (game's most likely scorer among edges, on the tip team). In-sample 10/21-11/18: 114 bets (~4/day vs ~15), +67.4u, t 1.95, vs every edge 409 bets +29.2u t 0.48. Bigger edges did worse (p/implied 1.2+ was -12.7u; last 2 weeks 2-37). Counts only games after it registers.",
     "2026-11-17: Midweek email: small 'Pulled from ...' line at top (WaiverContext.sources, lib/waivers/source-names.ts; Jingles/Flock/Dynasty Nerds first, Sleeper last) and 'No bids this week for this league' on empty cards (no more 'claims below' over nothing). Shipped the 11/14 locked-players waiver fix with it (90f1a84, 9aeeaca). Week 11 resent via send-email workflow. Flock week 11 was stored 7:12pm and used; none of his names were claims in Half PPR or Sunday Scaries.",

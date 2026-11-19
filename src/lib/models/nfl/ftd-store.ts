@@ -10,7 +10,7 @@ import { ATTD_GATE, FTD_GATE, sectionView, type SectionView } from "@/lib/learni
 import { SECTIONS, attdCandidates } from "../sections";
 import { loadJournal, loadSection, reviewIfDue } from "@/lib/learning/store";
 import { loadVenomChances, loadVenomPicks } from "./venom";
-import { NIGHT_LEGS, PARLAY_LEGS, SLATE_LABEL, buildNightParlay, buildParlay, gradeParlay, pickLegs, pickNightLegs, tickets, type AttdParlay, type ParlayOutcome, type ParlaySlate, type Ticket } from "./attd-parlay";
+import { NIGHT_LEGS, PARLAY_LEGS, SLATE_LABEL, buildNightParlay, buildParlay, fillNightLegs, gradeParlay, pickLegs, pickNightLegs, tickets, type AttdParlay, type ParlayOutcome, type ParlaySlate, type Ticket } from "./attd-parlay";
 import { etDate } from "@/lib/props/parse";
 import { push } from "@/lib/notify/pushover";
 import { OUR_SECTION, ourFtdCandidates } from "../learn";
@@ -401,19 +401,25 @@ async function buildNightTicket(season: number, week: number, now: Date): Promis
     .filter(([, g]) => g.attd && g.kickoff && etDate(new Date(g.kickoff)) === today && new Date(g.kickoff) > now)
     .map(([slug, g]) => ({ slug, game: `${g.game.away} at ${g.game.home}`, kickoff: g.kickoff, rows: g.attd!.rows }));
   if (!games.length) return `no ${SLATE_LABEL[slate]} game still to start with prices`;
-  const pool = pickNightLegs(games, venom);
+  const qualified = pickNightLegs(games, venom);
+  // Every night gets its 2-leg ticket (Jack, 2026-11-19). Short of 2 legs over
+  // the bar, wait until kickoff is near (6 hours, so the late-afternoon runs
+  // build it on fresh news), then fill from the best remaining Venom picks.
+  const soon = Math.min(...games.map((g) => Date.parse(g.kickoff!))) - now.getTime() <= 6 * 3600_000;
+  const pool = qualified.length >= NIGHT_LEGS ? qualified : soon ? fillNightLegs(games, venom, qualified) : qualified;
   const p = buildNightParlay(season, week, slate, pool, now);
-  if (!p) return `${SLATE_LABEL[slate]}: ${pool.length} leg${pool.length === 1 ? "" : "s"} qualify, need ${NIGHT_LEGS}`;
+  if (!p) return `${SLATE_LABEL[slate]}: ${qualified.length} leg${qualified.length === 1 ? "" : "s"} clear the bar${soon ? `, and Venom has too few other picks` : `; fills from Venom's picks within 6 hours of kickoff`}`;
   if ((await redis.set(NIGHT_KEY(season, week, slate), p, { nx: true })) !== "OK") return `${SLATE_LABEL[slate]} already built`;
   await redis.sadd(NIGHTS(season), `${week}:${slate}`);
   const am = (x: number) => (x > 0 ? `+${x}` : `${x}`);
   await push({
     title: `${SLATE_LABEL[slate]} ATTD 2-leg ${am(p.price)}`,
-    message: `${p.legs.map((l) => `${l.name} ${l.team} ${am(l.price)}`).join("\n")}\nOur blended chance ${(p.chance * 100).toFixed(1)}%, EV ${p.ev >= 0 ? "+" : ""}${p.ev.toFixed(2)}u per 1u.`,
+    message: `${p.legs.map((l) => `${l.name} ${l.team} ${am(l.price)}${l.belowBar ? " (below the bar)" : ""}`).join("\n")}\nOur chance ${(p.chance * 100).toFixed(1)}%, EV ${p.ev >= 0 ? "+" : ""}${p.ev.toFixed(2)}u per 1u.`,
     url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://fantasy-hub-tan.vercel.app"}/props?m=attd`,
     urlTitle: "Anytime TD",
   });
-  return `${SLATE_LABEL[slate]} built at ${am(p.price)}`;
+  const below = p.legs.filter((l) => l.belowBar).length;
+  return `${SLATE_LABEL[slate]} built at ${am(p.price)}${below ? ` (${below} leg below the bar)` : ""}`;
 }
 
 /** Every saved TNF / MNF ticket with its grade, newest first. */
