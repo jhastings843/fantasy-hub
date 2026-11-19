@@ -201,6 +201,7 @@ export async function runOurFirstTd(now = new Date()): Promise<OurFtdReport> {
           // ATTD may weigh last season differently (AttdParams.wPrev, set by the weekly refit): same players, its own totals.
           attdLists[T] = (AP.wPrev ?? 1) === 1 ? tl.lines : teamList({ team: T, rows, prior, cur, active, out, nameKey, wPrev: AP.wPrev }).lines;
           if (tl.returners.length) report.saved.push(`${T} back: ${tl.returners.join(", ")}`);
+          if (tl.left.length) report.saved.push(`${T} no longer on roster: ${tl.left.join(", ")}`);
         }
         const pts = impliedPoints(line.total, line.margin);
         const when = new Date(e.date!).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });

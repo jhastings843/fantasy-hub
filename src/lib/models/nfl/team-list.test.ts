@@ -25,4 +25,19 @@ describe("teamList", () => {
     expect(r.lines.map((l) => l.id)).toEqual(["wil"]);
     expect(r.returners).toEqual([]);
   });
+  it("drops a recent player traded off the roster (Josh Downs, IND -> KC, 2026-11-10)", () => {
+    const r = teamList({ team: "SEA", rows, prior, cur, active: new Set(["emanuelwilson"]), out: new Set(), nameKey: nk });
+    expect(r.lines.map((l) => l.id)).toEqual(["wil"]);
+    expect(r.left).toEqual(["George Holani"]);
+  });
+  it("drops nobody when the roster didn't load", () => {
+    const r = teamList({ team: "SEA", rows, prior, cur, active: new Set(), out: new Set(), nameKey: nk });
+    expect(r.lines.map((l) => l.id).sort()).toEqual(["hol", "wil"]);
+    expect(r.left).toEqual([]);
+  });
+  it("lists a player traded in before his first game for the new team", () => {
+    const r = teamList({ team: "SEA", rows, prior, cur, active: new Set(["emanuelwilson", "georgeholani", "tradedguy"]), out: new Set(), nameKey: nk });
+    expect(r.lines.map((l) => l.id).sort()).toEqual(["hol", "other", "wil"]);
+    expect(r.returners).toEqual(["Traded Guy"]);
+  });
 });

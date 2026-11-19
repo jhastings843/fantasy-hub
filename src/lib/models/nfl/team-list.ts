@@ -15,6 +15,13 @@
 //   no 2026 games, 2025 history: Charbonnet (now active)
 //     -> Wilson, Holani, Price, Charbonnet
 //
+// And (2026-11-19): a recent player no longer on the team's ESPN roster is
+// dropped, so a traded player stops being priced for his old team. Josh Downs
+// went IND -> KC on Nov 10 and Week 11 still listed him for the Colts. Only
+// when the roster loaded (an empty roster drops nobody); `left` names them.
+// The new team lists him from his first game there, or before it when he is
+// on its ESPN roster and active (counted with the returners).
+//
 // Pure.
 
 import type { TdLine } from "./firsttd";
@@ -40,7 +47,7 @@ export interface TeamListInput {
   wPrev?: number;
 }
 
-export function teamList(x: TeamListInput): { lines: TdLine[]; returners: string[] } {
+export function teamList(x: TeamListInput): { lines: TdLine[]; returners: string[]; left: string[] } {
   const T = x.team;
   const mine = x.rows.filter((r) => r.team === T);
   const weeks = [...new Set(mine.map((r) => r.week))].sort((a, b) => a - b).slice(-3);
@@ -49,8 +56,20 @@ export function teamList(x: TeamListInput): { lines: TdLine[]; returners: string
   const playedAnywhere = new Set(x.rows.map((r) => r.id));
   const debut = Object.keys(x.prior).filter((id) => !playedAnywhere.has(id));
   const returners: string[] = [];
-  const ids = [...recent];
-  for (const id of [...earlier, ...debut]) {
+  const left: string[] = [];
+  const nameOf = (id: string) => x.cur.get(id)?.name ?? x.prior[id]?.name;
+  const rosterLoaded = x.active.size + x.out.size > 0;
+  const ids = [...recent].filter((id) => {
+    const name = nameOf(id);
+    if (!rosterLoaded || !name) return true;
+    const k = x.nameKey(name);
+    if (x.active.has(k) || x.out.has(k)) return true;
+    left.push(name);
+    return false;
+  });
+  // Traded in: played for another team this season, now on this roster.
+  const joined = [...playedAnywhere].filter((id) => !recent.has(id) && !earlier.has(id));
+  for (const id of [...earlier, ...debut, ...joined]) {
     const name = x.cur.get(id)?.name ?? x.prior[id]?.name;
     if (!name || !x.active.has(x.nameKey(name))) continue;
     ids.push(id);
@@ -60,5 +79,5 @@ export function teamList(x: TeamListInput): { lines: TdLine[]; returners: string
     const tot = addTotals(x.prior[id], x.cur.get(id), x.wPrev ?? 1);
     return tot && !x.out.has(x.nameKey(tot.name)) ? [{ ...tot, team: T }] : [];
   });
-  return { lines, returners: returners.filter((n) => lines.some((l) => l.name === n)) };
+  return { lines, returners: returners.filter((n) => lines.some((l) => l.name === n)), left };
 }
