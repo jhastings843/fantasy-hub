@@ -391,7 +391,10 @@ export function fbStaked(input: { boards: (OurStoredProps | (StoredProps & { fb?
     if (!fb || fb.result !== undefined || !openToday(g.kickoff, input.now, input.today)) return [];
     const event = g.espnId ?? g.game.slug;
     const board: FbGradedBoard = { event, week: 0, at: g.kickoff!, tip: fb.tip, home: fb.home, top: fb.players[0]?.id ?? "", bets: [] };
-    return fb.players.flatMap((x): StakedBet[] => {
+    // Jack, 2026-11-20: one First Basket bet per game, our highest chance among the
+    // edges a live slice keeps. Backtest 10/21-11/20 (scripts/fb-one-per-game-backtest.mts):
+    // fb:tip every edge 216 bets +53.0u t 1.22 vs one per game 154 bets +68.8u t 1.72.
+    const staked = fb.players.flatMap((x): StakedBet[] => {
       if (!x.edge || x.price === null) return [];
       const bet = { id: x.id, team: x.team, price: x.price, net: 0 };
       const slices = liveKeeping(input.entries, g.kickoff!, (id) => !!FB_SLICES.find(([s]) => s === id)?.[2](board, bet));
@@ -419,6 +422,8 @@ export function fbStaked(input: { boards: (OurStoredProps | (StoredProps & { fb?
         },
       ];
     });
+    const best = staked.reduce<StakedBet | undefined>((m, b) => (!m || (b.chance?.p ?? 0) > (m.chance?.p ?? 0) ? b : m), undefined);
+    return best ? [best] : [];
   });
 }
 

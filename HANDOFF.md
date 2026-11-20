@@ -959,3 +959,6 @@ Frozen 8:00am on the old blended rule (Tinsley + Holani +27200). Replaced 10:52a
 
 ## 2026-11-18: First Basket fb:tiptop slice
 Jack asked how to cut ~20 First Basket bets a day without losing the edge. Graded 10/21-11/18 (409 bets, 195 games): every edge +29.2u t 0.48 (late half -9.6u). Bigger edge is worse (p/implied 1.2-1.35: -12.7u; EV >0.2 last two weeks 2-37), +1000 and longer -22.2u. Holding in both halves: tip team (198, +60.4u, t 1.38), top pick per game (195, +72.5u, t 1.64), both (114, +67.4u, t 1.95). Added `fb:tiptop` in learn.ts FB_SLICES (parent fb:all); in-sample only, so it counts games after registration like every slice.
+
+## 2026-11-20: First Basket one bet per game
+Jack: still too many First Basket bets (fb:tip went live 11/18 at 0.25u and stakes every tip-team edge, ~7 a day, 13 on 11/18). `fbStaked` (src/lib/props/staked-core.ts) now keeps only the highest-chance edge per game among those a live slice keeps. The learner still grades every edge. Backtest (scripts/fb-one-per-game-backtest.mts, read-only, 1u flat, per-game t): fb:tip 216 bets +53.0u ROI 24.5% t 1.22 (halves +50.9u / +2.1u); one per game 154 bets +68.8u ROI 44.7% t 1.72 (halves +37.7u / +31.1u); fb:tiptop 125 bets +67.0u t 1.85. Test added in staked-core.test.ts.

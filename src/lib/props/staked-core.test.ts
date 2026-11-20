@@ -101,6 +101,15 @@ describe("fbStaked", () => {
     expect(bets[0].priceText).toBe("+450 DraftKings");
     expect(bets[0].team).toBe("NYK");
   });
+  it("stakes only one edge per game, our highest chance", () => {
+    const fb = { home: "NYK", away: "BOS", tip: 0.55, first: 0.5, jumpers: {}, starters: "dk" as const, players: [
+      { id: "p1", name: "Josh Hart", team: "NYK", p: 0.12, price: 900, fair: 0.09, edge: true },
+      { id: "p2", name: "Karl-Anthony Towns", team: "NYK", p: 0.2, price: 450, fair: 0.15, edge: true },
+      { id: "p3", name: "OG Anunoby", team: "NYK", p: 0.15, price: 700, fair: 0.11, edge: true },
+    ] };
+    const bets = fbStaked({ boards: [{ ...board([]), fb }], entries: [entry("fb:tip")], now, today, section: "nba-firstbasket-ours" });
+    expect(bets.map((b) => b.player)).toEqual(["Karl-Anthony Towns"]);
+  });
 });
 
 describe("attdStakedBets", () => {
