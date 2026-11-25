@@ -2,8 +2,7 @@ import "server-only";
 import { redis } from "@/lib/redis/client";
 import { watchProblems } from "@/lib/notify/problems";
 import { boardFor, cbbSeason } from "./store";
-import { matchRows } from "./harris";
-import { SAM_DAY, SAM_DAYS, SAM_PRE, fetchSamCbb, mergeSam, parseSamCbb, samPreOf, type SamCbbDay, type SamCbbRow } from "./sam";
+import { SAM_DAY, SAM_DAYS, SAM_PRE, fetchSamCbb, matchSamRows, mergeSam, parseSamCbb, samPreOf, type SamCbbDay } from "./sam";
 
 // Sam's CBB page into Redis (tracked only; sam.ts has the page and its signs).
 // His page shows today's games, so the pulse reads it every ~25 minutes and a
@@ -30,21 +29,9 @@ export async function ingestSamCbb(now = new Date(), html?: string): Promise<Sam
   const next = etDate(new Date(now.getTime() + 86_400_000));
   const boards = (await Promise.all([date, next].map((d) => boardFor(d.replace(/-/g, ""))))).flat();
   if (!boards.length) throw new Error(`No college basketball games on our board for ${date} to match Sam's page against.`);
-  const m = matchRows(page.rows, boards.map((g) => ({ id: g.id, tip: g.tip, home: g.home, away: g.away })));
-  const problems = [...m.problems];
-  // His card links the ESPN event: a name match on a different game is a problem, not a read.
-  const rows = (m.rows as SamCbbRow[]).map((r) => {
-    if (r.event && r.samEvent && r.event !== r.samEvent) {
-      problems.push(`${r.away} at ${r.home}: matched ESPN ${r.event} but his card links ${r.samEvent}`);
-      const rest: SamCbbRow = { ...r };
-      delete rest.event;
-      delete rest.homeId;
-      delete rest.awayId;
-      delete rest.tip;
-      return rest;
-    }
-    return r;
-  });
+  const m = matchSamRows(page.rows, boards.map((g) => ({ id: g.id, tip: g.tip, home: { id: g.home.id, name: g.home.name }, away: { id: g.away.id, name: g.away.name } })));
+  const problems = m.problems;
+  const rows = m.rows;
   const season = cbbSeason(new Date(`${date}T12:00:00Z`));
   const prior = await redis.get<SamCbbDay>(SAM_DAY(season, date)).catch(() => null);
   const merged = mergeSam(prior?.rows, rows, at);
@@ -54,7 +41,6 @@ export async function ingestSamCbb(now = new Date(), html?: string): Promise<Sam
     rows: merged,
     verified: rows.some((r) => r.event) && problems.length === 0,
     problems,
-    ...(m.setAside.length ? { setAside: m.setAside } : {}),
     ...(page.updated ? { updated: page.updated } : {}),
     at,
   };

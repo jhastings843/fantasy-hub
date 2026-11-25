@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { mergeSam, parseSamCbb, samPreOf } from "./sam";
+import { matchSamRows, mergeSam, parseSamCbb, samPreOf } from "./sam";
 import { CBB_SLICES, betOf, type Read } from "./learn";
 
 const html = readFileSync("test/fixtures/picks/sam-cbb-board.html", "utf8");
@@ -50,5 +50,31 @@ describe("Sam slices", () => {
     const r = { sam: { side: "away", edge: 4, total: { side: "under", edge: 6 } } } as unknown as Read;
     expect(betOf("sam", r)).toEqual({ market: "ats", side: "away" });
     expect(betOf("sam-total", r)).toEqual({ market: "ou", side: "under" });
+  });
+});
+
+describe("matchSamRows", () => {
+  const base = { neutral: true, spread: -3, model: -1, conf: null, edge: 2, pick: "away" as const, trigger: false, total: 140 };
+  const games = [
+    { id: "1", tip: "2026-11-25T16:00:00Z", home: { id: "h1", name: "Ohio" }, away: { id: "a1", name: "Rice" } },
+    { id: "2", tip: "2026-11-25T17:00:00Z", home: { id: "h2", name: "Ohio" }, away: { id: "a2", name: "Ohio State" } },
+  ];
+  it("matches by his ESPN link and keeps his home", () => {
+    const m = matchSamRows([{ ...base, away: "Rice Owls", home: "Ohio Bobcats", samEvent: "1" }], games);
+    expect(m.problems).toEqual([]);
+    expect(m.rows[0]).toMatchObject({ event: "1", homeId: "h1", awayId: "a1" });
+  });
+  it("flips when ESPN calls his road team home", () => {
+    const m = matchSamRows([{ ...base, away: "Ohio Bobcats", home: "Rice Owls", samEvent: "1" }], games);
+    expect(m.rows[0]).toMatchObject({ homeId: "a1", awayId: "h1" });
+  });
+  it("tells Ohio from Ohio State", () => {
+    expect(matchSamRows([{ ...base, away: "Ohio Bobcats", home: "Ohio State Buckeyes", samEvent: "2" }], games).rows[0].homeId).toBe("a2");
+    expect(matchSamRows([{ ...base, away: "Ohio State Buckeyes", home: "Ohio Bobcats", samEvent: "2" }], games).rows[0].homeId).toBe("h2");
+  });
+  it("reports a card off the board or with wrong names", () => {
+    const m = matchSamRows([{ ...base, away: "X", home: "Y", samEvent: "9" }, { ...base, away: "Duke Blue Devils", home: "UNC Tar Heels", samEvent: "1" }], games);
+    expect(m.problems).toHaveLength(2);
+    expect(m.rows.every((r) => !r.event)).toBe(true);
   });
 });

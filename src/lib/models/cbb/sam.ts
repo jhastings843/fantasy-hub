@@ -136,6 +136,45 @@ export function parseSamCbb(html: string): { updated: string | null; rows: SamCb
   return { updated, rows, unread };
 }
 
+/** A board game's teams, enough to match his cards (ESPN `name` is the school, e.g. "Ohio"). */
+export interface SamBoardGame {
+  id: string;
+  tip: string;
+  home: { id: string; name: string };
+  away: { id: string; name: string };
+}
+
+/** His full name ("Ohio Bobcats") is the ESPN school plus mascot: a match is the name or the name and a space. */
+const isTeam = (his: string, school: string) => his === school || his.startsWith(`${school} `);
+
+/**
+ * His cards matched to the ESPN board by the event id each card links, then
+ * oriented by name (his second team is his home; ESPN may call the other team
+ * home at a neutral site). A card whose id is not on the board, or whose names
+ * fit neither way round, is a problem.
+ */
+export function matchSamRows(rows: SamCbbRow[], games: SamBoardGame[]): { rows: SamCbbRow[]; problems: string[] } {
+  const by = new Map(games.map((g) => [g.id, g]));
+  const problems: string[] = [];
+  const out = rows.map((r) => {
+    const g = r.samEvent ? by.get(r.samEvent) : undefined;
+    if (!g) {
+      problems.push(`${r.away} at ${r.home}: ${r.samEvent ? `ESPN ${r.samEvent} not on our board` : "no ESPN link on his card"}`);
+      return r;
+    }
+    const straight = isTeam(r.home, g.home.name) && isTeam(r.away, g.away.name);
+    const flipped = isTeam(r.home, g.away.name) && isTeam(r.away, g.home.name);
+    // Both fit only when one school name starts the other's ("Ohio" / "Ohio State"): the way round that uses more of the school names wins.
+    const flip = straight && flipped ? g.away.name.length > g.home.name.length && r.home.startsWith(`${g.away.name} `) : flipped;
+    if (!straight && !flipped) {
+      problems.push(`${r.away} at ${r.home}: names don't fit ESPN ${g.id} (${g.away.name} at ${g.home.name})`);
+      return r;
+    }
+    return { ...r, event: g.id, homeId: flip ? g.away.id : g.home.id, awayId: flip ? g.home.id : g.away.id, tip: g.tip };
+  });
+  return { rows: out, problems };
+}
+
 /** A fresh read merged onto the stored one; `pre` moves only on a read before tip. */
 export function mergeSam(prior: SamCbbRow[] | undefined, fresh: SamCbbRow[], at: string): SamCbbRow[] {
   const old = new Map((prior ?? []).filter((r) => r.event).map((r) => [r.event!, r]));
