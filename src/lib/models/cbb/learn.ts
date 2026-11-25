@@ -18,6 +18,7 @@ import { payout } from "./lines";
 import type { TrackedCbbGame } from "./track";
 import type { HarrisPre } from "./harris";
 import type { DavidPre } from "./david";
+import type { SamPre } from "./sam";
 
 export const CBB_SECTION = "cbb-model-ours";
 
@@ -46,6 +47,8 @@ export interface Read {
    * his last read before tip (david.ts). Undefined without a pregame read.
    */
   david?: { side: "home" | "away" | null; edge: number; total: { side: "over" | "under"; edge: number } | null };
+  /** Sam's side and total the same way, from his last read before tip (sam.ts). Undefined without a pregame read. */
+  sam?: { side: "home" | "away" | null; edge: number; total: { side: "over" | "under"; edge: number } | null };
 }
 
 /** Everything a Read needs, from a live snapshot or a backtest row. */
@@ -91,7 +94,7 @@ export function readOf(x: ReadInput, earlyBefore = "12-15"): Read {
   return { side, edge, fav, agree, withMove, conf: x.conf, neutral: x.neutral, early: md >= "08-01" && md < earlyBefore, total };
 }
 
-type Pick = "ours" | "fade" | "total" | "harris" | "david" | "david-total";
+type Pick = "ours" | "fade" | "total" | "harris" | "david" | "david-total" | "sam" | "sam-total";
 type Keep = (r: Read) => boolean;
 
 /** [id, label, parent, which bet, keep]. Thresholds fixed 2026-11-02 before any live game. */
@@ -134,6 +137,17 @@ export const CBB_SLICES: [string, string, string | undefined, Pick, Keep][] = [
   ["cbb:david-total", "David's side of the total, any edge", undefined, "david-total", (r) => !!r.david?.total],
   ["cbb:david-total5", "David's side of the total, 5+ pts", "cbb:david-total", "david-total", (r) => !!r.david?.total && r.david.total.edge >= 5],
   ["cbb:david-total-agree", "Our total when David is on the same side", "cbb:total", "total", (r) => !!r.total && r.david?.total?.side === r.total.side],
+  // Sam as an outside source (added 2026-11-25 when his /cbb page went live, before any graded game; thresholds mirror David's).
+  ["cbb:sam-agree", "Our side when Sam is on it too", "cbb:lean", "ours", (r) => !!r.side && r.sam?.side === r.side],
+  ["cbb:sam-split", "Our side when Sam is on the other side", "cbb:lean", "ours", (r) => !!r.side && !!r.sam?.side && r.sam.side !== r.side],
+  ["cbb:sam", "Sam's side, any edge", undefined, "sam", (r) => !!r.sam?.side],
+  ["cbb:sam3", "Sam's side, 3+ pts off the line", "cbb:sam", "sam", (r) => !!r.sam?.side && r.sam.edge >= 3],
+  ["cbb:sam5", "Sam's side, 5+ pts off the line", "cbb:sam3", "sam", (r) => !!r.sam?.side && r.sam.edge >= 5],
+  ["cbb:sam-david", "Sam's side when David is on it too", "cbb:sam", "sam", (r) => !!r.sam?.side && r.david?.side === r.sam.side],
+  ["cbb:sam-harris", "Sam's side when Harris is on it too", "cbb:sam", "sam", (r) => !!r.sam?.side && r.harris?.side === r.sam.side],
+  ["cbb:sam-total", "Sam's side of the total, any edge", undefined, "sam-total", (r) => !!r.sam?.total],
+  ["cbb:sam-total5", "Sam's side of the total, 5+ pts", "cbb:sam-total", "sam-total", (r) => !!r.sam?.total && r.sam.total.edge >= 5],
+  ["cbb:sam-total-agree", "Our total when Sam is on the same side", "cbb:total", "total", (r) => !!r.total && r.sam?.total?.side === r.total.side],
 ];
 
 /** The bet a slice makes on a read: side and market, or null. */
@@ -142,6 +156,8 @@ export function betOf(pick: Pick, r: Read): { market: "ats" | "ou"; side: "home"
   if (pick === "harris") return r.harris?.side ? { market: "ats", side: r.harris.side } : null;
   if (pick === "david") return r.david?.side ? { market: "ats", side: r.david.side } : null;
   if (pick === "david-total") return r.david?.total ? { market: "ou", side: r.david.total.side } : null;
+  if (pick === "sam") return r.sam?.side ? { market: "ats", side: r.sam.side } : null;
+  if (pick === "sam-total") return r.sam?.total ? { market: "ou", side: r.sam.total.side } : null;
   if (!r.side) return null;
   return { market: "ats", side: pick === "fade" ? (r.side === "home" ? "away" : "home") : r.side };
 }
@@ -185,7 +201,10 @@ export function davidRead(g: TrackedCbbGame, d: DavidPre | undefined): Read["dav
   return { side: line === null || e === 0 ? null : e > 0 ? "home" : "away", edge: r1(Math.abs(e)), total };
 }
 
-export function liveRead(g: TrackedCbbGame, h?: HarrisPre, d?: DavidPre): Read {
+/** Sam's side and total on a tracked game (his pre has David's shape, so the same reading). */
+export const samRead = (g: TrackedCbbGame, s: SamPre | undefined): Read["sam"] => davidRead(g, s);
+
+export function liveRead(g: TrackedCbbGame, h?: HarrisPre, d?: DavidPre, sm?: SamPre): Read {
   const s = g.first;
   const r = readOf({
     spread: s.spread,
@@ -200,18 +219,19 @@ export function liveRead(g: TrackedCbbGame, h?: HarrisPre, d?: DavidPre): Read {
   });
   const hr = harrisRead(g, h);
   const dr = davidRead(g, d);
-  return { ...r, ...(hr ? { harris: hr } : {}), ...(dr ? { david: dr } : {}) };
+  const sr = samRead(g, sm);
+  return { ...r, ...(hr ? { harris: hr } : {}), ...(dr ? { david: dr } : {}), ...(sr ? { sam: sr } : {}) };
 }
 
-/** Graded games into the engine's candidates, at the first saved price. `harris` and `david` are their pregame numbers by event (harris.ts, david.ts). */
-export function cbbCandidates(games: TrackedCbbGame[], season: number, harris: { [event: string]: HarrisPre } = {}, david: { [event: string]: DavidPre } = {}): Candidate[] {
+/** Graded games into the engine's candidates, at the first saved price. `harris`, `david` and `sam` are their pregame numbers by event (harris.ts, david.ts, sam.ts). */
+export function cbbCandidates(games: TrackedCbbGame[], season: number, harris: { [event: string]: HarrisPre } = {}, david: { [event: string]: DavidPre } = {}, sam: { [event: string]: SamPre } = {}): Candidate[] {
   return CBB_SLICES.map(([id, label, parent, pick, keep]) => ({
     id,
     label,
     ...(parent ? { parent } : {}),
     bets: games.flatMap((g): Bet[] => {
       if (!g.final) return [];
-      const r = liveRead(g, harris[g.event], david[g.event]);
+      const r = liveRead(g, harris[g.event], david[g.event], sam[g.event]);
       if (!keep(r)) return [];
       const b = betOf(pick, r);
       if (!b) return [];

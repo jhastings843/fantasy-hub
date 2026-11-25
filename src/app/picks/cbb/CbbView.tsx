@@ -6,8 +6,9 @@ import BACKTEST from "@/lib/models/cbb/backtest.json";
 import { GameCell, line, pieces, price, rec, units, whenEt, type Market, type View } from "../ui";
 import { betRecordTile } from "../../props/learning";
 import { Background, engineEntry, Hero, LearnerLog, PageHead, SecHead, Stats, TrackingProgress, WordsGuide } from "../board";
-import { CBB_SLICES, davidRead, harrisRead, settle } from "@/lib/models/cbb/learn";
+import { CBB_SLICES, davidRead, harrisRead, samRead, settle } from "@/lib/models/cbb/learn";
 import { DAVID_CBB_URL, type DavidPre } from "@/lib/models/cbb/david";
+import { SAM_CBB_URL } from "@/lib/models/cbb/sam";
 import { scoresAt } from "@/lib/live/scores-at";
 import { ScopeRow, ViewTabs } from "../tabs";
 import { scopeGroups, viewTabs } from "../tab-sets";
@@ -33,7 +34,7 @@ const STATUS = { collecting: "Collecting", active: "Live", paused: "Paused this 
 /** Which slices belong to a market tab. */
 const sliceMarket = (id: string): Market => {
   const pick = CBB_SLICES.find((x) => x[0] === id)?.[3];
-  return pick === "total" || pick === "david-total" ? "ou" : "ats";
+  return pick === "total" || pick === "david-total" || pick === "sam-total" ? "ou" : "ats";
 };
 
 /** A source's model line for the board row's home team (its home side can be ESPN's away at a neutral site). */
@@ -43,6 +44,28 @@ function homeLineOf(x: { g: { home: { id: string }; away: { id: string } } }, d:
 }
 const davidHome = (x: { g: { home: { id: string }; away: { id: string } }; david?: DavidPre }) => homeLineOf(x, x.david);
 const harrisHome = (x: CbbBoardRow) => homeLineOf(x, x.harris);
+const samHome = (x: CbbBoardRow) => homeLineOf(x, x.sam);
+
+/** Sam's number in this market, like David's. Null when he didn't post the game. */
+function samCell(x: CbbBoardRow, m: Market): string | null {
+  const h = samHome(x);
+  if (h === null) return null;
+  if (m === "ou") return x.sam!.total !== null ? x.sam!.total.toFixed(1) : null;
+  if (m === "su") return h === 0 ? "even" : `${h < 0 ? x.g.home.abbr : x.g.away.abbr} by ${Math.abs(h).toFixed(1)}`;
+  return `${x.g.home.abbr} ${line(h)}`;
+}
+
+/** Whether Sam sides with our lean at today's line: true, false, or null. */
+function samAgrees(x: CbbBoardRow, m: Market, l: Lean): boolean | null {
+  if (!l || m === "su") return null;
+  if (m === "ou") {
+    const t = x.read.line?.total;
+    const st = x.sam?.total;
+    if (t == null || st == null || st === t) return null;
+    return (st > t ? "over" : "under") === l.side;
+  }
+  return sideAgrees(x, samHome(x), l);
+}
 
 /** Harris's number in a few words (spreads and straight up only: his sheet has no totals). */
 function harrisCell(x: CbbBoardRow, m: Market): string | null {
@@ -132,7 +155,7 @@ function SliceTable({ v, m }: { v: CbbRecord; m: Market }) {
           </tbody>
         </table>
       </div>
-      <p className={`${s.notice} ${s.dim}`}>2025-26 is retrospective: the model&apos;s number on a game could use results from after its line opened, and the blend&apos;s two weights were fit on that season&apos;s first half. Line-move slices need a later read, Harris slices his daily sheet (tracked from Nov 6) and David slices his daily page (tracked from Nov 12; his page keeps no past days), so none of them has a backtest.</p>
+      <p className={`${s.notice} ${s.dim}`}>2025-26 is retrospective: the model&apos;s number on a game could use results from after its line opened, and the blend&apos;s two weights were fit on that season&apos;s first half. Line-move slices need a later read, Harris slices his daily sheet (tracked from Nov 6) David slices his daily page (tracked from Nov 12; his page keeps no past days) and Sam slices his daily page (tracked from Nov 25), so none of them has a backtest.</p>
     </div>
   );
 }
@@ -274,6 +297,8 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
   const dCell = davidCell(x, m);
   const dAgree = davidAgrees(x, m, l);
   const hCell = harrisCell(x, m);
+  const smCell = samCell(x, m);
+  const smAgree = samAgrees(x, m, l);
   const hAgree = m === "ats" ? sideAgrees(x, harrisHome(x), l) : null;
   const status =
     g.state === "in" ? (
@@ -297,12 +322,14 @@ function Row({ x, m, day }: { x: CbbBoardRow; m: Market; day: string }) {
         <span className={s.gNum} data-k="Ours">
           <span className={c.ours}>{ours.v}</span>
           <small>{[ours.sub, m !== "su" && r.parts.trank ? `T-Rank ${trankCell(x, m)}` : ""].filter(Boolean).join(" · ")}</small>
+          {smCell && <small className={s.cSam}>{`Sam ${smCell}`}</small>}
           {dCell && <small className={s.cDavid}>{`David ${dCell}`}</small>}
           {hCell && <small className={s.cHarris}>{`Harris ${hCell}`}</small>}
         </span>
         <span className={s.gNum} data-k="Side">
           {m !== "su" && !r.line ? "·" : pickText(x, m, l)}
           {(edgeTxt || chance !== null) && (m === "su" || r.line) && <small>{[edgeTxt, chance !== null && m !== "su" ? `${pctOf(chance)} to ${m === "ou" ? "hit" : "cover"}` : ""].filter(Boolean).join(" · ")}</small>}
+          {smAgree !== null && <small className={s.cSam}>{smAgree ? "Sam agrees" : "Sam on the other side"}</small>}
           {dAgree !== null && <small className={s.cDavid}>{dAgree ? "David agrees" : "David on the other side"}</small>}
           {hAgree !== null && <small className={s.cHarris}>{hAgree ? "Harris agrees" : "Harris on the other side"}</small>}
         </span>
@@ -330,6 +357,8 @@ export function CbbRowBody({ x, m }: { x: CbbBoardRow; m?: Market }) {
   const sides = m !== "ou";
   const dHome = davidHome(x);
   const dTotal = x.david?.total ?? null;
+  const smHome = samHome(x);
+  const smTotal = x.sam?.total ?? null;
   const both = (margin: string, total: string) => [sides ? margin : "", ou ? total : ""].filter(Boolean).join(", ");
   return (
       <div className={s.gBody}>
@@ -382,6 +411,12 @@ export function CbbRowBody({ x, m }: { x: CbbBoardRow; m?: Market }) {
           <dd className={s.num}>{r.parts.trank ? `${both(`${g.home.short} ${line(Math.round(-r.parts.trank.margin * 10) / 10 || 0)}`, `total ${r.parts.trank.total.toFixed(1)}`)}${r.rank.home || r.rank.away ? ` (ranks ${r.rank.away ?? "·"} at ${r.rank.home ?? "·"})` : ""}` : "not rated (non-Division I side)"}</dd>
           <dt>Blend</dt>
           <dd className={s.num}>{both(`${g.home.short} ${line(r.proj.spread)}`, `total ${r.proj.total}`)}</dd>
+          <dt>Sam</dt>
+          <dd className={`${s.num} ${s.cSam}`}>
+            {(sides ? smHome !== null : smTotal !== null)
+              ? `${both(`${g.home.short} ${line(smHome ?? 0)}`, `total ${smTotal?.toFixed(1) ?? "·"}`)}`
+              : "not posted (his page lists today's games only)"}
+          </dd>
           <dt>David</dt>
           <dd className={`${s.num} ${s.cDavid}`}>
             {(sides ? dHome !== null : dTotal !== null)
@@ -421,7 +456,7 @@ function Rows({ rows, m }: { rows: { x: CbbBoardRow; day: string }[]; m: Market 
       <div className={`${s.gHead} ${s.ledgerHead}`} aria-hidden>
         <span>Game</span>
         <span>{m === "su" ? "Moneyline" : "DraftKings"}</span>
-        <span>{m === "ou" ? "Ours · David" : "Ours · David · Harris"}</span>
+        <span>{m === "ou" ? "Ours · Sam · David" : "Ours · Sam · David · Harris"}</span>
         <span>Side</span>
         <span>Read</span>
         <span />
@@ -530,6 +565,20 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
     return { side, ...settle(m, side, ln, pr, g.final!) };
   };
   const dBets = m === "su" ? [] : done.map(davidBet).filter((x) => x !== null);
+  // Sam's the same way (from Nov 25).
+  const samBet = (g: (typeof done)[number]) => {
+    const d = samRead(g, v.sam[g.event]);
+    if (!d || m === "su") return null;
+    const side = m === "ats" ? d.side : d.total?.side;
+    const ln = m === "ats" ? g.first.spread : g.first.total;
+    if (!side || ln === null) return null;
+    const pr = side === "home" ? g.first.homePrice : side === "away" ? g.first.awayPrice : side === "over" ? g.first.overPrice : g.first.underPrice;
+    return { side, ...settle(m, side, ln, pr, g.final!) };
+  };
+  const smBets = m === "su" ? [] : done.map(samBet).filter((x) => x !== null);
+  const smW = smBets.filter((b) => b.r > 0).length;
+  const smL = smBets.filter((b) => b.r < 0).length;
+  const smU = Math.round(smBets.reduce((a, b) => a + b.net, 0) * 100) / 100;
   const dW = dBets.filter((b) => b.r > 0).length;
   const dL = dBets.filter((b) => b.r < 0).length;
   const dU = Math.round(dBets.reduce((a, b) => a + b.net, 0) * 100) / 100;
@@ -563,7 +612,7 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
         }
         sub={m === "su" ? "Our winner on every game at the saved moneyline, 1 unit each. Tracked only." : "Graded at the DraftKings number and price we first saved, 1 unit each. Closing-line value is how far the line moved toward our side by tip; it is the gate, since it settles faster than wins."}
       />
-      <Stats label="Bet record" items={[{ k: "Bet record", v: betRecordTile(v.section).value, sub: betRecordTile(v.section).label.replace(/^Bet record · /, ""), tone: v.section.record.bets ? (v.section.record.units >= 0 ? "up" : "down") : undefined }, { k: `Every ${what.replace(/s$/, "")} we priced`, v: head && head.w + head.l ? units(head.units) : "0-0", sub: head ? rec(head) : "nothing graded" }, ...(m === "su" ? [] : [{ k: `Every David ${m === "ou" ? "total" : "side"} (from Nov 12)`, v: dW + dL ? units(dU) : "0-0", sub: dW + dL ? `${dW}-${dL}${dBets.length - dW - dL ? `-${dBets.length - dW - dL}` : ""}, same line and price as ours` : "nothing graded yet", tone: dW + dL ? (dU >= 0 ? ("up" as const) : ("down" as const)) : undefined }]), ...(m === "ats" ? [{ k: "Every Harris side (from Nov 6)", v: hW + hL ? units(hU) : "0-0", sub: hW + hL ? `${hW}-${hL}${hBets.length - hW - hL ? `-${hBets.length - hW - hL}` : ""}, same line and price as ours` : "nothing graded yet", tone: hW + hL ? (hU >= 0 ? ("up" as const) : ("down" as const)) : undefined }] : [])]} />
+      <Stats label="Bet record" items={[{ k: "Bet record", v: betRecordTile(v.section).value, sub: betRecordTile(v.section).label.replace(/^Bet record · /, ""), tone: v.section.record.bets ? (v.section.record.units >= 0 ? "up" : "down") : undefined }, { k: `Every ${what.replace(/s$/, "")} we priced`, v: head && head.w + head.l ? units(head.units) : "0-0", sub: head ? rec(head) : "nothing graded" }, ...(m === "su" ? [] : [{ k: `Every Sam ${m === "ou" ? "total" : "side"} (from Nov 25)`, v: smW + smL ? units(smU) : "0-0", sub: smW + smL ? `${smW}-${smL}${smBets.length - smW - smL ? `-${smBets.length - smW - smL}` : ""}, same line and price as ours` : "nothing graded yet", tone: smW + smL ? (smU >= 0 ? ("up" as const) : ("down" as const)) : undefined }]), ...(m === "su" ? [] : [{ k: `Every David ${m === "ou" ? "total" : "side"} (from Nov 12)`, v: dW + dL ? units(dU) : "0-0", sub: dW + dL ? `${dW}-${dL}${dBets.length - dW - dL ? `-${dBets.length - dW - dL}` : ""}, same line and price as ours` : "nothing graded yet", tone: dW + dL ? (dU >= 0 ? ("up" as const) : ("down" as const)) : undefined }]), ...(m === "ats" ? [{ k: "Every Harris side (from Nov 6)", v: hW + hL ? units(hU) : "0-0", sub: hW + hL ? `${hW}-${hL}${hBets.length - hW - hL ? `-${hBets.length - hW - hL}` : ""}, same line and price as ours` : "nothing graded yet", tone: hW + hL ? (hU >= 0 ? ("up" as const) : ("down" as const)) : undefined }] : [])]} />
       {m !== "su" && <SliceTable v={v} m={m} />}
       {m === "su" && (
       <div className={s.tw}>
@@ -609,6 +658,7 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
                   <th>Our side</th>
                   <th>Final</th>
                   <th>Result</th>
+                  {m !== "su" && <th>Sam</th>}
                   {m !== "su" && <th>David</th>}
                   {m === "ats" && <th>Harris</th>}
                 </tr>
@@ -628,6 +678,12 @@ function ResultsView({ v, m }: { v: CbbRecord; m: Market }) {
                     </td>
                     <td className={s.num}>{`${g.final!.away}-${g.final!.home}`}</td>
                     <td className={`${s.num} ${res!.r > 0 ? s.pos : res!.r < 0 ? s.neg : ""}`}>{res!.r > 0 ? `W ${units(res!.u)}` : res!.r < 0 ? "L −1.0u" : "Push"}</td>
+                    {m !== "su" && (() => {
+                      const sb = samBet(g);
+                      if (!sb) return <td className={`${s.num} ${s.dim}`}>·</td>;
+                      const who = sb.side === "home" ? g.homeName : sb.side === "away" ? g.awayName : sb.side === "over" ? "Over" : "Under";
+                      return <td className={`${s.num} ${s.cSam}`}>{`${who}${sb.side === side ? " (same)" : ""} · ${sb.r > 0 ? "W" : sb.r < 0 ? "L" : "P"}`}</td>;
+                    })()}
                     {m !== "su" && (() => {
                       const db = davidBet(g);
                       if (!db) return <td className={`${s.num} ${s.dim}`}>·</td>;
@@ -812,7 +868,7 @@ export default async function CbbView({ view = "week", market = "ats", show = "p
 
         <footer className={s.footer}>
           <span>
-            Sources: <a href="https://barttorvik.com/">Bart Torvik&apos;s T-Rank</a>, <a href={DAVID_CBB_URL}>David Sasser</a> and John Harris&apos;s daily sheet (both tracked beside ours), ESPN finals. Lines: DraftKings via ESPN. Model output, not betting advice.
+            Sources: <a href="https://barttorvik.com/">Bart Torvik&apos;s T-Rank</a>, <a href={SAM_CBB_URL}>Sam</a>, <a href={DAVID_CBB_URL}>David Sasser</a> and John Harris&apos;s daily sheet (all tracked beside ours), ESPN finals. Lines: DraftKings via ESPN. Model output, not betting advice.
           </span>
           {b?.problems.map((t) => (
             <span key={t}>{t}</span>

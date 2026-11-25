@@ -613,6 +613,7 @@ button.chip { background: none; font: inherit; font-size: 14px; cursor: pointer;
 .ledger > summary, .ledgerHead { grid-template-columns: minmax(170px, 1.6fr) minmax(96px, .8fr) minmax(130px, 1.1fr) minmax(130px, 1.1fr) 190px 16px; }
 .ledger .gNum { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
 .ledger .gNum small, .ledgerRead small { font-family: var(--font-plex), sans-serif; font-size: 12px; color: var(--mute); }
+.ledger .gNum small.cSam { color: var(--accent); font-family: var(--font-plex-mono), monospace; }
 .ledger .gNum small.cDavid { color: var(--david); font-family: var(--font-plex-mono), monospace; }
 .ledger .gNum small.cHarris { color: var(--harris); font-family: var(--font-plex-mono), monospace; }
 .ledgerRead { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; justify-self: end; min-width: 0; }

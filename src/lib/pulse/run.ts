@@ -4,6 +4,7 @@ import "server-only";
 import { runNbaNews } from "@/lib/models/nba/news-store";
 import { runSamCbbWatch } from "@/lib/models/cbb/sam-watch";
 import { davidCbbIfDue } from "@/lib/models/cbb/david-store";
+import { samCbbIfDue } from "@/lib/models/cbb/sam-store";
 import { runCbb } from "@/lib/models/cbb/store";
 import { recheckSam } from "@/lib/picks/nba-track-store";
 import { runSplitsAlerts } from "@/lib/picks/splits-alert";
@@ -523,7 +524,7 @@ async function alreadyWentOut(id: SendId): Promise<boolean> {
 }
 
 /** Pulse jobs that read or save pick sources, for the Picks line on Today's feed. */
-const PICK_JOBS = new Set(["picks-data", "picks-review", "harris-feed", "harris-cbb", "tracker", "nba-sam", "splits-skip", "pool-watch", "cbb", "sam-cbb-watch", "david-cbb"]);
+const PICK_JOBS = new Set(["picks-data", "picks-review", "harris-feed", "harris-cbb", "tracker", "nba-sam", "splits-skip", "pool-watch", "cbb", "sam-cbb-watch", "david-cbb", "sam-cbb"]);
 
 export async function runPulse(
   options: { now?: Date; tier?: PulseTier; sends?: boolean } = {},
@@ -554,8 +555,9 @@ export async function runPulse(
   // The pick'em watch too: a push when the entry's pick flips on a game still to play.
   // College hoops too: our number saved for games within 36 hours of tip and finals graded, at most every 30 minutes (its own claim).
   // David Sasser's CBB page too (tracked only): today's games, at most every 25 minutes, so his pregame number is saved before he drops a game at tip.
+  // Sam's CBB page the same way (tracked only, from 2026-11-25).
   // Staked props and NBA bets too: each pushed once, before lock (notify/staked.ts).
-  const [jobs, news, sam, skips, pool, cbb, samCbb, davidCbb, staked] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now)), job("splits-skip", () => runSplitsAlerts(now)), job("pool-watch", () => runPoolWatch(now)), job("cbb", () => runCbb(now)), job("sam-cbb-watch", () => runSamCbbWatch(now)), job("david-cbb", () => davidCbbIfDue(now)), job("staked-push", () => runStakedPushes(now))]);
+  const [jobs, news, sam, skips, pool, cbb, samCbb, davidCbb, samCbbRead, staked] = await Promise.all([Promise.all(jobsFor(tier).map((j) => job(j.name, j.work))), job("nba-news", () => runNbaNews(now)), job("nba-sam", () => recheckSam(now)), job("splits-skip", () => runSplitsAlerts(now)), job("pool-watch", () => runPoolWatch(now)), job("cbb", () => runCbb(now)), job("sam-cbb-watch", () => runSamCbbWatch(now)), job("david-cbb", () => davidCbbIfDue(now)), job("sam-cbb", () => samCbbIfDue(now)), job("staked-push", () => runStakedPushes(now))]);
 
   for (const id of tempo.dueJobs) {
     let left = DEADLINE_MS - (Date.now() - started);
@@ -595,7 +597,7 @@ export async function runPulse(
   // the difference between advice that is stale for fifteen minutes and
   // advice that is stale until lunch.
   if (claimed && jobs.every((j) => j.ok)) await recordTierRun(tier);
-  jobs.push(news, sam, skips, pool, cbb, samCbb, davidCbb, staked);
+  jobs.push(news, sam, skips, pool, cbb, samCbb, davidCbb, samCbbRead, staked);
   // A job failing three pulses in a row pushes once (notify/problems.ts).
   await Promise.all(jobs.map((j) => watchProblems(`Pulse ${j.job}`, j.ok ? [] : [j.error ?? "failed"])));
   // One Picks line on Today's feed per pulse (Jack, 2026-11-09: every pick scan shows). Same text folds into one row.

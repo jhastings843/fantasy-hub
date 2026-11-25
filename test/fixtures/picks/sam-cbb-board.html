@@ -1,0 +1,1490 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sam&#x27;s Models — November 25 CBB</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* SURFACES AND TEXT ARE NOW SEPARATE VARIABLES, which is what makes a dark theme possible at
+   all. --cream and --navy were each doing two jobs: cream was the light panel AND the light
+   text on the dark header; navy was the dark text AND the dark header itself. Flip either one
+   and half the site inverts correctly while the other half turns unreadable. The three
+   background uses are therefore aliased out, so the dark theme can move a surface without
+   touching the colour printed on it. */
+:root{--navy:#0b1d33;--navy2:#16304f;--cream:#fffbf2;--paper:#fff;--rule:#e6e2d8;--rule2:#f0ece2;
+--surf:var(--cream);--surf2:var(--paper);--surfd:var(--navy);
+/* Inset surfaces: hovered table rows, note panels, bar tracks. The fragment modules
+   (picks, first basket) used literal near-whites here, and a literal is the one thing
+   a theme cannot move -- they stayed white while the text above them went light. */
+--sunk:#fbfaf7;--sunk2:#f7f5ef;--track:#eceae3;
+/* The amber 'this number is thin' tint, shared by the first-TD panels. */
+--warnbg:#fdf6e3;--warnfg:#6f5a1d;--warnln:#e8d9ad;
+/* The pale green 'this is the winning row' wash, and the card edge beside it. */
+--okbg:#f3f8f5;--okln:#cde8da;--cardln:#d8d4cb;
+--ink:#0b1d33;--body:#4a5668;--mute:#8a8578;--accent:#1c4e7a;--pos:#0f7b5f;--neg:#a8443c;
+--sans:'Inter',system-ui,-apple-system,sans-serif;--serif:'Source Serif 4',Georgia,serif;
+--mono:'IBM Plex Mono',ui-monospace,monospace;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+/* ===== DARK THEME ======================================================================
+   Opt-in, never automatic. The cream-and-navy look is the brand and the thing people have
+   already seen; a site that silently turns black because of a phone setting is a different
+   product than the one that was bookmarked. So the default stays light whatever the OS says,
+   and the switch is the only thing that changes it.
+   Only the palette moves — not one layout rule — which is the whole return on splitting the
+   surface variables out above. */
+:root[data-theme="dark"]{
+  --surf:#121b25;          /* panels, hero bands, tiles */
+  --surf2:#0b1119;         /* the page itself */
+  --surfd:#060b11;         /* header and the inverted tiles */
+  --navy:#e8eef5;          /* was dark text; now light text and emphasis borders */
+  --navy2:#9fc0e4;
+  --ink:#e8eef5;
+  --body:#b0bdcc;
+  --mute:#7d8c9e;
+  --rule:#202c3a;
+  --rule2:#1a2430;
+  --accent:#6cb6ec;
+  --pos:#3ad99f;
+  --neg:#ff9080;
+  --warnbg:#2b2310;--warnfg:#f0d79b;--warnln:#5c4a1c;
+  --okbg:#122a22;--okln:#235c46;--cardln:#2a3a4a;
+  --sunk:#0f1821;--sunk2:#141f2a;--track:#223040;
+  color-scheme:dark;
+}
+/* The one thing a palette swap cannot carry: team logos and marks drawn for a light page.
+   Knocking a little brightness off them stops them glowing out of a dark board. */
+::selection{{ background:#b9d9f5;color:#0b1d33 }}
+:root[data-theme="dark"] ::selection{{ background:#2f5676;color:#eaf2fb }}
+:root[data-theme="dark"] img{filter:saturate(.92) brightness(.94)}
+/* SELECTED HAS TO GO THE OTHER WAY IN THE DARK. On cream, "chosen" is the tile that turns
+   navy — darker than everything round it. Invert the palette and that same rule paints a
+   near-black tile onto a near-black page and the selection disappears. Contrast is the
+   signal, not darkness, so in this theme the chosen tile lifts instead. */
+:root[data-theme="dark"] .tile.on{background:#20303f;box-shadow:inset 0 0 0 1px #30455a}
+:root[data-theme="dark"] .tile.on .k,:root[data-theme="dark"] .tile.on .n{color:#a7bed6}
+
+.thm{background:none;border:1px solid rgba(255,251,242,.28);border-radius:7px;cursor:pointer;
+color:var(--cream);font-family:var(--mono);font-size:10px;letter-spacing:1.2px;padding:6px 9px;
+line-height:1;display:inline-flex;align-items:center;gap:5px;flex:none}
+.thm:focus-visible{outline:2px solid var(--cream);outline-offset:2px}
+@media(hover:hover){.thm:hover{border-color:var(--cream)}}
+/* ON A PHONE IT IS THE SYMBOL ALONE. The header is already tight enough that the disclaimer
+   gets a line of its own; five more characters of "DARK" is what tips the whole bar into a
+   third row. A sun and a moon need no label. */
+@media(max-width:720px){
+ .thm{padding:7px;gap:0;font-size:12px}
+ #thmt{display:none}
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surf2);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;
+font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+a{color:inherit;text-decoration:none}
+img{max-width:100%}
+/* HEADER AND PARTNER BAND STICK AS ONE BLOCK. The header was sticky on its own; sticking the
+   band separately would need a top offset equal to the header's height, and that height is not
+   a constant -- the bar reflows on a narrow screen and the band would either overlap the nav
+   or float below it with a gap. One sticky wrapper holds them together at any width, and
+   whatever the header does the band stays attached to its underside. */
+.topstick{position:sticky;top:env(safe-area-inset-top,0);z-index:20}
+header{background:var(--surfd);color:var(--cream)}
+.hbar{max-width:1080px;margin:0 auto;padding:12px 24px;display:flex;justify-content:space-between;
+align-items:center;gap:16px}
+/* The header ran 2px past the viewport on a 360px phone — the nav's four sport links plus the
+   wordmark need a little more than that width at full padding. Narrow phones get tighter
+   padding and gaps rather than a wrapped or scrolling header. */
+@media(max-width:380px){
+ .hbar{padding:12px 14px;gap:8px}
+ .hright{gap:4px}
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand .mk{width:38px;height:38px;border-radius:50%;background:var(--surf);color:var(--navy);
+display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;
+font-size:17px;letter-spacing:.5px;flex:none}
+.bt{display:flex;flex-direction:column;line-height:1.1}
+.bt .n1{font-family:var(--serif);font-size:17px;font-weight:700;letter-spacing:2px}
+.bt .n2{font-family:var(--mono);font-size:8.5px;letter-spacing:2.4px;color:#9fb3c8;margin-top:3px}
+/* THE DISCLAIMER IS A SIGN, NOT A DESTINATION. Small, quiet, and beside the mark rather than in
+   the nav: it has to be visible on every page without competing with the four sports for the
+   eye or for the width, which the header has none of to spare. It survives the 420px cut that
+   drops the wordmark — at 9px it is narrower than the text it stands next to, and the one
+   control that should never disappear on the phones most of this traffic arrives on. */
+.disc{font-family:var(--mono);font-size:9px;letter-spacing:1.1px;color:#8aa0b6;
+text-decoration:none;white-space:nowrap;padding:6px 7px;border:1px solid rgba(255,255,255,.14);
+border-radius:4px;margin-left:12px;flex:none;align-self:center;
+/* space-between would otherwise spread three children across the bar and leave this stranded
+   in the middle of nowhere; the auto margin takes up the slack so it stays beside the mark. */
+margin-right:auto}
+.disc:hover{color:var(--cream);border-color:rgba(255,255,255,.34)}
+.hright{display:flex;align-items:center;gap:10px;min-width:0}
+.search{display:flex;align-items:center}
+.sbtn{background:transparent;border:0;color:#9fb3c8;padding:7px;border-radius:6px;cursor:pointer;
+display:flex}
+.sbtn:hover{color:var(--cream);background:rgba(255,251,242,.12)}
+.search input{width:0;opacity:0;padding:0;border:0;border-radius:6px;background:rgba(255,251,242,.12);
+color:var(--cream);font-family:var(--sans);font-size:16px;transition:width .18s ease,opacity .18s ease,
+padding .18s ease;outline:none;min-width:0}
+.search input::placeholder{color:#8ba1b8}
+.search.open input{width:170px;opacity:1;padding:7px 10px}
+.search.open .sbtn{color:var(--cream)}
+.nores{padding:26px 0;color:var(--mute);font-family:var(--mono);font-size:12px;letter-spacing:1px}
+nav{display:flex;gap:2px}
+nav a{font-family:var(--mono);font-size:11px;letter-spacing:1.3px;color:#9fb3c8;padding:8px 12px;border-radius:5px}
+nav a.on{color:var(--cream);background:rgba(255,251,242,.13)}
+/* SIGN IN, NOT A SPORT, so it sits outside the nav and is coloured like an action. The path is
+   served by the members Worker; on any other host it 404s, which is the correct outcome for a
+   copy of this site that is not behind the gate. */
+.signin{font-family:var(--mono);font-size:11px;letter-spacing:1.3px;color:#0b1d33;
+ background:#5865F2;padding:8px 13px;border-radius:5px;margin-left:10px;white-space:nowrap;
+ font-weight:600;color:#fff}
+.signin:hover{background:#4752c4}
+/* SIGNED IN. The Worker swaps the class and the label at the edge when it serves the members'
+   copy — both builds ship this same header, so the page itself cannot know. Parlay Science
+   green, so the one visible difference between free and elite is their colour. */
+.signin.elite{background:#22c55e;color:#06260f}
+.signin.elite:hover{background:#16a34a}
+/* THE PARTNER BAND. Full width, directly under the header, in the partner's own colour so it
+   reads as theirs rather than as another piece of site furniture -- a promo that looks like
+   navigation gets ignored like navigation. One line on a phone, with the call to action
+   dropping away before the offer does: the offer is the thing worth keeping at 360px. */
+/* ONE AT A TIME, AND THE ONE ON SCREEN IS THE ONE A CLICK FOLLOWS. Both links are in the
+   page; only the current one is displayed, so there is no moment where the offer being read
+   and the destination being linked are different things. */
+.promos .promo{display:none}
+.promos .promo.on{display:block}
+.promo{display:block;background:var(--pm);color:var(--pmfg);text-decoration:none;
+ border-bottom:1px solid rgba(0,0,0,.22)}
+/* The dark palette gets the partner's second colour. Without this the black-branded partner
+   paints a black band directly under the navy header and reads as a gap in the page. The
+   divider rules below are keyed off the text colour for the same reason: a white hairline on
+   a white band is nothing. */
+[data-theme="dark"] .promo{background:var(--pmd);color:var(--pmdfg)}
+[data-theme="dark"] .promo .pmword,[data-theme="dark"] .promo .pmlogo{border-right-color:currentColor}
+.promo .pmin{max-width:1080px;margin:0 auto;padding:9px 24px;display:flex;align-items:center;
+ gap:11px}
+.promo b{font-family:var(--mono);font-size:11.5px;letter-spacing:1.4px;font-weight:600;
+ text-transform:uppercase}
+.promo .pmword{font-family:var(--sans);font-weight:700;font-size:13px;letter-spacing:-.2px;
+ padding-right:11px;border-right:1px solid rgba(255,255,255,.3);line-height:1}
+.promo .pmlogo{height:16px;width:auto;display:block;padding-right:11px;
+ border-right:1px solid rgba(255,255,255,.3)}
+.promo .pmgo{margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:1px;
+ font-style:normal;opacity:.85;white-space:nowrap}
+.promo:hover{filter:brightness(1.08)}
+/* A partner may ship two logo files; CSS decides which is visible so the page never draws
+   the wrong one first and swaps it. One file and no .pmlt/.pmdk classes: shown in both.
+   MATCHED SPECIFICITY ON PURPOSE. Written as a bare .pmdk these lose to the two-class
+   sizing rule above them and BOTH logos render side by side -- which is what happened the
+   first time, and looks like a layout bug rather than a cascade one. */
+.promo .pmdk{display:none}
+[data-theme="dark"] .promo .pmlt{display:none}
+[data-theme="dark"] .promo .pmdk{display:block}
+.promo:hover .pmgo{opacity:1}
+@media(max-width:640px){
+ .promo .pmin{padding:8px 16px;gap:9px}
+ .promo b{font-size:10px;letter-spacing:1px}
+ .promo .pmgo{display:none}
+}
+.hero{background:var(--surf);border-bottom:1px solid var(--rule)}
+.hero .in{max-width:1080px;margin:0 auto;padding:44px 24px 34px}
+/* THE HERO'S RIGHT-HAND THIRD WAS EMPTY. The headline and the paragraph both stop well short
+   of the measure -- a line of body text past about 70 characters is harder to read, so the
+   paragraph is capped and the space beside it was simply unused. A split puts something there
+   worth pressing instead, and collapses back to one column before the text would be squeezed. */
+.hero .in.split{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:40px;align-items:center}
+/* GREEN, BECAUSE GREEN IS WHAT THE TOOL MEANS. Everywhere else on this site green marks the
+   model disagreeing with a price in your favour -- the verdict chips, the edge figures, the
+   model bar. The builder is the page made entirely of that, so the one button pointing at it
+   should look like the thing it opens rather than like another nav link. Built on the shared
+   --okbg/--okln/--pos tokens, so it follows light and dark without a second definition. */
+.herocta{display:block;text-decoration:none;border:1px solid var(--okln);border-radius:12px;
+ padding:19px 22px 17px;background:var(--okbg);position:relative;overflow:hidden;
+ transition:border-color .15s,background .15s,transform .15s,box-shadow .15s}
+.herocta .hk{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;
+ letter-spacing:1.6px;color:var(--pos)}
+/* A LIVE DOT, NOT AN ANIMATION. It breathes once every three seconds at a third of its
+   opacity -- enough to read as "running tonight", quiet enough to sit beside a paragraph
+   somebody is trying to read. Motion is dropped entirely for anyone who asked for less. */
+.herocta .hk:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--pos);
+ flex:none;animation:ctapulse 3s ease-in-out infinite}
+@keyframes ctapulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.herocta .hk:before{animation:none}}
+.herocta .hv{display:block;font-family:var(--serif);font-size:19px;font-weight:600;
+ color:var(--navy);margin-top:10px;line-height:1.3}
+.herocta .hn{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.8px;
+ color:var(--pos);margin-top:11px}
+/* THE COLUMN BESIDE THE HEADLINE, holding the sheets and the builder as one stack. The grid
+   above expects a single child in that track, so the stack is that child and the buttons live
+   inside it -- adding them as further grid children would have put them in the headline's
+   column at every width. */
+.herostack{display:flex;flex-direction:column;gap:10px;min-width:0}
+/* The sheets are smaller than the builder on purpose: three buttons of equal weight stacked
+   in a 300px column is a menu, and the builder is still the thing the page is pointing at. */
+.herocta.sm{padding:13px 16px 12px}
+.herocta.sm .hv{font-size:15px;line-height:1.25}
+.herocta.sm .hk:before{animation:none}
+.herocta:hover{border-color:var(--pos);transform:translateY(-1px);
+ box-shadow:0 6px 18px -10px var(--pos)}
+/* The arrow is the last character of that line, so nudging the whole line moves it. */
+.herocta:hover .hn{transform:translateX(2px);transition:transform .15s}
+h1{font-family:var(--serif);font-size:50px;font-weight:600;line-height:1.05;letter-spacing:-.7px;color:var(--navy)}
+.sub{color:var(--body);font-size:16px;line-height:1.65;margin-top:13px;max-width:62ch}
+.stamp{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:.7px;margin-top:15px}
+.strip{background:var(--surf);border-bottom:1px solid var(--rule)}
+/* EQUAL COLUMNS. This was flex with space-between for a while, on the reasoning that what a
+   reader perceives is the gap between one block of words and the next, not the column edges --
+   a tile reading "GAMES / 15 / this week" next to one reading "BIGGEST GAP / 5.7 / Dallas
+   Cowboys at Indianapolis" occupies a fifth of the width, and equal columns left the short one
+   marooned in white space.
+
+   Distributing the leftover space instead fixed the gaps and broke something worse: the tiles
+   stopped lining up at all. Each one sat at its own width, so GAMES became a small box with a
+   gulf either side, and its hover state drew that box for everyone to see. A row of tiles is a
+   table whether or not it has borders, and a table whose columns do not line up looks broken
+   in a way that uneven gaps never did.
+
+   Equal columns, and the short tile simply has room around its text. */
+.strip .grid{max-width:1080px;margin:0 auto;padding:0 24px 28px;
+display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:22px 30px}
+.cmp{margin-top:18px}
+.cmprow{display:grid;grid-template-columns:86px repeat(3,1fr);gap:14px;align-items:center;
+padding:13px 0;border-top:1px solid var(--rule2)}
+.cl{font-family:var(--mono);font-size:10px;letter-spacing:1.6px;color:var(--mute)}
+.cmprow .lbl{margin-bottom:3px}
+.cv{font-family:var(--mono);font-size:14px;color:var(--body);display:block}
+.cv.big{font-weight:700;color:var(--navy)}
+.pick{display:grid;grid-template-columns:2fr 1.3fr .7fr 1.1fr 1fr .8fr;gap:14px;align-items:center;
+padding:13px 0;border-top:1px solid var(--rule2)}
+.pg{display:flex;flex-direction:column;min-width:0}
+.pd{font-family:var(--mono);font-size:10px;color:var(--mute);letter-spacing:.5px}
+.pm{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}
+.pf{display:flex;flex-direction:column;min-width:0}
+.pf .lbl{margin-bottom:3px}
+.pv{font-family:var(--mono);font-size:13px;color:var(--body);white-space:nowrap;overflow:hidden;
+text-overflow:ellipsis}
+.pf.res .pv{font-weight:700}
+/* THE WEEK PICKER. A select rather than a rail of chips: the list grows by one every week
+   and a control that gets wider all season is a control that breaks in January. The record
+   rides inside each option, so the menu still answers "which week was good" at a glance. */
+.weeks{display:flex;align-items:center;gap:10px;padding:18px 0 2px;flex-wrap:wrap}
+.weeks label{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;color:var(--mute)}
+.weeks select{font-family:var(--mono);font-size:12.5px;letter-spacing:.5px;color:var(--ink);
+/* NOT TRANSPARENT, AND THE OPTIONS ARE STYLED TOO. The open list is drawn by the browser,
+   not by this page, and it takes its colours from the select itself -- given `transparent` it
+   fell back to a white popup, which in dark mode put pale grey text on white. An explicit
+   surface here and on the options is what the popup actually reads. */
+padding:9px 34px 9px 12px;border:1px solid var(--rule);border-radius:8px;
+background-color:var(--surf2);color-scheme:inherit;
+cursor:pointer;appearance:none;-webkit-appearance:none;min-width:240px;max-width:100%;
+background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7'><path d='M1 1l4 4 4-4' fill='none' stroke='%236b7a8c' stroke-width='1.6'/></svg>");
+background-repeat:no-repeat;background-position:right 12px center}
+.weeks select option{background-color:var(--surf2);color:var(--ink)}
+.weeks select:focus{outline:none;border-color:var(--navy)}
+.filterbar{font-family:var(--mono);font-size:10.5px;letter-spacing:1.2px;color:var(--mute);
+padding:10px 0 4px;text-transform:uppercase}
+.tile.on{background:var(--surfd);color:var(--cream)}
+.tile.on .k,.tile.on .n{color:#9fb3c8}
+.tile.on .v{color:var(--cream)}
+.tile{display:block;color:inherit;border-radius:9px;padding:4px 6px;margin:-4px -6px}
+.tile:hover{background:var(--rule2)}
+.tile:hover .v{color:var(--accent)}
+.k{font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;color:var(--mute)}
+.v{font-family:var(--serif);font-size:25px;font-weight:700;color:var(--navy);margin-top:6px}
+.n{font-size:12px;color:var(--body);margin-top:3px}
+.wrap{max-width:1080px;margin:0 auto;padding:8px 24px 80px}
+.day{display:flex;align-items:baseline;gap:12px;margin:36px 0 13px}
+.day h2{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--navy)}
+.day span{font-family:var(--mono);font-size:10px;color:var(--mute);letter-spacing:1.3px}
+.game{border:1px solid var(--rule);border-radius:10px;padding:16px 18px;margin-bottom:10px}
+.game:hover{border-color:var(--rule);background:var(--rule2)}
+.when{display:flex;gap:8px;font-family:var(--mono);font-size:10.5px;color:var(--mute);letter-spacing:.6px;
+margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.when span:last-child{overflow:hidden;text-overflow:ellipsis}
+.when .dot{color:var(--rule)}
+.teams{display:grid;gap:10px}
+.team{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:12px}
+.team img{width:28px;height:28px;object-fit:contain}
+.tn{display:flex;flex-direction:column;min-width:0}
+.nm{font-size:15px;font-weight:600;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec{font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-top:1px}
+.pts{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--body)}
+.team.win .nm,.team.win .pts{color:var(--navy);font-weight:700}
+/* three fields, label above value, left aligned. Fixed columns so they can never wrap onto
+   each other, and values are allowed to wrap rather than being cut off. */
+.mkt{display:grid;grid-template-columns:repeat(2, minmax(130px, max-content));gap:14px 34px;
+margin-top:14px;padding-top:13px;border-top:1px solid var(--rule2)}
+.pickrow{display:flex;align-items:baseline;gap:12px;margin-top:12px;padding-top:11px;
+border-top:1px solid var(--rule2)}
+.pickval{font-size:14.5px;font-weight:700;color:var(--accent);overflow:visible;text-overflow:clip;
+white-space:normal}
+.lbl{display:block;font-family:var(--mono);font-size:9px;letter-spacing:1.3px;color:var(--mute)}
+.val{display:block;font-size:13.5px;font-weight:600;color:var(--body);margin-top:5px;
+white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.val.mono{font-family:var(--mono)}
+.pick .val{color:var(--accent);font-weight:700}
+.bdbtn{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 14px;border:1px solid var(--rule);
+border-radius:7px;font-family:var(--mono);font-size:10px;letter-spacing:1.4px;color:var(--navy);background:var(--surf)}
+.bdbtn:hover{background:var(--surfd);color:var(--cream);border-color:var(--navy)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btnrow .bdbtn{margin-top:14px}
+/* .bdbtn.alt and .bdbtn:hover carry the same specificity, and this rule sits after the hover
+   one, so it was winning the background while hover still won the colour: cream text on a pale
+   background, which reads as the button going blank. The alt variant needs its own hover. */
+.bdbtn.alt{background:var(--surf2)}
+.bdbtn.alt:hover{background:var(--surfd);color:var(--cream);border-color:var(--navy)}
+/* The prop analyzer is the one button that leaves this cream world for a dark page, so it is
+   the one button that does not look like the others. Outline only — a filled green block beside
+   two outlined buttons would read as the primary action, and it is not.
+   ONE PLACE TO CHANGE THE GREEN: --ps below. */
+:root{--ps:#0f8f55}
+.bdbtn.ps.lk{background:var(--surf2);color:var(--mute);border-color:var(--rule);
+ cursor:default;pointer-events:none}
+.bdbtn.ps{background:var(--surf);color:var(--ps);border-color:var(--ps)}
+.bdbtn.ps:hover,.bdbtn.ps:focus-visible{background:var(--ps);color:var(--cream);
+ border-color:var(--ps)}
+/* ---- player prop analyzer. Lives in this stylesheet rather than its own so it inherits the
+   site's type, colour and spacing automatically — the first version shipped a dark theme of its
+   own and the newest tool read as a different product. */
+/* top plays — the one green thing on an otherwise navy-and-cream page, because it is the one
+   part of the board that is a recommendation rather than a reading */
+.tp{--g:#0f8f55;border:1px solid var(--g);border-radius:12px;background:var(--okbg);
+ padding:16px 18px;margin:18px 0 6px}
+.tp-k{font-family:var(--mono);font-size:10px;letter-spacing:1.8px;text-transform:uppercase;
+ color:var(--g);font-weight:700;margin-bottom:12px}
+.tp-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tp-c{background:var(--surf2);border:1px solid var(--okln);border-radius:9px;padding:13px 14px}
+.tp-n{font-weight:700;font-size:15px}
+.tp-n em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--mute);
+ letter-spacing:1px;margin-left:7px}
+.tp-b{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--g);margin-top:5px}
+.tp-b span{font-size:11px;color:var(--body);font-weight:400;margin-left:5px}
+.tp-m{font-family:var(--mono);font-size:11px;color:var(--body);margin-top:4px}
+.tp-w{font-size:12.5px;color:var(--body);margin-top:8px;line-height:1.5}
+.tp-none p{color:var(--body);font-size:13px;margin:0}
+/* The runner-up card. Every game shows two, but only a play that clears on price is a play;
+   this one is muted, greyed and labelled so it cannot be mistaken for the pick beside it.
+   The label carries the meaning, not the colour, so it survives being read in greyscale. */
+.tp-c.tp-thin{background:transparent;border-style:dashed;border-color:var(--cardln)}
+.tp-thin .tp-b,.tp-thin .tp-n{color:var(--mute)}
+.tp-t{font-family:var(--mono);font-size:9.5px;letter-spacing:1.4px;color:var(--mute);
+ font-weight:700;margin-bottom:7px}
+@media(max-width:560px){.tp-row{grid-template-columns:1fr}.tp{padding:14px}}
+.pp-note{color:var(--body);font-size:13.5px;max-width:64ch;margin:14px 0 2px}
+.pp-meta{font-family:var(--mono);font-size:11.5px;color:var(--mute);margin:16px 0 2px;
+ line-height:1.9;letter-spacing:.2px}
+.pp-meta b{color:var(--body);font-weight:600}
+/* The game tiles an index is built from. These lived ONLY in nfl_props._shell, so any page
+   using the site shell — the demo index, for one — rendered them as unstyled run-together
+   text with no rule, no card and no hover. One copy, reachable from both. */
+.gcard{display:flex;align-items:center;gap:14px;border:1px solid var(--rule);
+ border-radius:12px;background:var(--surf);padding:15px 16px;margin:11px 0;
+ text-decoration:none;color:inherit;transition:border-color .12s,background .12s}
+.gcard:hover{border-color:var(--navy);background:var(--surf2)}
+.gname{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:.3px;flex:1;
+ min-width:0}
+.gname span{color:var(--mute);font-weight:400}
+.gmeta{font-family:var(--mono);font-size:11px;color:var(--mute);text-align:right;
+ line-height:1.7;flex:none}
+.go{font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:1.3px;
+ color:var(--ps)}
+@media(max-width:560px){
+ .gcard{flex-wrap:wrap;gap:6px;padding:13px 14px}
+ .gname{flex:1 0 100%;font-size:14.5px}
+ .gmeta{text-align:left;flex:1}
+}
+.pp-mkt{display:flex;align-items:center;gap:12px;margin:30px 0 2px}
+.pp-mkt h3{font-family:var(--mono);font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;
+ color:var(--mute);font-weight:600}
+.pp-mkt span{height:1px;background:var(--rule);flex:1}
+.pp{border-top:1px solid var(--rule2);padding:0}
+.pp:first-of-type{border-top:0}
+.pp>summary{display:flex;align-items:baseline;gap:9px;padding:12px 2px;cursor:pointer;
+ list-style:none}
+.pp>summary::-webkit-details-marker{display:none}
+.pp>summary:hover{background:var(--surf)}
+.pp .nm{font-weight:600;font-size:15px}
+.pp .tm{font-family:var(--mono);font-size:10.5px;color:var(--mute);letter-spacing:1px}
+.pp .sp{flex:1}
+.pp .num{font-family:var(--mono);font-size:13px}
+.pp .best{color:var(--accent);font-weight:600}
+.pp .pp-proj,.pp .pp-line{font-family:var(--mono);font-size:12px;color:var(--mute);
+ white-space:nowrap;min-width:92px;text-align:right}
+.pp .pp-proj em,.pp .pp-line em{font-style:normal;font-size:9.5px;letter-spacing:1.2px;
+ text-transform:uppercase}
+.pp .pp-proj b{color:var(--accent);font-size:14px;font-weight:600;margin-left:3px}
+.pp .pp-line b{color:var(--ink);font-size:14px;font-weight:600;margin-left:3px}
+.pp-best{font-family:var(--mono);font-size:11.5px;color:var(--body);padding:2px 2px 10px}
+.pp-best b{color:var(--accent);font-size:12.5px}
+.pp .gapv{font-family:var(--mono);font-size:12px;color:var(--pos);min-width:62px;text-align:right}
+.pp .gapv.nil{color:var(--mute)}
+/* The simulated distribution as MASS, not as fifty loose marks. One accent on the half that
+   wins, everything else in ink and rule; the fifty draws survive as a hairline rug so the
+   individual nights are still countable under a shape that reads from across a room. */
+.sd-chart{display:block;width:100%;max-width:860px;height:auto;margin:12px 0 2px}
+.sd-area{fill:var(--ink);opacity:.07}
+.sd-area.o{fill:var(--pos);opacity:.17}
+.sd-crest{fill:none;stroke:var(--ink);stroke-width:1.4;opacity:.42;
+ stroke-linejoin:round;stroke-linecap:round}
+.sd-base{stroke:var(--ink);stroke-width:1;opacity:.3}
+.sd-rug{stroke-width:1.1;opacity:.5}
+.sd-rug.o{stroke:var(--pos);opacity:.75}
+.sd-rug.u{stroke:var(--ink);opacity:.3}
+.sd-line{stroke:var(--ink);stroke-width:1.5;opacity:.9}
+.sd-proj{stroke:var(--accent);stroke-width:1.2;stroke-dasharray:4 3.5;opacity:.6}
+.sd-tick{stroke:var(--ink);stroke-width:1;opacity:.25}
+.sd-ax{font-family:var(--mono);font-size:10.5px;fill:var(--mute);text-anchor:middle;
+ letter-spacing:.4px}
+.sd-ax.hi{fill:var(--ink);font-weight:700;font-size:12px;letter-spacing:.2px}
+.sd-ax.md{fill:var(--accent);font-weight:600}
+.dots-k{font-family:var(--mono);font-size:10.5px;color:var(--mute);padding:3px 2px 10px;
+ letter-spacing:.3px}
+.dots-k b{color:var(--body)}
+.pp .chev{color:var(--mute);font-size:15px;transition:transform .15s}
+.pp[open] .chev{transform:rotate(90deg)}
+/* PHONE: the summary row is six items in a baseline flex, which needs about 395px and gets 390.
+   So every row wrapped, the win-probability figure dropped to a second line on its own, and a
+   long name pushed the chevron onto a THIRD line by itself. Rather than shrink type until it
+   fits, the row is given a deliberate break: name and team on top, the two numbers and the
+   figure underneath. The spacer that right-aligns things on desktop is what forces the break,
+   so the desktop layout is untouched. */
+.pp-id,.pp-figs{display:flex;align-items:baseline;gap:9px;min-width:0}
+/* PHONE: an explicit grid, because flex-wrap broke the row in a different place on every line.
+   Letting it wrap put the figure alone on line two for one player, the line and the figure on
+   line two for the next, and the chevron alone on line THREE for a long name — a column of
+   rows that each looked broken in their own way. A grid says where the two groups go, so every
+   row breaks identically: who it is on top, the numbers underneath, figure and chevron right. */
+@media(max-width:560px){
+ .pp>summary{display:grid;grid-template-columns:1fr auto auto;
+  grid-template-areas:"id gap chev" "figs figs figs";
+  align-items:center;column-gap:9px;row-gap:5px;padding:12px 2px 13px}
+ .pp .pp-id{grid-area:id}
+ .pp .pp-figs{grid-area:figs}
+ .pp .gapv{grid-area:gap;min-width:0;font-size:12.5px}
+ .pp .chev{grid-area:chev;font-size:17px}
+ .pp .sp{display:none}
+ .pp .nm{font-size:16px}
+ .pp .pp-proj,.pp .pp-line{font-size:12.5px}
+ .pp-best{font-size:11px;line-height:1.6}
+ .pp-meta{font-size:11px;line-height:1.85}
+}
+.pp-body{padding:2px 2px 16px}
+.pp-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.pp-tbl th{text-align:right;font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
+ color:var(--mute);font-weight:600;padding:5px 7px;border-bottom:1px solid var(--rule)}
+.pp-tbl th:first-child{text-align:left}
+.pp-tbl td{text-align:right;padding:6px 7px;border-bottom:1px solid var(--rule2)}
+.pp-tbl td:first-child{text-align:left;color:var(--body)}
+.pp-tbl tr.win td{background:var(--okbg)}
+.pp-tbl tr.win td:first-child{font-weight:600;color:var(--ink)}
+.pp-ctx{margin-top:11px;color:var(--mute);font-size:12px;line-height:1.6}
+.pp-ctx b{color:var(--body);font-weight:600;font-family:var(--mono)}
+@media(max-width:560px){
+ .pp>summary{flex-wrap:wrap;gap:2px 10px;padding:12px 0}
+ .pp .pp-proj,.pp .pp-line{min-width:0;text-align:left}
+ .pp .sp{display:none}
+ .pp .gapv{margin-left:auto}
+ .pp-tbl{font-size:11.5px}
+ .pp-tbl th,.pp-tbl td{padding:5px 4px}
+}
+.hero.landing .in{padding:64px 24px 52px;text-align:center}
+.hero.landing .mark{width:74px;height:74px;border-radius:50%;background:var(--surfd);color:var(--cream);
+display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:30px;
+font-weight:700;letter-spacing:1px;margin:0 auto 22px}
+.hero.landing h1{font-size:58px}
+.lead{font-size:19px;line-height:1.6;color:var(--ink);margin:18px auto 0;max-width:34ch;font-weight:500}
+.hero.landing .sub{margin:16px auto 0;max-width:62ch}
+.lrec{margin:30px auto 0;padding:18px 24px;border:1px solid var(--rule);border-radius:11px;
+background:var(--surf2);display:inline-block}
+.lrec .v{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--navy);margin-top:4px}
+.lrec .n{font-size:12.5px;color:var(--body);margin-top:3px}
+.lrec a{color:var(--accent);font-weight:600}
+.lrrow{display:flex;gap:30px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.lrcell .k{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;color:var(--mute)}
+.lrcell .v{font-size:27px}
+@media(max-width:520px){.lrrow{gap:20px}.lrcell .v{font-size:23px}}
+.sportgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:34px}
+.sportcard{display:flex;flex-direction:column;gap:4px;padding:22px;border:1px solid var(--rule);
+border-radius:11px;background:var(--surf2)}
+.sportcard:hover{border-color:var(--navy);background:var(--surf)}
+.sportcard .sp{font-family:var(--serif);font-size:25px;font-weight:700;color:var(--navy)}
+.sportcard .sn{font-size:13px;color:var(--body)}
+.sportcard .sgo{font-family:var(--mono);font-size:10px;letter-spacing:1.3px;color:var(--accent);margin-top:10px}
+.sportcard.off{opacity:.62}
+.sportcard.off:hover{opacity:1}
+.sportcard.off .sgo{color:var(--mute)}
+.soonbox{border:1px solid var(--rule);border-radius:14px;padding:30px 28px;background:var(--surf2);
+ max-width:620px;margin:30px 0}
+.soonbox .soonk{font-family:var(--mono);font-size:11px;letter-spacing:1.6px;text-transform:uppercase;
+ color:var(--accent);margin-bottom:12px}
+.soonbox p{margin:0 0 16px;line-height:1.6}
+.soonbox .soonline{font-family:var(--serif);font-size:22px;color:var(--navy);line-height:1.4}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:26px}
+.how .hn{font-family:var(--mono);font-size:10px;letter-spacing:1.6px;color:var(--mute)}
+.how h4{font-size:15.5px;font-weight:600;color:var(--navy);margin:7px 0 6px}
+.how p{font-size:13.5px;line-height:1.65;color:var(--body)}
+footer{border-top:1px solid var(--rule);background:var(--surf)}
+.footdisc{display:inline-block;margin-left:8px;font-family:var(--mono);font-size:10.5px;
+letter-spacing:.6px;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.notice{background:#c0271d;color:#fff}
+.notice .in{max-width:1100px;margin:0 auto;padding:9px 20px;font:600 11.5px/1.45 'IBM Plex Mono',monospace;
+  letter-spacing:.08em;text-transform:uppercase;text-align:center}
+footer .in{max-width:1080px;margin:0 auto;padding:24px;color:var(--mute);font-size:12.5px;line-height:1.75;max-width:78ch}
+/* breakdown page */
+.back{font-family:var(--mono);font-size:10px;letter-spacing:1.4px;color:var(--mute)}
+.bd h1{font-size:40px}
+.score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px;margin:26px 0 8px;
+background:var(--surf);border:1px solid var(--rule);border-radius:12px;padding:26px 24px}
+.sc{display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center}
+.sc img{width:54px;height:54px;object-fit:contain}
+.sc .t{font-size:15px;font-weight:600;color:var(--body)}
+.sc .p{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--navy);line-height:1}
+.sc.lose .p,.sc.lose .t{color:var(--mute)}
+.vs{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:2px}
+.sec{margin-top:40px}
+.sec>h3{font-family:var(--mono);font-size:10px;letter-spacing:2.2px;color:var(--mute);
+padding-bottom:9px;border-bottom:1px solid var(--rule);margin-bottom:16px}
+.sec>h3 b{color:var(--navy);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-family:var(--mono);font-size:9px;letter-spacing:1.3px;color:var(--mute);text-align:right;
+font-weight:500;padding:0 0 9px}
+th:first-child{text-align:left}
+td{padding:9px 0;border-top:1px solid var(--rule2);text-align:right;font-family:var(--mono);color:var(--body)}
+td:first-child{text-align:left;font-family:var(--sans);color:var(--ink)}
+td.big{font-weight:700;color:var(--navy)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.bar{display:grid;grid-template-columns:150px 1fr 96px;align-items:center;gap:14px;padding:9px 0;
+border-top:1px solid var(--rule2)}
+.bar .t{font-size:13.5px}
+.track{position:relative;height:9px;background:var(--rule2);border-radius:5px}
+.track i{position:absolute;top:0;height:9px;border-radius:5px;background:var(--surfd)}
+.track u{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--rule);left:50%}
+.bar .a{font-family:var(--mono);font-size:12px;text-align:right;color:var(--body)}
+.radars{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.rtitle{font-family:var(--mono);font-size:9.5px;letter-spacing:1.6px;color:var(--mute);margin-bottom:6px;
+text-align:center}
+.legend{display:flex;gap:20px;justify-content:center;margin-top:8px;font-size:12px;color:var(--body)}
+.legend .sw{display:inline-block;width:14px;height:3px;margin-right:7px;vertical-align:middle}
+.legend .sw.home{background:var(--surfd)}
+.legend .sw.away{background:var(--neg)}
+.why{background:var(--surf);border:1px solid var(--rule);border-radius:11px;padding:20px 22px;margin-top:8px}
+.why p{font-size:14px;line-height:1.7;color:var(--body)}
+.why .hl{font-weight:700;color:var(--navy)}
+.note{font-size:12px;color:var(--mute);line-height:1.7;margin-top:10px}
+/* Under 420 even that is not enough, so the sport links give up their letter-spacing before
+   anything is allowed to leave the screen. Checked at 360 and 380. */
+@media(max-width:420px){
+ nav a{padding:13px 6px;letter-spacing:0;font-size:10.5px}
+ .signin{padding:13px 7px;letter-spacing:0}
+ .search{display:none}
+ /* THE WORDMARK GOES, THE MARK STAYS. Measured at 360: the brand text, four sport links and
+    the members button cannot all fit, and of the three the wordmark is the one nobody needs —
+    the SM circle is still a home link and still says whose site this is. Dropping the sport
+    links instead would cost navigation; shrinking the button would cost the tap target. */
+ .brand .bt{display:none}
+}
+@media(max-width:640px){
+ h1{font-size:33px}.bd h1{font-size:27px}.hero .in{padding:28px 16px 22px}
+ .hero .in.split{grid-template-columns:minmax(0,1fr);gap:22px}
+ .wrap{padding:8px 16px 70px}.strip .grid{padding:0 16px 22px;gap:18px}
+ /* 7px of padding on 10px text gives a 26px tap target; a thumb wants 44. Measured in a phone
+    viewport rather than guessed at — the nav is on every page, so it is the one thing everybody
+    has to hit. Minimum body text goes to 11px at the same time: below that it is a squint. */
+ .hbar{padding:8px 12px}
+ nav a{padding:13px 10px;font-size:11px;letter-spacing:.8px}
+ /* THE HEADER IS FULL AND THE BUTTON WINS. Measured: the disclaimer link beside the mark
+    pushes MEMBERS 24px off a 390px screen. So below 640 it wraps to its own line under the
+    bar — still top left, still on every page, and now with room to be read rather than
+    squeezed to 8px beside four sport links. The border goes with it: a boxed control on its
+    own row reads as a button, and this is a footnote. */
+ .hbar{flex-wrap:wrap}
+ .disc{order:3;flex-basis:100%;margin:7px 0 1px;padding:0;border:0;font-size:9.5px;
+  letter-spacing:1px;text-decoration:underline;text-underline-offset:2px}
+ /* THE HEADER HAD NO ROOM LEFT. Its own note records that four sport links plus the search
+    already ran 2px past a 360px viewport, and adding a fifth control pushed the new button
+    off the edge entirely. Below 640 the search collapses to its icon anyway, so the recovered
+    width goes here: the button keeps a thumb-sized target and the row still fits. */
+ .signin{padding:13px 9px;font-size:10px;letter-spacing:.4px;margin-left:4px}
+ nav{gap:0}
+ .sportcard .sgo,.lrec .k,.lrcell .k,.when,.stamp,.foot{font-size:11px}
+ /* the two buttons on every game card are the main thing anyone taps on a phone */
+ .bdbtn{padding:13px 15px;font-size:10.5px}
+ .btnrow{gap:10px}
+ .mkt{grid-template-columns:1fr 1fr;gap:14px 16px}
+ .mkt .val{font-size:13px}
+ .pickrow{flex-wrap:wrap;gap:4px 10px}
+ .pts{font-size:20px}
+ .cmprow{grid-template-columns:1fr 1fr;gap:10px 14px}
+ .cmprow .cl{grid-column:1/-1}
+ .score{grid-template-columns:1fr;gap:14px;padding:20px}
+ .sc .p{font-size:36px}.vs{display:none}
+ .radars{grid-template-columns:1fr;gap:26px}
+ .hero.landing h1{font-size:36px}.hero.landing .in{padding:44px 16px 36px}
+ .lead{font-size:16.5px}
+ .pick{grid-template-columns:1fr 1fr;gap:10px 14px;padding:15px 0}
+ .pg{grid-column:1/-1}
+ .pf.res{align-items:flex-end}
+ table{font-size:11.5px}
+ th{font-size:8px}
+ table{font-size:12.5px}
+}
+
+/* THE TOGGLE'S OWN NARROW-PHONE RULES, LAST IN THE SHEET ON PURPOSE.
+   The header already has an @media(max-width:380px) block tightening its padding and gaps,
+   and it sits below where these would naturally go — so written up there they lost on source
+   order and silently did nothing. Measured at 360px: the control row is 82px tall without
+   this button and 128px with it, because brand + controls come to 363px against 360 of
+   viewport and the whole group drops to its own line. These few pixels buy it back. */
+@media(max-width:400px){
+ .thm{padding:4px 5px;font-size:10.5px;border-radius:6px}
+ .hright{gap:8px}
+ .hbar{gap:6px;padding:8px 10px}
+}
+
+/* THE WORDMARK'S BREAKPOINT WAS 50px TOO LOW, and this predates the theme toggle.
+   It drops at 420, so anything from 421 up to the real desktop layout still renders the full
+   "SAM'S MODELS" text — and at 430, which is an iPhone Pro Max, brand + controls come to
+   486px against 430 of viewport. The controls take a second row and the disclaimer a third,
+   giving a 144px-tall header on one of the commonest phone widths going. The circle is still
+   a home link and still says whose site this is; the words are what has to go. Search stays,
+   which is why this is a separate rule rather than widening the 420 block. */
+@media(min-width:421px) and (max-width:520px){
+ .brand .bt{display:none}
+}
+
+/* SPACE-BETWEEN NEEDS A FULL ROW TO BE FAIR. Once the strip wraps, the last row holds fewer
+   tiles and distributing the leftover space across them pushes a 97px hole between two of
+   them while the rest sit at 44 — the exact raggedness this was meant to cure, moved onto
+   the phone. Below the wrap point the gaps are simply fixed. */
+@media(max-width:720px){
+ /* A WRAPPED FLEX ROW CANNOT ALIGN DOWN THE PAGE: each line distributes its own tiles, so
+    row one sits tight against the left with a hole beside it while row two spreads out --
+    and the hole changes size whenever the tile count does. Four tiles on a phone is a
+    2x2 grid, which is the shape it always wanted. Equal columns, so the second tile in
+    every row starts on the same vertical line. */
+ .strip .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px 20px;
+  justify-content:stretch;align-items:start}
+}
+
+/* THE WEEK PICKER ON A PHONE. Three things were wrong at 390px: a 240px min-width plus the
+   label plus the gap does not fit, so the control was clipped mid-word; the label and the
+   control fought over one line and neither lined up with the content either side of them;
+   and a 12.5px font on a <select> makes iOS zoom the whole page the moment it is tapped --
+   the same trap the search box fell into. Stacked, full width, 16px. The grey menu that
+   opens on tap is the operating system's own picker and cannot be styled by a page. */
+@media(max-width:640px){
+ .weeks{flex-direction:column;align-items:stretch;gap:7px;padding:14px 0 2px}
+ .weeks label{font-size:10px}
+ .weeks select{width:100%;min-width:0;font-size:16px;padding:12px 36px 12px 13px;
+  background-position:right 13px center}
+}
+</style><script>/* BEFORE ANYTHING PAINTS. Applied synchronously in the head: set the
+theme after the body renders and every visitor on dark gets a white flash first, which is the
+exact thing people turn dark mode on to avoid. */
+(function(){try{var t=localStorage.getItem("smm-theme");
+if(t==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script></head><body>
+<div class="topstick"><header><div class="hbar">
+  <a class="brand" href="../index.html"><div class="mk">SM</div>
+    <div class="bt"><span class="n1">SAM'S</span><span class="n2">MODELS</span></div></a>
+  <a class="disc" href="../disclaimer.html">DISCLAIMER</a>
+  <div class="hright">
+    <button class="thm" id="thm" type="button"
+      aria-label="Switch between light and dark">
+      <span id="thmi">&#9789;</span><span id="thmt">DARK</span></button>
+    <div class="search" id="search">
+      <button class="sbtn" id="sbtn" aria-label="Search games">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="M13.5 13.5 18 18"/></svg>
+      </button>
+      <input id="sinput" type="search" placeholder="Search teams…" autocomplete="off" spellcheck="false">
+    </div>
+    <nav><a class="" href="../ncaaf/index.html">NCAAF</a><a class="" href="../nfl/index.html">NFL</a><a class="" href="../nba/index.html">NBA</a><a class="on" href="../cbb/index.html">CBB</a></nav>
+    <a class="signin" href="/__auth/login">MEMBERS</a>
+  </div>
+</div></header><div class="promos" data-ms="10000"><a class="promo on" href="../offers.html" style="--pm:#1652f0;--pmfg:#fff;--pmd:#5b8cff;--pmdfg:#fff"><span class="pmin"><span class="pmword">Polymarket</span><b>FREE $25 TO TRADE ON POLYMARKET</b><i class="pmgo">Claim it &#8594;</i></span></a><a class="promo" href="../offers.html" style="--pm:#0a0a0a;--pmfg:#fff;--pmd:#f4f4f4;--pmdfg:#0b1d33"><span class="pmin"><span class="pmword">Novig</span><b>FREE $50 TO BET ON NOVIG</b><i class="pmgo">Claim it &#8594;</i></span></a><a class="promo" href="../offers.html" style="--pm:#B039F9;--pmfg:#fff;--pmd:#B039F9;--pmdfg:#fff"><span class="pmin"><span class="pmword">Onyx</span><b>TRADE $10 GET A FREE 100 ON ONYX</b><i class="pmgo">Claim it &#8594;</i></span></a></div>
+<script>
+(function () {
+  var box = document.querySelector('.promos');
+  if (!box) return;
+  var all = box.querySelectorAll('.promo');
+  if (all.length < 2) return;
+  // Still for anyone who has asked for less movement: they keep the first offer, which is
+  // a worse deal for the second partner and the right call for the reader.
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var i = 0, held = false;
+  function step() {
+    if (held) return;
+    all[i].classList.remove('on');
+    i = (i + 1) % all.length;
+    all[i].classList.add('on');
+  }
+  setInterval(step, Number(box.dataset.ms) || 10000);
+  // Hold while somebody is actually looking at it or tabbing through it.
+  ['mouseenter', 'touchstart', 'focusin'].forEach(function (e) {
+    box.addEventListener(e, function () { held = true; }, { passive: true });
+  });
+  ['mouseleave', 'touchend', 'touchcancel', 'focusout'].forEach(function (e) {
+    box.addEventListener(e, function () { held = false; }, { passive: true });
+  });
+})();
+</script></div><script>(function(){
+  /* The switch. Remembered per browser and never read from the OS: the cream look is the brand,
+     and it should not change because of a phone setting nobody pointed at this site. */
+  var r=document.documentElement,b=document.getElementById("thm");
+  if(!b)return;
+  var icon=document.getElementById("thmi"),txt=document.getElementById("thmt");
+  function paint(){var d=r.getAttribute("data-theme")==="dark";
+    icon.innerHTML=d?"&#9728;":"&#9789;";txt.textContent=d?"LIGHT":"DARK";
+    b.setAttribute("aria-pressed",d?"true":"false");}
+  paint();
+  b.addEventListener("click",function(){
+    var d=r.getAttribute("data-theme")==="dark";
+    if(d)r.removeAttribute("data-theme");else r.setAttribute("data-theme","dark");
+    try{localStorage.setItem("smm-theme",d?"light":"dark");}catch(e){}
+    paint();});
+})();</script><section class="hero"><div class="in">
+  <div class="hmain">
+  <h1>November 25 Projections.</h1>
+  <p class="sub">A projected score for every game on the board — built from play-by-play efficiency, beside the first line the model saw for that game. Open any game for the full breakdown.</p>
+  <div class="stamp">UPDATED WEDNESDAY 10:56 AM ET</div>
+  </div>
+  
+</div></section>
+<section class="strip"><div class="grid">
+  
+  <a class="tile" href="#board"><span class="k">GAMES</span>
+    <div class="v">41</div><div class="n">today</div></a>
+  <a class="tile" href="gaps.html"><span class="k">MODEL DISAGREES 3+</span>
+    <div class="v">14</div>
+    <div class="n">points off the market</div></a>
+  <a class="tile" href="game/401924705.html"><span class="k">BIGGEST GAP</span>
+    <div class="v">7.8</div><div class="n">Saint Peter's. at Columbia Lions</div></a>
+  
+</div></section><div class="wrap" id="board"><div class="day"><h2>Wednesday, November 25</h2><span>41 games</span></div><article class="game" data-gap="3.09" data-teams="ohio bobcats rice owls ohio rice">
+  <div class="when"><span>11:00 AM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Rice_Owls.png" alt="" loading="lazy"><div class="tn"><span class="nm">Rice Owls</span><span class="rec">5-2</span></div><div class="pts">74.0</div></div>
+    <div class="team win"><img src="logos/Ohio_Bobcats.png" alt="" loading="lazy"><div class="tn"><span class="nm">Ohio Bobcats</span><span class="rec">4-1</span></div><div class="pts">74.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Ohio Bobcats -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Ohio Bobcats -0.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Rice Owls +3.5  (3.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401928845.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.05" data-teams="charlotte 49ers northern iowa panthers clt uni">
+  <div class="when"><span>11:00 AM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Northern_Iowa_Panthers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northern Iowa Panthers</span><span class="rec">3-4</span></div><div class="pts">67.9</div></div>
+    <div class="team win"><img src="logos/Charlotte_49ers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Charlotte 49ers</span><span class="rec">4-2</span></div><div class="pts">76.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Charlotte 49ers -8.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Charlotte 49ers -8.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Charlotte 49ers -8.5  (0.0)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921702.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.65" data-teams="marquette golden eagles virginia cavaliers marq uva">
+  <div class="when"><span>12:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Virginia_Cavaliers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Virginia Cavaliers</span><span class="rec">7-0</span></div><div class="pts">73.3</div></div>
+    <div class="team"><img src="logos/Marquette_Golden_Eagles.png" alt="" loading="lazy"><div class="tn"><span class="nm">Marquette Golden Eagles</span><span class="rec">4-2</span></div><div class="pts">69.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Virginia Cavaliers -5.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Virginia Cavaliers -3.9</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Marquette Golden Eagles +5.5  (1.6)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920428.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="6.72" data-teams="wright state raiders yale bulldogs wrst yale">
+  <div class="when"><span>12:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Yale_Bulldogs.png" alt="" loading="lazy"><div class="tn"><span class="nm">Yale Bulldogs</span><span class="rec">4-4</span></div><div class="pts">61.5</div></div>
+    <div class="team win"><img src="logos/Wright_State_Raiders.png" alt="" loading="lazy"><div class="tn"><span class="nm">Wright State Raiders</span><span class="rec">6-1</span></div><div class="pts">73.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Wright State Raiders -5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Wright State Raiders -11.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Wright State Raiders -5  (6.7)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401928831.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.83" data-teams="stony brook seawolves lindenwood lions stbk lin">
+  <div class="when"><span>1:00 PM ET</span><span class="dot">·</span><span>Stony Brook Seawolves</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Lindenwood_Lions.png" alt="" loading="lazy"><div class="tn"><span class="nm">Lindenwood Lions</span><span class="rec">2-5</span></div><div class="pts">64.9</div></div>
+    <div class="team win"><img src="logos/Stony_Brook_Seawolves.png" alt="" loading="lazy"><div class="tn"><span class="nm">Stony Brook Seawolves</span><span class="rec">3-2</span></div><div class="pts">75.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Stony Brook Seawolves -11.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Stony Brook Seawolves -10.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Lindenwood Lions +11.5  (0.8)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401926835.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="7.53" data-teams="miami (oh) redhawks eastern kentucky colonels m-oh eku">
+  <div class="when"><span>1:00 PM ET</span><span class="dot">·</span><span>Miami (OH) RedHawks</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Eastern_Kentucky_Colonels.png" alt="" loading="lazy"><div class="tn"><span class="nm">Eastern Kentucky Colonels</span><span class="rec">5-2</span></div><div class="pts">65.1</div></div>
+    <div class="team win"><img src="logos/Miami__OH__RedHawks.png" alt="" loading="lazy"><div class="tn"><span class="nm">Miami (OH) RedHawks</span><span class="rec">5-0</span></div><div class="pts">87.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Miami (OH) RedHawks -14.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Miami (OH) RedHawks -22</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Miami (OH) RedHawks -14.5  (7.5)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401911029.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.83" data-teams="davidson wildcats tulane green wave dav tuln">
+  <div class="when"><span>1:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Tulane_Green_Wave.png" alt="" loading="lazy"><div class="tn"><span class="nm">Tulane Green Wave</span><span class="rec">2-4</span></div><div class="pts">63.8</div></div>
+    <div class="team win"><img src="logos/Davidson_Wildcats.png" alt="" loading="lazy"><div class="tn"><span class="nm">Davidson Wildcats</span><span class="rec">4-2</span></div><div class="pts">72.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Davidson Wildcats -9</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Davidson Wildcats -8.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Tulane Green Wave +9  (0.8)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401919007.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.52" data-teams="south dakota coyotes arkansas-pine bluff golden lions sdak uapb">
+  <div class="when"><span>2:00 PM ET</span><span class="dot">·</span><span>South Dakota Coyotes</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Arkansas_Pine_Bluff_Golden_Lions.png" alt="" loading="lazy"><div class="tn"><span class="nm">Arkansas-Pine Bluff Golden Lions</span><span class="rec">0-6</span></div><div class="pts">67.1</div></div>
+    <div class="team win"><img src="logos/South_Dakota_Coyotes.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Dakota Coyotes</span><span class="rec">3-5</span></div><div class="pts">88.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">South Dakota Coyotes -21.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">South Dakota Coyotes -21</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Arkansas-Pine Bluff Golden Lions +21.5  (0.5)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401929406.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="7.77" data-teams="columbia lions saint peter&#x27;s peacocks colu spu">
+  <div class="when"><span>2:00 PM ET</span><span class="dot">·</span><span>Columbia Lions</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Saint_Peter_s_Peacocks.png" alt="" loading="lazy"><div class="tn"><span class="nm">Saint Peter&#x27;s Peacocks</span><span class="rec">0-6</span></div><div class="pts">53.1</div></div>
+    <div class="team win"><img src="logos/Columbia_Lions.png" alt="" loading="lazy"><div class="tn"><span class="nm">Columbia Lions</span><span class="rec">5-1</span></div><div class="pts">74.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Columbia Lions -13.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Columbia Lions -21.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Columbia Lions -13.5  (7.8)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401924705.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.13" data-teams="njit highlanders manhattan jaspers njit man">
+  <div class="when"><span>2:00 PM ET</span><span class="dot">·</span><span>NJIT Highlanders</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Manhattan_Jaspers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Manhattan Jaspers</span><span class="rec">1-5</span></div><div class="pts">69.2</div></div>
+    <div class="team win"><img src="logos/NJIT_Highlanders.png" alt="" loading="lazy"><div class="tn"><span class="nm">NJIT Highlanders</span><span class="rec">1-7</span></div><div class="pts">71.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">NJIT Highlanders -1.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">NJIT Highlanders -2.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">NJIT Highlanders -1.5  (1.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920868.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="7.13" data-teams="south dakota state jackrabbits abilene christian wildcats sdst acu">
+  <div class="when"><span>2:00 PM ET</span><span class="dot">·</span><span>South Dakota State Jackrabbits</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Abilene_Christian_Wildcats.png" alt="" loading="lazy"><div class="tn"><span class="nm">Abilene Christian Wildcats</span><span class="rec">3-3</span></div><div class="pts">64.7</div></div>
+    <div class="team win"><img src="logos/South_Dakota_State_Jackrabbits.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Dakota State Jackrabbits</span><span class="rec">5-1</span></div><div class="pts">78.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">South Dakota State Jackrabbits -6.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">South Dakota State Jackrabbits -13.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">South Dakota State Jackrabbits -6.5  (7.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401917967.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.00" data-teams="arizona wildcats ole miss rebels ariz miss">
+  <div class="when"><span>2:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Ole_Miss_Rebels.png" alt="" loading="lazy"><div class="tn"><span class="nm">Ole Miss Rebels</span><span class="rec">6-0</span></div><div class="pts">71.1</div></div>
+    <div class="team win"><img src="logos/Arizona_Wildcats.png" alt="" loading="lazy"><div class="tn"><span class="nm">Arizona Wildcats</span><span class="rec">6-1</span></div><div class="pts">74.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Arizona Wildcats -5.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Arizona Wildcats -3.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Ole Miss Rebels +5.5  (2.0)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921715.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="3.65" data-teams="xavier musketeers texas a&amp;m aggies xav ta&amp;m">
+  <div class="when"><span>2:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Texas_A_M_Aggies.png" alt="" loading="lazy"><div class="tn"><span class="nm">Texas A&amp;M Aggies</span><span class="rec">6-0</span></div><div class="pts">80.6</div></div>
+    <div class="team"><img src="logos/Xavier_Musketeers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Xavier Musketeers</span><span class="rec">5-1</span></div><div class="pts">73.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Texas A&amp;M Aggies -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Texas A&amp;M Aggies -7.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Texas A&amp;M Aggies -3.5  (3.6)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920809.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.02" data-teams="app state mountaineers akron zips app akr">
+  <div class="when"><span>3:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Akron_Zips.png" alt="" loading="lazy"><div class="tn"><span class="nm">Akron Zips</span><span class="rec">5-2</span></div><div class="pts">64.7</div></div>
+    <div class="team"><img src="logos/App_State_Mountaineers.png" alt="" loading="lazy"><div class="tn"><span class="nm">App State Mountaineers</span><span class="rec">4-3</span></div><div class="pts">59.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Akron Zips -5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Akron Zips -5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Akron Zips -5  (0.0)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401928836.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="3.37" data-teams="north dakota fighting hawks se louisiana lions und sela">
+  <div class="when"><span>3:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/SE_Louisiana_Lions.png" alt="" loading="lazy"><div class="tn"><span class="nm">SE Louisiana Lions</span><span class="rec">2-4</span></div><div class="pts">71.6</div></div>
+    <div class="team win"><img src="logos/North_Dakota_Fighting_Hawks.png" alt="" loading="lazy"><div class="tn"><span class="nm">North Dakota Fighting Hawks</span><span class="rec">4-3</span></div><div class="pts">74.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">SE Louisiana Lions -1</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">North Dakota Fighting Hawks -2.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">North Dakota Fighting Hawks +1  (3.4)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920548.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.95" data-teams="oklahoma state cowboys jackson state tigers okst jkst">
+  <div class="when"><span>3:00 PM ET</span><span class="dot">·</span><span>Oklahoma State Cowboys</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Jackson_State_Tigers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Jackson State Tigers</span><span class="rec">2-4</span></div><div class="pts">61.8</div></div>
+    <div class="team win"><img src="logos/Oklahoma_State_Cowboys.png" alt="" loading="lazy"><div class="tn"><span class="nm">Oklahoma State Cowboys</span><span class="rec">4-2</span></div><div class="pts">94.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Oklahoma State Cowboys -35.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Oklahoma State Cowboys -32.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Jackson State Tigers +35.5  (2.9)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401919042.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.30" data-teams="liberty flames princeton tigers lib prin">
+  <div class="when"><span>4:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Princeton_Tigers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Princeton Tigers</span><span class="rec">4-2</span></div><div class="pts">64.4</div></div>
+    <div class="team win"><img src="logos/Liberty_Flames.png" alt="" loading="lazy"><div class="tn"><span class="nm">Liberty Flames</span><span class="rec">4-2</span></div><div class="pts">69.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Liberty Flames -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Liberty Flames -4.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Liberty Flames -3.5  (1.3)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401924737.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.67" data-teams="florida gulf coast eagles georgia state panthers fgcu gast">
+  <div class="when"><span>4:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Georgia_State_Panthers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Georgia State Panthers</span><span class="rec">3-4</span></div><div class="pts">71.9</div></div>
+    <div class="team"><img src="logos/Florida_Gulf_Coast_Eagles.png" alt="" loading="lazy"><div class="tn"><span class="nm">Florida Gulf Coast Eagles</span><span class="rec">2-5</span></div><div class="pts">71.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Georgia State Panthers -3</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Georgia State Panthers -0.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Florida Gulf Coast Eagles +3  (2.7)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921703.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.63" data-teams="usc trojans south carolina gamecocks usc sc">
+  <div class="when"><span>4:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/South_Carolina_Gamecocks.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Carolina Gamecocks</span><span class="rec">5-0</span></div><div class="pts">66.3</div></div>
+    <div class="team win"><img src="logos/USC_Trojans.png" alt="" loading="lazy"><div class="tn"><span class="nm">USC Trojans</span><span class="rec">6-0</span></div><div class="pts">79.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">USC Trojans -10.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">USC Trojans -13.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">USC Trojans -10.5  (2.6)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921670.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.80" data-teams="nebraska cornhuskers southern jaguars neb sou">
+  <div class="when"><span>5:00 PM ET</span><span class="dot">·</span><span>Nebraska Cornhuskers</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Southern_Jaguars.png" alt="" loading="lazy"><div class="tn"><span class="nm">Southern Jaguars</span><span class="rec">1-5</span></div><div class="pts">56.9</div></div>
+    <div class="team win"><img src="logos/Nebraska_Cornhuskers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Nebraska Cornhuskers</span><span class="rec">6-0</span></div><div class="pts">92.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Nebraska Cornhuskers -34.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Nebraska Cornhuskers -35.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Nebraska Cornhuskers -34.5  (0.8)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401926065.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="3.94" data-teams="penn state nittany lions memphis tigers psu mem">
+  <div class="when"><span>5:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Memphis_Tigers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Memphis Tigers</span><span class="rec">4-1</span></div><div class="pts">85.1</div></div>
+    <div class="team"><img src="logos/Penn_State_Nittany_Lions.png" alt="" loading="lazy"><div class="tn"><span class="nm">Penn State Nittany Lions</span><span class="rec">5-1</span></div><div class="pts">77.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Memphis Tigers -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Memphis Tigers -7.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Memphis Tigers -3.5  (3.9)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401917182.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.14" data-teams="uc riverside highlanders portland state vikings ucr prst">
+  <div class="when"><span>5:00 PM ET</span><span class="dot">·</span><span>UC Riverside Highlanders</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Portland_State_Vikings.png" alt="" loading="lazy"><div class="tn"><span class="nm">Portland State Vikings</span><span class="rec">3-4</span></div><div class="pts">68.9</div></div>
+    <div class="team win"><img src="logos/UC_Riverside_Highlanders.png" alt="" loading="lazy"><div class="tn"><span class="nm">UC Riverside Highlanders</span><span class="rec">3-2</span></div><div class="pts">73.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">UC Riverside Highlanders -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">UC Riverside Highlanders -4.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">UC Riverside Highlanders -2.5  (2.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401925917.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="6.48" data-teams="texas state bobcats alcorn state braves txst alcn">
+  <div class="when"><span>5:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Alcorn_State_Braves.png" alt="" loading="lazy"><div class="tn"><span class="nm">Alcorn State Braves</span><span class="rec">0-7</span></div><div class="pts">54.4</div></div>
+    <div class="team win"><img src="logos/Texas_State_Bobcats.png" alt="" loading="lazy"><div class="tn"><span class="nm">Texas State Bobcats</span><span class="rec">7-0</span></div><div class="pts">86.4</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Texas State Bobcats -25.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Texas State Bobcats -32</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Texas State Bobcats -25.5  (6.5)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401925688.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.96" data-teams="dartmouth big green holy cross crusaders dart hc">
+  <div class="when"><span>5:00 PM ET</span><span class="dot">·</span><span>Dartmouth Big Green</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Holy_Cross_Crusaders.png" alt="" loading="lazy"><div class="tn"><span class="nm">Holy Cross Crusaders</span><span class="rec">0-6</span></div><div class="pts">69.7</div></div>
+    <div class="team win"><img src="logos/Dartmouth_Big_Green.png" alt="" loading="lazy"><div class="tn"><span class="nm">Dartmouth Big Green</span><span class="rec">4-2</span></div><div class="pts">83.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Dartmouth Big Green -11.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Dartmouth Big Green -13.5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Dartmouth Big Green -11.5  (2.0)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920237.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="3.07" data-teams="providence friars byu cougars prov byu">
+  <div class="when"><span>5:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/BYU_Cougars.png" alt="" loading="lazy"><div class="tn"><span class="nm">BYU Cougars</span><span class="rec">6-1</span></div><div class="pts">76.3</div></div>
+    <div class="team"><img src="logos/Providence_Friars.png" alt="" loading="lazy"><div class="tn"><span class="nm">Providence Friars</span><span class="rec">5-2</span></div><div class="pts">70.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">BYU Cougars -2.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">BYU Cougars -5.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">BYU Cougars -2.5  (3.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921716.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.68" data-teams="northwestern state demons west florida argonauts nwst uwf">
+  <div class="when"><span>6:00 PM ET</span><span class="dot">·</span><span>Northwestern State Demons</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/West_Florida_Argonauts.png" alt="" loading="lazy"><div class="tn"><span class="nm">West Florida Argonauts</span><span class="rec">3-4</span></div><div class="pts">71.6</div></div>
+    <div class="team win"><img src="logos/Northwestern_State_Demons.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northwestern State Demons</span><span class="rec">1-5</span></div><div class="pts">74.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Northwestern State Demons -1.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Northwestern State Demons -3.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Northwestern State Demons -1.5  (1.7)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401922253.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="5.11" data-teams="charleston cougars kennesaw state owls cofc kenn">
+  <div class="when"><span>6:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Kennesaw_State_Owls.png" alt="" loading="lazy"><div class="tn"><span class="nm">Kennesaw State Owls</span><span class="rec">5-2</span></div><div class="pts">78.3</div></div>
+    <div class="team"><img src="logos/Charleston_Cougars.png" alt="" loading="lazy"><div class="tn"><span class="nm">Charleston Cougars</span><span class="rec">4-2</span></div><div class="pts">74.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Charleston Cougars -1.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Kennesaw State Owls -3.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Kennesaw State Owls +1.5  (5.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920549.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="3.10" data-teams="richmond spiders bethune-cookman wildcats rich bcu">
+  <div class="when"><span>6:00 PM ET</span><span class="dot">·</span><span>Richmond Spiders</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Bethune_Cookman_Wildcats.png" alt="" loading="lazy"><div class="tn"><span class="nm">Bethune-Cookman Wildcats</span><span class="rec">1-5</span></div><div class="pts">73.0</div></div>
+    <div class="team win"><img src="logos/Richmond_Spiders.png" alt="" loading="lazy"><div class="tn"><span class="nm">Richmond Spiders</span><span class="rec">4-3</span></div><div class="pts">81.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Richmond Spiders -11.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Richmond Spiders -8.4</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Bethune-Cookman Wildcats +11.5  (3.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401911241.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="6.49" data-teams="the citadel bulldogs south carolina upstate spartans cit upst">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>The Citadel Bulldogs</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/South_Carolina_Upstate_Spartans.png" alt="" loading="lazy"><div class="tn"><span class="nm">South Carolina Upstate Spartans</span><span class="rec">1-6</span></div><div class="pts">65.3</div></div>
+    <div class="team win"><img src="logos/The_Citadel_Bulldogs.png" alt="" loading="lazy"><div class="tn"><span class="nm">The Citadel Bulldogs</span><span class="rec">4-2</span></div><div class="pts">75.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">The Citadel Bulldogs -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">The Citadel Bulldogs -10</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">The Citadel Bulldogs -3.5  (6.5)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401922285.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.03" data-teams="northern kentucky norse bellarmine knights nku bell">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Northern Kentucky Norse</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Bellarmine_Knights.png" alt="" loading="lazy"><div class="tn"><span class="nm">Bellarmine Knights</span><span class="rec">3-5</span></div><div class="pts">73.3</div></div>
+    <div class="team win"><img src="logos/Northern_Kentucky_Norse.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northern Kentucky Norse</span><span class="rec">3-4</span></div><div class="pts">78.3</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Northern Kentucky Norse -7</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Northern Kentucky Norse -5</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Bellarmine Knights +7  (2.0)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921108.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.34" data-teams="siu edwardsville cougars northern illinois huskies siue niu">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>SIU Edwardsville Cougars</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Northern_Illinois_Huskies.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northern Illinois Huskies</span><span class="rec">4-3</span></div><div class="pts">74.0</div></div>
+    <div class="team"><img src="logos/SIU_Edwardsville_Cougars.png" alt="" loading="lazy"><div class="tn"><span class="nm">SIU Edwardsville Cougars</span><span class="rec">3-4</span></div><div class="pts">72.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Northern Illinois Huskies -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Northern Illinois Huskies -1.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">SIU Edwardsville Cougars +3.5  (2.3)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920916.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.28" data-teams="george mason patriots longwood lancers gmu long">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>George Mason Patriots</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Longwood_Lancers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Longwood Lancers</span><span class="rec">4-3</span></div><div class="pts">66.2</div></div>
+    <div class="team win"><img src="logos/George_Mason_Patriots.png" alt="" loading="lazy"><div class="tn"><span class="nm">George Mason Patriots</span><span class="rec">5-1</span></div><div class="pts">81.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">George Mason Patriots -16.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">George Mason Patriots -15.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Longwood Lancers +16.5  (1.3)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920076.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.61" data-teams="nc state wolfpack norfolk state spartans ncsu norf">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>NC State Wolfpack</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Norfolk_State_Spartans.png" alt="" loading="lazy"><div class="tn"><span class="nm">Norfolk State Spartans</span><span class="rec">2-5</span></div><div class="pts">57.6</div></div>
+    <div class="team win"><img src="logos/NC_State_Wolfpack.png" alt="" loading="lazy"><div class="tn"><span class="nm">NC State Wolfpack</span><span class="rec">5-1</span></div><div class="pts">88.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">NC State Wolfpack -28.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">NC State Wolfpack -31.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">NC State Wolfpack -28.5  (2.6)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401918960.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.18" data-teams="wisconsin badgers northeastern huskies wis ne">
+  <div class="when"><span>7:00 PM ET</span><span class="dot">·</span><span>Wisconsin Badgers</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Northeastern_Huskies.png" alt="" loading="lazy"><div class="tn"><span class="nm">Northeastern Huskies</span><span class="rec">2-4</span></div><div class="pts">67.8</div></div>
+    <div class="team win"><img src="logos/Wisconsin_Badgers.png" alt="" loading="lazy"><div class="tn"><span class="nm">Wisconsin Badgers</span><span class="rec">4-2</span></div><div class="pts">88.1</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Wisconsin Badgers -20.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Wisconsin Badgers -20.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Northeastern Huskies +20.5  (0.2)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401911028.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.42" data-teams="mississippi state bulldogs wake forest demon deacons msst wake">
+  <div class="when"><span>7:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Wake_Forest_Demon_Deacons.png" alt="" loading="lazy"><div class="tn"><span class="nm">Wake Forest Demon Deacons</span><span class="rec">5-1</span></div><div class="pts">68.4</div></div>
+    <div class="team win"><img src="logos/Mississippi_State_Bulldogs.png" alt="" loading="lazy"><div class="tn"><span class="nm">Mississippi State Bulldogs</span><span class="rec">5-1</span></div><div class="pts">71.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Mississippi State Bulldogs -3.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Mississippi State Bulldogs -3.1</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Wake Forest Demon Deacons +3.5  (0.4)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401929287.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.69" data-teams="uc davis aggies omaha mavericks ucd oma">
+  <div class="when"><span>8:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Omaha_Mavericks.png" alt="" loading="lazy"><div class="tn"><span class="nm">Omaha Mavericks</span><span class="rec">3-3</span></div><div class="pts">67.3</div></div>
+    <div class="team win"><img src="logos/UC_Davis_Aggies.png" alt="" loading="lazy"><div class="tn"><span class="nm">UC Davis Aggies</span><span class="rec">3-2</span></div><div class="pts">73.5</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">UC Davis Aggies -4.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">UC Davis Aggies -6.2</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">UC Davis Aggies -4.5  (1.7)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401911522.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="1.62" data-teams="utep miners eastern michigan eagles utep emu">
+  <div class="when"><span>8:30 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team win"><img src="logos/Eastern_Michigan_Eagles.png" alt="" loading="lazy"><div class="tn"><span class="nm">Eastern Michigan Eagles</span><span class="rec">5-1</span></div><div class="pts">63.7</div></div>
+    <div class="team"><img src="logos/UTEP_Miners.png" alt="" loading="lazy"><div class="tn"><span class="nm">UTEP Miners</span><span class="rec">5-1</span></div><div class="pts">63.0</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">UTEP Miners -1</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Eastern Michigan Eagles -0.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Eastern Michigan Eagles +1  (1.6)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401920550.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.22" data-teams="loyola marymount lions eastern washington eagles lmu ewu">
+  <div class="when"><span>9:00 PM ET</span><span class="dot">·</span><span>Loyola Marymount Lions</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Eastern_Washington_Eagles.png" alt="" loading="lazy"><div class="tn"><span class="nm">Eastern Washington Eagles</span><span class="rec">2-4</span></div><div class="pts">73.0</div></div>
+    <div class="team win"><img src="logos/Loyola_Marymount_Lions.png" alt="" loading="lazy"><div class="tn"><span class="nm">Loyola Marymount Lions</span><span class="rec">4-3</span></div><div class="pts">80.8</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Loyola Marymount Lions -7.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Loyola Marymount Lions -7.7</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Loyola Marymount Lions -7.5  (0.2)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401917545.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="0.68" data-teams="vcu rams washington huskies vcu wash">
+  <div class="when"><span>10:00 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Washington_Huskies.png" alt="" loading="lazy"><div class="tn"><span class="nm">Washington Huskies</span><span class="rec">5-1</span></div><div class="pts">66.4</div></div>
+    <div class="team win"><img src="logos/VCU_Rams.png" alt="" loading="lazy"><div class="tn"><span class="nm">VCU Rams</span><span class="rec">4-2</span></div><div class="pts">70.2</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">VCU Rams -4.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">VCU Rams -3.8</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Washington Huskies +4.5  (0.7)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921713.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="2.33" data-teams="hawai&#x27;i rainbow warriors incarnate word cardinals haw uiw">
+  <div class="when"><span>11:59 PM ET</span><span class="dot">·</span><span>Hawai&#x27;i Rainbow Warriors</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Incarnate_Word_Cardinals.png" alt="" loading="lazy"><div class="tn"><span class="nm">Incarnate Word Cardinals</span><span class="rec">1-5</span></div><div class="pts">58.2</div></div>
+    <div class="team win"><img src="logos/Hawai_i_Rainbow_Warriors.png" alt="" loading="lazy"><div class="tn"><span class="nm">Hawai&#x27;i Rainbow Warriors</span><span class="rec">3-2</span></div><div class="pts">77.6</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Hawai&#x27;i Rainbow Warriors -17</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Hawai&#x27;i Rainbow Warriors -19.3</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Hawai&#x27;i Rainbow Warriors -17  (2.3)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401929005.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article><article class="game" data-gap="4.08" data-teams="saint louis billikens stanford cardinal slu stan">
+  <div class="when"><span>11:59 PM ET</span><span class="dot">·</span><span>Neutral court</span></div>
+  <div class="teams">
+    <div class="team"><img src="logos/Stanford_Cardinal.png" alt="" loading="lazy"><div class="tn"><span class="nm">Stanford Cardinal</span><span class="rec">5-2</span></div><div class="pts">68.1</div></div>
+    <div class="team win"><img src="logos/Saint_Louis_Billikens.png" alt="" loading="lazy"><div class="tn"><span class="nm">Saint Louis Billikens</span><span class="rec">3-3</span></div><div class="pts">76.7</div></div>
+  </div>
+  <div class="mkt">
+    <div><span class="lbl">Vegas line</span><span class="val">Saint Louis Billikens -4.5</span></div>
+    <div><span class="lbl">Model line</span><span class="val mono">Saint Louis Billikens -8.6</span></div>
+  </div>
+  <div class="pickrow"><span class="lbl">Model pick</span><span class="pickval">Saint Louis Billikens -4.5  (4.1)</span></div>
+  <div class="btnrow">
+    <a class="bdbtn" href="game/401921672.html">GAME BREAKDOWN →</a>
+    
+    
+  </div>
+</article></div>
+<script>
+(function () {
+  var board = document.getElementById('board');
+  if (!board) return;
+  var cards = Array.prototype.slice.call(board.querySelectorAll('.game'));
+  var days = Array.prototype.slice.call(board.querySelectorAll('.day'));
+  var tile = document.getElementById('gapTile');
+  var all = document.getElementById('allTile');
+  var input = document.getElementById('sinput');
+  var sbtn = document.getElementById('sbtn');
+  var wrap = document.getElementById('search');
+  var min = 0, term = '';
+
+  function apply() {
+    var shown = 0;
+    cards.forEach(function (el) {
+      var ok = (min === 0 || parseFloat(el.dataset.gap) >= min) &&
+               (!term || el.dataset.teams.indexOf(term) !== -1);
+      el.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    days.forEach(function (h) {
+      var n = 0, el = h.nextElementSibling;
+      while (el && el.classList.contains('game')) {
+        if (el.style.display !== 'none') n++;
+        el = el.nextElementSibling;
+      }
+      h.style.display = n ? '' : 'none';
+    });
+    var none = document.getElementById('nores');
+    if (!none) {
+      none = document.createElement('div');
+      none.id = 'nores';
+      none.className = 'nores';
+      board.appendChild(none);
+    }
+    none.textContent = shown ? '' : 'NO GAMES MATCH THAT SEARCH';
+  }
+
+  if (tile) tile.addEventListener('click', function (e) {
+    e.preventDefault();
+    var on = tile.classList.toggle('on');
+    if (all) all.classList.toggle('on', !on);
+    min = on ? parseFloat(tile.dataset.min) : 0;
+    apply();
+    board.scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
+  if (all) all.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (tile) tile.classList.remove('on');
+    all.classList.add('on');
+    min = 0;
+    apply();
+  });
+  if (sbtn) sbtn.addEventListener('click', function () {
+    wrap.classList.toggle('open');
+    if (wrap.classList.contains('open')) { try { input.focus({preventScroll: true}); }
+      catch (err) { input.focus(); } }
+    else { input.value = ''; term = ''; apply(); }
+  });
+  if (input) {
+    input.addEventListener('input', function () {
+      term = input.value.trim().toLowerCase();
+      apply();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { input.value = ''; term = ''; wrap.classList.remove('open'); apply(); }
+    });
+  }
+})();
+</script><footer><div class="in">Projections are model output, not betting advice. Every number on this
+page comes from the same model that produced the score — nothing is hand-entered.
+<a class="footdisc" href="../disclaimer.html">Full disclaimer</a></div></footer>
+</body></html>

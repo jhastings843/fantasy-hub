@@ -194,6 +194,25 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
     }
     return `${g.home.short} ${line(hHome)}${hp!.trigger ? " · Trigger on" : ""}${side}`;
   })();
+  // Sam (tracked beside ours from Nov 25): the same reading as David's.
+  const sm = x.sam;
+  const smHome = !sm ? null : sm.homeId === g.home.id ? sm.model : sm.homeId === g.away.id ? -sm.model || 0 : null;
+  const samLine = (() => {
+    if (smHome === null) return null;
+    let side = "";
+    if (r.spread !== null && r.spread - smHome !== 0) {
+      const home = r.spread - smHome > 0;
+      const cov = margin !== null && final ? (margin + r.spread) * (home ? 1 : -1) : null;
+      side = ` · his side ${home ? `${g.home.short} ${line(r.spread)}` : `${g.away.short} ${line(-r.spread)}`}${cov === null ? "" : cov > 0 ? " (covered)" : cov < 0 ? " (missed)" : " (push)"}`;
+    }
+    return `${g.home.short} ${line(smHome)}${side}`;
+  })();
+  const samTotal = (() => {
+    if (!sm || sm.total === null) return null;
+    if (r.total === null || sm.total === r.total) return sm.total.toFixed(1);
+    const o = sm.total > r.total;
+    return `${sm.total.toFixed(1)} · ${o ? "over" : "under"} ${r.total}${pts !== null && final ? (pts === r.total ? " (push)" : (pts > r.total) === o ? " (hit)" : " (missed)") : ""}`;
+  })();
   const davidTotal = (() => {
     if (!d || d.total === null) return null;
     if (r.total === null || d.total === r.total) return d.total.toFixed(1);
@@ -285,6 +304,14 @@ export function CbbGamePreview({ x }: { x: CbbBoardRow }) {
           <dd className={s.num}>{now.parts.trank ? `${g.home.short} ${signed(now.parts.trank.margin)}, total ${now.parts.trank.total.toFixed(1)}${now.rank.home || now.rank.away ? ` (ranks ${now.rank.away ?? "·"} at ${now.rank.home ?? "·"})` : ""}` : "not rated (non-Division I side)"}</dd>
           <dt>Blend</dt>
           <dd className={s.num}>{`${Math.round(CBB_PARAMS.blend.margin.ours * 100)}% ours, ${Math.round(CBB_PARAMS.blend.margin.trank * 100)}% T-Rank on the margin; ${g.home.short} ${line(now.proj.spread)}, total ${now.proj.total} today`}</dd>
+          <dt>Sam line</dt>
+          <dd className={`${s.num} ${s.cSam}`}>{samLine ?? "not posted (his page lists today's games only)"}</dd>
+          {samTotal && (
+            <>
+              <dt>Sam total</dt>
+              <dd className={`${s.num} ${s.cSam}`}>{samTotal}</dd>
+            </>
+          )}
           <dt>David line</dt>
           <dd className={`${s.num} ${s.cDavid}`}>{davidLine ?? "not posted (his page lists some games, today only)"}</dd>
           <dt>Harris line</dt>

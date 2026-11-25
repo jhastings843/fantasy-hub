@@ -36,6 +36,7 @@ const NAMES: Record<string, string> = {
   "harris-cbb": "Harris CBB",
   "sam-cbb-watch": "Sam CBB watch",
   "david-cbb": "David CBB",
+  "sam-cbb": "Sam CBB",
   "nba-sam": "Sam NBA",
   "nba-news": "NBA injury news",
   "pool-entry": "Pick'em pool entry",
