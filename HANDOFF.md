@@ -1,3 +1,12 @@
+# 2026-11-25: Sam on CBB, tracked like David (5bae1cb, ae442e5, pushed, live)
+- Jack: "make sure sam is now being tracked as a part of cbb". Sam's /cbb/ went live today (41 games); until now only sam-cbb-watch looked at it.
+- Page: <article class="game"> cards, first team road, second home, .pts projected scores (his total = sum), "Vegas line" / "Model line" (team + line), pick "(gap)", link game/<ESPN id>.html. Fixture test/fixtures/picks/sam-cbb-board.html (Nov 25).
+- Code: lib/models/cbb/sam.ts (parseSamCbb, matchSamRows by his ESPN link then orient by name: his names carry mascots, so Harris's matchRows failed all 41 on the first run), sam-store.ts (samCbbIfDue: pulse job "sam-cbb", 25-min claim, Nov-Apr, watchProblems "Sam CBB page"). Redis models:v1:cbb:{season}:sam:{day:<date>|days|pre|claim}. SamPre = DavidPre shape; samRead = davidRead.
+- Learner: 10 slices register at the next CBB review: cbb:sam, sam3, sam5, sam-agree, sam-split, sam-david, sam-harris, sam-total, sam-total5, sam-total-agree.
+- UI: board "Ours · Sam · David · Harris" (Sam in rust .cSam), agree note, row details and game page Sam line/total, Results tile "Every Sam side/total (from Nov 25)" + Sam column, Learning row "Sam (CBB, his website)", /status "Sam CBB", footer link.
+- First verified run 21:2xZ Nov 25: 41 games, 24 with a pregame read (the rest had tipped). No backtest (no archive seen).
+- sam-cbb-watch is now redundant (already alerted); can be removed.
+
 # 2026-11-12 late: Harris CBB read moved to after(); lineup swaps on one ranking scale (3cead43, cfb0c6a, pushed, deployed)
 - /status "Harris CBB, day check" failing 5 runs: his Apps Script feed timed 41.8 s cold, 1.5 s warm; the 18 s limit could never pass a cold read. harrisCbbIfDue now claims days, then reads in next/server after() (falls back inline outside a request) with HARRIS_CBB_SLOW_MS 55_000; pulse route maxDuration 60 -> 120. Not yet verified live: harris-cbb runs only in the hourly tier and tonight's pulses are the live (TNF) tier. Check /status after the next hourly run.
 - Lineup advice (Jack: "switching flex you give both flex rankings, rb with rb in the rb slot the rb rankings"): shuffle sentences quoted the starter on this slot's scale and the leaver on his own. shareScale(): same position and no flex slot -> position ranks, else the flex slot (or FLEX); the leaver's own slot rank stays in brackets ("at FLEX 83 (TE 13)"). Direct swaps were already like-for-like.
