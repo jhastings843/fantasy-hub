@@ -7,7 +7,7 @@ import { season } from "@/lib/scorecard/pure";
 import { isSettled, readSeason, type Settled as SettledWeek } from "@/lib/scorecard/store";
 import { buildWaivers } from "@/lib/waivers/build";
 import type { StartableTarget } from "@/lib/waivers/rank";
-import { mergePickups } from "@/lib/waivers/merge";
+import { mergePickups, skipLine } from "@/lib/waivers/merge";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -282,7 +282,7 @@ function subhead(changes: number, locked: number, slots: number): string {
  * email cannot disagree. Hidden when nobody on the wire beats a starter:
  * "if needed" means an empty section is noise.
  */
-function PickupCard({ target, slot }: { target: StartableTarget; slot?: string }) {
+function PickupCard({ target, slot, fallback }: { target: StartableTarget; slot?: string; fallback?: string | null }) {
   const at = slot ?? target.slot;
   const rank =
     target.player.positionalRank != null
@@ -308,6 +308,7 @@ function PickupCard({ target, slot }: { target: StartableTarget; slot?: string }
         {target.displaces ? `, starts at ${at} ahead of ${target.displaces.name}` : ` at ${at}`}.{" "}
         {drop}
       </p>
+      {fallback ? <p className="mt-1 text-sm leading-relaxed text-hh-ink-2">{fallback}</p> : null}
     </TeamEdge>
   );
 }
@@ -401,13 +402,13 @@ export default async function LineupPage({
 
       {changes.length > 0 && (
         <Spotlight label="First change" className="mt-6">
-          {changes[0].pickup ? <PickupCard target={changes[0].pickup} slot={changes[0].slot.slot} /> : <ChangeCard slot={changes[0].slot} />}
+          {changes[0].pickup ? <PickupCard target={changes[0].pickup} slot={changes[0].slot.slot} fallback={skipLine(changes[0])} /> : <ChangeCard slot={changes[0].slot} />}
         </Spotlight>
       )}
       {changes.length > 1 && (
         <Section label="Other changes" className="mt-8">
           {changes.slice(1).map((c) => c.pickup ? (
-            <PickupCard key={`${c.slot.slot}-${c.slot.index}`} target={c.pickup} slot={c.slot.slot} />
+            <PickupCard key={`${c.slot.slot}-${c.slot.index}`} target={c.pickup} slot={c.slot.slot} fallback={skipLine(c)} />
           ) : <ChangeCard key={`${c.slot.slot}-${c.slot.index}`} slot={c.slot} />)}
         </Section>
       )}

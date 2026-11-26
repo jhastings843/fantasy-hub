@@ -360,7 +360,8 @@
     "2026-11-06: Portfolio plan tracking + trade status, Harris website feeds (CFB+CBB), props NFL over rule (-120), UX walkthrough; next: freshness/status page, tab fold, speed, plain words (HANDOFF top)",
     "2026-11-09: Money tabs show 'Checked X ago, found Y, next check Z' per desk; Today has a live Research desks feed. trade-bot tradebot/activity.py posts lines to /api/money/activity (Day Trader, Trends, Stock books, Options, Phil); Gus and Weather use their snapshot times.",
     "2026-11-12: David Sasser CBB tracked beside ours (board, pop-up, Results, 9 learner slices, Learning row); Sam CBB still coming soon.",
-    "2026-11-25: Sam CBB tracked like David (reader, pulse job, 10 slices, board/results); first live run 41 games verified."
+    "2026-11-25: Sam CBB tracked like David (reader, pulse job, 10 slices, board/results); first live run 41 games verified.",
+    "2026-11-25: lineup email/page/Today now keep the rostered swap (\"If you skip the add: ...\") when a free-agent pickup takes a slot that was itself changing (Chopped W12 hid Hall over Pollard). Uncommitted."
   ],
   "tags": [
     "personal",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergePickups } from "./merge";
+import { mergePickups, skipLine } from "./merge";
 import type { LineupAdvice, SlotAdvice } from "@/lib/lineup/weekly-advice";
 import type { StartableTarget } from "./rank";
 
@@ -42,5 +42,16 @@ describe("mergePickups", () => {
   it("keeps a pickup with no starter to displace as leftover", () => {
     const { leftover } = mergePickups(advice([slot("WR", 0, "a", "a")]), [target("fa", null)]);
     expect(leftover).toHaveLength(1);
+  });
+
+  it("keeps the rostered swap as a fallback when the pickup takes a changed slot", () => {
+    const flex = { ...slot("FLEX", 1, "pollard", "hall"), reason: "Start Hall (FLEX 36) over Pollard, at FLEX 37." };
+    const { changes } = mergePickups(advice([slot("WR", 0, "a", "a"), flex]), [target("smith", "hall")]);
+    expect(skipLine(changes[0])).toBe("If you skip the add: Start Hall (FLEX 36) over Pollard, at FLEX 37.");
+  });
+
+  it("has no fallback when the pickup takes a slot that was not changing", () => {
+    const { changes } = mergePickups(advice([slot("WR", 0, "a", "a")]), [target("fa", "a")]);
+    expect(skipLine(changes[0])).toBeNull();
   });
 });

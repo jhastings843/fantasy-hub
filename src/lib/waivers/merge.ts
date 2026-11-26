@@ -38,3 +38,17 @@ export function mergePickups(
     .sort((a, b) => a.slot.index - b.slot.index);
   return { changes, leftover };
 }
+
+/**
+ * What to do with the rostered players if Jack skips the free agent.
+ *
+ * A pickup row replaces the slot's own row, and when that slot was itself a
+ * change the change vanished with it. Week 12 Dah Chopped: the email said "Add
+ * DeVonta Smith, ahead of Breece Hall" and never said Hall was meant to start
+ * over Tony Pollard, so with no safe drop on the bench Jack was left with
+ * nothing to act on. Null when the slot's rostered pick is already starting.
+ */
+export function skipLine(c: MergedChange): string | null {
+  if (!c.pickup || !c.slot.changed || !c.slot.reason) return null;
+  return `If you skip the add: ${c.slot.reason}`;
+}

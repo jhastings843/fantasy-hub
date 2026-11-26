@@ -5,7 +5,7 @@ import type { WeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
 import type { StartableTarget } from "@/lib/waivers/rank";
 import type { WaiverReview } from "@/lib/guillotine/waiver-review";
-import { mergePickups, type MergedChange } from "@/lib/waivers/merge";
+import { mergePickups, skipLine, type MergedChange } from "@/lib/waivers/merge";
 import {
   card,
   emailPage,
@@ -269,7 +269,7 @@ function dropText(t: StartableTarget): string {
  * A slot a free agent takes. Replaces the ordinary row for that slot, so the
  * email never says "start Pat" and then "sub Pat out for a pickup".
  */
-function pickupChangeRow(slot: SlotAdvice, t: StartableTarget): string {
+function pickupChangeRow(slot: SlotAdvice, t: StartableTarget, fallback: string | null = null): string {
   const rank = t.player.positionalRank != null ? `${t.player.position}${t.player.positionalRank} this week` : "ranked this week";
   const over = t.displaces ? `, ahead of ${t.displaces.name}` : "";
   return `<div style="padding:8px 0;border-top:1px solid ${PALETTE.hairline};">
@@ -279,11 +279,12 @@ function pickupChangeRow(slot: SlotAdvice, t: StartableTarget): string {
   </div>
   <div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:3px;">${escapeHtml(`${rank}${over}. ${dropText(t)} Instant add in Sleeper, then start him here.`)}</div>
   <div style="font-size:12px;color:${PALETTE.body};padding-top:5px">${escapeHtml(playerContext(t.player))}</div>
+  ${fallback ? `<div style="font:400 12px/1.5 -apple-system,sans-serif;color:${PALETTE.body};padding-top:5px;">${escapeHtml(fallback)}</div>` : ""}
 </div>`;
 }
 
 function mergedRow(c: MergedChange): string {
-  return c.pickup ? pickupChangeRow(c.slot, c.pickup) : changeRow(c.slot);
+  return c.pickup ? pickupChangeRow(c.slot, c.pickup, skipLine(c)) : changeRow(c.slot);
 }
 
 function leagueBlock(

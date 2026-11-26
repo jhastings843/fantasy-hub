@@ -7,7 +7,7 @@ import { buildWeeklyLineups } from "@/lib/lineup/build";
 import type { SlotAdvice } from "@/lib/lineup/weekly-advice";
 import { buildWaivers, type WaiverContext } from "@/lib/waivers/build";
 import type { SeasonTarget, StartableTarget } from "@/lib/waivers/rank";
-import { mergePickups } from "@/lib/waivers/merge";
+import { mergePickups, skipLine } from "@/lib/waivers/merge";
 import { leaguePath } from "@/lib/league/tools";
 import type { LeagueProfile } from "@/lib/league/types";
 import { Call, Disclosure, Empty, Num, Section, Spotlight } from "@/components/hh/ui";
@@ -95,7 +95,7 @@ function claimsOf(w: WaiverContext): Claim[] {
   return [...starts, ...season];
 }
 
-function moveOf(leagueId: string, league: string, slot: SlotAdvice, pickup: StartableTarget | null): LineupMove {
+function moveOf(leagueId: string, league: string, slot: SlotAdvice, pickup: StartableTarget | null, fallback: string | null = null): LineupMove {
   const out = slot.benched ?? slot.current;
   return {
     key: `${leagueId}-${slot.index}`,
@@ -106,7 +106,7 @@ function moveOf(leagueId: string, league: string, slot: SlotAdvice, pickup: Star
     startId: pickup ? pickup.player.playerId : (slot.recommended?.playerId ?? null),
     sit: out?.name ?? null,
     sitId: out?.playerId ?? null,
-    reason: pickup ? `Free agent: ${dropText(pickup.dropFor).toLowerCase()}` : slot.reason,
+    reason: pickup ? `Free agent: ${dropText(pickup.dropFor).toLowerCase()}${fallback ? ` ${fallback}` : ""}` : slot.reason,
     pickup: !!pickup,
   };
 }
@@ -147,7 +147,7 @@ export const getFantasyNow = cache(async (): Promise<FantasyNow> => {
     for (const c of merged.changes) {
       // A locked slot is not a decision any more.
       if (c.slot.recommended?.locked) continue;
-      moves.push(moveOf(l.leagueId, l.leagueName, c.slot, c.pickup));
+      moves.push(moveOf(l.leagueId, l.leagueName, c.slot, c.pickup, skipLine(c)));
     }
   }
 
